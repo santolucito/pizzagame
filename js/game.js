@@ -4,7 +4,7 @@ const Game = {
   s: null,
   player: null,
   customers: [], cars: [], staff: [], fx: [], floats: [], tables: [], ovens: [],
-  seq: 0, time: 0, spawnT: 1.5, carT: 4, saveT: 0, secT: 0, secEarned: 0,
+  seq: 0, time: 0, spawnT: 1.5, carT: 4, saveT: 0, secT: 0, secEarned: 0, groupLeft: 0, groupT: 0,
   hint: null, padInside: Object.create(null), lastTotal: 0,
   onUnlock: null, onFranchise: null, onToast: null,
 
@@ -354,20 +354,36 @@ const Game = {
     }
   },
 
+  spawnCustomer() {
+    const s = this.s;
+    if (this.countMainQueue() >= CFG.QUEUE.max || this.customers.length >= 16) return;
+    const want = U.randInt(1, 2 + Math.floor(s.upg.marketing / 3));
+    const c = new Customer(this.seq++, want);
+    c.x += U.rand(-12, 10); c.y += U.rand(-10, 10);
+    this.customers.push(c);
+  },
+
   updateSpawns(dt) {
     const s = this.s;
+    // Customers arrive at irregular intervals; sometimes a small group walks in together.
     this.spawnT -= dt;
     if (this.spawnT <= 0) {
-      this.spawnT = this.spawnInterval() * U.rand(0.7, 1.3);
-      if (this.countMainQueue() < CFG.QUEUE.max && this.customers.length < 16) {
-        const want = U.randInt(1, 2 + Math.floor(s.upg.marketing / 3));
-        this.customers.push(new Customer(this.seq++, want));
-      }
+      const r = Math.random();
+      this.spawnT = this.spawnInterval() * (r < 0.2 ? U.rand(0.25, 0.6) : r < 0.85 ? U.rand(0.6, 1.4) : U.rand(1.4, 2.2));
+      const groupChance = 0.22 + 0.03 * s.upg.decor + 0.02 * s.upg.marketing;
+      const size = Math.random() < groupChance ? U.randInt(2, Math.random() < 0.3 ? 4 : 3) : 1;
+      this.spawnCustomer();
+      this.groupLeft = size - 1; this.groupT = U.rand(0.35, 0.7);
+      if (size > 1) this.spawnT += 0.6 * size;
+    }
+    if (this.groupLeft > 0) {
+      this.groupT -= dt;
+      if (this.groupT <= 0) { this.groupLeft--; this.groupT = U.rand(0.35, 0.7); this.spawnCustomer(); }
     }
     if (this.isUnlocked('driveThru')) {
       this.carT -= dt;
       if (this.carT <= 0) {
-        this.carT = this.carSpawnInterval() * U.rand(0.7, 1.3);
+        this.carT = this.carSpawnInterval() * U.rand(0.5, 1.6);
         if (this.cars.filter((c) => c.inLine).length < CFG.DT_SLOTS) {
           this.cars.push(new Car(this.seq++, U.randInt(1, 3 + Math.floor(s.upg.marketing / 4))));
         }

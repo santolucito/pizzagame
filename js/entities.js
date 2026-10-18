@@ -187,7 +187,9 @@ class Staff {
           g.s.piles.oven--; this.carry++; this.cd = 0.2; this.timer = 0;
           g.fx.push({ kind: 'pizza', x0: CFG.OVEN_PILE.x, y0: CFG.OVEN_PILE.y - 10, x1: this.x, y1: this.y - 30, t: 0, dur: 0.18 });
         }
-        if (this.carry >= cap || (this.carry > 0 && g.s.piles.oven === 0 && this.timer > 0.9)) {
+        // Leave with a full stack, or early if the shop is starving for pizzas or the oven has gone quiet.
+        const starving = g.s.piles.display === 0 || (g.isUnlocked('driveThru') && g.s.piles.dt === 0 && g.cars.some((c) => c.inLine));
+        if (this.carry >= cap || (this.carry > 0 && g.s.piles.oven === 0 && (this.timer > 2.5 || (starving && this.timer > 0.5)))) {
           const t = g.bestDropTarget();
           if (t) { this.target = t; this.state = 'toTarget'; }
           else { this.timer = 0; }

@@ -183,8 +183,8 @@ const Render = {
     ctx.fillStyle = '#7fd1ff'; U.roundRect(ctx, w.x - 36, CFG.ROAD.y2 + 1, 72, 12, 3); ctx.fill();
     for (let i = 0; i < 8; i++) { ctx.fillStyle = i % 2 ? '#fff' : '#e4572e'; ctx.fillRect(w.x - 48 + i * 12, CFG.ROAD.y2 - 10, 12, 10); }
     ctx.fillStyle = '#fff'; ctx.font = this.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, w.x + 52, CFG.ROAD.y2 - 4, 92, 18, 4); ctx.fill();
-    ctx.fillStyle = '#ffe08a'; ctx.fillText('DRIVE THRU', w.x + 98, CFG.ROAD.y2 + 5);
+    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, w.x - 146, CFG.ROAD.y2 - 4, 92, 18, 4); ctx.fill();
+    ctx.fillStyle = '#ffe08a'; ctx.fillText('DRIVE THRU', w.x - 100, CFG.ROAD.y2 + 5);
     // stack shelf + cash
     const s = CFG.DT_STACK;
     ctx.fillStyle = '#8c8f94'; U.roundRect(ctx, s.x - 26, s.y - 12, 52, 26, 6); ctx.fill();

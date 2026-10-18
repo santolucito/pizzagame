@@ -111,7 +111,7 @@ const Game = {
     const lvl = staffed ? this.s.staff.cashier.level : 0;
     return CFG.CHECKOUT_TIME / (1 + 0.3 * lvl);
   },
-  staffSpeed(role) { return 125 + 16 * this.s.staff[role].level; },
+  staffSpeed(role) { return 145 + 16 * this.s.staff[role].level; },
   helperCap() { return 3 + this.s.staff.helper.level; },
   cleanTime(who) { return who === 'cleaner' ? CFG.CLEAN_TIME / (1 + 0.35 * this.s.staff.cleaner.level) : CFG.CLEAN_TIME; },
   cityName() { return CFG.CITIES[Math.min(this.s.city, CFG.CITIES.length - 1)] + (this.s.city >= CFG.CITIES.length ? ' ' + (this.s.city - CFG.CITIES.length + 2) : ''); },

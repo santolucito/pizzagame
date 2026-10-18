@@ -8,6 +8,7 @@ No build step, no dependencies: plain HTML5 Canvas + vanilla JavaScript.
 
 ## Play it
 
+- **Live:** https://santolucito.github.io/pizzagame/
 - **Locally:** open `index.html` in any modern browser, or serve the folder
   (`python3 -m http.server 8000` → http://localhost:8000).
 - **GitHub Pages:** `.github/workflows/pages.yml` deploys the site on every push to `main` or the

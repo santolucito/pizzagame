@@ -5,17 +5,27 @@
 const Render = {
   canvas: null, ctx: null, scale: 1, baseScale: 1, fitScale: 1, dpr: 1, zoom: 1,
   viewW: CFG.W, viewH: CFG.H, camX: 0, camY: 0,
-  MIN_VIEW_W: 440, MIN_VIEW_H: 420, FULL_MAP_MIN_SCALE: 0.9, HUD_PAD_PX: 56,
+  MIN_VIEW_W: 440, MIN_VIEW_H: 420, MIN_ZOOMED_VIEW: 330, FULL_MAP_MIN_SCALE: 0.9, HUD_PAD_PX: 56,
   ZOOM_KEY: 'pizza-rush-zoom',
   bg: null, bgKey: '', bgRes: 1, bgBuiltAt: 0, zoomLabelT: 0,
 
   init(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
-    try { const z = parseFloat(localStorage.getItem(this.ZOOM_KEY)); if (z > 0.3 && z < 4) this.zoom = z; } catch (e) { /* ignore */ }
+    this.resize();
+    if (this.isSmallScreen()) {
+      // Phones always start at the closest zoom level; pinch out to see more.
+      this.zoom = this.maxScale() / this.baseScale;
+    } else {
+      try { const z = parseFloat(localStorage.getItem(this.ZOOM_KEY)); if (z > 0.3 && z < 4) this.zoom = z; } catch (e) { /* ignore */ }
+    }
     this.resize();
     window.addEventListener('resize', () => this.resize());
   },
+
+  isSmallScreen() { return Math.min(window.innerWidth / CFG.W, window.innerHeight / CFG.H) < this.FULL_MAP_MIN_SCALE; },
+  // Closest allowed zoom: keep at least MIN_ZOOMED_VIEW logical px visible on each axis.
+  maxScale() { return Math.min(window.innerWidth / this.MIN_ZOOMED_VIEW, window.innerHeight / this.MIN_ZOOMED_VIEW, 3.2); },
 
   resize() {
     const vw = window.innerWidth, vh = window.innerHeight;
@@ -24,7 +34,7 @@ const Render = {
     const fit = Math.min(vw / CFG.W, vh / CFG.H);
     this.fitScale = fit;
     this.baseScale = fit >= this.FULL_MAP_MIN_SCALE ? fit : Math.min(this.FULL_MAP_MIN_SCALE, Math.max(fit, Math.min(vw / this.MIN_VIEW_W, vh / this.MIN_VIEW_H)));
-    this.scale = U.clamp(this.baseScale * this.zoom, fit * 0.8, 3.2);
+    this.scale = U.clamp(this.baseScale * this.zoom, fit * 0.8, Math.max(fit, this.maxScale()));
     this.viewW = Math.min(CFG.W, vw / this.scale);
     this.viewH = Math.min(CFG.H, vh / this.scale);
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -34,7 +44,7 @@ const Render = {
   },
 
   setZoom(z) {
-    const minZ = (this.fitScale * 0.8) / this.baseScale, maxZ = 3.2 / this.baseScale;
+    const minZ = (this.fitScale * 0.8) / this.baseScale, maxZ = Math.max(this.fitScale, this.maxScale()) / this.baseScale;
     const nz = U.clamp(z, minZ, maxZ);
     if (Math.abs(nz - this.zoom) < 0.001) return;
     this.zoom = nz; this.zoomLabelT = 1.2;

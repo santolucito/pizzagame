@@ -15,7 +15,7 @@ const Game = {
       cash: 0, city: 0,
       unlocked: {},
       padPaid: {},
-      upg: { speed: 0, capacity: 0, profit: 0, ovenSpeed: 0, ovenCap: 0, marketing: 0 },
+      upg: { speed: 0, capacity: 0, profit: 0, ovenSpeed: 0, ovenCap: 0, marketing: 0, decor: 0 },
       staff: { cashier: { count: 0, level: 0 }, helper: { count: 0, level: 0 }, cleaner: { count: 0, level: 0 } },
       piles: { oven: 0, display: 0, dt: 0, cash: 0, dtCash: 0 },
       tablesDirty: [false, false, false, false],
@@ -104,8 +104,9 @@ const Game = {
   bakeTime() { return CFG.BAKE_TIME / (1 + 0.25 * this.s.upg.ovenSpeed); },
   ovenPileCap() { return 6 + 3 * this.s.upg.ovenCap; },
   ovenCount() { return this.isUnlocked('oven2') ? 2 : 1; },
-  spawnInterval() { return CFG.SPAWN_BASE / (1 + 0.12 * this.s.upg.marketing); },
-  carSpawnInterval() { return CFG.CAR_SPAWN_BASE / (1 + 0.1 * this.s.upg.marketing); },
+  spawnInterval() { return CFG.SPAWN_BASE / (1 + 0.12 * this.s.upg.marketing + 0.1 * this.s.upg.decor); },
+  carSpawnInterval() { return CFG.CAR_SPAWN_BASE / (1 + 0.1 * this.s.upg.marketing + 0.05 * this.s.upg.decor); },
+  patienceBonus() { return 1 + 0.08 * this.s.upg.decor; },
   checkoutTime() {
     const staffed = this.staff.some((st) => st.role === 'cashier' && st.state === 'working');
     const lvl = staffed ? this.s.staff.cashier.level : 0;
@@ -192,7 +193,7 @@ const Game = {
       this.fx.push({ kind: 'bill', x0: pos.x + U.rand(-14, 14), y0: pos.y + U.rand(-10, 4), x1: this.player.x, y1: this.player.y - 10, t: -i * 0.04, dur: 0.3, follow: true });
     }
     this.floats.push({ x: this.player.x, y: this.player.y - 46, text: '+' + U.money(amt), color: '#ffe08a', t: 0, dur: 1, big: true });
-    Sfx.cash();
+    Sfx.cash(); Haptics.tap();
   },
   cleanTable(t) {
     t.dirty = false; t.cleanProg = 0;
@@ -204,7 +205,7 @@ const Game = {
   unlock(key) {
     this.s.unlocked[key] = true;
     delete this.s.padPaid[key];
-    Sfx.unlock();
+    Sfx.unlock(); Haptics.success();
     if (key === 'franchise') { this.franchise(); return; }
     const pad = CFG.PADS.find((p) => p.key === key);
     this.toast(`Unlocked: ${pad.label}!`);

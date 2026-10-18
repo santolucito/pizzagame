@@ -7,7 +7,7 @@ class Customer {
     this.x = CFG.ENTRANCE.x; this.y = CFG.ENTRANCE.y;
     this.state = 'toQueue';
     this.want = want; this.have = 0;
-    this.patience = CFG.PATIENCE;
+    this.patience = CFG.PATIENCE * Game.patienceBonus();
     this.takeCd = 0;
     this.payProg = 0;
     this.table = null;
@@ -17,7 +17,9 @@ class Customer {
     this.speed = U.rand(115, 145);
     this.shirt = U.pick(COLORS.shirts);
     this.skin = U.pick(COLORS.skins);
-    this.hair = U.pick(['#2b1d14', '#5a3a1a', '#d9a066', '#1a1a1a', '#8c3b2f']);
+    this.hair = U.pick(['#2b1d14', '#5a3a1a', '#d9a066', '#1a1a1a', '#8c3b2f', '#c7c7c7']);
+    this.hairStyle = U.randInt(0, 3);
+    this.stripes = Math.random() < 0.3;
     this.bob = Math.random() * Math.PI * 2;
   }
 

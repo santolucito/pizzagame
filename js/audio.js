@@ -34,3 +34,11 @@ const Sfx = {
   angry() { if (this.throttle('angry', 300)) this.tone(260, 0.25, 'sawtooth', 0.04, -100); },
   clean() { if (this.throttle('clean', 200)) this.tone(900, 0.15, 'sine', 0.05, 400); },
 };
+
+// Light haptic feedback where the platform supports it (Android Chrome); silently ignored elsewhere.
+const Haptics = {
+  enabled: true,
+  buzz(pattern) { if (!this.enabled || Sfx.muted) return; try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) { /* ignore */ } },
+  tap() { this.buzz(12); },
+  success() { this.buzz([20, 40, 30]); },
+};

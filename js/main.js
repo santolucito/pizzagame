@@ -3,6 +3,7 @@
   const canvas = document.getElementById('game');
   Render.init(canvas);
   Input.toScreen = (cx, cy) => Render.toScreen(cx, cy);
+  Input.onZoom = (z) => Render.setZoom(z);
   Input.init(canvas);
   const loaded = Game.init();
   UI.init();
@@ -30,6 +31,11 @@
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
+
+  // Installable / offline: register the service worker when served over http(s).
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => { /* offline support is optional */ }); });
+  }
 
   const saveNow = () => Game.save();
   window.addEventListener('beforeunload', saveNow);

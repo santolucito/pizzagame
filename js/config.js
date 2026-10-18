@@ -46,7 +46,7 @@ const CFG = {
     { key: 'dining', label: 'Dining Area', price: 180, pos: { x: 790, y: 465 }, req: [] },
     { key: 'oven2', label: '2nd Oven', price: 280, pos: { x: 90, y: 350 }, req: [] },
     { key: 'tables2', label: 'More Tables', price: 450, pos: { x: 790, y: 465 }, req: ['dining'] },
-    { key: 'driveThru', label: 'Drive-Thru', price: 650, pos: { x: 790, y: 135 }, req: ['dining'] },
+    { key: 'driveThru', label: 'Drive-Thru', price: 650, pos: { x: 850, y: 165 }, req: ['dining'] },
     { key: 'franchise', label: 'Open Next City', price: 3500, pos: { x: 480, y: 560 }, req: ['tables2', 'oven2', 'driveThru'] },
   ],
   PAD_RADIUS: 40,
@@ -66,7 +66,11 @@ const CFG = {
     ovenSpeed: { name: 'Oven Speed',     ico: '🔥', base: 55,  growth: 1.5, max: 10, desc: 'Bake pizzas faster' },
     ovenCap:   { name: 'Oven Storage',   ico: '🍕', base: 40,  growth: 1.45, max: 6,  desc: 'Bigger pile next to the oven' },
     marketing: { name: 'Marketing',      ico: '📣', base: 90,  growth: 1.55, max: 8,  desc: 'More customers, bigger orders' },
+    decor:     { name: 'Decorations',    ico: '🪴', base: 50,  growth: 1.5,  max: 6,  desc: 'A prettier shop draws more (and more patient) customers' },
   },
+
+  // What each Decorations level adds to the shop (purely cosmetic names shown in the panel)
+  DECOR_LEVELS: ['Potted plants', 'Framed posters', 'String lights', 'Neon sign', 'Jukebox & rug', 'Chandelier & award'],
 
   // Staff
   STAFF: {

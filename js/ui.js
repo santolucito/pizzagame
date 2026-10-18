@@ -18,6 +18,14 @@ const UI = {
     this.els.btnStaff.addEventListener('click', () => this.toggle('staff'));
     $('btn-help').addEventListener('click', () => this.toggle('help'));
     this.els.btnSound.addEventListener('click', () => this.toggleSound());
+    const fsBtn = $('btn-fullscreen');
+    if (document.fullscreenEnabled || document.documentElement.webkitRequestFullscreen) {
+      fsBtn.addEventListener('click', () => this.toggleFullscreen());
+    } else {
+      fsBtn.remove();
+    }
+    $('btn-zoom-in').addEventListener('click', () => Render.setZoom(Render.zoom * 1.25));
+    $('btn-zoom-out').addEventListener('click', () => Render.setZoom(Render.zoom / 1.25));
     $('btn-reset').addEventListener('click', () => {
       if (confirm('Reset all progress and start over?')) { Game.reset(); this.close(); this.toast('Progress reset'); }
     });
@@ -75,6 +83,13 @@ const UI = {
     this.updateSoundBtn();
   },
   updateSoundBtn() { this.els.btnSound.textContent = Sfx.muted ? '🔇' : '🔊'; },
+  toggleFullscreen() {
+    const el = document.documentElement;
+    try {
+      if (document.fullscreenElement || document.webkitFullscreenElement) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      else (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+    } catch (e) { /* not supported */ }
+  },
 
   row({ ico, name, desc, lvl, btnText, enabled, maxed, onClick }) {
     const row = document.createElement('div'); row.className = 'row';
@@ -97,6 +112,7 @@ const UI = {
       ovenSpeed: () => `${g.bakeTime().toFixed(2)}s per pizza`,
       ovenCap: () => `${g.ovenPileCap()} pizzas`,
       marketing: () => `every ${g.spawnInterval().toFixed(1)}s`,
+      decor: () => (s.upg.decor ? CFG.DECOR_LEVELS[s.upg.decor - 1] : 'plain walls') + (s.upg.decor < CFG.UPGRADES.decor.max ? ` → next: ${CFG.DECOR_LEVELS[s.upg.decor]}` : ''),
     };
     for (const key of Object.keys(CFG.UPGRADES)) {
       const u = CFG.UPGRADES[key];

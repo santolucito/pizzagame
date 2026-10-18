@@ -10,7 +10,10 @@ No build step, no dependencies: plain HTML5 Canvas + vanilla JavaScript.
 
 - **Locally:** open `index.html` in any modern browser, or serve the folder
   (`python3 -m http.server 8000` → http://localhost:8000).
-- **GitHub Pages:** in the repo settings, publish the branch root as a Pages site. Nothing else is needed.
+- **GitHub Pages:** `.github/workflows/pages.yml` deploys the site on every push to `main` or the
+  development branch. Enable it once under **Settings → Pages → Build and deployment → Source: GitHub
+  Actions**, then the site appears at `https://<user>.github.io/pizzagame/`. (GitHub only serves Pages
+  from private repositories on paid plans; make the repo public otherwise.)
 
 ## Controls
 

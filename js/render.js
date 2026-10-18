@@ -1,7 +1,7 @@
 'use strict';
 // Canvas renderer. Everything is drawn procedurally (no image assets).
 const Render = {
-  canvas: null, ctx: null, scale: 1, dpr: 1, viewW: CFG.W, viewH: CFG.H, camX: 0, camY: 0, MIN_VIEW_W: 540,
+  canvas: null, ctx: null, scale: 1, dpr: 1, viewW: CFG.W, viewH: CFG.H, camX: 0, camY: 0, MIN_VIEW_W: 440, MIN_VIEW_H: 420, FULL_MAP_MIN_SCALE: 0.9, HUD_PAD_PX: 56,
 
   init(canvas) {
     this.canvas = canvas;
@@ -15,7 +15,9 @@ const Render = {
     // Fit the whole map when the screen allows it; on narrow (portrait) screens zoom in so at least
     // MIN_VIEW_W logical pixels are visible and let the camera follow the player.
     const fit = Math.min(vw / CFG.W, vh / CFG.H);
-    this.scale = Math.max(fit, Math.min(vw / this.MIN_VIEW_W, vh / CFG.H));
+    // Small screens (phones in either orientation): zoom in so characters stay readable and let the
+    // camera follow; otherwise show the whole map.
+    this.scale = fit >= this.FULL_MAP_MIN_SCALE ? fit : Math.min(this.FULL_MAP_MIN_SCALE, Math.max(fit, Math.min(vw / this.MIN_VIEW_W, vh / this.MIN_VIEW_H)));
     this.viewW = Math.min(CFG.W, vw / this.scale);
     this.viewH = Math.min(CFG.H, vh / this.scale);
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -27,7 +29,9 @@ const Render = {
   // Camera follows the player only along axes where the map is larger than the view.
   updateCamera(g, snap) {
     const tx = U.clamp(g.player.x - this.viewW / 2, 0, CFG.W - this.viewW);
-    const ty = U.clamp(g.player.y - this.viewH / 2, 0, CFG.H - this.viewH);
+    // When the map is taller than the view, let it scroll a little below the HUD so the road is not hidden.
+    const hudPad = this.viewH < CFG.H ? this.HUD_PAD_PX / this.scale : 0;
+    const ty = U.clamp(g.player.y - this.viewH / 2, -hudPad, CFG.H - this.viewH);
     if (snap) { this.camX = tx; this.camY = ty; return; }
     this.camX = U.lerp(this.camX, tx, 0.12);
     this.camY = U.lerp(this.camY, ty, 0.12);
@@ -47,6 +51,8 @@ const Render = {
   draw(g) {
     const ctx = this.ctx;
     this.updateCamera(g, false);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = '#2b1d14'; ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     ctx.setTransform(this.dpr * this.scale, 0, 0, this.dpr * this.scale, -this.camX * this.dpr * this.scale, -this.camY * this.dpr * this.scale);
     this.drawFloor(g);
     this.drawRoad(g);

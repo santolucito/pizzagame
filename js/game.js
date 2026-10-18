@@ -100,7 +100,7 @@ const Game = {
   costMult() { return Math.pow(CFG.CITY_COST_GROWTH, this.s.city); },
   price() { return CFG.PIZZA_PRICE * this.priceMult() * (1 + 0.15 * this.s.upg.profit); },
   playerSpeed() { return 175 + 22 * this.s.upg.speed; },
-  playerCap() { return 3 + this.s.upg.capacity; },
+  playerCap() { return Math.round(4 * Math.pow(1.5, this.s.upg.capacity)); },
   bakeTime() { return CFG.BAKE_TIME / (1 + 0.25 * this.s.upg.ovenSpeed); },
   ovenPileCap() { return 6 + 3 * this.s.upg.ovenCap; },
   ovenCount() { return this.isUnlocked('oven2') ? 2 : 1; },

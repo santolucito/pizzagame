@@ -315,7 +315,7 @@ const Render = {
     }
     // carried pizzas
     if (o.carry > 0) {
-      for (let i = 0; i < o.carry; i++) this.drawPizza(x, y - 62 + bob - i * 4, 12);
+      for (let i = 0; i < Math.min(o.carry, 30); i++) this.drawPizza(x, y - 62 + bob - i * 4, 12);
     }
   },
 

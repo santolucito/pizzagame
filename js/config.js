@@ -61,7 +61,7 @@ const CFG = {
   // Player upgrades: {base cost, growth, max}
   UPGRADES: {
     speed:     { name: 'Move Speed',     ico: '👟', base: 35,  growth: 1.45, max: 8,  desc: 'Run faster around the shop' },
-    capacity:  { name: 'Carry Capacity', ico: '📦', base: 45,  growth: 1.5, max: 8,  desc: 'Carry more pizzas at once' },
+    capacity:  { name: 'Carry Capacity', ico: '📦', base: 45,  growth: 1.5, max: 8,  desc: '+50% carry capacity per level' },
     profit:    { name: 'Pizza Price',    ico: '💰', base: 70,  growth: 1.55, max: 10, desc: '+15% income per level' },
     ovenSpeed: { name: 'Oven Speed',     ico: '🔥', base: 55,  growth: 1.5, max: 10, desc: 'Bake pizzas faster' },
     ovenCap:   { name: 'Oven Storage',   ico: '🍕', base: 40,  growth: 1.45, max: 6,  desc: 'Bigger pile next to the oven' },

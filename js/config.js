@@ -43,36 +43,36 @@ const CFG = {
 
   // Unlockable areas. Price is multiplied by the city cost multiplier.
   PADS: [
-    { key: 'dining', label: 'Dining Area', price: 300, pos: { x: 790, y: 465 }, req: [] },
-    { key: 'oven2', label: '2nd Oven', price: 500, pos: { x: 90, y: 350 }, req: [] },
-    { key: 'tables2', label: 'More Tables', price: 800, pos: { x: 790, y: 465 }, req: ['dining'] },
-    { key: 'driveThru', label: 'Drive-Thru', price: 1200, pos: { x: 790, y: 135 }, req: ['dining'] },
-    { key: 'franchise', label: 'Open Next City', price: 7000, pos: { x: 480, y: 560 }, req: ['tables2', 'oven2', 'driveThru'] },
+    { key: 'dining', label: 'Dining Area', price: 180, pos: { x: 790, y: 465 }, req: [] },
+    { key: 'oven2', label: '2nd Oven', price: 280, pos: { x: 90, y: 350 }, req: [] },
+    { key: 'tables2', label: 'More Tables', price: 450, pos: { x: 790, y: 465 }, req: ['dining'] },
+    { key: 'driveThru', label: 'Drive-Thru', price: 650, pos: { x: 790, y: 135 }, req: ['dining'] },
+    { key: 'franchise', label: 'Open Next City', price: 3500, pos: { x: 480, y: 560 }, req: ['tables2', 'oven2', 'driveThru'] },
   ],
   PAD_RADIUS: 40,
 
   // Economy
-  PIZZA_PRICE: 6,
+  PIZZA_PRICE: 8,
   DT_PRICE_MULT: 1.5,
   CITY_PRICE_GROWTH: 1.8,
-  CITY_COST_GROWTH: 1.5,
+  CITY_COST_GROWTH: 1.4,
   CITIES: ['Naples Street', 'Brooklyn', 'Chicago', 'Austin', 'Los Angeles', 'Tokyo', 'Rome', 'Sydney', 'Paris', 'Mars Colony'],
 
   // Player upgrades: {base cost, growth, max}
   UPGRADES: {
-    speed:     { name: 'Move Speed',     ico: '👟', base: 60,  growth: 1.6, max: 8,  desc: 'Run faster around the shop' },
-    capacity:  { name: 'Carry Capacity', ico: '📦', base: 80,  growth: 1.7, max: 8,  desc: 'Carry more pizzas at once' },
-    profit:    { name: 'Pizza Price',    ico: '💰', base: 120, growth: 1.8, max: 10, desc: '+15% income per level' },
-    ovenSpeed: { name: 'Oven Speed',     ico: '🔥', base: 100, growth: 1.7, max: 10, desc: 'Bake pizzas faster' },
-    ovenCap:   { name: 'Oven Storage',   ico: '🍕', base: 70,  growth: 1.6, max: 6,  desc: 'Bigger pile next to the oven' },
-    marketing: { name: 'Marketing',      ico: '📣', base: 150, growth: 1.8, max: 8,  desc: 'More customers, bigger orders' },
+    speed:     { name: 'Move Speed',     ico: '👟', base: 35,  growth: 1.45, max: 8,  desc: 'Run faster around the shop' },
+    capacity:  { name: 'Carry Capacity', ico: '📦', base: 45,  growth: 1.5, max: 8,  desc: 'Carry more pizzas at once' },
+    profit:    { name: 'Pizza Price',    ico: '💰', base: 70,  growth: 1.55, max: 10, desc: '+15% income per level' },
+    ovenSpeed: { name: 'Oven Speed',     ico: '🔥', base: 55,  growth: 1.5, max: 10, desc: 'Bake pizzas faster' },
+    ovenCap:   { name: 'Oven Storage',   ico: '🍕', base: 40,  growth: 1.45, max: 6,  desc: 'Bigger pile next to the oven' },
+    marketing: { name: 'Marketing',      ico: '📣', base: 90,  growth: 1.55, max: 8,  desc: 'More customers, bigger orders' },
   },
 
   // Staff
   STAFF: {
-    cashier: { name: 'Cashier', ico: '🧑‍💼', hire: [250], upBase: 150, upGrowth: 1.7, upMax: 5, desc: 'Checks customers out at the register' },
-    helper:  { name: 'Kitchen Helper', ico: '👨‍🍳', hire: [300, 600, 1100], upBase: 200, upGrowth: 1.7, upMax: 5, desc: 'Carries pizzas from the oven to the counter' },
-    cleaner: { name: 'Cleaner', ico: '🧹', hire: [200], upBase: 120, upGrowth: 1.6, upMax: 3, desc: 'Cleans dirty tables (needs Dining Area)', needs: 'dining' },
+    cashier: { name: 'Cashier', ico: '🧑‍💼', hire: [140], upBase: 90, upGrowth: 1.5, upMax: 5, desc: 'Checks customers out at the register' },
+    helper:  { name: 'Kitchen Helper', ico: '👨‍🍳', hire: [160, 350, 700], upBase: 110, upGrowth: 1.5, upMax: 5, desc: 'Carries pizzas from the oven to the counter' },
+    cleaner: { name: 'Cleaner', ico: '🧹', hire: [110], upBase: 70, upGrowth: 1.5, upMax: 3, desc: 'Cleans dirty tables (needs Dining Area)', needs: 'dining' },
   },
 
   // Timing

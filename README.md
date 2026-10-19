@@ -1,8 +1,21 @@
 # Pizza Rush — a web-based idle pizzeria
 
-A browser remake of the arcade‑idle restaurant loop popularised by *Pizza Ready!*: run around your
-pizzeria, carry pizzas from the oven to the counter, check customers out, scoop up the cash, and reinvest
-it in staff, upgrades and new areas until you can franchise to the next city.
+A browser game inspired by the arcade‑idle restaurant loop of *Pizza Ready!*: run around your pizzeria,
+carry pizzas from the oven to the counter, check customers out, scoop up the cash, and spend it on staff,
+upgrades, new areas and decorations. Then wander outside to the park.
+
+## Design intent
+
+Spiritually this is meant to be closer to **Stardew Valley** than to a pay‑to‑win mobile cash grab, and
+it is built so a five‑year‑old can play it:
+
+- **Nothing ever resets.** There is no prestige, no "next city", no wiping the shop to start over.
+  Everything you buy stays bought.
+- **No ads, no purchases, no timers to pay away, no dark patterns.** Money only comes from serving
+  pizza and finding coins outside.
+- **No menus.** Everything is bought by standing still on a glowing circle placed where the thing lives:
+  the oven upgrade is by the oven, the cashier by the register, each decoration where it will appear.
+- **A cosy world to explore**, with a park, a dog, ducks and a fountain, rather than a treadmill.
 
 No build step, no dependencies: plain HTML5 Canvas + vanilla JavaScript.
 
@@ -35,14 +48,15 @@ No build step, no dependencies: plain HTML5 Canvas + vanilla JavaScript.
    - **Dining Area / More Tables** — some customers eat in and leave dirty tables to clean.
    - **2nd Oven** — doubles production.
    - **Drive‑Thru** — cars queue at a window on the road and pay 1.5× for pizzas you drop at the window.
-   - **Open Next City** — franchise: start a fresh shop where pizzas sell for 1.8× (and costs are 1.5×).
-6. The **shop corner** has one circle per upgrade (Speed, Carry More, Better Oven, Pretty Shop) and one per
-   staff member (Cashier, Helper, Cleaner): stand on it to hire, then to train.
-7. Walk out of the door to explore the **park, street and parking lot**: collect coins and meet the dog.
+6. Upgrade circles (Speed, Carry More, Better Oven) and staff circles (Cashier, Helper, Cleaner) sit where
+   they belong in the shop; stand still on one to buy. Staff circles hire first, then train.
+7. Grayed-out **decorations** (plants, posters, string lights, neon sign, jukebox, chandelier) show where
+   they will go; buy them to bring more, and more patient, customers.
+8. Walk out of the door to explore the **park, street and parking lot**: collect coins and meet the dog.
 
 Impatient customers and cars leave if they wait too long. Progress saves automatically to
-`localStorage`, and once you have a cashier and a helper the shop keeps earning a reduced rate for up
-to three hours while you are away.
+`localStorage` and never resets; once you have a cashier and a helper the shop keeps earning a reduced
+rate for up to three hours while you are away.
 
 ## Project layout
 

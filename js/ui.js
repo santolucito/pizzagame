@@ -33,7 +33,6 @@ const UI = {
       else if (e.key === '?') this.toggle('help');
     });
     Game.onToast = (m) => this.toast(m);
-    Game.onFranchise = (city) => this.message('New city!', `<div>Your pizza empire grows.</div><div class="big">${city}</div><div>Pizzas sell for more here, but everything costs more too.</div>`);
     this.updateSoundBtn();
   },
 
@@ -83,7 +82,7 @@ const UI = {
   update(dt) {
     const g = Game, s = g.s;
     this.els.cash.textContent = U.money(s.cash);
-    this.els.city.textContent = `${g.cityName()} · ${s.stats.served} served`;
+    this.els.city.textContent = `${CFG.SHOP_NAME} · ${s.stats.served} served`;
     this.els.hint.textContent = g.hint ? g.hint.text : '';
   },
 };

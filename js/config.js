@@ -43,43 +43,47 @@ const CFG = {
   DT_STACK_CAP: 10,
   DT_CASH: { x: 705, y: 128 },
 
-  // Shop pads (office corner): stand on one to pour money in. No menus.
+  // Buy pads: stand still on one to pour money in. Each sits where it makes sense in the shop.
   SHOP_PADS: [
-    { key: 'speed',    kind: 'upgrade', pos: { x: 55,  y: 522 } },
-    { key: 'capacity', kind: 'upgrade', pos: { x: 145, y: 522 } },
-    { key: 'oven',     kind: 'upgrade', pos: { x: 235, y: 522 } },
-    { key: 'decor',    kind: 'upgrade', pos: { x: 325, y: 522 } },
-    { key: 'cashier',  kind: 'staff',   pos: { x: 55,  y: 602 } },
-    { key: 'helper',   kind: 'staff',   pos: { x: 145, y: 602 } },
-    { key: 'cleaner',  kind: 'staff',   pos: { x: 235, y: 602 } },
+    { key: 'speed',    kind: 'upgrade', pos: { x: 70,  y: 540 } },   // office corner
+    { key: 'capacity', kind: 'upgrade', pos: { x: 250, y: 540 } },   // office corner
+    { key: 'oven',     kind: 'upgrade', pos: { x: 90,  y: 432 } },   // below the ovens
+    { key: 'helper',   kind: 'staff',   pos: { x: 300, y: 300 } },   // kitchen, by the pizza tray
+    { key: 'cashier',  kind: 'staff',   pos: { x: 760, y: 180 } },   // behind the counter, by the register
+    { key: 'cleaner',  kind: 'staff',   pos: { x: 920, y: 460 } },   // dining area (needs tables)
   ],
-  PAD_DWELL: 0.35, // seconds to stand on a pad before money starts flowing
+  PAD_DWELL: 0.45, // seconds standing still on a pad before money starts flowing
 
-  // Unlockable areas. Price is multiplied by the city cost multiplier.
+  // Decorations: grayed-out items shown where they will appear; stand on one to buy it.
+  DECOR_ITEMS: [
+    { key: 'plants',     label: 'Plants',        ico: '🪴', price: 50,  spot: { x: 662, y: 560 } },
+    { key: 'posters',    label: 'Posters',       ico: '🖼️', price: 80,  spot: { x: 100, y: 168 } },
+    { key: 'lights',     label: 'String Lights', ico: '💡', price: 120, spot: { x: 250, y: 168 } },
+    { key: 'neon',       label: 'Neon Sign',     ico: '💗', price: 180, spot: { x: 760, y: 178 } },
+    { key: 'jukebox',    label: 'Jukebox & Rug', ico: '🎵', price: 260, spot: { x: 918, y: 262 } },
+    { key: 'chandelier', label: 'Chandelier',    ico: '✨', price: 400, spot: { x: 790, y: 300 } },
+  ],
+
+  // Unlockable areas.
   PADS: [
     { key: 'dining', label: 'Tables', ico: '🍽️', price: 180, pos: { x: 790, y: 465 }, req: [] },
     { key: 'oven2', label: '2nd Oven', ico: '🔥', price: 280, pos: { x: 90, y: 350 }, req: [] },
     { key: 'tables2', label: 'More Tables', ico: '🍽️', price: 450, pos: { x: 790, y: 465 }, req: ['dining'] },
-    { key: 'driveThru', label: 'Drive-Thru', ico: '🚗', price: 650, pos: { x: 850, y: 165 }, req: ['dining'] },
-    { key: 'franchise', label: 'New City!', ico: '🏙️', price: 3500, pos: { x: 480, y: 560 }, req: ['tables2', 'oven2', 'driveThru'] },
+    { key: 'driveThru', label: 'Drive-Thru', ico: '🚗', price: 650, pos: { x: 880, y: 170 }, req: ['dining'] },
   ],
   PAD_RADIUS: 40,
 
   // Economy
   PIZZA_PRICE: 8,
   DT_PRICE_MULT: 1.5,
-  CITY_PRICE_GROWTH: 1.8,
-  CITY_COST_GROWTH: 1.4,
-  CITIES: ['Naples Street', 'Brooklyn', 'Chicago', 'Austin', 'Los Angeles', 'Tokyo', 'Rome', 'Sydney', 'Paris', 'Mars Colony'],
+  SHOP_NAME: 'Naples Street Pizza',
 
-  // Simplified upgrades: four things, each does one obvious thing.
+  // Simplified upgrades: three things, each does one obvious thing.
   UPGRADES: {
     speed:    { name: 'Speed',       ico: '👟', base: 35, growth: 1.45, max: 8,  desc: 'Run faster' },
     capacity: { name: 'Carry More',  ico: '📦', base: 45, growth: 1.5,  max: 8,  desc: 'Carry a bigger pizza stack' },
     oven:     { name: 'Better Oven', ico: '🔥', base: 50, growth: 1.5,  max: 10, desc: 'Bakes faster and holds more' },
-    decor:    { name: 'Pretty Shop', ico: '🪴', base: 50, growth: 1.5,  max: 6,  desc: 'Decorations bring more customers' },
   },
-  DECOR_LEVELS: ['Potted plants', 'Framed posters', 'String lights', 'Neon sign', 'Jukebox & rug', 'Chandelier & award'],
 
   // Staff: the pad hires first, then trains.
   STAFF: {

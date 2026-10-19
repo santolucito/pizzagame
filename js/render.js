@@ -103,7 +103,7 @@ const Render = {
   // ======================= static background =======================
   ensureBackground(g) {
     const res = U.clamp(this.dpr * this.scale, 1, 2);
-    const key = [g.isUnlocked('dining'), g.isUnlocked('tables2'), g.isUnlocked('oven2'), g.isUnlocked('driveThru'), g.s.upg.decor, Math.round(g.price()), Math.round(res * 4) / 4].join('|');
+    const key = [g.isUnlocked('dining'), g.isUnlocked('tables2'), g.isUnlocked('oven2'), g.isUnlocked('driveThru'), CFG.DECOR_ITEMS.map((it) => g.hasDecor(it.key) ? 1 : 0).join(''), Math.round(g.price()), Math.round(res * 4) / 4].join('|');
     const now = performance.now();
     if (this.bg && key === this.bgKey) return;
     // During a pinch the resolution changes continuously; rebuild at most every 150 ms.
@@ -396,6 +396,17 @@ const Render = {
 
   bgOffice(g) {
     const ctx = this.ctx;
+    // manager's desk in the office corner (decorative)
+    const dx = 160, dy = 600;
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; U.roundRect(ctx, dx - 38, dy + 4, 80, 24, 5); ctx.fill();
+    ctx.fillStyle = '#5b3a1a'; U.roundRect(ctx, dx - 40, dy, 80, 24, 5); ctx.fill();
+    ctx.fillStyle = '#9b6531'; U.roundRect(ctx, dx - 40, dy - 6, 80, 24, 5); ctx.fill();
+    ctx.fillStyle = '#fff8ee'; U.roundRect(ctx, dx - 34, dy - 2, 20, 14, 2); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(dx - 31, dy + 2, 12, 1); ctx.fillRect(dx - 31, dy + 5, 10, 1); ctx.fillRect(dx - 31, dy + 8, 13, 1);
+    ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.arc(dx + 28, dy + 5, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#5a2a10'; ctx.beginPath(); ctx.arc(dx + 28, dy + 5, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#2d3a4a'; U.roundRect(ctx, dx - 4, dy - 20, 26, 18, 3); ctx.fill();
+    ctx.fillStyle = '#7fd1ff'; U.roundRect(ctx, dx - 1, dy - 17, 20, 12, 2); ctx.fill();
     for (const [pos, label, ico] of []) {
       ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.beginPath(); ctx.ellipse(pos.x, pos.y, 36, 20, 0, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = 'rgba(43,29,20,0.5)'; ctx.lineWidth = 2; ctx.setLineDash([6, 5]); ctx.stroke(); ctx.setLineDash([]);
@@ -460,9 +471,10 @@ const Render = {
     ctx.fillText('WELCOME', e.x - 8, e.y);
   },
 
-  // Decorations grow with the Decorations upgrade.
+  // Decorations: owned items are drawn fully; unowned ones are drawn as gray ghosts where they will go.
   bgDecor(g) {
-    const ctx = this.ctx, lvl = g.s.upg.decor;
+    const ctx = this.ctx;
+    const ghost = (key, fn) => { if (g.hasDecor(key)) { fn(); return; } ctx.save(); ctx.globalAlpha = 0.32; ctx.filter = 'grayscale(1)'; fn(); ctx.restore(); };
     const plant = (x, y, s = 1) => {
       ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(x, y + 4 * s, 13 * s, 6 * s, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#b5532b'; U.roundRect(ctx, x - 9 * s, y - 10 * s, 18 * s, 14 * s, 3 * s); ctx.fill();
@@ -471,8 +483,8 @@ const Render = {
       for (const [dx, dy, r] of [[0, -22, 9], [-9, -16, 7], [9, -17, 7], [-4, -26, 5], [5, -27, 5]]) { ctx.beginPath(); ctx.ellipse(x + dx * s, y + dy * s, r * s, r * 0.8 * s, 0, 0, Math.PI * 2); ctx.fill(); }
       ctx.fillStyle = '#56b862'; ctx.beginPath(); ctx.ellipse(x - 2 * s, y - 24 * s, 4 * s, 3 * s, 0, 0, Math.PI * 2); ctx.fill();
     };
-    if (lvl >= 1) { plant(662, 598); plant(936, 215); plant(40, 455, 0.9); }
-    if (lvl >= 2) {
+    ghost('plants', () => { plant(662, 598); plant(936, 215); plant(40, 455, 0.9); });
+    ghost('posters', () => {
       const poster = (x, y, text) => {
         ctx.fillStyle = '#5b3a1a'; U.roundRect(ctx, x - 20, y - 15, 40, 30, 3); ctx.fill();
         ctx.fillStyle = '#fff3d6'; ctx.fillRect(x - 17, y - 12, 34, 24);
@@ -480,46 +492,51 @@ const Render = {
         ctx.fillStyle = '#b8401c'; ctx.font = this.font(6); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, x, y + 8);
       };
       poster(70, 142, 'BEST PIZZA'); poster(130, 142, 'SINCE 1987'); poster(700, 134, 'HOT & FRESH');
-    }
-    if (lvl >= 4) {
-      // neon sign on the dining wall (glow is dynamic, letters static)
+    });
+    ghost('lights', () => {
+      // the wire; bulbs are dynamic when owned, static gray when not
+      ctx.strokeStyle = 'rgba(30,20,10,0.6)'; ctx.lineWidth = 1.5; ctx.beginPath();
+      for (let x = 10; x <= 330; x += 40) { ctx.moveTo(x, 110); ctx.quadraticCurveTo(x + 20, 124, x + 40, 110); }
+      ctx.stroke();
+      if (!g.hasDecor('lights')) { ctx.fillStyle = '#ffd166'; for (let x = 18; x < 370; x += 16) { const sag = 110 + 10 * Math.sin(((x - 10) % 40) / 40 * Math.PI); ctx.beginPath(); ctx.arc(x, sag + 4, 3, 0, Math.PI * 2); ctx.fill(); } }
+    });
+    ghost('neon', () => {
       ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, 756, 112, 128, 26, 6); ctx.fill();
-    }
-    if (lvl >= 5) {
-      // rug under the dining area
+      if (!g.hasDecor('neon')) { ctx.fillStyle = '#ff78dc'; ctx.font = this.font(17); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('♥ PIZZA ♥', 820, 126); }
+    });
+    ghost('jukebox', () => {
       const cx = 790, cy = 465;
       ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.beginPath(); ctx.ellipse(cx + 2, cy + 3, 92, 46, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#b23a48'; ctx.beginPath(); ctx.ellipse(cx, cy, 92, 46, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#d9a066'; ctx.beginPath(); ctx.ellipse(cx, cy, 78, 36, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#b23a48'; ctx.beginPath(); ctx.ellipse(cx, cy, 62, 26, 0, 0, Math.PI * 2); ctx.fill();
-      // jukebox by the right wall
       const jx = 934, jy = 262;
       ctx.fillStyle = 'rgba(0,0,0,0.2)'; U.roundRect(ctx, jx - 14, jy - 26, 32, 50, 10); ctx.fill();
       ctx.fillStyle = '#8c2f2f'; U.roundRect(ctx, jx - 16, jy - 30, 32, 50, 10); ctx.fill();
       ctx.fillStyle = '#f2b134'; U.roundRect(ctx, jx - 12, jy - 26, 24, 14, 8); ctx.fill();
       ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, jx - 10, jy - 6, 20, 14, 3); ctx.fill();
       ctx.fillStyle = '#7fd1ff'; ctx.fillRect(jx - 8, jy - 4, 16, 4);
-    }
-    if (lvl >= 6) {
-      // framed award on the kitchen wall
+    });
+    ghost('chandelier', () => {
       const ax = 300, ay = 142;
       ctx.fillStyle = '#5b3a1a'; U.roundRect(ctx, ax - 22, ay - 16, 44, 32, 3); ctx.fill();
       ctx.fillStyle = '#f2b134'; ctx.fillRect(ax - 19, ay - 13, 38, 26);
       ctx.fillStyle = '#2b1d14'; ctx.font = this.font(8); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText('★ 5 STARS ★', ax, ay - 4); ctx.fillText('CITY BEST', ax, ay + 6);
-    }
+      if (!g.hasDecor('chandelier')) {
+        ctx.fillStyle = '#f2b134';
+        for (let k = 0; k < 5; k++) { const a = (k / 5) * Math.PI * 2; ctx.beginPath(); ctx.arc(790 + Math.cos(a) * 16, 300 + Math.sin(a) * 6, 3, 0, Math.PI * 2); ctx.fill(); }
+        ctx.beginPath(); ctx.arc(790, 300, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#f2b134'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(790, 300); ctx.lineTo(790, 270); ctx.stroke();
+      }
+    });
   },
 
   // ======================= dynamic scenery =======================
   drawDecorDynamic(g) {
-    const ctx = this.ctx, lvl = g.s.upg.decor, t = g.time;
-    if (lvl >= 3) {
-      // string lights along the dining wall, twinkling
+    const ctx = this.ctx, t = g.time;
+    if (g.hasDecor('lights')) {
       const cols = ['#ff6b6b', '#ffd166', '#6bd3ff', '#7cf29a', '#ff9de2'];
-      ctx.strokeStyle = 'rgba(30,20,10,0.6)'; ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      for (let x = 10; x <= 330; x += 40) { ctx.moveTo(x, 110); ctx.quadraticCurveTo(x + 20, 124, x + 40, 110); }
-      ctx.stroke();
       let i = 0;
       for (let x = 18; x < 370; x += 16) {
         const sag = 110 + 10 * Math.sin(((x - 10) % 40) / 40 * Math.PI);
@@ -530,7 +547,7 @@ const Render = {
         ctx.globalAlpha = 1; i++;
       }
     }
-    if (lvl >= 4) {
+    if (g.hasDecor('neon')) {
       const flicker = 0.75 + 0.25 * Math.sin(t * 9) * Math.sin(t * 2.3);
       ctx.save();
       ctx.shadowColor = '#ff4fd8'; ctx.shadowBlur = 14 * flicker;
@@ -538,7 +555,7 @@ const Render = {
       ctx.fillText('♥ PIZZA ♥', 820, 126);
       ctx.restore();
     }
-    if (lvl >= 6) {
+    if (g.hasDecor('chandelier')) {
       // chandelier warm glow over the dining area
       const grd = ctx.createRadialGradient(790, 380, 10, 790, 380, 170);
       grd.addColorStop(0, 'rgba(255,220,140,0.28)'); grd.addColorStop(1, 'rgba(255,220,140,0)');
@@ -655,7 +672,7 @@ const Render = {
       if (pad.maxed) { ctx.fillStyle = '#6f665c'; ctx.font = this.font(12); ctx.fillText(pad.locked ? 'LOCKED' : 'MAX', x, y + 9); }
       else { ctx.fillStyle = afford ? '#1f6e2e' : '#b8401c'; ctx.font = this.font(14); ctx.fillText(U.money(pad.price - paid), x, y + 9); }
       if (pad.sub) {
-        ctx.fillStyle = 'rgba(43,29,20,0.75)'; U.roundRect(ctx, x - 30, y + 20, 60, 13, 6); ctx.fill();
+        ctx.fillStyle = 'rgba(43,29,20,0.75)'; U.roundRect(ctx, x - 34, y + 20, 68, 13, 6); ctx.fill();
         ctx.fillStyle = '#fff'; ctx.font = this.font(9); ctx.fillText(pad.sub, x, y + 27);
       }
     }

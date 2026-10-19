@@ -7,7 +7,7 @@ const UI = {
   init() {
     const $ = (id) => document.getElementById(id);
     this.els = {
-      cash: $('hud-cash'), city: $('hud-city'), hint: $('hint'), toasts: $('toasts'),
+      cash: $('hud-cash'), city: $('hud-city'), farm: $('hud-farm'), hint: $('hint'), toasts: $('toasts'),
       help: $('modal-help'), msg: $('modal-msg'),
       btnSound: $('btn-sound'), msgTitle: $('msg-title'), msgBody: $('msg-body'), btnCar: $('btn-car'), btnMake: $('btn-make'), pizza: $('modal-pizza'),
     };
@@ -98,6 +98,8 @@ const UI = {
     this.els.cash.textContent = U.money(s.cash);
     this.els.city.textContent = `${CFG.SHOP_NAME} · ${s.stats.served} served`;
     this.els.hint.textContent = g.hint ? g.hint.text : '';
+    const inv = Object.keys(CFG.INGREDIENTS).filter((k) => s.farm[k] > 0).map((k) => `${CFG.INGREDIENTS[k]}${s.farm[k]}`).join(' ');
+    this.els.farm.textContent = inv; this.els.farm.classList.toggle('hidden', !inv);
     this.els.btnMake.classList.toggle('hidden', !g.nearPrep || this.open);
     const showCar = g.driving || g.carNear;
     this.els.btnCar.classList.toggle('hidden', !showCar);

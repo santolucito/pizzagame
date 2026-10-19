@@ -5,6 +5,7 @@ const Game = {
   player: null,
   customers: [], cars: [], staff: [], fx: [], floats: [], tables: [], ovens: [], coins: [], dog: null,
   houses: [], icCustomers: [], car: null, bike: null, vehicle: null, driving: false, orderT: 30, icSpawnT: 4, carNear: false, nearVehicle: null, fireTruck: null, nearPrep: false,
+  plots: [], cow: null,
   seq: 0, time: 0, spawnT: 1.5, carT: 4, saveT: 0, secT: 0, secEarned: 0, groupLeft: 0, groupT: 0,
   hint: null, padDwell: Object.create(null), lastTotal: 0,
   onUnlock: null, onToast: null,
@@ -17,6 +18,7 @@ const Game = {
       unlocked: {},
       decor: {},
       iceCream: { owned: false, flavors: 0, cash: 0 },
+      farm: { wheat: 0, tomato: 0, cheese: 0, mushroom: 0, basil: 0 },
       padPaid: {},
       upg: { speed: 0, capacity: 0, oven: 0 },
       staff: { cashier: { count: 0, level: 0 }, helper: { count: 0, level: 0 }, cleaner: { count: 0, level: 0 } },
@@ -56,6 +58,8 @@ const Game = {
     this.bike = { kind: 'bike', x: CFG.DELIVERY_BIKE.x, y: CFG.DELIVERY_BIKE.y, angle: -Math.PI / 2, vx: 0, vy: 0 };
     this.vehicle = null; this.driving = false; this.orderT = U.rand(20, 35); this.icSpawnT = 4;
     this.fireTruck = new FireTruck();
+    this.plots = CFG.FARM.plots.map((pl, i) => ({ i, kind: pl.kind, x: pl.x, y: pl.y, ready: true, t: 0, phase: Math.random() * 6 }));
+    this.cow = { x: CFG.FARM.cowHome.x, y: CFG.FARM.cowHome.y, facing: 1, moving: false, bob: 0, target: null, timer: 0, ready: true, t: 0, moo: 0 };
     this.padDwell = Object.create(null);
     this.spawnT = 1.5; this.carT = 4; this.groupLeft = 0;
     Sfx.muted = !!s.muted;
@@ -84,6 +88,7 @@ const Game = {
         piles: Object.assign(d.piles, data.piles || {}),
         stats: Object.assign(d.stats, data.stats || {}),
         iceCream: Object.assign(d.iceCream, data.iceCream || {}),
+        farm: Object.assign(d.farm, data.farm || {}),
         unlocked: data.unlocked || {},
         padPaid: data.padPaid || {},
       });
@@ -318,6 +323,7 @@ const Game = {
     this.updateSpawns(dt);
     this.updateOutside(dt);
     this.updateTown(dt);
+    this.updateFarm(dt);
 
     for (const c of this.customers) c.update(dt, this);
     this.customers = this.customers.filter((c) => c.state !== 'gone');
@@ -391,6 +397,8 @@ const Game = {
     }
     for (const h of CFG.HOUSES) o.push({ x: h.x0, y: h.y0, w: h.x1 - h.x0, h: h.y1 - h.y0 });
     const F = CFG.FIRE_STATION; o.push({ x: F.x0, y: F.y0, w: F.x1 - F.x0, h: F.y1 - F.y0 });
+    const B2 = CFG.FARM.barn; o.push({ x: B2.x0, y: B2.y0, w: B2.x1 - B2.x0, h: B2.y1 - B2.y0 });
+    o.push({ x: CFG.FARM.silo.x - 22, y: CFG.FARM.silo.y - 40, w: 44, h: 80 });
     if (forCar) {
       const B = CFG.BUILDING; o.push({ x: B.x0 - 6, y: B.y0, w: B.x1 - B.x0 + 6, h: B.y1 - B.y0 });
       const pd = CFG.POND; o.push({ x: pd.x - pd.rx, y: pd.y - pd.ry, w: pd.rx * 2, h: pd.ry * 2 });
@@ -400,16 +408,43 @@ const Game = {
     return o;
   },
 
+  // ---------- farm: pick ingredients, cow gives cheese ----------
+  addIngredient(kind, x, y) {
+    const f = this.s.farm;
+    if (f[kind] >= CFG.FARM.max) { this.floats.push({ x, y: y - 30, text: 'Basket full!', color: '#8a7a6a', t: 0, dur: 1 }); return false; }
+    f[kind]++;
+    this.floats.push({ x, y: y - 34, text: CFG.INGREDIENTS[kind] + ' +1', color: '#ffe08a', t: 0, dur: 1, big: true });
+    this.fx.push({ kind: 'sparkle', x0: x, y0: y, x1: x, y1: y, t: 0, dur: 0.5 });
+    Sfx.pickup(); Haptics.tap();
+    return true;
+  },
+  updateFarm(dt) {
+    const p = this.player, F = CFG.FARM;
+    for (const pl of this.plots) {
+      if (!pl.ready) { pl.t -= dt; if (pl.t <= 0) pl.ready = true; continue; }
+      if (!this.driving && U.dist(p.x, p.y, pl.x, pl.y) < 34) { if (this.addIngredient(pl.kind, pl.x, pl.y)) { pl.ready = false; pl.t = F.regrow[pl.kind]; } }
+    }
+    const c = this.cow;
+    c.moo = Math.max(0, c.moo - dt); c.timer -= dt;
+    if (!c.ready) { c.t -= dt; if (c.t <= 0) c.ready = true; }
+    if (!c.target || c.timer <= 0) { c.target = { x: U.rand(F.pen.x0 + 30, F.pen.x1 - 30), y: U.rand(F.pen.y0 + 30, F.pen.y1 - 24) }; c.timer = U.rand(3, 7); }
+    if (U.moveToward(c, c.target.x, c.target.y, 28, dt)) { c.moving = false; c.target = null; c.timer = U.rand(2, 5); } else c.bob += dt * 6;
+    if (c.ready && !this.driving && U.dist(p.x, p.y, c.x, c.y) < 56) {
+      if (this.addIngredient('cheese', c.x, c.y)) { c.ready = false; c.t = F.regrow.cheese; c.moo = 1.5; this.floats.push({ x: c.x, y: c.y - 56, text: 'Moo!', color: '#2b1d14', t: 0, dur: 1.2, big: true }); }
+    }
+  },
+  nearFarm() { const p = this.player, F = CFG.FARM; return p.x > F.x0 - 80 && p.x < F.x1 + 80 && p.y > F.y0 - 60 && p.y < F.y1; },
+
   // ---------- handmade pizza (mini-game reward) ----------
   finishHandmade(result) {
-    const p = this.player, n = CFG.HANDMADE_PIZZAS;
+    const p = this.player, n = CFG.HANDMADE_PIZZAS + (result.farmBonus || 0);
     const room = Math.max(0, this.playerCap() - p.carry);
     const carried = Math.min(n, room); p.carry += carried;
     const extra = n - carried; if (extra > 0) this.s.piles.oven = Math.min(this.ovenPileCap() + extra, this.s.piles.oven + extra);
     this.s.stats.handmade = (this.s.stats.handmade || 0) + 1;
     for (let i = 0; i < n; i++) this.fx.push({ kind: 'pizza', x0: CFG.PREP_TABLE.x, y0: CFG.PREP_TABLE.y - 10, x1: p.x, y1: p.y - 30, t: -i * 0.08, dur: 0.3 });
-    this.floats.push({ x: p.x, y: p.y - 60, text: result.crispy ? 'Extra crispy pizza!' : 'Handmade pizza!', color: '#ffe08a', t: 0, dur: 1.4, big: true });
-    this.toast(`Family-size pizza: counts as ${n} pizzas!`);
+    this.floats.push({ x: p.x, y: p.y - 60, text: result.crispy ? 'Extra crispy pizza!' : result.farmBonus ? 'Farm-fresh pizza!' : 'Handmade pizza!', color: '#ffe08a', t: 0, dur: 1.4, big: true });
+    this.toast(`${result.farmBonus ? 'Farm-fresh' : 'Family-size'} pizza: counts as ${n} pizzas!`);
   },
 
   // ---------- delivery vehicles (car and scooter) ----------
@@ -635,7 +670,10 @@ const Game = {
     else if (!this.insideBuilding(p.x, p.y)) {
       const IC = CFG.ICE_CREAM;
       const coin = this.coins.filter((c) => !c.taken).sort((a, b) => U.dist(p.x, p.y, a.x, a.y) - U.dist(p.x, p.y, b.x, b.y))[0];
-      if (s.iceCream.owned && s.iceCream.cash >= 30 && U.dist(p.x, p.y, IC.cash.x, IC.cash.y) < 500) h = { text: 'Collect the ice cream money', target: IC.cash };
+      const ripe = this.nearFarm() ? this.plots.filter((pl) => pl.ready && s.farm[pl.kind] < CFG.FARM.max).sort((a, b) => U.dist(p.x, p.y, a.x, a.y) - U.dist(p.x, p.y, b.x, b.y))[0] : null;
+      if (ripe) h = { text: `Pick the ${ripe.kind}! ${CFG.INGREDIENTS[ripe.kind]}`, target: ripe };
+      else if (this.nearFarm() && this.cow.ready && s.farm.cheese < CFG.FARM.max) h = { text: 'Say hi to the cow for cheese 🧀', target: this.cow };
+      else if (s.iceCream.owned && s.iceCream.cash >= 30 && U.dist(p.x, p.y, IC.cash.x, IC.cash.y) < 500) h = { text: 'Collect the ice cream money', target: IC.cash };
       else if (coin && U.dist(p.x, p.y, coin.x, coin.y) < 420) h = { text: 'Grab the shiny coin!', target: coin };
       else if (order) h = { text: 'Grab pizzas, then deliver by car!', target: CFG.DOOR_OUT };
       else h = { text: 'Walk back to the pizza shop', target: CFG.DOOR_OUT };

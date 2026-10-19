@@ -23,6 +23,9 @@ const MiniGame = {
 
   start(onDone) {
     this.open = true; this.onDone = onDone;
+    this.inv = Game.s.farm; this.used = {};
+    // farm flour / tomatoes / cheese are used automatically if you have them
+    for (const k of ['wheat', 'tomato', 'cheese']) if (this.inv[k] > 0) { this.inv[k]--; this.used[k] = true; }
     this.stage = 'dough'; this.t = 0; this.dough = 0; this.doughBounce = 0;
     this.sauce = []; this.sauceCells = new Set(); this.cheese = []; this.toppings = []; this.bake = 0; this.baked = false; this.baking = false; this.crispy = 0; this.held = null; this.tapFx = [];
     this.resize(); this.updateButton();
@@ -49,8 +52,9 @@ const MiniGame = {
       if (this.inPizza(p, -10)) { for (let i = 0; i < 7; i++) this.cheese.push({ x: p.x + U.rand(-26, 26), y: p.y + U.rand(-26, 26), a: Math.random() * Math.PI, l: U.rand(8, 14) }); Sfx.pickup(); this.tapFx.push({ x: p.x, y: p.y, t: 0 }); if (this.cheese.length >= 70) this.next('toppings'); }
     } else if (this.stage === 'toppings') {
       const item = this.TRAY.find((it) => U.dist(p.x, p.y, it.x, it.y) < 40);
-      if (item) { this.held = { kind: item.kind, x: p.x, y: p.y }; Sfx.pickup(); }
-      else if (this.inPizza(p, 14)) { this.toppings.push({ kind: this.lastKind || 'pepperoni', x: p.x, y: p.y, a: Math.random() * 6 }); Sfx.drop(); this.checkToppings(); }
+      if (item && !this.trayAvailable(item.kind)) { Sfx.error(); }
+      else if (item) { this.held = { kind: item.kind, x: p.x, y: p.y }; Sfx.pickup(); }
+      else if (this.inPizza(p, 14)) { const k = this.trayAvailable(this.lastKind || 'pepperoni') ? (this.lastKind || 'pepperoni') : 'pepperoni'; this.placeTopping(k, p); }
     } else if (this.stage === 'oven' || this.stage === 'done') {
       // tapping the oven or the pizza does the same as the big button: in, out, take
       if (!(this.stage === 'oven' && this.baking && !this.baked)) { this.tapFx.push({ x: p.x, y: p.y, t: 0 }); this.primary(); }
@@ -62,7 +66,7 @@ const MiniGame = {
   },
   onUp(p) {
     if (this.stage === 'toppings' && this.held) {
-      if (this.inPizza(p, 14)) { this.toppings.push({ kind: this.held.kind, x: p.x, y: p.y, a: Math.random() * 6 }); this.lastKind = this.held.kind; Sfx.drop(); Haptics.tap(); this.checkToppings(); }
+      if (this.inPizza(p, 14)) { this.placeTopping(this.held.kind, p); this.lastKind = this.held.kind; Haptics.tap(); }
       this.held = null;
     }
   },
@@ -82,6 +86,14 @@ const MiniGame = {
     }
     return inside ? painted / inside : 0;
   },
+  // mushroom and basil come from the farm basket; pepperoni and olives are always in the shop
+  trayAvailable(kind) { return (kind !== 'mushroom' && kind !== 'basil') || this.inv[kind] > 0; },
+  placeTopping(kind, p) {
+    if (!this.trayAvailable(kind)) return;
+    if (kind === 'mushroom' || kind === 'basil') { this.inv[kind]--; this.used[kind] = true; }
+    this.toppings.push({ kind, x: p.x, y: p.y, a: Math.random() * 6 }); Sfx.drop(); this.checkToppings();
+  },
+  farmBonus() { return Object.keys(this.used).length; },
   checkToppings() { if (this.toppings.length >= 7) this.next('oven'); },
   next(stage) { this.stage = stage; this.t = 0; Sfx.buy(); this.updateButton(); },
 
@@ -97,7 +109,7 @@ const MiniGame = {
   primary() {
     if (this.stage === 'oven' && !this.baking && !this.baked) { this.baking = true; this.bake = 0; Sfx.drop(); this.updateButton(); }
     else if (this.stage === 'oven' && this.baked) { this.baking = false; this.stage = 'done'; this.t = 0; Sfx.unlock(); Haptics.success(); this.updateButton(); }
-    else if (this.stage === 'done') { this.stop(); if (this.onDone) this.onDone({ crispy: this.crispy > 0 }); }
+    else if (this.stage === 'done') { this.stop(); if (this.onDone) this.onDone({ crispy: this.crispy > 0, farmBonus: this.farmBonus() }); }
   },
 
   update(dt) {
@@ -124,12 +136,12 @@ const MiniGame = {
     if (stage === 'oven' || stage === 'done') this.drawOvenScene(); else this.drawPizza(c.x, c.y, this.radius(), false);
     // instruction banner
     const msg = {
-      dough: `👐 Tap the dough to stretch it!  ${this.dough}/8`,
-      sauce: `🥄 Rub the sauce all over!  ${Math.round(this.sauceCoverage() * 100)}%`,
-      cheese: `🧀 Tap to sprinkle cheese!  ${Math.min(10, Math.floor(this.cheese.length / 7))}/10`,
+      dough: `👐 Tap the dough to stretch it!  ${this.dough}/8${this.used.wheat ? ' 🌾' : ''}`,
+      sauce: `🥄 Rub the sauce all over!  ${Math.round(this.sauceCoverage() * 100)}%${this.used.tomato ? ' 🍅' : ''}`,
+      cheese: `🧀 Tap to sprinkle cheese!  ${Math.min(10, Math.floor(this.cheese.length / 7))}/10${this.used.cheese ? ' 🐄' : ''}`,
       toppings: `🍄 Drag toppings onto the pizza!  ${this.toppings.length}/7`,
       oven: this.baked ? '🔔 DING! Tap to take it out!' : this.baking ? `⏱ Baking… ${Math.max(0, Math.ceil(this.BAKE_TIME - this.bake))}` : '🔥 Tap the oven to put it in!',
-      done: this.crispy > 0 ? '😅 Extra crispy! Tap to take it.' : '🎉 Perfect! Tap to take it!',
+      done: this.crispy > 0 ? '😅 Extra crispy! Tap to take it.' : this.farmBonus() ? `🌾 Farm-fresh! Counts as ${CFG.HANDMADE_PIZZAS + this.farmBonus()}!` : '🎉 Perfect! Tap to take it!',
     }[stage];
     ctx.fillStyle = 'rgba(43,29,20,0.85)'; U.roundRect(ctx, 16, 14, W - 32, 44, 14); ctx.fill();
     ctx.fillStyle = '#ffe08a'; ctx.font = Render.font(18); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(msg, W / 2, 36);
@@ -140,7 +152,17 @@ const MiniGame = {
     if (stage === 'toppings') {
       ctx.fillStyle = 'rgba(0,0,0,0.15)'; U.roundRect(ctx, 34, 468, W - 68, 76, 14); ctx.fill();
       ctx.fillStyle = '#e6e1d4'; U.roundRect(ctx, 30, 464, W - 60, 76, 14); ctx.fill();
-      for (const it of this.TRAY) { ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.beginPath(); ctx.arc(it.x, it.y, 32, 0, Math.PI * 2); ctx.fill(); for (let k = 0; k < 3; k++) this.drawTopping(it.kind, it.x + Math.cos(k * 2.1) * 10, it.y + Math.sin(k * 2.1) * 10, k); }
+      for (const it of this.TRAY) {
+        const ok = this.trayAvailable(it.kind);
+        ctx.globalAlpha = ok ? 1 : 0.35;
+        ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.beginPath(); ctx.arc(it.x, it.y, 32, 0, Math.PI * 2); ctx.fill();
+        for (let k = 0; k < 3; k++) this.drawTopping(it.kind, it.x + Math.cos(k * 2.1) * 10, it.y + Math.sin(k * 2.1) * 10, k);
+        ctx.globalAlpha = 1;
+        if (it.kind === 'mushroom' || it.kind === 'basil') {
+          ctx.fillStyle = ok ? '#2f9e44' : '#8a7a6a'; U.roundRect(ctx, it.x + 14, it.y - 36, 26, 18, 9); ctx.fill();
+          ctx.fillStyle = '#fff'; ctx.font = Render.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(this.inv[it.kind]), it.x + 27, it.y - 27);
+        }
+      }
       if (this.held) this.drawTopping(this.held.kind, this.held.x, this.held.y - 10, 0, 1.3);
     }
     if (stage === 'sauce') { // spoon follows the finger

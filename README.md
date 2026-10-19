@@ -65,7 +65,10 @@ No build step, no dependencies: plain HTML5 Canvas + vanilla JavaScript.
 9. Houses order pizza now and then. Carry pizzas out, hop into the **delivery car** in the parking lot or
    onto the quicker, nimbler **scooter** by the door (button or `E`) and drive to their door; delivered
    pizzas pay double.
-10. The **ice cream shop** is for sale. Once bought it runs itself with a scooper and its own customers;
+10. The **farm** past the west road grows tomatoes, wheat, basil and mushrooms, and the cow gives cheese.
+    Walk up to pick; everything regrows. Farm ingredients go into handmade pizzas (flour, sauce, cheese,
+    and the mushroom and basil tray items), and each one used makes the pizza count for one more.
+11. The **ice cream shop** is for sale. Once bought it runs itself with a scooper and its own customers;
     walk in to collect the money, and buy More Flavors inside to make it busier.
 
 Impatient customers and cars leave if they wait too long. Progress saves automatically to

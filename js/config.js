@@ -3,7 +3,7 @@
 // (0..960, 98..646); the world extends beyond it so the player can wander outside.
 const CFG = {
   W: 960, H: 640,                                   // reference viewport used for zoom rules
-  WORLD: { x0: -560, y0: -170, x1: 1520, y1: 1180 }, // walkable world bounds (the whole tiny town)
+  WORLD: { x0: -1020, y0: -170, x1: 1520, y1: 1180 }, // walkable world bounds (the whole tiny town, farm included)
   BUILDING: { x0: 0, y0: 98, x1: 966, y1: 646 },    // outer wall rectangle
   DOOR: { y0: 572, y1: 638 },                        // gap in the right wall
   SAVE_KEY: 'pizza-rush-save-v1',
@@ -38,9 +38,9 @@ const CFG = {
   // Roads: the top street (drive-thru) plus a loop around the block. Buildings sit across the loop.
   ROAD: { y1: 18, y2: 98 },
   ROADS: [
-    { x0: -560, y0: 18, x1: 1520, y1: 98 },      // Main Street (top)
+    { x0: -1020, y0: 18, x1: 1520, y1: 98 },     // Main Street (top)
     { x0: 1240, y0: 18, x1: 1320, y1: 1000 },    // East Road
-    { x0: -560, y0: 920, x1: 1320, y1: 1000 },   // South Road
+    { x0: -1020, y0: 920, x1: 1320, y1: 1000 },  // South Road
     { x0: -480, y0: 18, x1: -400, y1: 1000 },    // West Road
   ],
   // Other buildings in town (solid rectangles; doors face a road)
@@ -72,6 +72,28 @@ const CFG = {
   // Drive-thru vehicles: a plain car most of the time, something fun now and then
   FUN_CAR_CHANCE: 0.14,
   FUN_CARS: ['mixer', 'police', 'schoolbus', 'taxi', 'tractor'],
+  // The farm, west of West Road: pick ingredients for handmade pizzas
+  FARM: {
+    x0: -1000, y0: 120, x1: -500, y1: 900,
+    barn: { x0: -980, y0: 150, x1: -800, y1: 300 },
+    silo: { x: -770, y: 225 },
+    pen: { x0: -740, y0: 150, x1: -520, y1: 300 },
+    cowHome: { x: -630, y: 235 },
+    gate: { x: -500, y: 420 },
+    tractor: { x: -600, y: 760 },
+    plots: [
+      { kind: 'tomato', x: -940, y: 370 }, { kind: 'tomato', x: -890, y: 370 }, { kind: 'tomato', x: -840, y: 370 },
+      { kind: 'tomato', x: -940, y: 440 }, { kind: 'tomato', x: -890, y: 440 }, { kind: 'tomato', x: -840, y: 440 },
+      { kind: 'wheat', x: -740, y: 370 }, { kind: 'wheat', x: -690, y: 370 }, { kind: 'wheat', x: -640, y: 370 }, { kind: 'wheat', x: -590, y: 370 },
+      { kind: 'wheat', x: -740, y: 440 }, { kind: 'wheat', x: -690, y: 440 }, { kind: 'wheat', x: -640, y: 440 }, { kind: 'wheat', x: -590, y: 440 },
+      { kind: 'basil', x: -940, y: 570 }, { kind: 'basil', x: -890, y: 570 }, { kind: 'basil', x: -840, y: 570 }, { kind: 'basil', x: -915, y: 630 }, { kind: 'basil', x: -865, y: 630 },
+      { kind: 'mushroom', x: -740, y: 580 }, { kind: 'mushroom', x: -680, y: 580 }, { kind: 'mushroom', x: -620, y: 580 }, { kind: 'mushroom', x: -710, y: 640 }, { kind: 'mushroom', x: -650, y: 640 },
+    ],
+    regrow: { tomato: 40, wheat: 45, basil: 35, mushroom: 45, cheese: 30 },
+    max: 9,
+  },
+  INGREDIENTS: { wheat: '🌾', tomato: '🍅', cheese: '🧀', mushroom: '🍄', basil: '🌿' },
+
   // Pizza delivery
   DELIVERY_CAR: { x: 1116, y: 596 },   // parked in the shop's lot
   DELIVERY_BIKE: { x: 990, y: 520 },   // scooter on the sidewalk by the door
@@ -147,14 +169,14 @@ const CFG = {
     { x: 250, y: 740 }, { x: 620, y: 760 }, { x: 880, y: 730 },
     { x: 1150, y: 480 }, { x: 1060, y: 740 },
     { x: 150, y: -90 }, { x: 560, y: -110 }, { x: 980, y: -70 },
-    { x: -520, y: 500 }, { x: 400, y: 1100 }, { x: 1420, y: 700 }, { x: 1440, y: 150 }, { x: -200, y: 860 },
+    { x: -520, y: 500 }, { x: 400, y: 1100 }, { x: 1420, y: 700 }, { x: 1440, y: 150 }, { x: -200, y: 860 }, { x: -600, y: 700 }, { x: -950, y: 800 },
   ],
   COIN_RESPAWN: 60,
   TREES: [
     { x: -200, y: 230, s: 1.1 }, { x: -90, y: 300, s: 0.9 }, { x: -215, y: 560, s: 1 }, { x: -120, y: 790, s: 1.05 },
     { x: 60, y: -120, s: 1 }, { x: 330, y: -140, s: 0.9 }, { x: 760, y: -125, s: 1.1 }, { x: 1120, y: -130, s: 0.95 },
     { x: 80, y: 780, s: 1 }, { x: 760, y: 790, s: 0.95 }, { x: 1010, y: 800, s: 0.9 },
-    { x: -520, y: 300, s: 1 }, { x: -530, y: 760, s: 0.9 }, { x: -340, y: 880, s: 0.8 },
+    { x: -520, y: 300, s: 1 }, { x: -530, y: 760, s: 0.9 }, { x: -340, y: 880, s: 0.8 }, { x: -980, y: 700, s: 1.1 }, { x: -800, y: 850, s: 0.9 }, { x: -980, y: -120, s: 1 }, { x: -700, y: -130, s: 0.9 }, { x: -820, y: 1120, s: 1 },
     { x: 1420, y: 230, s: 1 }, { x: 1460, y: 650, s: 1.1 }, { x: 1380, y: 860, s: 0.9 },
     { x: -40, y: 1120, s: 0.9 }, { x: 400, y: 1140, s: 1 }, { x: 840, y: 1130, s: 0.9 }, { x: 1300, y: 1120, s: 1 },
   ],

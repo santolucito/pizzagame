@@ -38,7 +38,7 @@ const Game = {
 
   buildRuntime() {
     const s = this.s;
-    const start = s.playerPos || CFG.PLAYER_START;
+    const start = CFG.PLAYER_START;
     this.player = { x: start.x, y: start.y, carry: 0, facing: 1, moving: false, xferCd: 0, bob: 0, cleanTarget: null, hasMoved: false };
     this.customers = []; this.cars = []; this.staff = []; this.fx = []; this.floats = [];
     this.tables = CFG.TABLES.map((t, i) => ({ x: t.x, y: t.y, i, dirty: !!s.tablesDirty[i], tip: (s.tablesTip || [])[i] || 0, occupied: null, cleanProg: 0, cleaner: null }));
@@ -86,7 +86,6 @@ const Game = {
     try {
       this.s.tablesDirty = this.tables.map((t) => t.dirty);
       this.s.tablesTip = this.tables.map((t) => t.tip);
-      this.s.playerPos = { x: Math.round(this.player.x), y: Math.round(this.player.y) };
       this.s.savedAt = Date.now();
       this.s.muted = Sfx.muted;
       localStorage.setItem(CFG.SAVE_KEY, JSON.stringify(this.s));

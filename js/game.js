@@ -4,7 +4,7 @@ const Game = {
   s: null,
   player: null,
   customers: [], cars: [], staff: [], fx: [], floats: [], tables: [], ovens: [], coins: [], dog: null,
-  houses: [], icCustomers: [], car: null, driving: false, orderT: 30, icSpawnT: 4, carNear: false, fireTruck: null,
+  houses: [], icCustomers: [], car: null, bike: null, vehicle: null, driving: false, orderT: 30, icSpawnT: 4, carNear: false, nearVehicle: null, fireTruck: null,
   seq: 0, time: 0, spawnT: 1.5, carT: 4, saveT: 0, secT: 0, secEarned: 0, groupLeft: 0, groupT: 0,
   hint: null, padDwell: Object.create(null), lastTotal: 0,
   onUnlock: null, onToast: null,
@@ -52,8 +52,9 @@ const Game = {
     this.dog = new Dog();
     this.houses = CFG.HOUSES.map((h, i) => Object.assign({ i, order: null, happy: 0 }, h));
     this.icCustomers = [];
-    this.car = { x: CFG.DELIVERY_CAR.x, y: CFG.DELIVERY_CAR.y, angle: -Math.PI / 2, vx: 0, vy: 0 };
-    this.driving = false; this.orderT = U.rand(20, 35); this.icSpawnT = 4;
+    this.car = { kind: 'car', x: CFG.DELIVERY_CAR.x, y: CFG.DELIVERY_CAR.y, angle: -Math.PI / 2, vx: 0, vy: 0 };
+    this.bike = { kind: 'bike', x: CFG.DELIVERY_BIKE.x, y: CFG.DELIVERY_BIKE.y, angle: -Math.PI / 2, vx: 0, vy: 0 };
+    this.vehicle = null; this.driving = false; this.orderT = U.rand(20, 35); this.icSpawnT = 4;
     this.fireTruck = new FireTruck();
     this.padDwell = Object.create(null);
     this.spawnT = 1.5; this.carT = 4; this.groupLeft = 0;
@@ -398,29 +399,38 @@ const Game = {
     return o;
   },
 
-  // ---------- delivery car ----------
-  canEnterCar() { return !this.driving && U.dist(this.player.x, this.player.y, this.car.x, this.car.y) < 70; },
-  enterCar() { if (!this.canEnterCar()) return; this.driving = true; this.car.vx = 0; this.car.vy = 0; Sfx.buy(); Haptics.tap(); },
+  // ---------- delivery vehicles (car and scooter) ----------
+  vehicles() { return [this.car, this.bike]; },
+  findNearVehicle() {
+    if (this.driving) return null;
+    let best = null, bd = 70;
+    for (const v of this.vehicles()) { const d = U.dist(this.player.x, this.player.y, v.x, v.y); if (d < bd) { bd = d; best = v; } }
+    return best;
+  },
+  canEnterCar() { return !!this.findNearVehicle(); },
+  enterCar() { const v = this.findNearVehicle(); if (!v) return; this.vehicle = v; this.driving = true; v.vx = 0; v.vy = 0; Sfx.buy(); Haptics.tap(); },
   exitCar() {
     if (!this.driving) return;
-    this.driving = false; this.car.vx = 0; this.car.vy = 0;
-    // step out beside the car, on a spot that is not inside anything
+    const c = this.vehicle;
+    this.driving = false; this.vehicle = null; c.vx = 0; c.vy = 0;
+    // step off beside it, on a spot that is not inside anything
     const cands = [[0, 46], [46, 0], [-46, 0], [0, -46]];
     for (const [dx, dy] of cands) {
-      const x = this.car.x + dx, y = this.car.y + dy;
+      const x = c.x + dx, y = c.y + dy;
       if (!this.obstacles().some((o) => this.hitRect(x, y, 12, o))) { this.player.x = x; this.player.y = y; return; }
     }
-    this.player.x = this.car.x; this.player.y = this.car.y + 46;
+    this.player.x = c.x; this.player.y = c.y + 46;
   },
   updateDriving(dt) {
-    const c = this.car, a = Input.axis();
-    const sp = CFG.DELIVERY_SPEED;
+    const c = this.vehicle, a = Input.axis();
+    const spec = CFG.VEHICLES[c.kind];
+    const sp = spec.speed;
     const tx = a.x * sp, ty = a.y * sp;
     const k = (a.x || a.y) ? 1 - Math.pow(0.02, dt) : 1 - Math.pow(0.001, dt); // snappy accelerate, quick stop
     c.vx += (tx - c.vx) * k; c.vy += (ty - c.vy) * k;
     const speed = Math.hypot(c.vx, c.vy);
     if (speed > 15) { const target = Math.atan2(c.vy, c.vx); let d = target - c.angle; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; c.angle += d * Math.min(1, dt * 10); }
-    const r = 22, w = CFG.WORLD, obs = this.townObstacles(true);
+    const r = spec.radius, w = CFG.WORLD, obs = this.townObstacles(true);
     c.x = U.clamp(c.x + c.vx * dt, w.x0 + 30, w.x1 - 30);
     for (const o of obs) if (o.w && this.hitRect(c.x, c.y, r, o)) { c.x = c.vx > 0 ? o.x - r : o.x + o.w + r; c.vx = 0; }
     c.y = U.clamp(c.y + c.vy * dt, w.y0 + 30, w.y1 - 30);
@@ -473,7 +483,7 @@ const Game = {
         Sfx.cash(); Haptics.tap();
       }
     }
-    this.carNear = this.canEnterCar();
+    this.nearVehicle = this.findNearVehicle(); this.carNear = !!this.nearVehicle;
   },
   hitRect(px, py, r, o) { return px + r > o.x && px - r < o.x + o.w && py + r > o.y && py - r < o.y + o.h; },
 
@@ -607,7 +617,7 @@ const Game = {
     let h = null;
     const order = this.houses.find((hh) => hh.order);
     if (order && p.carry > 0) h = { text: `Deliver to ${order.name}!`, target: order.door };
-    else if (this.driving) { const IC = CFG.ICE_CREAM; h = s.iceCream.owned && s.iceCream.cash > 20 ? { text: 'Pick up the ice cream money', target: IC.cash } : { text: 'Vroom! Drive around town', target: null }; }
+    else if (this.driving) { const IC = CFG.ICE_CREAM; h = s.iceCream.owned && s.iceCream.cash > 20 ? { text: 'Pick up the ice cream money', target: IC.cash } : { text: this.vehicle.kind === 'bike' ? 'Zoom! Ride around town' : 'Vroom! Drive around town', target: null }; }
     else if (!this.insideBuilding(p.x, p.y)) {
       const IC = CFG.ICE_CREAM;
       const coin = this.coins.filter((c) => !c.taken).sort((a, b) => U.dist(p.x, p.y, a.x, a.y) - U.dist(p.x, p.y, b.x, b.y))[0];

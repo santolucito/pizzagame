@@ -89,6 +89,7 @@ const UI = {
     this.els.hint.textContent = g.hint ? g.hint.text : '';
     const showCar = g.driving || g.carNear;
     this.els.btnCar.classList.toggle('hidden', !showCar);
-    this.els.btnCar.textContent = g.driving ? '🚶 Get out' : '🚗 Drive';
+    const v = g.driving ? g.vehicle : g.nearVehicle;
+    if (v) this.els.btnCar.textContent = g.driving ? CFG.VEHICLES[v.kind].exit : CFG.VEHICLES[v.kind].label;
   },
 };

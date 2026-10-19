@@ -60,8 +60,9 @@ No build step, no dependencies: plain HTML5 Canvas + vanilla JavaScript.
 8. Walk out of the door to explore the **tiny town**: a park with a pond and fountain, a street loop, a
    parking lot, four houses, a fire station, and an ice cream shop next door. Coins respawn outside and a
    dog follows you around.
-9. Houses order pizza now and then. Carry pizzas out, hop into the **delivery car** in the parking lot
-   (Drive button or `E`) and drive to their door; delivered pizzas pay double.
+9. Houses order pizza now and then. Carry pizzas out, hop into the **delivery car** in the parking lot or
+   onto the quicker, nimbler **scooter** by the door (button or `E`) and drive to their door; delivered
+   pizzas pay double.
 10. The **ice cream shop** is for sale. Once bought it runs itself with a scooper and its own customers;
     walk in to collect the money, and buy More Flavors inside to make it busier.
 

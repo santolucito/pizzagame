@@ -834,15 +834,46 @@ const Render = {
     ctx.fillStyle = '#fff8ee'; U.roundRect(ctx, -16, -8, 32, 16, 4); ctx.fill();
     this.drawPizza(0, 0, 6);
     ctx.restore();
-    if (g.driving && g.player.carry > 0) {
+    this.drawRidingExtras(g, c, 30);
+  },
+
+  // pizzas stacked on the vehicle while driving, and the "hop in" bubble when standing next to it
+  drawRidingExtras(g, c, lift) {
+    const ctx = this.ctx;
+    if (g.driving && g.vehicle === c && g.player.carry > 0) {
       const n = Math.min(g.player.carry, 30);
-      for (let i = 0; i < n; i++) { ctx.fillStyle = '#b86f2d'; ctx.beginPath(); ctx.arc(c.x, c.y - 30 - i * 4 + 2, 11, 0, Math.PI * 2); ctx.fill(); this.drawPizza(c.x, c.y - 30 - i * 4, 11); }
-      this.drawCountBadge(c.x + 18, c.y - 40 - n * 4, g.player.carry, g.playerCap());
+      for (let i = 0; i < n; i++) { ctx.fillStyle = '#b86f2d'; ctx.beginPath(); ctx.arc(c.x, c.y - lift - i * 4 + 2, 11, 0, Math.PI * 2); ctx.fill(); this.drawPizza(c.x, c.y - lift - i * 4, 11); }
+      this.drawCountBadge(c.x + 18, c.y - lift - 10 - n * 4, g.player.carry, g.playerCap());
     }
-    if (!g.driving && g.carNear) {
+    if (!g.driving && g.nearVehicle === c) {
       const bob = Math.sin(g.time * 5) * 3;
-      this.drawBubble(c.x, c.y - 48 + bob, () => { ctx.font = this.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('🚗 Drive!', 0, 0); }, 60);
+      const label = CFG.VEHICLES[c.kind].label + '!';
+      this.drawBubble(c.x, c.y - 48 + bob, () => { ctx.font = this.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText(label, 0, 0); }, 64);
     }
+  },
+
+  drawDeliveryBike(g) {
+    const ctx = this.ctx, b = g.bike, riding = g.driving && g.vehicle === b;
+    ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.angle);
+    // scooter, nose +x
+    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(2, 4, 28, 12, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#1e1e1e'; ctx.beginPath(); ctx.ellipse(-20, 0, 8, 5, 0, 0, Math.PI * 2); ctx.ellipse(22, 0, 8, 5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#e4572e'; U.roundRect(ctx, -14, -8, 36, 16, 7); ctx.fill();     // body
+    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, -10, -6, 16, 12, 5); ctx.fill();     // seat
+    ctx.fillStyle = '#c9ccd2'; ctx.fillRect(16, -12, 3, 24);                           // handlebar
+    ctx.fillStyle = '#fff6b0'; ctx.beginPath(); ctx.arc(24, 0, 3, 0, Math.PI * 2); ctx.fill(); // headlight
+    // pizza box on the back rack
+    ctx.fillStyle = '#b23a48'; U.roundRect(ctx, -30, -9, 16, 18, 3); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = this.font(7); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🍕', -22, 0);
+    if (riding) {
+      // the chef riding: shoulders + hat seen from above
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(0, 0, 9, 11, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(3, 0, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(1, 0, 5.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(14, -9, 2.5, 0, Math.PI * 2); ctx.arc(14, 9, 2.5, 0, Math.PI * 2); ctx.fill(); // hands on the bars
+    }
+    ctx.restore();
+    this.drawRidingExtras(g, b, 22);
   },
 
   drawDog(d, g) {
@@ -889,6 +920,7 @@ const Render = {
     if (g.fireTruck.state !== 'away') items.push({ y: g.fireTruck.y + 10, draw: () => { const t = g.fireTruck; this.ctx.save(); this.ctx.translate(t.x, t.y); this.ctx.rotate(t.angle); this.drawVehicle('firetruck', g, '#d32f2f'); this.ctx.restore(); } });
     for (const c of g.icCustomers) items.push({ y: c.y, draw: () => this.drawIceCreamCustomer(c, g) });
     items.push({ y: g.car.y + 10, draw: () => this.drawDeliveryCar(g) });
+    items.push({ y: g.bike.y + 8, draw: () => this.drawDeliveryBike(g) });
     if (!g.driving) items.push({ y: g.player.y, draw: () => this.drawPlayer(g) });
     items.sort((a, b) => a.y - b.y);
     for (const it of items) it.draw();

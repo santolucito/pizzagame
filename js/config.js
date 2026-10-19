@@ -72,6 +72,11 @@ const CFG = {
   FUN_CARS: ['mixer', 'police', 'schoolbus', 'taxi', 'tractor'],
   // Pizza delivery
   DELIVERY_CAR: { x: 1116, y: 596 },   // parked in the shop's lot
+  DELIVERY_BIKE: { x: 990, y: 520 },   // scooter on the sidewalk by the door
+  VEHICLES: {
+    car:  { speed: 360, radius: 22, label: '🚗 Drive', exit: '🚶 Get out' },
+    bike: { speed: 440, radius: 13, label: '🛵 Ride', exit: '🚶 Hop off' },
+  },
   DELIVERY_SPEED: 360,
   DELIVERY_TIP: 2.0,                   // delivered pizzas pay double
   ORDER_EVERY: [25, 45],               // seconds between new house orders

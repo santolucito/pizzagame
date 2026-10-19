@@ -8,6 +8,7 @@ const Render = {
   MIN_VIEW_W: 440, MIN_VIEW_H: 420, MIN_ZOOMED_VIEW: 330, FULL_MAP_MIN_SCALE: 0.9, HUD_PAD_PX: 56,
   ZOOM_KEY: 'pizza-rush-zoom',
   bgs: null, bgRes: 1, zoomLabelT: 0,
+  ext: [],   // feature extensions with optional draw hooks (see js/city.js etc.)
 
   init(canvas) {
     this.canvas = canvas;
@@ -101,7 +102,10 @@ const Render = {
     this.drawForeground(g);
     this.drawFx(g);
     this.drawFloats(g);
+    for (const e of this.ext) if (e.overlay) e.overlay(this, g);        // world space
     this.drawHint(g);
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    for (const e of this.ext) if (e.screen) e.screen(this, g);          // screen space (CSS px)
     this.drawOverlay();
   },
 
@@ -110,7 +114,8 @@ const Render = {
   ensureBackground(g) {
     const W = g.bounds(), area = (W.x1 - W.x0) * (W.y1 - W.y0);
     const res = Math.min(U.clamp(this.dpr * this.scale, 1, 2), Math.sqrt(9e6 / area)); // keep the cached map under ~9M pixels
-    const key = (g.area === 'site' ? ['site'] : [g.isUnlocked('dining'), g.isUnlocked('tables2'), g.isUnlocked('oven2'), g.isUnlocked('driveThru'), g.isUnlocked('station'), CFG.DECOR_ITEMS.map((it) => g.hasDecor(it.key) ? 1 : 0).join(''), g.s.iceCream.owned, Math.round(g.price())]).concat([Math.round(res * 4) / 4]).join('|');
+    const extKey = this.ext.map((e) => e.bgKey ? e.bgKey(g) : '').join(',');
+    const key = (g.area !== 'town' ? [g.area, extKey] : [extKey, g.isUnlocked('dining'), g.isUnlocked('tables2'), g.isUnlocked('oven2'), g.isUnlocked('driveThru'), g.isUnlocked('station'), CFG.DECOR_ITEMS.map((it) => g.hasDecor(it.key) ? 1 : 0).join(''), g.s.iceCream.owned, Math.round(g.price())]).concat([Math.round(res * 4) / 4]).join('|');
     const now = performance.now();
     if (!this.bgs) this.bgs = {};
     const c = this.bgs[g.area] || (this.bgs[g.area] = { canvas: document.createElement('canvas'), key: null, builtAt: 0, res: 1 });
@@ -123,7 +128,9 @@ const Render = {
     const ctx = c.canvas.getContext('2d');
     ctx.setTransform(c.res, 0, 0, c.res, -W.x0 * c.res, -W.y0 * c.res);
     const main = this.ctx; this.ctx = ctx;
-    if (g.area === 'site') this.paintSite(g); else this.paintBackground(g);
+    if (g.area === 'site') this.paintSite(g);
+    else if (g.area === 'town') this.paintBackground(g);
+    else { const e = this.ext.find((x) => x.paint && x.paint[g.area]); if (e) e.paint[g.area](this, g); }
     this.ctx = main;
   },
 
@@ -178,6 +185,7 @@ const Render = {
     this.bgFarm(g);
     this.bgStation(g);
     this.bgPlayground(g);
+    for (const e of this.ext) if (e.paintTown) e.paintTown(this, g);
   },
 
   // Grass over the whole world, sidewalks around the building, the parking lot.
@@ -699,7 +707,8 @@ const Render = {
       if (horiz) { ctx.fillRect(x0, y0 - 2, x1 - x0, 4); ctx.fillRect(x0, y0 + 8, x1 - x0, 4); for (let x = x0; x <= x1; x += 28) ctx.fillRect(x - 2, y0 - 8, 5, 22); }
       else { ctx.fillRect(x0 - 2, y0, 4, y1 - y0); ctx.fillRect(x0 + 8, y0, 4, y1 - y0); for (let y = y0; y <= y1; y += 28) ctx.fillRect(x0 - 8, y - 2, 22, 5); }
     };
-    fence(F.x0, F.y0, F.x1, F.y0); fence(F.x0, F.y1, F.x1, F.y1); fence(F.x0, F.y0, F.x0, F.y1);
+    fence(F.x0, F.y0, F.x1, F.y0); fence(F.x0, F.y1, F.x1, F.y1);
+    fence(F.x0, F.y0, F.x0, F.secretGate.y - F.secretGate.half); fence(F.x0, F.secretGate.y + F.secretGate.half, F.x0, F.y1);   // west fence, gap behind the barn
     fence(F.x1 - 10, F.y0, F.x1 - 10, F.gate.y - 40); fence(F.x1 - 10, F.gate.y + 40, F.x1 - 10, F.y1);
     // cow pen fence
     const P = F.pen; fence(P.x0, P.y0, P.x1, P.y0); fence(P.x0, P.y1, F.penGate.x - F.penGate.half, P.y1); fence(F.penGate.x + F.penGate.half, P.y1, P.x1, P.y1); fence(P.x0, P.y0, P.x0, P.y1); fence(P.x1, P.y0, P.x1, P.y1);
@@ -963,6 +972,7 @@ const Render = {
   drawTravel(g) {
     const ctx = this.ctx, tr = g.travel, W = this.canvas.width / this.dpr, H = this.canvas.height / this.dpr;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    if (tr.via !== 'train') { const e = this.ext.find((x) => x.travel && x.travel[tr.via]); if (e) e.travel[tr.via](this, g, W, H); return; }
     const k = tr.t / tr.dur, ease = k < 0.15 ? k / 0.15 : k > 0.85 ? (1 - k) / 0.15 : 1; // slow out, slow in
     const dist = (tr.t < 1.2 ? tr.t * tr.t / 2.4 : tr.t - 0.6) * 420 * (tr.to === 'site' ? 1 : 1); // scrolled distance (px)
     const sky = ctx.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#79c6f2'); sky.addColorStop(0.6, '#d9f0ff'); sky.addColorStop(1, '#eaf7ff');
@@ -1357,6 +1367,7 @@ const Render = {
     this.drawPlaygroundDynamic(g);
     this.drawFishing(g);
     this.drawSiteDynamic(g);
+    for (const e of this.ext) if (e.dynamic) e.dynamic(this, g);
   },
 
   drawTownDynamic(g) {
@@ -1490,6 +1501,7 @@ const Render = {
     items.push({ y: g.siteTrain.y + 20, draw: () => this.drawTrain(g, g.siteTrain) });
     for (const v of [g.excavator, g.dumptruck, g.bulldozer]) items.push({ y: v.y + 12, draw: () => this.drawSiteVehicle(g, v, 30) });
     if (!g.driving && !g.onTrain) items.push({ y: g.player.y, draw: () => this.drawPlayer(g) });
+    for (const e of this.ext) if (e.entities) e.entities(this, g, items);
     items.sort((a, b) => a.y - b.y);
     for (const it of items) it.draw();
   },
@@ -1701,6 +1713,7 @@ const Render = {
     const flash = Math.floor(t * 5) % 2 === 0;
     const lightbar = (x) => { ctx.fillStyle = flash ? '#ff3b3b' : '#3b7dff'; U.roundRect(ctx, x - 4, -14, 8, 12, 2); ctx.fill(); ctx.fillStyle = flash ? '#3b7dff' : '#ff3b3b'; U.roundRect(ctx, x - 4, 2, 8, 12, 2); ctx.fill(); ctx.fillStyle = '#ddd'; ctx.fillRect(x - 5, -2, 10, 4); };
     const shadow = (len, half) => { ctx.fillStyle = 'rgba(0,0,0,0.28)'; U.roundRect(ctx, -len / 2 + 2, -half + 5, len, half * 2, 11); ctx.fill(); };
+    for (const e of this.ext) if (e.vehicleArt && e.vehicleArt[kind]) { e.vehicleArt[kind](this, g, color, v, { shadow, wheels, lights, lightbar }); return; }
     switch (kind) {
       case 'firetruck': {
         shadow(124, 24); wheels([-44, -16, 40], 15, 10, 24);

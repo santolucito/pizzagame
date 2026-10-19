@@ -9,6 +9,8 @@ const Game = {
   seq: 0, time: 0, spawnT: 1.5, carT: 4, saveT: 0, secT: 0, secEarned: 0, groupLeft: 0, groupT: 0,
   hint: null, padDwell: Object.create(null), lastTotal: 0,
   onUnlock: null, onToast: null,
+  // Feature extensions (see js/city.js etc.): objects with optional hooks the core calls at set points.
+  ext: [],
 
   // ---------- state ----------
   defaultState() {
@@ -37,6 +39,7 @@ const Game = {
   init() {
     const loaded = this.load();
     if (!loaded) this.s = this.defaultState();
+    for (const e of this.ext) if (e.defaults) for (const k of Object.keys(e.defaults)) if (this.s[k] === undefined) this.s[k] = JSON.parse(JSON.stringify(e.defaults[k]));
     this.buildRuntime();
     return loaded;
   },
@@ -75,6 +78,7 @@ const Game = {
     this.padDwell = Object.create(null);
     this.spawnT = 1.5; this.carT = 4; this.groupLeft = 0;
     Sfx.muted = !!s.muted;
+    for (const e of this.ext) if (e.build) e.build(this);
   },
 
   load() {
@@ -222,6 +226,7 @@ const Game = {
     const IC = CFG.ICE_CREAM;
     if (!this.s.iceCream.owned) out.push({ key: 'icecream', kind: 'icecream', label: 'Buy Ice Cream Shop', ico: '🍦', pos: IC.buyPad, price: IC.price, maxed: false, sub: 'earns money for you' });
     else { const c = this.flavorsCost(); out.push({ key: 'flavors', kind: 'flavors', label: 'More Flavors', ico: '🍨', pos: IC.flavorsPad, price: c || 0, maxed: c === null, sub: `${this.s.iceCream.flavors}/${IC.flavorsMax}` }); }
+    for (const e of this.ext) if (e.pads) for (const p of e.pads(this)) out.push(Object.assign({ kind: 'ext', ext: e, maxed: false, sub: '' }, p));
     for (const it of CFG.DECOR_ITEMS) {
       if (this.s.decor[it.key]) continue;
       out.push({ key: 'decor_' + it.key, kind: 'decor', item: it.key, label: it.label, ico: it.ico, pos: it.spot, price: it.price, maxed: false, sub: '' });
@@ -238,6 +243,7 @@ const Game = {
     else if (pad.kind === 'decor') { this.s.decor[pad.item] = true; this.toast(`${pad.label} bought!`); }
     else if (pad.kind === 'icecream') { this.s.iceCream.owned = true; Sfx.unlock(); Haptics.success(); this.toast('🍦 You own the ice cream shop!', true); }
     else if (pad.kind === 'flavors') { this.s.iceCream.flavors++; this.toast(`More flavors! ${this.s.iceCream.flavors}/${CFG.ICE_CREAM.flavorsMax}`); }
+    else if (pad.kind === 'ext') pad.ext.onPad(this, pad);
     else this.applyStaffPad(pad.role, pad.mode);
   },
 
@@ -277,7 +283,7 @@ const Game = {
   countMainQueue() { return this.customers.filter((c) => c.inMainQueue || c.entering).length; },
   insideBuilding(x, y) { const b = CFG.BUILDING; return x > b.x0 && x < b.x1 && y > b.y0 && y < b.y1; },
   // which map the player is on: the pizza town or Construction Town down the line
-  bounds() { return this.area === 'site' ? CFG.SITE.WORLD : CFG.WORLD; },
+  bounds() { return CFG.AREAS[this.area].WORLD; },
   station() { return this.area === 'site' ? CFG.SITE.STATION : CFG.STATION; },
   currentTrain() { return this.area === 'site' ? this.siteTrain : this.train; },
 
@@ -345,6 +351,7 @@ const Game = {
     if (this.travel) this.updateTravel(dt);
     if (this.driving) this.updateDriving(dt); else if (this.onTrain) this.updateOnTrain(dt); else if (this.ride) this.updateRide(dt); else this.updatePlayer(dt);
     this.updateSite(dt);
+    for (const e of this.ext) if (e.update) e.update(this, dt);
     this.updateFishing(dt);
     this.updateOvens(dt);
     this.updateInteractions(dt);
@@ -432,6 +439,7 @@ const Game = {
   // Town buildings. The ice cream shop has a door gap in its bottom wall for people; cars see it solid.
   townObstacles(forCar) {
     const o = this.siteObstacles(forCar);
+    for (const e of this.ext) if (e.obstacles) o.push(...e.obstacles(this, forCar));
     const IC = CFG.ICE_CREAM.rect, dw = CFG.ICE_CREAM.doorW / 2, dx = CFG.ICE_CREAM.door.x;
     if (forCar) o.push({ x: IC.x0, y: IC.y0, w: IC.x1 - IC.x0, h: IC.y1 - IC.y0 });
     else {
@@ -450,7 +458,9 @@ const Game = {
     const B2 = CFG.FARM.barn; o.push({ x: B2.x0, y: B2.y0, w: B2.x1 - B2.x0, h: B2.y1 - B2.y0 });
     // farm fences: perimeter with the east gate open, cow pen with a gate in its bottom rail
     const FA = CFG.FARM, G = FA.gate, P = FA.pen, PG = FA.penGate, fw = 8;
-    o.push({ x: FA.x0, y: FA.y0 - 4, w: FA.x1 - FA.x0, h: fw }, { x: FA.x0, y: FA.y1 - 4, w: FA.x1 - FA.x0, h: fw }, { x: FA.x0 - 4, y: FA.y0, w: fw, h: FA.y1 - FA.y0 });
+    const SG = FA.secretGate;   // the west fence has a hidden gap behind the barn
+    o.push({ x: FA.x0, y: FA.y0 - 4, w: FA.x1 - FA.x0, h: fw }, { x: FA.x0, y: FA.y1 - 4, w: FA.x1 - FA.x0, h: fw });
+    o.push({ x: FA.x0 - 4, y: FA.y0, w: fw, h: SG.y - SG.half - FA.y0 }, { x: FA.x0 - 4, y: SG.y + SG.half, w: fw, h: FA.y1 - (SG.y + SG.half) });
     o.push({ x: FA.x1 - 14, y: FA.y0, w: fw, h: G.y - G.half - FA.y0 }, { x: FA.x1 - 14, y: G.y + G.half, w: fw, h: FA.y1 - (G.y + G.half) });
     o.push({ x: P.x0, y: P.y0 - 4, w: P.x1 - P.x0, h: fw }, { x: P.x0 - 4, y: P.y0, w: fw, h: P.y1 - P.y0 }, { x: P.x1 - 4, y: P.y0, w: fw, h: P.y1 - P.y0 });
     o.push({ x: P.x0, y: P.y1 - 4, w: PG.x - PG.half - P.x0, h: fw }, { x: PG.x + PG.half, y: P.y1 - 4, w: P.x1 - (PG.x + PG.half), h: fw });
@@ -498,6 +508,7 @@ const Game = {
     if (this.travel) return null;
     if (this.onTrain) return this.currentTrain().state === 'stopped' ? '🚶 Hop off the train' : null;
     if (this.fishing) return this.fishing.phase === 'bite' ? '🎣 Reel in!' : this.fishing.phase === 'wait' ? '🎣 Wait for it…' : null;
+    for (const e of this.ext) if (e.action) { const a = e.action(this); if (a) return a.label; }
     if (this.nearPrep) return '👐 Make a pizza';
     if (this.nearPond) return '🎣 Go fishing';
     if (this.nearTrain) return '🚂 Ride the train';
@@ -507,6 +518,7 @@ const Game = {
     if (this.travel) return;
     if (this.onTrain) { if (this.currentTrain().state === 'stopped') this.leaveTrain(); return; }
     if (this.fishing) { this.reel(); return; }
+    for (const e of this.ext) if (e.action) { const a = e.action(this); if (a) { a.run(this); return; } }
     if (this.nearPrep) { if (this.onMakePizza) this.onMakePizza(); return; }
     if (this.nearPond) { this.startFishing(); return; }
     if (this.nearTrain) { this.boardTrain(); return; }
@@ -551,14 +563,17 @@ const Game = {
   updateOnTrain(dt) { const t = this.currentTrain(); this.player.x = t.x - 240; this.player.y = t.y; this.player.moving = false; this.player.hasMoved = true; },
 
   // ---------- the ride between towns, and Construction Town itself ----------
-  startTravel(to) { this.travel = { t: 0, dur: CFG.TRAVEL.dur, to }; Sfx.whistle(); },
+  // via: 'train' (the core's mountain ride) or an extension's own ride ('bus', 'ferry', ...) which draws and lands itself
+  startTravel(to, via = 'train', dur = CFG.TRAVEL.dur) { this.travel = { t: 0, dur, to, via, from: this.area }; if (via === 'train') Sfx.whistle(); },
   updateTravel(dt) {
     const tr = this.travel; tr.t += dt;
     if (tr.t < tr.dur) return;
-    this.travel = null; this.area = tr.to;
-    const t = this.currentTrain(); t.summon(); this.player.x = t.x - 240; this.player.y = t.y;
-    this.cameraSnap = true;
-    this.toast(tr.to === 'site' ? '🏗️ Welcome to Construction Town!' : '🍕 Home sweet home!', true);
+    this.travel = null; this.area = tr.to; this.cameraSnap = true;
+    if (tr.via === 'train') {
+      const t = this.currentTrain(); t.summon(); this.player.x = t.x - 240; this.player.y = t.y;
+      this.toast(tr.to === 'site' ? '🏗️ Welcome to Construction Town!' : '🍕 Home sweet home!', true);
+    }
+    for (const e of this.ext) if (e.arrive) e.arrive(this, tr);
   },
   updateSite(dt) {
     const S = CFG.SITE;
@@ -591,7 +606,7 @@ const Game = {
   },
 
   // ---------- delivery vehicles (car and scooter) ----------
-  vehicles() { return [this.car, this.bike, this.tractor, this.excavator, this.dumptruck, this.bulldozer]; },
+  vehicles() { const v = [this.car, this.bike, this.tractor, this.excavator, this.dumptruck, this.bulldozer]; for (const e of this.ext) if (e.vehicles) v.push(...e.vehicles(this)); return v; },
   isSiteVehicle(v) { return v === this.excavator || v === this.dumptruck || v === this.bulldozer; },
   findNearVehicle() {
     if (this.driving) return null;
@@ -895,6 +910,7 @@ const Game = {
   computeHint() {
     const s = this.s, p = this.player;
     if (this.area === 'site' || this.travel) { this.hint = this.siteHint(); return; }
+    for (const e of this.ext) if (e.hint) { const h = e.hint(this); if (h !== undefined) { this.hint = h; return; } }
     const hasCashier = this.staff.some((st) => st.role === 'cashier');
     const paying = this.customers.some((c) => c.state === 'paying' || c.state === 'toPay');
     const hasHelper = this.staff.some((st) => st.role === 'helper');

@@ -3,7 +3,7 @@
 // (0..960, 98..646); the world extends beyond it so the player can wander outside.
 const CFG = {
   W: 960, H: 640,                                   // reference viewport used for zoom rules
-  WORLD: { x0: -1020, y0: -170, x1: 1520, y1: 1180 }, // walkable world bounds (the whole tiny town, farm included)
+  WORLD: { x0: -1320, y0: -170, x1: 1520, y1: 1330 }, // walkable world bounds (the whole tiny town, farm included)
   BUILDING: { x0: 0, y0: 98, x1: 966, y1: 646 },    // outer wall rectangle
   DOOR: { y0: 572, y1: 638 },                        // gap in the right wall
   SAVE_KEY: 'pizza-rush-save-v1',
@@ -83,6 +83,7 @@ const CFG = {
     pen: { x0: -740, y0: 150, x1: -520, y1: 300 },
     cowHome: { x: -630, y: 235 },
     gate: { x: -500, y: 420, half: 44 },        // opening in the east fence
+    secretGate: { y: 225, half: 40 },            // a gap in the west fence hidden behind the barn
     penGate: { x: -630, half: 34 },               // opening in the pen's bottom fence
     tractor: { x: -600, y: 760 },
     plots: [
@@ -265,6 +266,9 @@ const CFG = {
 };
 
 CFG.COINS.push(...CFG.SITE.coins);
+
+// Every map the player can be on, by area name. Extension files (js/city.js, js/islands.js, ...) add their own.
+CFG.AREAS = { town: { WORLD: CFG.WORLD }, site: { WORLD: CFG.SITE.WORLD } };
 
 const COLORS = {
   shirts: ['#4e79a7', '#f28e2b', '#59a14f', '#b07aa1', '#ff9da7', '#76b7b2', '#edc948', '#9c755f', '#e15759'],

@@ -50,6 +50,8 @@ No build step, no dependencies: plain HTML5 Canvas + vanilla JavaScript.
    - **Tables / More Tables** — some customers eat in, leave a tip on the table (half their bill) and a mess to clean.
    - **2nd Oven** — doubles production.
    - **Drive‑Thru** — cars queue at a window on the road and pay 1.5× for pizzas you drop at the window.
+     Now and then a concrete mixer, police car, school bus, taxi or tractor turns up, and once in a while
+     the fire truck leaves the station, drives the loop around town, picks up a big order and heads home.
 6. Upgrade circles (Speed, Carry More, Better Oven) sit in the kitchen; the three staff circles (Cashier,
    Helper, Cleaner) are at the office desk. Stand still on one to buy. Each staff circle hires once, then
    trains that person: a trained helper walks faster and carries a bigger stack.

@@ -4,7 +4,7 @@ const Game = {
   s: null,
   player: null,
   customers: [], cars: [], staff: [], fx: [], floats: [], tables: [], ovens: [], coins: [], dog: null,
-  houses: [], icCustomers: [], car: null, driving: false, orderT: 30, icSpawnT: 4, carNear: false,
+  houses: [], icCustomers: [], car: null, driving: false, orderT: 30, icSpawnT: 4, carNear: false, fireTruck: null,
   seq: 0, time: 0, spawnT: 1.5, carT: 4, saveT: 0, secT: 0, secEarned: 0, groupLeft: 0, groupT: 0,
   hint: null, padDwell: Object.create(null), lastTotal: 0,
   onUnlock: null, onToast: null,
@@ -54,6 +54,7 @@ const Game = {
     this.icCustomers = [];
     this.car = { x: CFG.DELIVERY_CAR.x, y: CFG.DELIVERY_CAR.y, angle: -Math.PI / 2, vx: 0, vy: 0 };
     this.driving = false; this.orderT = U.rand(20, 35); this.icSpawnT = 4;
+    this.fireTruck = new FireTruck();
     this.padDwell = Object.create(null);
     this.spawnT = 1.5; this.carT = 4; this.groupLeft = 0;
     Sfx.muted = !!s.muted;
@@ -324,6 +325,7 @@ const Game = {
     for (const st of this.staff) st.update(dt, this);
     this.dog.update(dt, this);
     for (const c of this.icCustomers) c.update(dt, this);
+    this.fireTruck.update(dt, this);
     this.icCustomers = this.icCustomers.filter((c) => c.state !== 'gone');
 
     for (const f of this.fx) f.t += dt;
@@ -589,7 +591,8 @@ const Game = {
       if (this.carT <= 0) {
         this.carT = this.carSpawnInterval() * U.rand(0.5, 1.6);
         if (this.cars.filter((c) => c.inLine).length < CFG.DT_SLOTS) {
-          this.cars.push(new Car(this.seq++, U.randInt(1, 3 + Math.floor(this.decorCount() / 4))));
+          const kind = Math.random() < CFG.FUN_CAR_CHANCE ? U.pick(CFG.FUN_CARS) : 'car';
+          this.cars.push(new Car(this.seq++, U.randInt(1, 3 + Math.floor(this.decorCount() / 4)), kind));
         }
       }
     }

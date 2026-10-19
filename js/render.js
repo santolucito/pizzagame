@@ -224,7 +224,7 @@ const Render = {
     ctx.fillStyle = '#ffe08a'; ctx.font = this.font(11); ctx.fillText('PARK', -147, 172);
     // parked cars (static)
     for (const [i, col] of [[0, '#41b883'], [1, '#f06292']]) {
-      this.drawCar({ x: CFG.PARKING.x0 + 75, y: CFG.PARKING.y0 + 50 + i * 72, color: col, state: 'parked', want: 0, have: 0, patience: 99 }, g);
+      ctx.save(); ctx.translate(CFG.PARKING.x0 + 75, CFG.PARKING.y0 + 50 + i * 72); this.drawVehicle('car', g, col); ctx.restore();
     }
   },
 
@@ -599,11 +599,9 @@ const Render = {
     ctx.fillStyle = 'rgba(255,255,255,0.08)'; for (let y = F.y0; y < F.y1; y += 14) ctx.fillRect(F.x0 + 40, y, fw - 40, 2);
     // two garage doors on the road side
     for (const dy of [70, 160]) { ctx.fillStyle = '#e0e0e0'; ctx.fillRect(F.x0 + 4, F.y0 + dy - 30, 32, 60); ctx.fillStyle = 'rgba(0,0,0,0.15)'; for (let k = 0; k < 4; k++) ctx.fillRect(F.x0 + 4, F.y0 + dy - 30 + k * 15, 32, 2); }
-    // fire truck peeking out of the lower door
-    ctx.fillStyle = '#d32f2f'; U.roundRect(ctx, F.x0 - 20, F.y0 + 140, 70, 40, 6); ctx.fill();
-    ctx.fillStyle = '#ffeb3b'; ctx.fillRect(F.x0 - 10, F.y0 + 150, 50, 4); ctx.fillStyle = '#9fe0ff'; ctx.fillRect(F.x0 - 16, F.y0 + 146, 10, 28);
-    ctx.fillStyle = '#1e1e1e'; ctx.fillRect(F.x0 - 12, F.y0 + 136, 12, 6); ctx.fillRect(F.x0 + 28, F.y0 + 136, 12, 6); ctx.fillRect(F.x0 - 12, F.y0 + 178, 12, 6); ctx.fillRect(F.x0 + 28, F.y0 + 178, 12, 6);
-    ctx.fillStyle = '#c0c0c0'; for (let k = 0; k < 5; k++) ctx.fillRect(F.x0 + 2 + k * 9, F.y0 + 158, 6, 2);
+    // the lower bay is open: dark garage interior where the truck lives (the truck itself is drawn live)
+    ctx.fillStyle = '#3a2323'; ctx.fillRect(F.x0 + 4, F.y0 + 130, 130, 60);
+    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(F.x0 + 4, F.y0 + 130, 130, 8);
     // sign + hydrant
     ctx.fillStyle = '#fff'; U.roundRect(ctx, F.x0 + 50, F.y0 + 10, fw - 60, 20, 4); ctx.fill();
     ctx.fillStyle = '#c62828'; ctx.font = this.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🚒 FIRE DEPT', F.x0 + 50 + (fw - 60) / 2, F.y0 + 20);
@@ -831,7 +829,7 @@ const Render = {
   drawDeliveryCar(g) {
     const ctx = this.ctx, c = g.car;
     ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.angle);
-    this.drawCar({ x: 0, y: 0, color: '#e4572e', state: 'parked', want: 0, have: 0, patience: 99 }, g);
+    this.drawVehicle('car', g, '#e4572e');
     // roof sign
     ctx.fillStyle = '#fff8ee'; U.roundRect(ctx, -16, -8, 32, 16, 4); ctx.fill();
     this.drawPizza(0, 0, 6);
@@ -888,6 +886,7 @@ const Render = {
     for (const c of g.customers) items.push({ y: c.y, draw: () => this.drawCustomer(c, g) });
     for (const st of g.staff) items.push({ y: st.y, draw: () => this.drawStaff(st, g) });
     for (const c of g.cars) items.push({ y: c.y, draw: () => this.drawCar(c, g) });
+    if (g.fireTruck.state !== 'away') items.push({ y: g.fireTruck.y + 10, draw: () => { const t = g.fireTruck; this.ctx.save(); this.ctx.translate(t.x, t.y); this.ctx.rotate(t.angle); this.drawVehicle('firetruck', g, '#d32f2f'); this.ctx.restore(); } });
     for (const c of g.icCustomers) items.push({ y: c.y, draw: () => this.drawIceCreamCustomer(c, g) });
     items.push({ y: g.car.y + 10, draw: () => this.drawDeliveryCar(g) });
     if (!g.driving) items.push({ y: g.player.y, draw: () => this.drawPlayer(g) });
@@ -1076,25 +1075,9 @@ const Render = {
   drawCar(c, g) {
     const ctx = this.ctx;
     const x = c.x, y = c.y;
-    ctx.fillStyle = 'rgba(0,0,0,0.28)'; U.roundRect(ctx, x - 44, y - 17, 94, 44, 11); ctx.fill();
-    ctx.fillStyle = '#1e1e1e';
-    for (const wx of [-28, 26]) { U.roundRect(ctx, x + wx - 7, y - 26, 14, 9, 3); ctx.fill(); U.roundRect(ctx, x + wx - 7, y + 17, 14, 9, 3); ctx.fill(); }
-    const grd = ctx.createLinearGradient(0, y - 22, 0, y + 22);
-    grd.addColorStop(0, c.color); grd.addColorStop(1, 'rgba(0,0,0,0.0)');
-    ctx.fillStyle = c.color; U.roundRect(ctx, x - 46, y - 22, 92, 44, 12); ctx.fill();
-    ctx.fillStyle = 'rgba(0,0,0,0.18)'; U.roundRect(ctx, x - 46, y + 8, 92, 14, 8); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.3)'; U.roundRect(ctx, x - 40, y - 18, 80, 8, 4); ctx.fill();
-    // cabin
-    ctx.fillStyle = 'rgba(0,0,0,0.2)'; U.roundRect(ctx, x - 30, y - 17, 54, 34, 7); ctx.fill();
-    const glass = ctx.createLinearGradient(x - 30, 0, x + 24, 0);
-    glass.addColorStop(0, '#9fd8ff'); glass.addColorStop(0.5, '#e3f6ff'); glass.addColorStop(1, '#9fd8ff');
-    ctx.fillStyle = glass; U.roundRect(ctx, x + 8, y - 15, 15, 30, 4); ctx.fill(); U.roundRect(ctx, x - 30, y - 15, 8, 30, 3); ctx.fill();
-    ctx.fillStyle = c.color; U.roundRect(ctx, x - 20, y - 14, 26, 28, 5); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.18)'; U.roundRect(ctx, x - 18, y - 12, 22, 6, 3); ctx.fill();
-    // mirrors + lights
-    ctx.fillStyle = c.color; ctx.fillRect(x + 2, y - 26, 6, 4); ctx.fillRect(x + 2, y + 22, 6, 4);
-    ctx.fillStyle = '#fff6b0'; U.roundRect(ctx, x + 42, y - 17, 5, 9, 2); ctx.fill(); U.roundRect(ctx, x + 42, y + 8, 5, 9, 2); ctx.fill();
-    ctx.fillStyle = '#ff5252'; U.roundRect(ctx, x - 47, y - 17, 5, 9, 2); ctx.fill(); U.roundRect(ctx, x - 47, y + 8, 5, 9, 2); ctx.fill();
+    ctx.save(); ctx.translate(x, y); ctx.rotate(c.state === 'path' ? c.angle : 0);
+    this.drawVehicle(c.kind || 'car', g, c.color);
+    ctx.restore();
     if (c.state === 'waiting') {
       const left = c.want - c.have;
       this.drawBubble(x, y - 40, () => {
@@ -1103,6 +1086,113 @@ const Render = {
         ctx.fillText('×' + left, 2, 1);
       }, 46);
       if (c.patience < CFG.CAR_PATIENCE * 0.5) this.drawPatience(x, y - 58, c.patience / CFG.CAR_PATIENCE);
+    }
+  },
+
+  // Top-down vehicles drawn at the origin, nose pointing +x.
+  drawVehicle(kind, g, color) {
+    const ctx = this.ctx, t = g.time;
+    const wheels = (xs, w = 14, h = 9, half = 22) => { ctx.fillStyle = '#1e1e1e'; for (const wx of xs) { U.roundRect(ctx, wx - w / 2, -half - 4, w, h, 3); ctx.fill(); U.roundRect(ctx, wx - w / 2, half - 5, w, h, 3); ctx.fill(); } };
+    const lights = (len, half) => { ctx.fillStyle = '#fff6b0'; U.roundRect(ctx, len / 2 - 4, -half + 5, 5, 9, 2); ctx.fill(); U.roundRect(ctx, len / 2 - 4, half - 14, 5, 9, 2); ctx.fill(); ctx.fillStyle = '#ff5252'; U.roundRect(ctx, -len / 2 - 1, -half + 5, 5, 9, 2); ctx.fill(); U.roundRect(ctx, -len / 2 - 1, half - 14, 5, 9, 2); ctx.fill(); };
+    const flash = Math.floor(t * 5) % 2 === 0;
+    const lightbar = (x) => { ctx.fillStyle = flash ? '#ff3b3b' : '#3b7dff'; U.roundRect(ctx, x - 4, -14, 8, 12, 2); ctx.fill(); ctx.fillStyle = flash ? '#3b7dff' : '#ff3b3b'; U.roundRect(ctx, x - 4, 2, 8, 12, 2); ctx.fill(); ctx.fillStyle = '#ddd'; ctx.fillRect(x - 5, -2, 10, 4); };
+    const shadow = (len, half) => { ctx.fillStyle = 'rgba(0,0,0,0.28)'; U.roundRect(ctx, -len / 2 + 2, -half + 5, len, half * 2, 11); ctx.fill(); };
+    switch (kind) {
+      case 'firetruck': {
+        shadow(124, 24); wheels([-44, -16, 40], 15, 10, 24);
+        ctx.fillStyle = '#d32f2f'; U.roundRect(ctx, -62, -24, 124, 48, 9); ctx.fill();
+        ctx.fillStyle = '#9e1b1b'; U.roundRect(ctx, -62, 10, 124, 14, 6); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.fillRect(-58, -20, 116, 3); ctx.fillRect(-58, 17, 116, 3);
+        // cab
+        ctx.fillStyle = '#b71c1c'; U.roundRect(ctx, 18, -22, 42, 44, 7); ctx.fill();
+        ctx.fillStyle = '#bfe3ff'; U.roundRect(ctx, 44, -17, 12, 34, 3); ctx.fill(); U.roundRect(ctx, 24, -17, 8, 34, 3); ctx.fill();
+        lightbar(36);
+        // ladder on the back
+        ctx.fillStyle = '#9e9e9e'; U.roundRect(ctx, -58, -9, 74, 18, 3); ctx.fill();
+        ctx.fillStyle = '#cfd3d8'; ctx.fillRect(-56, -8, 70, 3); ctx.fillRect(-56, 5, 70, 3);
+        for (let k = -52; k < 14; k += 8) ctx.fillRect(k, -6, 2, 12);
+        ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(-50, 15, 4, 0, Math.PI * 2); ctx.fill();
+        lights(124, 24);
+        break;
+      }
+      case 'mixer': {
+        shadow(108, 22); wheels([-38, -12, 36], 14, 9, 22);
+        ctx.fillStyle = '#6d6d6d'; U.roundRect(ctx, -54, -16, 108, 32, 6); ctx.fill();
+        ctx.fillStyle = '#f2b134'; U.roundRect(ctx, 22, -21, 34, 42, 7); ctx.fill();
+        ctx.fillStyle = '#bfe3ff'; U.roundRect(ctx, 42, -16, 10, 32, 3); ctx.fill();
+        // drum with rotating stripes
+        ctx.save(); ctx.beginPath(); ctx.ellipse(-14, 0, 36, 19, 0, 0, Math.PI * 2); ctx.clip();
+        ctx.fillStyle = '#d7dbe0'; ctx.fillRect(-60, -30, 100, 60);
+        ctx.fillStyle = '#9aa0a8'; const off = (t * 40) % 16;
+        for (let k = -70; k < 40; k += 16) { ctx.beginPath(); ctx.moveTo(k + off, -30); ctx.lineTo(k + off + 8, -30); ctx.lineTo(k + off + 20, 30); ctx.lineTo(k + off + 12, 30); ctx.closePath(); ctx.fill(); }
+        ctx.restore();
+        ctx.strokeStyle = '#6d6d6d'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(-14, 0, 36, 19, 0, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = '#6d6d6d'; U.roundRect(ctx, -58, -5, 10, 10, 2); ctx.fill();
+        lights(108, 22);
+        break;
+      }
+      case 'police': {
+        shadow(92, 22); wheels([-28, 26]);
+        ctx.fillStyle = '#f5f5f5'; U.roundRect(ctx, -46, -22, 92, 44, 12); ctx.fill();
+        ctx.fillStyle = '#1e1e1e'; ctx.fillRect(-22, -22, 30, 44); U.roundRect(ctx, -46, 10, 92, 12, 6); ctx.fill();
+        ctx.fillStyle = '#bfe3ff'; U.roundRect(ctx, 8, -15, 15, 30, 4); ctx.fill(); U.roundRect(ctx, -30, -15, 8, 30, 3); ctx.fill();
+        ctx.fillStyle = '#f5f5f5'; U.roundRect(ctx, -20, -14, 26, 28, 5); ctx.fill();
+        lightbar(-4);
+        ctx.fillStyle = '#1e1e1e'; ctx.font = this.font(7); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.save(); ctx.translate(32, 0); ctx.rotate(Math.PI / 2); ctx.fillText('POLICE', 0, 0); ctx.restore();
+        lights(92, 22);
+        break;
+      }
+      case 'schoolbus': {
+        shadow(112, 22); wheels([-38, 36]);
+        ctx.fillStyle = '#f2b134'; U.roundRect(ctx, -56, -22, 112, 44, 9); ctx.fill();
+        ctx.fillStyle = '#1e1e1e'; ctx.fillRect(-52, -21, 104, 3); ctx.fillRect(-52, 18, 104, 3);
+        ctx.fillStyle = '#bfe3ff'; for (let k = -46; k < 40; k += 14) { U.roundRect(ctx, k, -18, 10, 8, 2); ctx.fill(); U.roundRect(ctx, k, 10, 10, 8, 2); ctx.fill(); }
+        U.roundRect(ctx, 44, -16, 8, 32, 3); ctx.fill();
+        ctx.fillStyle = '#1e1e1e'; ctx.font = this.font(8); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('SCHOOL BUS', -4, 0);
+        ctx.fillStyle = '#d32f2f'; ctx.beginPath(); for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2 + Math.PI / 8; ctx.lineTo(-30 + Math.cos(a) * 6, -27 + Math.sin(a) * 6); } ctx.closePath(); ctx.fill();
+        lights(112, 22);
+        break;
+      }
+      case 'taxi': {
+        shadow(92, 22); wheels([-28, 26]);
+        ctx.fillStyle = '#ffd60a'; U.roundRect(ctx, -46, -22, 92, 44, 12); ctx.fill();
+        ctx.fillStyle = 'rgba(0,0,0,0.18)'; U.roundRect(ctx, -46, 8, 92, 14, 8); ctx.fill();
+        for (let k = -40; k < 40; k += 8) { ctx.fillStyle = (k / 8) % 2 ? '#1e1e1e' : '#fff'; ctx.fillRect(k, -22, 8, 4); ctx.fillRect(k, 18, 8, 4); }
+        ctx.fillStyle = '#bfe3ff'; U.roundRect(ctx, 8, -15, 15, 30, 4); ctx.fill(); U.roundRect(ctx, -30, -15, 8, 30, 3); ctx.fill();
+        ctx.fillStyle = '#ffd60a'; U.roundRect(ctx, -20, -14, 26, 28, 5); ctx.fill();
+        ctx.fillStyle = '#fff'; U.roundRect(ctx, -14, -6, 14, 12, 2); ctx.fill();
+        ctx.fillStyle = '#1e1e1e'; ctx.font = this.font(6); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('TAXI', -7, 0);
+        lights(92, 22);
+        break;
+      }
+      case 'tractor': {
+        shadow(80, 20);
+        ctx.fillStyle = '#1e1e1e'; ctx.beginPath(); ctx.arc(-22, -20, 13, 0, Math.PI * 2); ctx.arc(-22, 20, 13, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(-22, -20, 5, 0, Math.PI * 2); ctx.arc(-22, 20, 5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#1e1e1e'; U.roundRect(ctx, 20, -22, 12, 8, 3); ctx.fill(); U.roundRect(ctx, 20, 14, 12, 8, 3); ctx.fill();
+        ctx.fillStyle = '#43a047'; U.roundRect(ctx, -34, -15, 76, 30, 8); ctx.fill();
+        ctx.fillStyle = '#2e7d32'; U.roundRect(ctx, -34, -15, 30, 30, 8); ctx.fill();
+        ctx.fillStyle = '#5b3a1a'; U.roundRect(ctx, -26, -8, 14, 16, 4); ctx.fill();
+        ctx.fillStyle = '#bfe3ff'; U.roundRect(ctx, -2, -12, 10, 24, 3); ctx.fill();
+        ctx.fillStyle = '#9e9e9e'; ctx.fillRect(12, -10, 4, 8); ctx.fillStyle = '#6d6d6d'; ctx.beginPath(); ctx.arc(14, -12, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#fff6b0'; U.roundRect(ctx, 38, -10, 4, 6, 1); ctx.fill(); U.roundRect(ctx, 38, 4, 4, 6, 1); ctx.fill();
+        break;
+      }
+      default: {
+        shadow(94, 22); wheels([-28, 26]);
+        ctx.fillStyle = color; U.roundRect(ctx, -46, -22, 92, 44, 12); ctx.fill();
+        ctx.fillStyle = 'rgba(0,0,0,0.18)'; U.roundRect(ctx, -46, 8, 92, 14, 8); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.3)'; U.roundRect(ctx, -40, -18, 80, 8, 4); ctx.fill();
+        ctx.fillStyle = 'rgba(0,0,0,0.2)'; U.roundRect(ctx, -30, -17, 54, 34, 7); ctx.fill();
+        const glass = ctx.createLinearGradient(-30, 0, 24, 0);
+        glass.addColorStop(0, '#9fd8ff'); glass.addColorStop(0.5, '#e3f6ff'); glass.addColorStop(1, '#9fd8ff');
+        ctx.fillStyle = glass; U.roundRect(ctx, 8, -15, 15, 30, 4); ctx.fill(); U.roundRect(ctx, -30, -15, 8, 30, 3); ctx.fill();
+        ctx.fillStyle = color; U.roundRect(ctx, -20, -14, 26, 28, 5); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.18)'; U.roundRect(ctx, -18, -12, 22, 6, 3); ctx.fill();
+        ctx.fillStyle = color; ctx.fillRect(2, -26, 6, 4); ctx.fillRect(2, 22, 6, 4);
+        lights(94, 22);
+      }
     }
   },
 

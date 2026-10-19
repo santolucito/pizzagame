@@ -61,6 +61,15 @@ const CFG = {
     { x0: 960, y0: 1020, x1: 1140, y1: 1160, door: { x: 1050, y: 1020 }, color: '#f7e0cf', roof: '#8a5a2d', name: 'Corner House' },
   ],
   FIRE_STATION: { x0: 1340, y0: 300, x1: 1520, y1: 540, door: { x: 1340, y: 440 } },
+  FIRE_TRUCK_HOME: { x: 1400, y: 460 },                 // parked inside the lower garage bay
+  // The fire truck's outing: out of the bay, around the block, into the drive-thru line, then home.
+  FIRE_TRUCK_OUT: [{ x: 1280, y: 460 }, { x: 1280, y: 960 }, { x: -440, y: 960 }, { x: -440, y: 58 }],
+  FIRE_TRUCK_BACK: [{ x: 1280, y: 58 }, { x: 1280, y: 460 }, { x: 1400, y: 460 }],
+  FIRE_TRUCK_EVERY: [240, 420],                         // seconds between outings (first one sooner)
+  FIRE_TRUCK_FIRST: [80, 140],
+  // Drive-thru vehicles: a plain car most of the time, something fun now and then
+  FUN_CAR_CHANCE: 0.14,
+  FUN_CARS: ['mixer', 'police', 'schoolbus', 'taxi', 'tractor'],
   // Pizza delivery
   DELIVERY_CAR: { x: 1116, y: 596 },   // parked in the shop's lot
   DELIVERY_SPEED: 360,

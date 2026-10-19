@@ -130,9 +130,10 @@ class Customer {
 }
 
 class Car {
-  constructor(id, want) {
-    this.id = id;
+  constructor(id, want, kind = 'car') {
+    this.id = id; this.kind = kind;
     this.x = CFG.WORLD.x0 - 110; this.y = (CFG.ROAD.y1 + CFG.ROAD.y2) / 2;
+    this.angle = 0; this.exitPath = null; this.onDone = null;
     this.state = 'arriving';
     this.want = want; this.have = 0;
     this.patience = CFG.CAR_PATIENCE;
@@ -161,8 +162,9 @@ class Car {
         g.fx.push({ kind: 'pizza', x0: CFG.DT_STACK.x, y0: CFG.DT_STACK.y - 10, x1: this.x, y1: this.y, t: 0, dur: 0.25 });
         Sfx.pickup();
         if (this.have >= this.want) {
-          const amount = g.price() * this.want * CFG.DT_PRICE_MULT;
+          const amount = g.price() * this.want * CFG.DT_PRICE_MULT * (this.kind === 'firetruck' ? 2 : 1);
           g.earn(amount, CFG.DT_CASH, 'dt');
+          if (this.kind === 'firetruck') g.floats.push({ x: this.x, y: this.y - 50, text: 'Thanks, chief!', color: '#ff6b8a', t: 0, dur: 1.5, big: true });
           g.fx.push({ kind: 'cash', x0: this.x, y0: this.y, x1: CFG.DT_CASH.x, y1: CFG.DT_CASH.y, t: 0, dur: 0.35 });
           Sfx.pay();
           this.state = 'leaving';
@@ -170,7 +172,47 @@ class Car {
       }
     } else if (this.state === 'leaving') {
       this.x += this.speed * 1.2 * dt;
-      if (this.x > CFG.WORLD.x1 + 130) this.state = 'gone';
+      if (this.exitPath && this.x >= this.exitPath[0].x) { this.state = 'path'; this.x = this.exitPath[0].x; }
+      else if (this.x > CFG.WORLD.x1 + 130) this.state = 'gone';
+    } else if (this.state === 'path') {
+      const wp = this.exitPath[0];
+      const ang = Math.atan2(wp.y - this.y, wp.x - this.x);
+      let d = ang - this.angle; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; this.angle += d * Math.min(1, dt * 6);
+      if (U.moveToward(this, wp.x, wp.y, this.speed, dt)) { this.exitPath.shift(); if (!this.exitPath.length) { this.state = 'gone'; if (this.onDone) this.onDone(); } }
+    }
+  }
+}
+
+// The town fire truck: parked in the station most of the time; now and then it drives the loop
+// around the block, joins the drive-thru line for a big order, and comes back home.
+class FireTruck {
+  constructor() {
+    this.x = CFG.FIRE_TRUCK_HOME.x; this.y = CFG.FIRE_TRUCK_HOME.y; this.angle = Math.PI; // nose toward the door
+    this.state = 'home'; this.path = []; this.speed = 200; this.timer = U.rand(CFG.FIRE_TRUCK_FIRST[0], CFG.FIRE_TRUCK_FIRST[1]);
+  }
+  update(dt, g) {
+    if (this.state === 'home') {
+      this.timer -= dt;
+      if (this.timer <= 0 && g.isUnlocked('driveThru')) {
+        this.state = 'out'; this.path = CFG.FIRE_TRUCK_OUT.map((p) => ({ x: p.x, y: p.y }));
+        g.toast('🚒 The fire truck is going out for pizza!'); Sfx.unlock();
+      }
+    } else if (this.state === 'out') {
+      const wp = this.path[0];
+      const ang = Math.atan2(wp.y - this.y, wp.x - this.x);
+      let d = ang - this.angle; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; this.angle += d * Math.min(1, dt * 6);
+      if (U.moveToward(this, wp.x, wp.y, this.speed, dt)) {
+        this.path.shift();
+        if (!this.path.length) {
+          // hand over to the drive-thru line as a vehicle, then come back along the return path
+          const car = new Car(g.seq++, U.randInt(3, 4), 'firetruck');
+          car.x = this.x; car.speed = 200;
+          car.exitPath = CFG.FIRE_TRUCK_BACK.map((p) => ({ x: p.x, y: p.y }));
+          car.onDone = () => { this.state = 'home'; this.x = CFG.FIRE_TRUCK_HOME.x; this.y = CFG.FIRE_TRUCK_HOME.y; this.angle = Math.PI; this.timer = U.rand(CFG.FIRE_TRUCK_EVERY[0], CFG.FIRE_TRUCK_EVERY[1]); g.toast('🚒 The fire truck is back home'); };
+          g.cars.push(car);
+          this.state = 'away';
+        }
+      }
     }
   }
 }

@@ -7,7 +7,7 @@ const Render = {
   viewW: CFG.W, viewH: CFG.H, camX: 0, camY: 0,
   MIN_VIEW_W: 440, MIN_VIEW_H: 420, MIN_ZOOMED_VIEW: 330, FULL_MAP_MIN_SCALE: 0.9, HUD_PAD_PX: 56,
   ZOOM_KEY: 'pizza-rush-zoom',
-  bg: null, bgKey: '', bgRes: 1, bgBuiltAt: 0, zoomLabelT: 0,
+  bgs: null, bgRes: 1, zoomLabelT: 0,
 
   init(canvas) {
     this.canvas = canvas;
@@ -55,11 +55,14 @@ const Render = {
 
   // Camera follows the player only along axes where the map is larger than the view.
   updateCamera(g, snap) {
-    const W = CFG.WORLD;
+    const W = g.bounds();
+    if (g.cameraSnap) { snap = true; g.cameraSnap = false; }
     const tx = U.clamp(g.player.x - this.viewW / 2, W.x0, W.x1 - this.viewW);
     // Let the world scroll a little below the HUD so the top edge is never hidden under it.
     const hudPad = this.HUD_PAD_PX / this.scale;
-    const ty = U.clamp(g.player.y - this.viewH / 2, W.y0 - hudPad, W.y1 - this.viewH);
+    // Riding the train, lift the camera so the train sits well down the screen with mountains above the tracks.
+    const minY = g.onTrain ? Math.min(W.y0 - hudPad, g.player.y - this.viewH * 0.4) : W.y0 - hudPad;
+    const ty = U.clamp(g.player.y - this.viewH / 2, minY, W.y1 - this.viewH);
     if (snap) { this.camX = tx; this.camY = ty; return; }
     this.camX = U.lerp(this.camX, tx, 0.12);
     this.camY = U.lerp(this.camY, ty, 0.12);
@@ -81,10 +84,12 @@ const Render = {
     this.updateCamera(g, false);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = '#2b1d14'; ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    if (g.travel) { this.drawTravel(g); return; }
     ctx.setTransform(this.dpr * this.scale, 0, 0, this.dpr * this.scale, -this.camX * this.dpr * this.scale, -this.camY * this.dpr * this.scale);
     this.ensureBackground(g);
-    const W = CFG.WORLD;
-    ctx.drawImage(this.bg, W.x0, W.y0, W.x1 - W.x0, W.y1 - W.y0);
+    const W = g.bounds();
+    this.drawSkyline(g, W);
+    ctx.drawImage(this.bgs[g.area].canvas, W.x0, W.y0, W.x1 - W.x0, W.y1 - W.y0);
     this.drawOutsideDynamic(g);
     this.drawDecorDynamic(g);
     this.drawKitchenDynamic(g);
@@ -101,23 +106,59 @@ const Render = {
   },
 
   // ======================= static background =======================
+  // One cached background per map (the town, Construction Town), rebuilt when its key changes.
   ensureBackground(g) {
-    const Wd = CFG.WORLD, area = (Wd.x1 - Wd.x0) * (Wd.y1 - Wd.y0);
+    const W = g.bounds(), area = (W.x1 - W.x0) * (W.y1 - W.y0);
     const res = Math.min(U.clamp(this.dpr * this.scale, 1, 2), Math.sqrt(9e6 / area)); // keep the cached map under ~9M pixels
-    const key = [g.isUnlocked('dining'), g.isUnlocked('tables2'), g.isUnlocked('oven2'), g.isUnlocked('driveThru'), CFG.DECOR_ITEMS.map((it) => g.hasDecor(it.key) ? 1 : 0).join(''), g.s.iceCream.owned, Math.round(g.price()), Math.round(res * 4) / 4].join('|');
+    const key = (g.area === 'site' ? ['site'] : [g.isUnlocked('dining'), g.isUnlocked('tables2'), g.isUnlocked('oven2'), g.isUnlocked('driveThru'), CFG.DECOR_ITEMS.map((it) => g.hasDecor(it.key) ? 1 : 0).join(''), g.s.iceCream.owned, Math.round(g.price())]).concat([Math.round(res * 4) / 4]).join('|');
     const now = performance.now();
-    if (this.bg && key === this.bgKey) return;
+    if (!this.bgs) this.bgs = {};
+    const c = this.bgs[g.area] || (this.bgs[g.area] = { canvas: document.createElement('canvas'), key: null, builtAt: 0, res: 1 });
+    if (c.key === key) return;
     // During a pinch the resolution changes continuously; rebuild at most every 150 ms.
-    if (this.bg && now - this.bgBuiltAt < 150 && key.split('|').slice(0, 6).join('|') === this.bgKey.split('|').slice(0, 6).join('|')) return;
-    this.bgKey = key; this.bgBuiltAt = now; this.bgRes = Math.round(res * 4) / 4;
-    if (!this.bg) this.bg = document.createElement('canvas');
-    const W = CFG.WORLD;
-    this.bg.width = Math.ceil((W.x1 - W.x0) * this.bgRes); this.bg.height = Math.ceil((W.y1 - W.y0) * this.bgRes);
-    const ctx = this.bg.getContext('2d');
-    ctx.setTransform(this.bgRes, 0, 0, this.bgRes, -W.x0 * this.bgRes, -W.y0 * this.bgRes);
+    const stem = (k) => k.split('|').slice(0, -1).join('|');
+    if (c.key && now - c.builtAt < 150 && stem(key) === stem(c.key)) return;
+    c.key = key; c.builtAt = now; c.res = Math.round(res * 4) / 4; this.bgRes = c.res;
+    c.canvas.width = Math.ceil((W.x1 - W.x0) * c.res); c.canvas.height = Math.ceil((W.y1 - W.y0) * c.res);
+    const ctx = c.canvas.getContext('2d');
+    ctx.setTransform(c.res, 0, 0, c.res, -W.x0 * c.res, -W.y0 * c.res);
     const main = this.ctx; this.ctx = ctx;
-    this.paintBackground(g);
+    if (g.area === 'site') this.paintSite(g); else this.paintBackground(g);
     this.ctx = main;
+  },
+
+  // Sky and mountains above the top edge of the map: seen when the camera lifts for a train ride.
+  drawSkyline(g, W) {
+    if (this.camY >= W.y0) return;
+    const ctx = this.ctx, x0 = this.camX - 10, x1 = this.camX + this.viewW + 10, top = this.camY - 10, base = W.y0 + 1;
+    const sky = ctx.createLinearGradient(0, top, 0, base); sky.addColorStop(0, '#79c6f2'); sky.addColorStop(1, '#d9f0ff');
+    ctx.fillStyle = sky; ctx.fillRect(x0, top, x1 - x0, base - top);
+    ctx.fillStyle = '#fff7c2'; ctx.beginPath(); ctx.arc(x0 + this.viewW * 0.8, base - 230, 26, 0, Math.PI * 2); ctx.fill();
+    // clouds drifting slowly
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    for (let i = 0; i < 6; i++) {
+      const cx = x0 + (((i * 530 + g.time * 12) % (this.viewW + 300)) + this.viewW + 300) % (this.viewW + 300) - 150, cy = base - 300 + (i % 3) * 46;
+      ctx.beginPath(); ctx.arc(cx, cy, 16, 0, Math.PI * 2); ctx.arc(cx + 18, cy - 8, 20, 0, Math.PI * 2); ctx.arc(cx + 40, cy, 15, 0, Math.PI * 2); ctx.fill();
+    }
+    const range = (h, step, col, snow, off) => {
+      ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x0, base);
+      const start = Math.floor(x0 / step) * step - step;
+      for (let x = start; x <= x1 + step; x += step) {
+        const k = Math.floor(x / step), peak = base - h * (0.6 + 0.4 * Math.abs(Math.sin(k * 7.3 + off)));
+        ctx.lineTo(x, base - 10); ctx.lineTo(x + step / 2, peak);
+      }
+      ctx.lineTo(x1 + step * 2, base); ctx.closePath(); ctx.fill();
+      if (snow) {
+        ctx.fillStyle = '#fff';
+        for (let x = start; x <= x1 + step; x += step) {
+          const k = Math.floor(x / step), peak = base - h * (0.6 + 0.4 * Math.abs(Math.sin(k * 7.3 + off)));
+          ctx.beginPath(); ctx.moveTo(x + step / 2, peak); ctx.lineTo(x + step / 2 + 22, peak + 26); ctx.lineTo(x + step / 2 + 6, peak + 22); ctx.lineTo(x + step / 2 - 6, peak + 30); ctx.lineTo(x + step / 2 - 22, peak + 26); ctx.closePath(); ctx.fill();
+        }
+      }
+    };
+    range(200, 260, '#7f8fb3', true, 0.3);
+    range(130, 180, '#5f7f8f', false, 1.9);
+    range(70, 120, '#4d8a56', false, 4.1);
   },
 
   paintBackground(g) {
@@ -748,7 +789,23 @@ const Render = {
 
   // Railway along the top of the world, a platform with a little station house opposite the farm.
   bgStation(g) {
-    const ctx = this.ctx, S = CFG.STATION, W = CFG.WORLD, ty = S.trackY;
+    const ctx = this.ctx, S = CFG.STATION, P = S.platform;
+    this.bgPlatform(S, CFG.WORLD, '🚉 STATION');
+    // railway crossing gates where the tracks meet nothing: just a crossing sign near the station path
+    ctx.fillStyle = '#d2cbbb'; ctx.fillRect(-712, P.y1, 24, 50); // path down to the sidewalk
+    // trash can beside the path: throw away pizzas you are carrying
+    const T = S.trash;
+    ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(T.x + 3, T.y + 4, 16, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#5c8a3c'; U.roundRect(ctx, T.x - 18, T.y - 30, 36, 32, 5); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.14)'; for (let i = 0; i < 4; i++) ctx.fillRect(T.x - 13 + i * 8, T.y - 24, 3, 22);
+    ctx.fillStyle = '#4a7230'; U.roundRect(ctx, T.x - 21, T.y - 36, 42, 9, 4); ctx.fill();
+    ctx.fillStyle = '#3d5f27'; U.roundRect(ctx, T.x - 5, T.y - 40, 10, 5, 2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = this.font(8); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('TRASH', T.x, T.y - 12);
+  },
+
+  // Tracks across the top of a map, a platform with a little station house. Shared by both towns.
+  bgPlatform(S, W, label) {
+    const ctx = this.ctx, ty = S.trackY;
     ctx.fillStyle = '#8d7b63'; ctx.fillRect(W.x0, ty - 18, W.x1 - W.x0, 36);           // ballast
     ctx.fillStyle = '#6b4a2b'; for (let x = W.x0; x < W.x1; x += 22) ctx.fillRect(x, ty - 12, 10, 24); // ties
     ctx.fillStyle = '#9aa0a8'; ctx.fillRect(W.x0, ty - 8, W.x1 - W.x0, 4); ctx.fillRect(W.x0, ty + 4, W.x1 - W.x0, 4); // rails
@@ -765,21 +822,194 @@ const Render = {
     ctx.fillStyle = '#9fe0ff'; ctx.fillRect(H.x0 + 12, H.y0 + 20, 20, 14); ctx.fillRect(H.x1 - 32, H.y0 + 20, 20, 14);
     ctx.fillStyle = '#5b3a1a'; ctx.fillRect(H.x0 + 42, H.y0 + 18, 16, 28);
     ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(H.x0 + 50, H.y0 - 2, 8, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(H.x0 + 50, H.y0 - 2); ctx.lineTo(H.x0 + 50, H.y0 - 8); ctx.moveTo(H.x0 + 50, H.y0 - 2); ctx.lineTo(H.x0 + 54, H.y0 - 2); ctx.stroke(); // clock
-    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, P.x0 + 150, P.y1 - 14, 90, 16, 4); ctx.fill();
-    ctx.fillStyle = '#ffe08a'; ctx.font = this.font(10); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🚉 STATION', P.x0 + 195, P.y1 - 6);
+    ctx.font = this.font(10); const lw = ctx.measureText(label).width + 18;
+    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, P.x0 + 195 - lw / 2, P.y1 - 14, lw, 16, 4); ctx.fill();
+    ctx.fillStyle = '#ffe08a'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(label, P.x0 + 195, P.y1 - 6);
     // bench + lamp on the platform
     ctx.fillStyle = '#8d5a2b'; ctx.fillRect(P.x1 - 70, P.y0 + 14, 40, 8); ctx.fillRect(P.x1 - 70, P.y0 + 24, 40, 6); ctx.fillStyle = '#4a2d12'; ctx.fillRect(P.x1 - 66, P.y0 + 30, 4, 8); ctx.fillRect(P.x1 - 38, P.y0 + 30, 4, 8);
     ctx.fillStyle = '#2d3a4a'; ctx.fillRect(P.x1 - 20, P.y0 + 10, 3, 30); ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.arc(P.x1 - 18, P.y0 + 8, 5, 0, Math.PI * 2); ctx.fill();
-    // railway crossing gates where the tracks meet nothing: just a crossing sign near the station path
-    ctx.fillStyle = '#d2cbbb'; ctx.fillRect(-712, P.y1, 24, 50); // path down to the sidewalk
-    // trash can beside the path: throw away pizzas you are carrying
-    const T = S.trash;
-    ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(T.x + 3, T.y + 4, 16, 6, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#5c8a3c'; U.roundRect(ctx, T.x - 18, T.y - 30, 36, 32, 5); ctx.fill();
-    ctx.fillStyle = 'rgba(0,0,0,0.14)'; for (let i = 0; i < 4; i++) ctx.fillRect(T.x - 13 + i * 8, T.y - 24, 3, 22);
-    ctx.fillStyle = '#4a7230'; U.roundRect(ctx, T.x - 21, T.y - 36, 42, 9, 4); ctx.fill();
-    ctx.fillStyle = '#3d5f27'; U.roundRect(ctx, T.x - 5, T.y - 40, 10, 5, 2); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.font = this.font(8); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('TRASH', T.x, T.y - 12);
+  },
+
+  // ======================= Construction Town =======================
+  paintSite(g) {
+    const ctx = this.ctx, S = CFG.SITE, W = S.WORLD;
+    // packed dirt with tyre ruts and gravel
+    const grd = ctx.createLinearGradient(0, W.y0, 0, W.y1); grd.addColorStop(0, '#c9a46a'); grd.addColorStop(1, '#b08a52');
+    ctx.fillStyle = grd; ctx.fillRect(W.x0, W.y0, W.x1 - W.x0, W.y1 - W.y0);
+    ctx.fillStyle = 'rgba(0,0,0,0.07)';
+    for (let i = 0; i < 700; i++) { const x = W.x0 + ((i * 193) % (W.x1 - W.x0)), y = W.y0 + ((i * 101) % (W.y1 - W.y0)); ctx.beginPath(); ctx.ellipse(x, y, 5, 2.5, 0, 0, Math.PI * 2); ctx.fill(); }
+    ctx.strokeStyle = 'rgba(0,0,0,0.08)'; ctx.lineWidth = 6;
+    for (const [x0, y0, x1, y1] of [[2650, 300, 3300, 820], [2700, 320, 3350, 840], [3300, 200, 3950, 700], [3330, 180, 3980, 680]]) { ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); }
+    // a few puddles
+    ctx.fillStyle = '#8fb8d6';
+    for (const [x, y, r] of [[2680, 640, 30], [3620, 820, 36], [3880, 250, 24]]) { ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.45, 0, 0, Math.PI * 2); ctx.fill(); }
+    // gravel road along the top
+    const R = S.ROAD;
+    ctx.fillStyle = '#8c8c86'; ctx.fillRect(R.x0, R.y0, R.x1 - R.x0, R.y1 - R.y0);
+    ctx.fillStyle = 'rgba(255,255,255,0.08)'; for (let i = 0; i < 400; i++) ctx.fillRect(R.x0 + ((i * 97) % (R.x1 - R.x0)), R.y0 + ((i * 53) % (R.y1 - R.y0)), 3, 2);
+    this.bgPlatform(S.STATION, W, '🏗️ ' + S.STATION.name);
+    ctx.fillStyle = '#d2cbbb'; ctx.fillRect(S.STATION.stopX - 12, S.STATION.platform.y1, 24, R.y0 - S.STATION.platform.y1); // path to the road
+    // orange safety fencing around the lot, with a wide gap by the station path
+    const fence = (x0, y0, x1, y1) => {
+      ctx.fillStyle = '#ff7a1a'; const vert = Math.abs(y1 - y0) > Math.abs(x1 - x0);
+      if (vert) { for (let y = y0; y < y1; y += 24) ctx.fillRect(x0 - 2, y, 5, 16); ctx.fillRect(x0 - 1, y0, 3, y1 - y0); }
+      else { for (let x = x0; x < x1; x += 24) ctx.fillRect(x, y0 - 2, 16, 5); ctx.fillRect(x0, y0 - 1, x1 - x0, 3); }
+    };
+    fence(W.x0 + 30, R.y1 + 20, S.STATION.stopX - 60, R.y1 + 20); fence(S.STATION.stopX + 60, R.y1 + 20, W.x1 - 30, R.y1 + 20);
+    // the half-built house: concrete slab, brick walls part way up, scaffolding, a doorway
+    const B = S.BUILDING;
+    ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(B.x0 + 6, B.y0 + 8, B.x1 - B.x0, B.y1 - B.y0);
+    ctx.fillStyle = '#b9b5ad'; ctx.fillRect(B.x0, B.y0, B.x1 - B.x0, B.y1 - B.y0);
+    ctx.strokeStyle = 'rgba(0,0,0,0.08)'; ctx.lineWidth = 1;
+    for (let x = B.x0; x < B.x1; x += 40) { ctx.beginPath(); ctx.moveTo(x + 0.5, B.y0); ctx.lineTo(x + 0.5, B.y1); ctx.stroke(); }
+    for (let y = B.y0; y < B.y1; y += 40) { ctx.beginPath(); ctx.moveTo(B.x0, y + 0.5); ctx.lineTo(B.x1, y + 0.5); ctx.stroke(); }
+    const brickWall = (x, y, w, h) => {
+      ctx.fillStyle = '#b5543a'; ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = 'rgba(255,255,255,0.22)';
+      for (let yy = y; yy < y + h; yy += 8) { ctx.fillRect(x, yy, w, 1.5); const off = ((yy - y) / 8) % 2 ? 10 : 0; for (let xx = x + off; xx < x + w; xx += 20) ctx.fillRect(xx, yy, 1.5, 8); }
+    };
+    brickWall(B.x0, B.y0, B.x1 - B.x0, 14); brickWall(B.x0, B.y0, 14, B.y1 - B.y0); brickWall(B.x1 - 14, B.y0, 14, B.y1 - B.y0);
+    brickWall(B.x0, B.y1 - 14, B.door.x - B.door.half - B.x0, 14); brickWall(B.door.x + B.door.half, B.y1 - 14, B.x1 - (B.door.x + B.door.half), 14);
+    ctx.fillStyle = '#9a9a9a'; // scaffolding poles along the back wall
+    for (let x = B.x0 + 10; x < B.x1; x += 48) { ctx.fillRect(x, B.y0 - 30, 4, 46); }
+    ctx.fillRect(B.x0 + 10, B.y0 - 30, B.x1 - B.x0 - 20, 4); ctx.fillRect(B.x0 + 10, B.y0 - 10, B.x1 - B.x0 - 20, 4);
+    ctx.fillStyle = '#c99a5f'; ctx.fillRect(B.x0 + 14, B.y0 - 26, B.x1 - B.x0 - 28, 10); // plank
+    ctx.fillStyle = '#2b1d14'; ctx.font = this.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff'; U.roundRect(ctx, B.x0 + 60, B.y0 + 70, 180, 40, 6); ctx.fill();
+    ctx.fillStyle = '#2b1d14'; ctx.fillText('🏠 FUTURE HOME OF', (B.x0 + B.x1) / 2, B.y0 + 84); ctx.fillText('PIZZA #2 ?', (B.x0 + B.x1) / 2, B.y0 + 100);
+    // brick pallets
+    for (const [x, y] of S.PALLETS) { ctx.fillStyle = '#8d5a2b'; ctx.fillRect(x - 24, y + 6, 48, 8); brickWall(x - 20, y - 16, 40, 24); }
+    // tower crane: concrete base and the mast (the jib swings in the dynamic pass)
+    const C = S.CRANE;
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(C.x - 20, C.y - 18, 48, 48);
+    ctx.fillStyle = '#9a9a9a'; ctx.fillRect(C.x - 24, C.y - 24, 48, 48);
+    ctx.fillStyle = '#f2b705'; ctx.fillRect(C.x - 12, C.y - 12, 24, 24);
+    ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(C.x - 12, C.y - 12); ctx.lineTo(C.x + 12, C.y + 12); ctx.moveTo(C.x + 12, C.y - 12); ctx.lineTo(C.x - 12, C.y + 12); ctx.stroke();
+    // portable toilet
+    const T = S.TOILET;
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(T.x - 12, T.y - 26, 32, 40);
+    ctx.fillStyle = '#2f9e9e'; ctx.fillRect(T.x - 16, T.y - 30, 32, 40); ctx.fillStyle = '#237a7a'; ctx.fillRect(T.x - 16, T.y - 30, 32, 8);
+    ctx.fillStyle = '#1b5e5e'; ctx.fillRect(T.x - 6, T.y - 16, 12, 24); ctx.fillStyle = '#fff'; ctx.fillRect(T.x - 12, T.y - 20, 6, 4);
+    // cones and barrels
+    for (const [x, y] of S.CONES) {
+      ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(x + 2, y + 3, 10, 4, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ff7a1a'; ctx.beginPath(); ctx.moveTo(x - 9, y); ctx.lineTo(x + 9, y); ctx.lineTo(x + 3, y - 24); ctx.lineTo(x - 3, y - 24); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.fillRect(x - 6, y - 14, 12, 4);
+    }
+    for (const [x, y] of S.BARRELS) {
+      ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(x + 2, y + 6, 12, 5, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#3b7dd8'; U.roundRect(ctx, x - 10, y - 16, 20, 24, 4); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(x - 10, y - 10, 20, 2); ctx.fillRect(x - 10, y, 20, 2);
+    }
+    // sign by the station
+    const G = S.SIGN;
+    ctx.fillStyle = '#5b3a1a'; ctx.fillRect(G.x - 3, G.y - 30, 6, 34); ctx.fillStyle = '#f2b705'; U.roundRect(ctx, G.x - 70, G.y - 60, 140, 34, 6); ctx.fill();
+    ctx.fillStyle = '#2b1d14'; ctx.font = this.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('🚧 UNDER CONSTRUCTION 🚧', G.x, G.y - 49); ctx.font = this.font(9); ctx.fillText('Ride the big machines!', G.x, G.y - 35);
+  },
+
+  // Construction Town things that move: dirt piles that get flattened, the crane's jib, the big machines' rider
+  drawSiteDynamic(g) {
+    const ctx = this.ctx, S = CFG.SITE;
+    for (const m of g.mounds) {
+      if (m.flat) { ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.beginPath(); ctx.ellipse(m.x, m.y + 2, m.r, m.r * 0.5, 0, 0, Math.PI * 2); ctx.fill(); continue; }
+      ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(m.x + 4, m.y + 6, m.r, m.r * 0.5, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#7a4f2a'; ctx.beginPath(); ctx.ellipse(m.x, m.y, m.r, m.r * 0.55, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#95643a'; ctx.beginPath(); ctx.ellipse(m.x - m.r * 0.1, m.y - m.r * 0.3, m.r * 0.65, m.r * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#b07a48'; ctx.beginPath(); ctx.ellipse(m.x - m.r * 0.2, m.y - m.r * 0.5, m.r * 0.3, m.r * 0.16, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    // crane jib swinging slowly over the site, hook dangling below it
+    const C = S.CRANE, a = Math.sin(g.time * 0.25) * 0.9 + 0.3, L = 230;
+    ctx.save(); ctx.translate(C.x, C.y); ctx.rotate(a);
+    ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(6, 10, L, 8);
+    ctx.fillStyle = '#f2b705'; ctx.fillRect(-50, -6, L + 50, 12);
+    ctx.fillStyle = '#2b1d14'; for (let x = -44; x < L - 10; x += 18) ctx.fillRect(x, -4, 3, 8);
+    ctx.fillStyle = '#9a9a9a'; ctx.fillRect(-56, -10, 30, 20); // counterweight
+    ctx.restore();
+    const hx = C.x + Math.cos(a) * (L - 30), hy = C.y + Math.sin(a) * (L - 30);
+    ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx, hy + 60); ctx.stroke();
+    ctx.fillStyle = '#9a9a9a'; ctx.beginPath(); ctx.arc(hx, hy + 64, 6, 0, Math.PI); ctx.fill();
+    ctx.fillStyle = Math.floor(g.time * 2) % 2 ? '#ff3b3b' : '#ffb3b3'; ctx.beginPath(); ctx.arc(C.x, C.y, 4, 0, Math.PI * 2); ctx.fill(); // beacon
+  },
+
+  drawSiteVehicle(g, v, lift) {
+    const ctx = this.ctx, riding = g.driving && g.vehicle === v;
+    ctx.save(); ctx.translate(v.x, v.y); ctx.rotate(v.angle);
+    this.drawVehicle(v.kind, g, g.s.paint[v.kind], v);
+    if (riding) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(-10, 0, 8, 10, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(-7, 0, 5.5, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-9, 0, 5, 0, Math.PI * 2); ctx.fill(); }
+    ctx.restore();
+    this.drawRidingExtras(g, v, lift);
+  },
+
+  // The ride between the towns: a side-on view of the train chugging past mountains.
+  drawTravel(g) {
+    const ctx = this.ctx, tr = g.travel, W = this.canvas.width / this.dpr, H = this.canvas.height / this.dpr;
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    const k = tr.t / tr.dur, ease = k < 0.15 ? k / 0.15 : k > 0.85 ? (1 - k) / 0.15 : 1; // slow out, slow in
+    const dist = (tr.t < 1.2 ? tr.t * tr.t / 2.4 : tr.t - 0.6) * 420 * (tr.to === 'site' ? 1 : 1); // scrolled distance (px)
+    const sky = ctx.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#79c6f2'); sky.addColorStop(0.6, '#d9f0ff'); sky.addColorStop(1, '#eaf7ff');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#fff7c2'; ctx.beginPath(); ctx.arc(W * 0.8, H * 0.18, Math.min(W, H) * 0.06, 0, Math.PI * 2); ctx.fill();
+    const groundY = H * 0.78;
+    const layer = (speed, draw) => { const off = (dist * speed) % 2000; for (let r = -1; r <= Math.ceil(W / 2000) + 1; r++) draw(r * 2000 - off); };
+    // clouds
+    layer(0.08, (ox) => { ctx.fillStyle = 'rgba(255,255,255,0.92)'; for (let i = 0; i < 5; i++) { const cx = ox + i * 410 + 60, cy = H * (0.12 + (i % 3) * 0.08); ctx.beginPath(); ctx.arc(cx, cy, 18, 0, Math.PI * 2); ctx.arc(cx + 20, cy - 10, 24, 0, Math.PI * 2); ctx.arc(cx + 46, cy, 17, 0, Math.PI * 2); ctx.fill(); } });
+    // far mountains with snow, then nearer hills
+    const range = (speed, h, step, col, snow, off) => layer(speed, (ox) => {
+      ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(ox, groundY);
+      for (let x = 0; x <= 2000; x += step) { const kk = x / step, peak = groundY - h * (0.55 + 0.45 * Math.abs(Math.sin(kk * 7.3 + off))); ctx.lineTo(ox + x, groundY - 6); ctx.lineTo(ox + x + step / 2, peak); }
+      ctx.lineTo(ox + 2000, groundY); ctx.closePath(); ctx.fill();
+      if (snow) { ctx.fillStyle = '#fff'; for (let x = 0; x <= 2000; x += step) { const kk = x / step, peak = groundY - h * (0.55 + 0.45 * Math.abs(Math.sin(kk * 7.3 + off))), px = ox + x + step / 2; ctx.beginPath(); ctx.moveTo(px, peak); ctx.lineTo(px + 24, peak + 30); ctx.lineTo(px + 6, peak + 24); ctx.lineTo(px - 6, peak + 32); ctx.lineTo(px - 24, peak + 30); ctx.closePath(); ctx.fill(); } }
+    });
+    range(0.15, H * 0.5, 250, '#7f8fb3', true, 0.3);
+    range(0.3, H * 0.3, 170, '#5f7f8f', false, 1.9);
+    range(0.5, H * 0.17, 110, '#4d8a56', false, 4.1);
+    // meadow, trees, a fence
+    ctx.fillStyle = '#6cb35a'; ctx.fillRect(0, groundY - 4, W, H - groundY + 4);
+    layer(0.8, (ox) => { for (let i = 0; i < 9; i++) { const tx = ox + i * 230 + (i % 2) * 60, ty = groundY + 6; ctx.fillStyle = '#6b4a2b'; ctx.fillRect(tx - 4, ty - 26, 8, 26); ctx.fillStyle = '#3f9a4a'; ctx.beginPath(); ctx.arc(tx, ty - 38, 22, 0, Math.PI * 2); ctx.arc(tx - 14, ty - 26, 16, 0, Math.PI * 2); ctx.arc(tx + 14, ty - 26, 16, 0, Math.PI * 2); ctx.fill(); } });
+    // track bed and rails run under the train, ties streaming past
+    const ty = groundY + 46;
+    ctx.fillStyle = '#8d7b63'; ctx.fillRect(0, ty - 10, W, 24);
+    layer(1, (ox) => { ctx.fillStyle = '#6b4a2b'; for (let x = 0; x < 2000; x += 26) ctx.fillRect(ox + x, ty - 8, 12, 20); });
+    ctx.fillStyle = '#9aa0a8'; ctx.fillRect(0, ty - 4, W, 3); ctx.fillRect(0, ty + 6, W, 3);
+    // the train, side on: two coaches and the locomotive, wheels turning, smoke puffing
+    const scale = Math.min(1.1, W / 760), tx0 = W / 2 - 300 * scale, by = ty - 6;
+    ctx.save(); ctx.translate(tx0, by); ctx.scale(scale, scale);
+    const wheel = (x, r) => { ctx.fillStyle = '#1e1e1e'; ctx.beginPath(); ctx.arc(x, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#9aa0a8'; ctx.lineWidth = 2; const a = dist / r; ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * r, Math.sin(a) * r); ctx.lineTo(x - Math.cos(a) * r, -Math.sin(a) * r); ctx.moveTo(x + Math.cos(a + 1.57) * r, Math.sin(a + 1.57) * r); ctx.lineTo(x - Math.cos(a + 1.57) * r, -Math.sin(a + 1.57) * r); ctx.stroke(); };
+    const coach = (x) => {
+      ctx.fillStyle = '#2d8a5a'; U.roundRect(ctx, x, -58, 170, 52, 8); ctx.fill();
+      ctx.fillStyle = '#3aa36c'; U.roundRect(ctx, x + 4, -64, 162, 10, 5); ctx.fill();
+      ctx.fillStyle = '#bfe3ff'; for (let k2 = 14; k2 < 160; k2 += 30) U.roundRect(ctx, x + k2, -48, 20, 18, 3), ctx.fill();
+      ctx.fillStyle = '#1f6e3e'; ctx.fillRect(x, -16, 170, 10);
+      wheel(x + 30, 11); wheel(x + 60, 11); wheel(x + 110, 11); wheel(x + 140, 11);
+    };
+    coach(0); ctx.fillStyle = '#2b1d14'; ctx.fillRect(170, -30, 14, 8); coach(184); ctx.fillRect(354, -30, 14, 8);
+    // locomotive
+    const lx = 368;
+    ctx.fillStyle = '#2d3a4a'; U.roundRect(ctx, lx, -22, 200, 18, 4); ctx.fill();
+    ctx.fillStyle = '#c62828'; U.roundRect(ctx, lx, -74, 60, 60, 8); ctx.fill(); ctx.fillStyle = '#e53935'; U.roundRect(ctx, lx - 4, -80, 68, 12, 5); ctx.fill(); // cab
+    ctx.fillStyle = '#bfe3ff'; U.roundRect(ctx, lx + 10, -66, 18, 18, 3); ctx.fill(); U.roundRect(ctx, lx + 34, -66, 18, 18, 3); ctx.fill();
+    const boiler = ctx.createLinearGradient(0, -62, 0, -18); boiler.addColorStop(0, '#c9ccd2'); boiler.addColorStop(1, '#6b7480');
+    ctx.fillStyle = boiler; U.roundRect(ctx, lx + 58, -62, 130, 44, 20); ctx.fill();
+    ctx.fillStyle = '#f2b134'; ctx.beginPath(); ctx.arc(lx + 110, -62, 10, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = '#2b1d14'; ctx.fillRect(lx + 160, -90, 16, 30); ctx.fillRect(lx + 156, -92, 24, 8); // chimney
+    ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.arc(lx + 190, -40, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#c62828'; ctx.beginPath(); ctx.moveTo(lx + 188, -10); ctx.lineTo(lx + 214, 10); ctx.lineTo(lx + 188, 10); ctx.closePath(); ctx.fill(); // cowcatcher
+    wheel(lx + 40, 12); wheel(lx + 90, 17); wheel(lx + 130, 17); wheel(lx + 172, 12);
+    ctx.fillStyle = '#9aa0a8'; const rod = Math.cos(dist / 17) * 17; ctx.fillRect(lx + 90 + rod - 2, -4, 44, 4);
+    // chef waving from the first coach window
+    ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(203, -40, 7, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(203, -49, 8, 5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    // smoke puffs trailing back from the chimney
+    for (let i = 0; i < 7; i++) { const age = ((g.time * 1.3 + i * 0.6) % 4.2) / 4.2; const sx = tx0 + (lx + 168) * scale - age * 260, sy = by - 92 * scale - age * 70; ctx.fillStyle = `rgba(240,240,240,${0.75 * (1 - age)})`; ctx.beginPath(); ctx.arc(sx, sy, (6 + age * 22) * scale, 0, Math.PI * 2); ctx.fill(); }
+    // destination banner
+    const msg = tr.to === 'site' ? '🚂 Next stop: Construction Town! 🏗️' : '🚂 Next stop: home! 🍕';
+    ctx.fillStyle = 'rgba(43,29,20,0.85)'; const bw = Math.min(W - 24, 360); U.roundRect(ctx, W / 2 - bw / 2, 60, bw, 44, 12); ctx.fill();
+    ctx.fillStyle = '#ffe08a'; ctx.font = this.font(bw < 300 ? 14 : 17); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(msg, W / 2, 82);
+    ctx.fillStyle = 'rgba(255,255,255,0.5)'; U.roundRect(ctx, W / 2 - bw / 2 + 16, 110, bw - 32, 6, 3); ctx.fill();
+    ctx.fillStyle = '#ffe08a'; U.roundRect(ctx, W / 2 - bw / 2 + 16, 110, (bw - 32) * U.clamp(k, 0, 1), 6, 3); ctx.fill();
+    // fade in and out at the ends of the ride
+    if (ease < 1) { ctx.fillStyle = `rgba(43,29,20,${1 - ease})`; ctx.fillRect(0, 0, W, H); }
   },
 
   // Playground across South Road from the farm.
@@ -815,8 +1045,8 @@ const Render = {
   },
 
   // Train and the moving parts of the playground (swing ropes, seesaw plank, spring horse).
-  drawTrain(g) {
-    const ctx = this.ctx, t = g.train;
+  drawTrain(g, t = g.train) {
+    const ctx = this.ctx;
     if (t.state === 'away') return;
     const y = t.y, stopped = t.state === 'stopped';
     for (const p of t.smoke) { ctx.fillStyle = `rgba(235,235,235,${0.65 * (1 - p.t / 1.6)})`; ctx.beginPath(); ctx.arc(p.x, p.y, 5 + p.t * 10, 0, Math.PI * 2); ctx.fill(); }
@@ -853,7 +1083,8 @@ const Render = {
     ctx.fillStyle = '#2b1d14'; for (let k = 0; k < 4; k++) ctx.fillRect(x + 160 + k * 4, y - 12 + k * 2, 2, 24 - k * 4);
     if (g.onTrain) { const cx = front - 240; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(cx, y, 9, 11, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(cx + 3, y, 6, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(cx + 1, y, 5.5, 0, Math.PI * 2); ctx.fill(); }
     // countdown over the locomotive while it waits
-    if (stopped && !g.onTrain) {
+    if (stopped && !g.onTrain && t.remote) this.drawBubble(front - 40, y - 52 + Math.sin(g.time * 4) * 3, () => { ctx.font = this.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('Hop on to go home!', 0, 0); }, 124);
+    else if (stopped && !g.onTrain) {
       const n = Math.ceil(t.leavesIn), urgent = n <= 5;
       this.drawBubble(front - 40, y - 52 + (urgent ? Math.sin(g.time * 12) * 3 : 0), () => { ctx.font = this.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = urgent ? '#e4572e' : '#2b1d14'; ctx.fillText(`Leaves in ${n}s`, 0, 0); }, 92);
     }
@@ -1107,6 +1338,7 @@ const Render = {
     this.drawFarmDynamic(g);
     this.drawPlaygroundDynamic(g);
     this.drawFishing(g);
+    this.drawSiteDynamic(g);
   },
 
   drawTownDynamic(g) {
@@ -1236,7 +1468,9 @@ const Render = {
     items.push({ y: g.car.y + 10, draw: () => this.drawDeliveryCar(g) });
     items.push({ y: g.bike.y + 8, draw: () => this.drawDeliveryBike(g) });
     items.push({ y: g.tractor.y + 12, draw: () => this.drawTractorRide(g) });
-    items.push({ y: g.train.y + 20, draw: () => this.drawTrain(g) });
+    items.push({ y: g.train.y + 20, draw: () => this.drawTrain(g, g.train) });
+    items.push({ y: g.siteTrain.y + 20, draw: () => this.drawTrain(g, g.siteTrain) });
+    for (const v of [g.excavator, g.dumptruck, g.bulldozer]) items.push({ y: v.y + 12, draw: () => this.drawSiteVehicle(g, v, 30) });
     if (!g.driving && !g.onTrain) items.push({ y: g.player.y, draw: () => this.drawPlayer(g) });
     items.sort((a, b) => a.y - b.y);
     for (const it of items) it.draw();
@@ -1442,7 +1676,7 @@ const Render = {
   },
 
   // Top-down vehicles drawn at the origin, nose pointing +x.
-  drawVehicle(kind, g, color) {
+  drawVehicle(kind, g, color, v) {
     const ctx = this.ctx, t = g.time;
     const wheels = (xs, w = 14, h = 9, half = 22) => { ctx.fillStyle = '#1e1e1e'; for (const wx of xs) { U.roundRect(ctx, wx - w / 2, -half - 4, w, h, 3); ctx.fill(); U.roundRect(ctx, wx - w / 2, half - 5, w, h, 3); ctx.fill(); } };
     const lights = (len, half) => { ctx.fillStyle = '#fff6b0'; U.roundRect(ctx, len / 2 - 4, -half + 5, 5, 9, 2); ctx.fill(); U.roundRect(ctx, len / 2 - 4, half - 14, 5, 9, 2); ctx.fill(); ctx.fillStyle = '#ff5252'; U.roundRect(ctx, -len / 2 - 1, -half + 5, 5, 9, 2); ctx.fill(); U.roundRect(ctx, -len / 2 - 1, half - 14, 5, 9, 2); ctx.fill(); };
@@ -1516,6 +1750,46 @@ const Render = {
         ctx.fillStyle = '#fff'; U.roundRect(ctx, -14, -6, 14, 12, 2); ctx.fill();
         ctx.fillStyle = '#1e1e1e'; ctx.font = this.font(6); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('TAXI', -7, 0);
         lights(92, 22);
+        break;
+      }
+      case 'excavator': {
+        shadow(84, 24); const ec = color || '#f2b705';
+        ctx.fillStyle = '#2b2b2b'; U.roundRect(ctx, -36, -26, 72, 12, 5); ctx.fill(); U.roundRect(ctx, -36, 14, 72, 12, 5); ctx.fill(); // tracks
+        ctx.fillStyle = '#6d6d6d'; for (let k = -30; k < 34; k += 9) { ctx.fillRect(k, -24, 4, 8); ctx.fillRect(k, 16, 4, 8); }
+        ctx.fillStyle = ec; ctx.beginPath(); ctx.arc(-4, 0, 22, 0, Math.PI * 2); ctx.fill(); // turntable body
+        ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.arc(-16, 0, 10, 0, Math.PI * 2); ctx.fill(); // engine
+        ctx.fillStyle = '#bfe3ff'; U.roundRect(ctx, 0, -12, 14, 24, 4); ctx.fill(); // cab glass
+        // arm: boom out front, bucket at the end, swinging up and down as it digs
+        const swing = v ? Math.sin(v.arm) : 0, reach = 36 + swing * 8;
+        ctx.fillStyle = ec; U.roundRect(ctx, 10, -6 + swing * 4, reach, 12, 4); ctx.fill();
+        ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(14, -2 + swing * 4, reach - 8, 3);
+        ctx.fillStyle = '#5c5c5c'; U.roundRect(ctx, 10 + reach - 4, -11 + swing * 6, 16, 22, 4); ctx.fill(); // bucket
+        ctx.fillStyle = '#2b2b2b'; for (let k = -8; k <= 8; k += 8) ctx.fillRect(10 + reach + 10, k - 2 + swing * 6, 5, 3); // teeth
+        break;
+      }
+      case 'dumptruck': {
+        shadow(104, 24); const dc = color || '#ff7a1a';
+        wheels([-32, -10, 32], 15, 10, 24);
+        ctx.fillStyle = '#5c5c5c'; U.roundRect(ctx, -52, -22, 104, 44, 6); ctx.fill(); // chassis
+        ctx.fillStyle = dc; U.roundRect(ctx, 20, -22, 32, 44, 7); ctx.fill(); // cab
+        ctx.fillStyle = '#bfe3ff'; U.roundRect(ctx, 36, -16, 10, 32, 3); ctx.fill();
+        ctx.fillStyle = dc; U.roundRect(ctx, -52, -24, 68, 48, 6); ctx.fill(); // tipper bed
+        ctx.fillStyle = '#7a4f2a'; U.roundRect(ctx, -46, -18, 56, 36, 5); ctx.fill(); // load of dirt
+        ctx.fillStyle = '#95643a'; ctx.beginPath(); ctx.ellipse(-18, -2, 20, 11, 0, 0, Math.PI * 2); ctx.fill();
+        lights(104, 24);
+        break;
+      }
+      case 'bulldozer': {
+        shadow(84, 24); const bc = color || '#f2b705';
+        ctx.fillStyle = '#2b2b2b'; U.roundRect(ctx, -30, -26, 60, 12, 5); ctx.fill(); U.roundRect(ctx, -30, 14, 60, 12, 5); ctx.fill(); // tracks
+        ctx.fillStyle = '#6d6d6d'; for (let k = -26; k < 28; k += 9) { ctx.fillRect(k, -24, 4, 8); ctx.fillRect(k, 16, 4, 8); }
+        ctx.fillStyle = bc; U.roundRect(ctx, -30, -16, 56, 32, 7); ctx.fill();
+        ctx.fillStyle = 'rgba(0,0,0,0.2)'; U.roundRect(ctx, 0, -12, 22, 24, 4); ctx.fill(); // engine hood
+        ctx.fillStyle = '#bfe3ff'; U.roundRect(ctx, -22, -10, 14, 20, 4); ctx.fill(); // cab
+        ctx.fillStyle = '#5c5c5c'; ctx.fillRect(22, -4, 20, 8); // push arms
+        ctx.fillStyle = '#9a9a9a'; U.roundRect(ctx, 38, -30, 10, 60, 3); ctx.fill(); // blade
+        ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(40, -28, 3, 56);
+        ctx.fillStyle = '#5c5c5c'; U.roundRect(ctx, -34, -8, 8, 16, 3); ctx.fill(); // ripper at the back
         break;
       }
       case 'tractor': {
@@ -1623,6 +1897,11 @@ const Render = {
     for (const f of g.fx) {
       if (f.t < 0) continue;
       const k = U.clamp(f.t / f.dur, 0, 1);
+      if (f.kind === 'dirt') {
+        const x = U.lerp(f.x0, f.x1, k), y = U.lerp(f.y0, f.y1, k) - Math.sin(k * Math.PI) * 34;
+        ctx.fillStyle = `rgba(122,79,42,${1 - k * 0.7})`; ctx.beginPath(); ctx.arc(x, y, 5 - k * 2, 0, Math.PI * 2); ctx.fill();
+        continue;
+      }
       if (f.kind === 'sparkle') {
         ctx.strokeStyle = `rgba(255,255,255,${1 - k})`; ctx.lineWidth = 3;
         for (let i = 0; i < 4; i++) {

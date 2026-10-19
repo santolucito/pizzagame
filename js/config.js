@@ -121,6 +121,27 @@ const CFG = {
     overflow: { x: 990, y: 520, dy: -44 },  // where extra customers queue outside the door
     trash: { x: -660, y: -46 },             // a bin at the end of the platform path: dump pizzas you no longer want
   },
+  // ---------- Construction Town: the next stop down the line, far to the east of town ----------
+  // It shares the world's coordinate space (so nothing in town can reach it) but has its own bounds,
+  // background and train. The train ride between the two plays as a little mountain journey.
+  SITE: {
+    WORLD: { x0: 2600, y0: -170, x1: 4000, y1: 900 },
+    STATION: { trackY: -140, platform: { x0: 2820, y0: -118, x1: 3160, y1: -72 }, house: { x0: 2830, y0: -118, x1: 2930, y1: -72 }, stopX: 3020, name: 'CONSTRUCTION TOWN' },
+    ROAD: { x0: 2600, y0: 40, x1: 4000, y1: 120 },            // gravel road along the top
+    BUILDING: { x0: 2720, y0: 330, x1: 3020, y1: 560, door: { x: 2870, half: 40 } },  // the half-built house
+    CRANE: { x: 3560, y: 330 },
+    TOILET: { x: 3260, y: 200 },
+    SIGN: { x: 3130, y: 200 },
+    CONES: [[2680, 210], [2720, 225], [3150, 300], [3180, 330], [3400, 770], [3450, 780], [3800, 640], [2650, 600]],
+    BARRELS: [[3120, 600], [3150, 612], [3700, 300], [3730, 312]],
+    PALLETS: [[3080, 430], [3140, 430]],
+    MOUNDS: [{ x: 3350, y: 620, r: 44 }, { x: 3550, y: 700, r: 50 }, { x: 3820, y: 450, r: 40 }, { x: 3300, y: 380, r: 36 }, { x: 3900, y: 790, r: 46 }, { x: 2750, y: 770, r: 42 }],
+    VEHICLES: { excavator: { x: 3450, y: 500 }, dumptruck: { x: 3750, y: 230 }, bulldozer: { x: 3050, y: 740 } },
+    FLATTEN_PAY: 6, MOUND_REGROW: 45,                          // flatten a dirt pile with a machine: pays, then grows back
+    coins: [{ x: 3650, y: 580 }, { x: 2900, y: 680 }, { x: 3950, y: 300 }],
+  },
+  TRAVEL: { dur: 8 },                                          // seconds the ride between the towns takes
+
   // Playground south of the farm across South Road
   PLAYGROUND: {
     x0: -1000, y0: 1015, x1: -500, y1: 1170,
@@ -139,6 +160,9 @@ const CFG = {
     car:  { speed: 360, radius: 22, label: '🚗 Drive', exit: '🚶 Get out' },
     bike: { speed: 440, radius: 13, label: '🛵 Ride', exit: '🚶 Hop off' },
     tractor: { speed: 210, radius: 18, label: '🚜 Drive', exit: '🚶 Hop off' },
+    excavator: { speed: 170, radius: 20, label: '🚜 Dig', exit: '🚶 Hop off' },
+    dumptruck: { speed: 300, radius: 24, label: '🚚 Drive', exit: '🚶 Get out' },
+    bulldozer: { speed: 160, radius: 20, label: '🚜 Push', exit: '🚶 Hop off' },
   },
   DELIVERY_SPEED: 360,
   DELIVERY_TIP: 2.0,                   // delivered pizzas pay double
@@ -238,6 +262,8 @@ const CFG = {
   OFFLINE_MAX_SEC: 3 * 3600,
   OFFLINE_EFFICIENCY: 0.5,
 };
+
+CFG.COINS.push(...CFG.SITE.coins);
 
 const COLORS = {
   shirts: ['#4e79a7', '#f28e2b', '#59a14f', '#b07aa1', '#ff9da7', '#76b7b2', '#edc948', '#9c755f', '#e15759'],

@@ -191,29 +191,43 @@ class Car {
 
 // The train: lives off-screen, rolls in along the top tracks, stops at the platform, lets a crowd off, leaves.
 class Train {
-  constructor() {
-    const S = CFG.STATION;
-    this.x = CFG.WORLD.x0 - 500; this.y = S.trackY; this.state = 'away'; this.timer = U.rand(S.first[0], S.first[1]);
-    this.speed = 0; this.unload = 0; this.toDrop = 0; this.dropT = 0; this.smoke = []; this.whistled = false; this.warned = false; this.hold = 0;
+  // st: the station it serves, bounds: the world it runs across. The Construction Town train is
+  // `remote`: it has no timetable, it waits at its platform until you hop on, then takes you home.
+  constructor(st = CFG.STATION, bounds = CFG.WORLD, remote = false) {
+    this.st = st; this.bounds = bounds; this.remote = remote;
+    this.x = bounds.x0 - 500; this.y = st.trackY; this.state = 'away'; this.timer = remote ? Infinity : U.rand(st.first[0], st.first[1]);
+    this.speed = 0; this.unload = 0; this.toDrop = 0; this.dropT = 0; this.smoke = []; this.whistled = false; this.warned = false; this.hold = 0; this.departIn = 0; this.hurrying = false;
   }
   // seconds until the train leaves the platform (for the countdown)
   get leavesIn() { return this.state === 'stopped' ? Math.max(0, this.unload + (this.hurrying ? this.hold : 0) + this.toDrop * 0.55) : 0; }
+  // bring the train in right now (arriving with a rider from the other town)
+  summon() { this.state = 'arriving'; this.x = this.bounds.x0 - 420; this.speed = 320; this.warned = true; this.smoke = []; }
   update(dt, g) {
-    const S = CFG.STATION;
+    const S = this.st, W = this.bounds, home = !this.remote && g.area === 'town';
     for (const p of this.smoke) { p.t += dt; p.y -= 18 * dt; p.x += 8 * dt; } this.smoke = this.smoke.filter((p) => p.t < 1.6);
     if (this.state === 'away') {
+      if (this.remote) return;
       this.timer -= dt;
-      if (!this.warned && this.timer <= S.warn && !g.onTrain) { this.warned = true; g.toast(`🚂 Train in ${S.warn} seconds! Run to the station!`, true); Sfx.whistle(); }
-      if (this.timer <= 0) { this.state = 'arriving'; this.x = CFG.WORLD.x0 - 420; this.speed = 320; this.whistled = false; this.warned = false; if (!g.onTrain) g.toast('🚂 The train is pulling in!', true); Sfx.whistle(); }
+      if (!this.warned && this.timer <= S.warn && !g.onTrain && home) { this.warned = true; g.toast(`🚂 Train in ${S.warn} seconds! Run to the station!`, true); Sfx.whistle(); }
+      if (this.timer <= 0) { this.summon(); this.warned = false; if (!g.onTrain && home) { g.toast('🚂 The train is pulling in!', true); Sfx.whistle(); } }
     } else if (this.state === 'arriving') {
       const dist = S.stopX - this.x;
       this.speed = Math.max(40, Math.min(320, dist * 1.2));
       this.x += this.speed * dt;
       if (Math.random() < dt * 6) this.smoke.push({ x: this.x - 14, y: this.y - 28, t: 0 });
-      if (dist <= 2) { this.x = S.stopX; this.state = 'stopped'; this.unload = S.dwell; this.hold = S.hold; this.toDrop = U.randInt(S.passengers[0], S.passengers[1]); this.dropT = 1.2; Sfx.whistle(); }
+      if (dist <= 2) {
+        this.x = S.stopX; this.state = 'stopped'; this.dropT = 1.2; Sfx.whistle();
+        if (this.remote) { this.unload = Infinity; this.hold = 0; this.toDrop = 0; this.departIn = Infinity; }   // waits until somebody boards
+        else { this.unload = S.dwell; this.hold = S.hold; this.toDrop = U.randInt(S.passengers[0], S.passengers[1]); }
+      }
     } else if (this.state === 'stopped') {
+      if (this.remote) {
+        // waits for you; two seconds after you climb aboard it pulls out
+        if (g.onTrain) { this.departIn -= dt; if (this.departIn <= 0) { this.state = 'leaving'; this.speed = 0; Sfx.whistle(); } }
+        return;
+      }
       // the conductor waits a little longer while somebody is hurrying up the platform path
-      const p = g.player, hurrying = !g.onTrain && !g.driving && p.y < 120 && Math.abs(p.x - S.stopX) < 420;
+      const p = g.player, hurrying = !g.onTrain && !g.driving && g.area === 'town' && p.y < 120 && Math.abs(p.x - S.stopX) < 420;
       this.hurrying = hurrying;
       if (this.unload <= 0 && hurrying && this.hold > 0) this.hold -= dt; else this.unload -= dt;
       this.dropT -= dt;
@@ -222,7 +236,10 @@ class Train {
     } else if (this.state === 'leaving') {
       this.speed = Math.min(360, this.speed + 160 * dt); this.x += this.speed * dt;
       if (Math.random() < dt * 8) this.smoke.push({ x: this.x - 14, y: this.y - 28, t: 0 });
-      if (this.x > CFG.WORLD.x1 + 500) { this.state = 'away'; this.timer = g.onTrain ? 2.5 : U.rand(S.every[0], S.every[1]); } // with a rider aboard it comes straight back around
+      if (this.x > W.x1 + 500) {
+        this.state = 'away'; this.timer = this.remote ? Infinity : U.rand(S.every[0], S.every[1]);
+        if (g.onTrain) g.startTravel(this.remote ? 'town' : 'site');   // off through the mountains to the other town
+      }
     }
   }
 }

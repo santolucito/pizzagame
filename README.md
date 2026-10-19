@@ -75,6 +75,7 @@ No build step, no dependencies: plain HTML5 Canvas + vanilla JavaScript.
     The farm **tractor** can be driven around the farm. Go **fishing** at the pond, and hop on the **train**
     at the platform for a ride.
 13. The **ice cream shop** is for sale. Once bought it runs itself with a scooper and its own customers;
+14. **Construction Town**: ride the train yourself and it takes you through the mountains to a second town that is still being built. Ride the excavator, bulldozer and dump truck, flatten dirt piles for a few coins, and take the waiting train home.
     walk in to collect the money, and buy More Flavors inside to make it busier.
 
 Impatient customers and cars leave if they wait too long. Progress saves automatically to

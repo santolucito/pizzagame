@@ -62,6 +62,14 @@ const Game = {
     this.vehicle = null; this.driving = false; this.orderT = U.rand(20, 35); this.icSpawnT = 4;
     this.fireTruck = new FireTruck();
     this.train = new Train(); this.ride = null; this.rideLeft = true;
+    // Construction Town: reached by train; its own train waits there to bring you home
+    this.area = 'town'; this.travel = null; this.cameraSnap = false;
+    this.siteTrain = new Train(CFG.SITE.STATION, CFG.SITE.WORLD, true);
+    const SV = CFG.SITE.VEHICLES;
+    this.excavator = { kind: 'excavator', x: SV.excavator.x, y: SV.excavator.y, angle: 0.4, vx: 0, vy: 0, arm: 0 };
+    this.dumptruck = { kind: 'dumptruck', x: SV.dumptruck.x, y: SV.dumptruck.y, angle: Math.PI, vx: 0, vy: 0 };
+    this.bulldozer = { kind: 'bulldozer', x: SV.bulldozer.x, y: SV.bulldozer.y, angle: -0.5, vx: 0, vy: 0 };
+    this.mounds = CFG.SITE.MOUNDS.map((m, i) => ({ i, x: m.x, y: m.y, r: m.r, flat: 0, t: 0 }));
     this.plots = CFG.FARM.plots.map((pl, i) => ({ i, kind: pl.kind, x: pl.x, y: pl.y, ready: true, t: 0, phase: Math.random() * 6 }));
     this.cow = { x: CFG.FARM.cowHome.x, y: CFG.FARM.cowHome.y, facing: 1, moving: false, bob: 0, target: null, timer: 0, ready: true, t: 0, moo: 0 };
     this.padDwell = Object.create(null);
@@ -268,6 +276,10 @@ const Game = {
   carIndex(c) { let i = 0; for (const o of this.cars) { if (o === c) return i; if (o.inLine) i++; } return i; },
   countMainQueue() { return this.customers.filter((c) => c.inMainQueue || c.entering).length; },
   insideBuilding(x, y) { const b = CFG.BUILDING; return x > b.x0 && x < b.x1 && y > b.y0 && y < b.y1; },
+  // which map the player is on: the pizza town or Construction Town down the line
+  bounds() { return this.area === 'site' ? CFG.SITE.WORLD : CFG.WORLD; },
+  station() { return this.area === 'site' ? CFG.SITE.STATION : CFG.STATION; },
+  currentTrain() { return this.area === 'site' ? this.siteTrain : this.train; },
 
   earn(amount, pos, pileKey) {
     if (pileKey === 'register') this.s.piles.cash += amount; else this.s.piles.dtCash += amount;
@@ -326,7 +338,9 @@ const Game = {
   update(dt) {
     const s = this.s;
     this.time += dt;
+    if (this.travel) this.updateTravel(dt);
     if (this.driving) this.updateDriving(dt); else if (this.onTrain) this.updateOnTrain(dt); else if (this.ride) this.updateRide(dt); else this.updatePlayer(dt);
+    this.updateSite(dt);
     this.updateFishing(dt);
     this.updateOvens(dt);
     this.updateInteractions(dt);
@@ -344,6 +358,7 @@ const Game = {
     for (const c of this.icCustomers) c.update(dt, this);
     this.fireTruck.update(dt, this);
     this.train.update(dt, this);
+    this.siteTrain.update(dt, this);
     this.icCustomers = this.icCustomers.filter((c) => c.state !== 'gone');
 
     for (const f of this.fx) f.t += dt;
@@ -370,7 +385,7 @@ const Game = {
       p.hasMoved = true;
       if (a.x) p.facing = a.x < 0 ? -1 : 1;
       p.bob += dt * 14;
-      const r = 12, w = CFG.WORLD;
+      const r = 12, w = this.bounds();
       const obstacles = this.obstacles();
       p.x = U.clamp(p.x + a.x * sp * dt, w.x0 + 16, w.x1 - 16);
       for (const o of obstacles) if (this.hitRect(p.x, p.y, r, o)) p.x = a.x > 0 ? o.x - r : o.x + o.w + r;
@@ -378,6 +393,22 @@ const Game = {
       for (const o of obstacles) if (this.hitRect(p.x, p.y, r, o)) p.y = a.y > 0 ? o.y - r : o.y + o.h + r;
     }
     this.checkRides();
+  },
+  // Construction Town: station house, the half-built house's walls (with a door gap), crane base, toilet, barrels, pallets
+  siteObstacles(forCar) {
+    const S = CFG.SITE, B = S.BUILDING, H = S.STATION.house, o = [];
+    o.push({ x: H.x0, y: H.y0, w: H.x1 - H.x0, h: H.y1 - H.y0 });
+    const fw = 8;
+    o.push({ x: B.x0, y: B.y0, w: B.x1 - B.x0, h: fw });
+    o.push({ x: B.x0, y: B.y0, w: fw, h: B.y1 - B.y0 });
+    o.push({ x: B.x1 - fw, y: B.y0, w: fw, h: B.y1 - B.y0 });
+    o.push({ x: B.x0, y: B.y1 - fw, w: B.door.x - B.door.half - B.x0, h: fw });
+    o.push({ x: B.door.x + B.door.half, y: B.y1 - fw, w: B.x1 - (B.door.x + B.door.half), h: fw });
+    o.push({ x: S.CRANE.x - 22, y: S.CRANE.y - 22, w: 44, h: 44 });
+    o.push({ x: S.TOILET.x - 16, y: S.TOILET.y - 30, w: 32, h: 40 });
+    for (const [x, y] of S.BARRELS) o.push({ x: x - 10, y: y - 14, w: 20, h: 20 });
+    for (const [x, y] of S.PALLETS) o.push({ x: x - 24, y: y - 16, w: 48, h: 30 });
+    return o;
   },
   obstacles() {
     const b = CFG.BUILDING, d = CFG.DOOR;
@@ -396,7 +427,7 @@ const Game = {
   },
   // Town buildings. The ice cream shop has a door gap in its bottom wall for people; cars see it solid.
   townObstacles(forCar) {
-    const o = [];
+    const o = this.siteObstacles(forCar);
     const IC = CFG.ICE_CREAM.rect, dw = CFG.ICE_CREAM.doorW / 2, dx = CFG.ICE_CREAM.door.x;
     if (forCar) o.push({ x: IC.x0, y: IC.y0, w: IC.x1 - IC.x0, h: IC.y1 - IC.y0 });
     else {
@@ -460,7 +491,8 @@ const Game = {
 
   // ---------- the one big action button: make a pizza, fish, ride the train ----------
   actionLabel() {
-    if (this.onTrain) return this.train.state === 'stopped' ? '🚶 Hop off the train' : null;
+    if (this.travel) return null;
+    if (this.onTrain) return this.currentTrain().state === 'stopped' ? '🚶 Hop off the train' : null;
     if (this.fishing) return this.fishing.phase === 'bite' ? '🎣 Reel in!' : this.fishing.phase === 'wait' ? '🎣 Wait for it…' : null;
     if (this.nearPrep) return '👐 Make a pizza';
     if (this.nearPond) return '🎣 Go fishing';
@@ -468,7 +500,8 @@ const Game = {
     return null;
   },
   doAction() {
-    if (this.onTrain) { if (this.train.state === 'stopped') this.leaveTrain(); return; }
+    if (this.travel) return;
+    if (this.onTrain) { if (this.currentTrain().state === 'stopped') this.leaveTrain(); return; }
     if (this.fishing) { this.reel(); return; }
     if (this.nearPrep) { if (this.onMakePizza) this.onMakePizza(); return; }
     if (this.nearPond) { this.startFishing(); return; }
@@ -509,9 +542,37 @@ const Game = {
   },
 
   // ---------- riding the train ----------
-  boardTrain() { this.onTrain = true; this.player.moving = false; Sfx.whistle(); Haptics.tap(); },
-  leaveTrain() { this.onTrain = false; this.player.x = CFG.STATION.stopX; this.player.y = CFG.STATION.platform.y1 - 12; this.player.hasMoved = true; },
-  updateOnTrain(dt) { this.player.x = this.train.x - 240; this.player.y = this.train.y; this.player.moving = false; this.player.hasMoved = true; },
+  boardTrain() { const t = this.currentTrain(); this.onTrain = true; this.player.moving = false; if (t.remote) t.departIn = 2; Sfx.whistle(); Haptics.tap(); },
+  leaveTrain() { const st = this.station(); this.onTrain = false; this.player.x = st.stopX; this.player.y = st.platform.y1 - 12; this.player.hasMoved = true; },
+  updateOnTrain(dt) { const t = this.currentTrain(); this.player.x = t.x - 240; this.player.y = t.y; this.player.moving = false; this.player.hasMoved = true; },
+
+  // ---------- the ride between towns, and Construction Town itself ----------
+  startTravel(to) { this.travel = { t: 0, dur: CFG.TRAVEL.dur, to }; Sfx.whistle(); },
+  updateTravel(dt) {
+    const tr = this.travel; tr.t += dt;
+    if (tr.t < tr.dur) return;
+    this.travel = null; this.area = tr.to;
+    const t = this.currentTrain(); t.summon(); this.player.x = t.x - 240; this.player.y = t.y;
+    this.cameraSnap = true;
+    this.toast(tr.to === 'site' ? '🏗️ Welcome to Construction Town!' : '🍕 Home sweet home!', true);
+  },
+  updateSite(dt) {
+    const S = CFG.SITE;
+    for (const m of this.mounds) if (m.flat) { m.t -= dt; if (m.t <= 0) { m.flat = 0; this.floats.push({ x: m.x, y: m.y - 30, text: 'Fresh dirt!', color: '#ffe08a', t: 0, dur: 1 }); } }
+    const v = this.vehicle;
+    if (this.driving && this.isSiteVehicle(v)) {
+      const speed = Math.hypot(v.vx, v.vy);
+      if (v === this.excavator) v.arm += dt * (speed > 15 ? 5 : 1.5);
+      for (const m of this.mounds) {
+        if (m.flat || speed < 30 || U.dist(v.x, v.y, m.x, m.y) > m.r + 8) continue;
+        m.flat = 1; m.t = S.MOUND_REGROW;
+        this.s.cash += S.FLATTEN_PAY; this.s.stats.earned += S.FLATTEN_PAY; this.s.stats.dirt = (this.s.stats.dirt || 0) + 1;
+        for (let i = 0; i < 10; i++) this.fx.push({ kind: 'dirt', x0: m.x + U.rand(-m.r, m.r) * 0.6, y0: m.y - 10, x1: m.x + U.rand(-m.r, m.r) * 1.4, y1: m.y + U.rand(-10, 16), t: -i * 0.02, dur: 0.45 });
+        this.floats.push({ x: m.x, y: m.y - 36, text: '+' + U.money(S.FLATTEN_PAY), color: '#ffe08a', t: 0, dur: 1, big: true });
+        Sfx.drop(); Haptics.tap();
+      }
+    }
+  },
 
   // ---------- handmade pizza (mini-game reward) ----------
   finishHandmade(result) {
@@ -526,7 +587,8 @@ const Game = {
   },
 
   // ---------- delivery vehicles (car and scooter) ----------
-  vehicles() { return [this.car, this.bike, this.tractor]; },
+  vehicles() { return [this.car, this.bike, this.tractor, this.excavator, this.dumptruck, this.bulldozer]; },
+  isSiteVehicle(v) { return v === this.excavator || v === this.dumptruck || v === this.bulldozer; },
   findNearVehicle() {
     if (this.driving) return null;
     let best = null, bd = 70;
@@ -563,7 +625,7 @@ const Game = {
     c.vx += (tx - c.vx) * k; c.vy += (ty - c.vy) * k;
     const speed = Math.hypot(c.vx, c.vy);
     if (speed > 15) { const target = Math.atan2(c.vy, c.vx); let d = target - c.angle; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; c.angle += d * Math.min(1, dt * 10); }
-    const r = spec.radius, w = CFG.WORLD, obs = this.townObstacles(true);
+    const r = spec.radius, w = this.bounds(), obs = this.townObstacles(true);
     c.x = U.clamp(c.x + c.vx * dt, w.x0 + 30, w.x1 - 30);
     for (const o of obs) if (o.w && this.hitRect(c.x, c.y, r, o)) { c.x = c.vx > 0 ? o.x - r : o.x + o.w + r; c.vx = 0; }
     c.y = U.clamp(c.y + c.vy * dt, w.y0 + 30, w.y1 - 30);
@@ -620,7 +682,7 @@ const Game = {
     this.nearVehicle = this.findNearVehicle(); this.carNear = !!this.nearVehicle;
     this.nearPrep = !this.driving && !this.onTrain && U.dist(p.x, p.y, CFG.PREP_TABLE.x, CFG.PREP_TABLE.y + 10) < 64;
     this.nearPond = !this.driving && !this.onTrain && U.dist(p.x, p.y, CFG.FISHING.spot.x, CFG.FISHING.spot.y) < 54;
-    this.nearTrain = !this.driving && !this.onTrain && this.train.state === 'stopped' && p.y < 0 && Math.abs(p.x - CFG.STATION.stopX) < 180;
+    { const t = this.currentTrain(), st = this.station(); this.nearTrain = !this.driving && !this.onTrain && t.state === 'stopped' && p.y < 0 && Math.abs(p.x - st.stopX) < 180; }
   },
   hitRect(px, py, r, o) { return px + r > o.x && px - r < o.x + o.w && py + r > o.y && py - r < o.y + o.h; },
 
@@ -811,8 +873,24 @@ const Game = {
   },
 
   // Contextual hint: what should the player do next? Kept short and simple.
+  siteHint() {
+    const p = this.player;
+    if (this.travel) return null;   // the ride draws its own banner
+    if (this.onTrain) return { text: 'Choo choo! Enjoy the ride', target: null };
+    if (this.nearTrain) return { text: 'Hop on the train to go home 🍕', target: null };
+    if (this.driving) {
+      const pile = this.mounds.filter((m) => !m.flat).sort((a, b) => U.dist(p.x, p.y, a.x, a.y) - U.dist(p.x, p.y, b.x, b.y))[0];
+      return pile ? { text: 'Drive into the dirt piles to flatten them!', target: pile } : { text: 'Vroom! Big machines at work', target: null };
+    }
+    const v = [this.excavator, this.bulldozer, this.dumptruck].sort((a, b) => U.dist(p.x, p.y, a.x, a.y) - U.dist(p.x, p.y, b.x, b.y))[0];
+    const names = { excavator: 'excavator', bulldozer: 'bulldozer', dumptruck: 'dump truck' };
+    const coin = this.coins.filter((c) => !c.taken && c.x > CFG.SITE.WORLD.x0).sort((a, b) => U.dist(p.x, p.y, a.x, a.y) - U.dist(p.x, p.y, b.x, b.y))[0];
+    if (coin && U.dist(p.x, p.y, coin.x, coin.y) < 300) return { text: 'Grab the shiny coin!', target: coin };
+    return { text: `Hop on the ${names[v.kind]}!`, target: v };
+  },
   computeHint() {
     const s = this.s, p = this.player;
+    if (this.area === 'site' || this.travel) { this.hint = this.siteHint(); return; }
     const hasCashier = this.staff.some((st) => st.role === 'cashier');
     const paying = this.customers.some((c) => c.state === 'paying' || c.state === 'toPay');
     const hasHelper = this.staff.some((st) => st.role === 'helper');

@@ -785,7 +785,7 @@ const Render = {
         ctx.fillStyle = '#3b7dd8'; ctx.beginPath(); ctx.moveTo(r.x - 12, r.y + 12); ctx.lineTo(r.x + 12, r.y + 12); ctx.lineTo(r.x, r.y - 6); ctx.closePath(); ctx.fill();
       } else if (r.kind === 'spring') {
         ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(r.x, r.y + 22, 20, 6, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = '#9aa0a8'; ctx.lineWidth = 3; ctx.beginPath(); for (let k = 0; k < 5; k++) { ctx.moveTo(r.x - 8, r.y + 4 + k * 4); ctx.lineTo(r.x + 8, r.y + 6 + k * 4); } ctx.stroke();
+        ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.beginPath(); ctx.ellipse(r.x, r.y + 26, 16, 5, 0, 0, Math.PI * 2); ctx.fill();
       }
     }
   },
@@ -794,29 +794,39 @@ const Render = {
   drawTrain(g) {
     const ctx = this.ctx, t = g.train;
     if (t.state === 'away') return;
-    const y = t.y;
-    for (const p of t.smoke) { ctx.fillStyle = `rgba(230,230,230,${0.6 * (1 - p.t / 1.6)})`; ctx.beginPath(); ctx.arc(p.x, p.y, 5 + p.t * 9, 0, Math.PI * 2); ctx.fill(); }
-    // two coaches behind the locomotive (front at t.x)
-    const coach = (x, col) => {
-      ctx.fillStyle = 'rgba(0,0,0,0.25)'; U.roundRect(ctx, x + 3, y - 18, 150, 44, 8); ctx.fill();
-      ctx.fillStyle = col; U.roundRect(ctx, x, y - 22, 150, 44, 8); ctx.fill();
-      ctx.fillStyle = 'rgba(0,0,0,0.15)'; U.roundRect(ctx, x, y + 8, 150, 14, 6); ctx.fill();
-      ctx.fillStyle = '#bfe3ff'; for (let k = 0; k < 6; k++) U.roundRect(ctx, x + 10 + k * 23, y - 16, 15, 12, 3), ctx.fill();
-      ctx.fillStyle = t.state === 'stopped' ? '#ffe08a' : '#2b1d14'; ctx.fillRect(x + 66, y + 2, 18, 18); // door (lit when open)
-      ctx.fillStyle = '#1e1e1e'; for (const wx of [20, 40, 110, 130]) { ctx.beginPath(); ctx.arc(x + wx, y + 24, 5, 0, Math.PI * 2); ctx.fill(); }
+    const y = t.y, stopped = t.state === 'stopped';
+    for (const p of t.smoke) { ctx.fillStyle = `rgba(235,235,235,${0.65 * (1 - p.t / 1.6)})`; ctx.beginPath(); ctx.arc(p.x, p.y, 5 + p.t * 10, 0, Math.PI * 2); ctx.fill(); }
+    const bogies = (x, len) => { ctx.fillStyle = '#1e1e1e'; for (const bx of [x + 18, x + len - 34]) { U.roundRect(ctx, bx, y - 27, 16, 6, 2); ctx.fill(); U.roundRect(ctx, bx, y + 21, 16, 6, 2); ctx.fill(); } };
+    const coupler = (x) => { ctx.fillStyle = '#2b1d14'; ctx.fillRect(x - 10, y - 4, 20, 8); };
+    // passenger coach seen from above: body, roof ridge, vents, windows along both sides, a door each side
+    const coach = (x, len) => {
+      ctx.fillStyle = 'rgba(0,0,0,0.28)'; U.roundRect(ctx, x + 4, y - 20, len, 48, 10); ctx.fill();
+      bogies(x, len);
+      ctx.fillStyle = '#2d8a5a'; U.roundRect(ctx, x, y - 24, len, 48, 10); ctx.fill();
+      ctx.fillStyle = '#bfe3ff';
+      for (let k = 12; k < len - 40; k += 20) { ctx.fillRect(x + k, y - 21, 12, 6); ctx.fillRect(x + k, y + 15, 12, 6); }
+      ctx.fillStyle = stopped ? '#ffe08a' : '#1f6e3e'; ctx.fillRect(x + len - 34, y - 23, 14, 8); ctx.fillRect(x + len - 34, y + 15, 14, 8); // doors
+      ctx.fillStyle = '#3aa36c'; U.roundRect(ctx, x + 6, y - 12, len - 12, 24, 8); ctx.fill(); // roof
+      ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 0.35; ctx.fillRect(x + 10, y - 1, len - 20, 2); ctx.globalAlpha = 1; // ridge
+      ctx.fillStyle = '#1f6e3e'; for (let k = 20; k < len - 20; k += 32) U.roundRect(ctx, x + k, y - 5, 10, 10, 3), ctx.fill(); // vents
     };
-    coach(t.x - 170, '#2d8a5a'); coach(t.x - 330, '#2d8a5a');
-    // locomotive
-    const x = t.x - 150;
-    ctx.fillStyle = 'rgba(0,0,0,0.25)'; U.roundRect(ctx, x + 3, y - 18, 150, 44, 10); ctx.fill();
-    ctx.fillStyle = '#2d3a4a'; U.roundRect(ctx, x, y - 22, 150, 44, 10); ctx.fill();
-    ctx.fillStyle = '#c62828'; U.roundRect(ctx, x + 90, y - 26, 60, 52, 10); ctx.fill(); // cab
-    ctx.fillStyle = '#bfe3ff'; U.roundRect(ctx, x + 100, y - 18, 18, 14, 3); ctx.fill(); U.roundRect(ctx, x + 124, y - 18, 18, 14, 3); ctx.fill();
-    ctx.fillStyle = '#9aa0a8'; U.roundRect(ctx, x + 10, y - 14, 70, 28, 14); ctx.fill(); // boiler
-    ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.arc(x + 24, y, 7, 0, Math.PI * 2); ctx.fill(); // chimney top
-    ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.arc(x + 150, y, 6, 0, Math.PI * 2); ctx.fill(); // headlamp
-    ctx.fillStyle = '#c62828'; ctx.beginPath(); ctx.moveTo(x + 150, y - 14); ctx.lineTo(x + 166, y); ctx.lineTo(x + 150, y + 14); ctx.closePath(); ctx.fill(); // cowcatcher
-    ctx.fillStyle = '#1e1e1e'; for (const wx of [30, 60, 120]) { ctx.beginPath(); ctx.arc(x + wx, y + 24, 7, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#9aa0a8'; ctx.beginPath(); ctx.arc(x + wx, y + 24, 3, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#1e1e1e'; }
+    const L = 150, front = t.x;
+    coach(front - 160 - L - 12, L); coupler(front - 160 - 12 + 1); coach(front - 160 - 2 * L - 24, L); coupler(front - 160 - L - 24 + 1);
+    // locomotive: chassis, round boiler, chimney, dome, cab, cowcatcher
+    const x = front - 160;
+    ctx.fillStyle = 'rgba(0,0,0,0.28)'; U.roundRect(ctx, x + 4, y - 20, 160, 48, 10); ctx.fill();
+    bogies(x, 160); ctx.fillStyle = '#1e1e1e'; U.roundRect(ctx, x + 70, y - 27, 16, 6, 2); ctx.fill(); U.roundRect(ctx, x + 70, y + 21, 16, 6, 2); ctx.fill();
+    ctx.fillStyle = '#2d3a4a'; U.roundRect(ctx, x, y - 22, 160, 44, 8); ctx.fill();
+    const boiler = ctx.createLinearGradient(0, y - 18, 0, y + 18); boiler.addColorStop(0, '#6b7480'); boiler.addColorStop(0.5, '#c9ccd2'); boiler.addColorStop(1, '#6b7480');
+    ctx.fillStyle = boiler; U.roundRect(ctx, x + 6, y - 18, 108, 36, 18); ctx.fill();
+    ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.arc(x + 100, y, 11, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#5c6670'; ctx.beginPath(); ctx.arc(x + 100, y, 6, 0, Math.PI * 2); ctx.fill(); // chimney
+    ctx.fillStyle = '#f2b134'; ctx.beginPath(); ctx.arc(x + 62, y, 8, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.arc(x + 60, y - 2, 3, 0, Math.PI * 2); ctx.fill(); // dome
+    ctx.fillStyle = '#c62828'; U.roundRect(ctx, x - 2, y - 26, 52, 52, 8); ctx.fill(); // cab
+    ctx.fillStyle = '#e53935'; U.roundRect(ctx, x + 4, y - 16, 40, 32, 6); ctx.fill(); // cab roof
+    ctx.fillStyle = '#bfe3ff'; ctx.fillRect(x + 8, y - 25, 14, 6); ctx.fillRect(x + 26, y - 25, 14, 6); ctx.fillRect(x + 8, y + 19, 14, 6); ctx.fillRect(x + 26, y + 19, 14, 6);
+    ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.arc(x + 156, y, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#c62828'; ctx.beginPath(); ctx.moveTo(x + 158, y - 16); ctx.lineTo(x + 176, y); ctx.lineTo(x + 158, y + 16); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#2b1d14'; for (let k = 0; k < 4; k++) ctx.fillRect(x + 160 + k * 4, y - 12 + k * 2, 2, 24 - k * 4);
   },
 
   drawPlaygroundDynamic(g) {
@@ -825,10 +835,14 @@ const Render = {
       if (r.kind === 'swing') {
         for (const dx of [-24, 24]) {
           const active = ride && ride.def === r && Math.abs(ride.seatX - (r.x + dx)) < 1;
-          const a = active ? Math.sin(ride.t * 4) * 0.8 : Math.sin(g.time * 1.2 + dx) * 0.06;
-          const sx = r.x + dx + Math.sin(a) * 46, sy = r.y + 46 - Math.cos(a) * 46 + 46;
-          ctx.strokeStyle = '#8d5a2b'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(r.x + dx - 8, r.y); ctx.lineTo(sx - 8, sy); ctx.moveTo(r.x + dx + 8, r.y); ctx.lineTo(sx + 8, sy); ctx.stroke();
-          ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, sx - 12, sy - 3, 24, 6, 3); ctx.fill();
+          const a = active ? ride.angle || 0 : Math.sin(g.time * 1.2 + dx) * 0.06;
+          // same pendulum as the rider: pivot on the top bar, rope length 70
+          const px = r.x + dx, py = r.y, sx = px + Math.sin(a) * 70, sy = py + Math.cos(a) * 70;
+          ctx.strokeStyle = '#8d5a2b'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+          ctx.beginPath(); ctx.moveTo(px - 9, py); ctx.lineTo(sx - 9, sy); ctx.moveTo(px + 9, py); ctx.lineTo(sx + 9, sy); ctx.stroke();
+          ctx.save(); ctx.translate(sx, sy); ctx.rotate(-a);
+          ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, -13, -3, 26, 6, 3); ctx.fill();
+          ctx.restore();
         }
       } else if (r.kind === 'seesaw') {
         const tilt = ride && ride.def === r ? ride.tilt * 0.35 : 0.12;
@@ -837,8 +851,14 @@ const Render = {
         ctx.fillStyle = '#e4572e'; U.roundRect(ctx, -60, -9, 16, 8, 3); ctx.fill(); U.roundRect(ctx, 44, -9, 16, 8, 3); ctx.fill();
         ctx.restore();
       } else if (r.kind === 'spring') {
-        const b = ride && ride.def === r ? Math.abs(Math.sin(ride.t * 9)) * 12 : 0;
+        const b = ride && ride.def === r ? ride.bounce || 0 : 0;
         const hx = r.x, hy = r.y - b;
+        // the coil stretches between the ground plate and the horse as it bounces
+        const baseY = r.y + 24, topY = hy + 2, coils = 5, step = (baseY - topY) / coils;
+        ctx.fillStyle = '#5c6670'; U.roundRect(ctx, hx - 12, baseY - 2, 24, 6, 3); ctx.fill();
+        ctx.strokeStyle = '#9aa0a8'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(hx - 8, baseY);
+        for (let k = 1; k <= coils; k++) ctx.lineTo(hx + (k % 2 ? 8 : -8), baseY - k * step);
+        ctx.stroke();
         ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, hx - 16, hy - 14, 32, 14, 7); ctx.fill();
         ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, hx + 10, hy - 26, 12, 16, 5); ctx.fill();
         ctx.fillStyle = '#2b1d14'; ctx.fillRect(hx + 16, hy - 22, 2, 2); ctx.fillStyle = '#5b3a1a'; ctx.fillRect(hx + 8, hy - 28, 14, 4);
@@ -1282,7 +1302,10 @@ const Render = {
 
   drawPlayer(g) {
     const p = g.player;
+    const swinging = g.ride && g.ride.def.kind === 'swing';
+    if (swinging) { this.ctx.save(); this.ctx.translate(p.x, p.y); this.ctx.rotate(-(g.ride.angle || 0)); this.ctx.translate(-p.x, -p.y); }
     this.drawPerson(p.x, p.y, { shirt: '#fff', apron: '#e4572e', skin: '#f1c27d', hat: 'chef', facing: p.facing, moving: p.moving, bob: p.bob, carry: p.carry, pants: '#2d3a4a' });
+    if (swinging) this.ctx.restore();
     if (p.carry > 0) this.drawCountBadge(p.x + 18, p.y - 70 - Math.min(p.carry, 30) * 4, p.carry, g.playerCap());
     if (p.cleanTarget) this.drawProgressRing(p.x, p.y - 20, 22, p.cleanTarget.cleanProg, '#2f9e44');
     if (g.nearPrep) { const pt = CFG.PREP_TABLE, bob = Math.sin(g.time * 5) * 3; this.drawBubble(pt.x, pt.y - 40 + bob, () => { this.ctx.font = this.font(13); this.ctx.textAlign = 'center'; this.ctx.textBaseline = 'middle'; this.ctx.fillStyle = '#2b1d14'; this.ctx.fillText('👐 Make a pizza!', 0, 0); }, 92); }

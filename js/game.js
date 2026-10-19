@@ -639,15 +639,16 @@ const Game = {
       if (k < 0.45) { const c = k / 0.45; p.x = x; p.y = y + 36 - 56 * c; p.facing = 1; }
       else { const c = (k - 0.45) / 0.55; p.x = x + 80 * c; p.y = y - 20 + 60 * c; p.facing = 1; }
     } else if (def.kind === 'swing') {
-      const a = Math.sin(r.t * 4) * 0.8; p.x = r.seatX + Math.sin(a) * 46; p.y = y + 46 - Math.cos(a) * 46 + 10; p.facing = a < 0 ? -1 : 1;
+      // pendulum from the top bar: rope length 70, swinging up to ~45 degrees each way
+      const a = Math.sin(r.t * 4) * 0.8; r.angle = a; p.x = r.seatX + Math.sin(a) * 70; p.y = y + Math.cos(a) * 70 + 4; p.facing = Math.cos(r.t * 4) < 0 ? -1 : 1;
     } else if (def.kind === 'seesaw') {
       const b = Math.abs(Math.sin(r.t * 5)); p.x = x - 40; p.y = y - 10 - b * 26; r.tilt = Math.sin(r.t * 5);
     } else if (def.kind === 'spring') {
-      p.x = x; p.y = y - 14 - Math.abs(Math.sin(r.t * 9)) * 12; p.facing = 1;
+      r.bounce = Math.abs(Math.sin(r.t * 8)) * 22; p.x = x; p.y = y - 10 - r.bounce; p.facing = 1;
     }
     if (r.t >= r.dur) {
       if (def.kind === 'slide') { p.x = x + 100; p.y = y + 46; }
-      else if (def.kind === 'swing') { p.x = r.seatX; p.y = y + 70; }
+      else if (def.kind === 'swing') { p.x = r.seatX; p.y = y + 100; }
       else if (def.kind === 'seesaw') { p.x = x - 40; p.y = y + 28; }
       else { p.x = x; p.y = y + 30; }
       this.ride = null; this.rideLeft = false; p.moving = false;
@@ -657,7 +658,7 @@ const Game = {
     const p = this.player;
     let nearAny = false;
     for (const def of CFG.PLAYGROUND.rides) {
-      const spots = def.kind === 'swing' ? [{ x: def.x - 24, y: def.y + 56 }, { x: def.x + 24, y: def.y + 56 }] : def.kind === 'slide' ? [{ x: def.x, y: def.y + 40 }] : def.kind === 'seesaw' ? [{ x: def.x - 40, y: def.y + 2 }] : [{ x: def.x, y: def.y + 16 }];
+      const spots = def.kind === 'swing' ? [{ x: def.x - 24, y: def.y + 74 }, { x: def.x + 24, y: def.y + 74 }] : def.kind === 'slide' ? [{ x: def.x, y: def.y + 40 }] : def.kind === 'seesaw' ? [{ x: def.x - 40, y: def.y + 2 }] : [{ x: def.x, y: def.y + 16 }];
       for (const sp of spots) {
         if (U.dist(p.x, p.y, sp.x, sp.y) < 22) {
           nearAny = true;

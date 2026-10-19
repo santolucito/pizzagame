@@ -761,11 +761,6 @@ const Render = {
     ctx.fillStyle = 'rgba(255,255,255,0.15)'; for (let i = 0; i < 60; i++) ctx.fillRect(PG.x0 + 20 + ((i * 53) % (PG.x1 - PG.x0 - 40)), PG.y0 + 8 + ((i * 31) % (PG.y1 - PG.y0 - 16)), 3, 3);
     ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, PG.x0 + 20, PG.y0 + 6, 96, 16, 4); ctx.fill();
     ctx.fillStyle = '#ffe08a'; ctx.font = this.font(10); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🛝 PLAYGROUND', PG.x0 + 68, PG.y0 + 14);
-    // sandbox
-    const sb = PG.sandbox;
-    ctx.fillStyle = '#8d5a2b'; ctx.fillRect(sb.x - sb.w / 2 - 6, sb.y - sb.h / 2 - 6, sb.w + 12, sb.h + 12);
-    ctx.fillStyle = '#f3dfa8'; ctx.fillRect(sb.x - sb.w / 2, sb.y - sb.h / 2, sb.w, sb.h);
-    ctx.fillStyle = '#e4572e'; U.roundRect(ctx, sb.x + 20, sb.y - 10, 16, 14, 3); ctx.fill(); ctx.fillStyle = '#3b7dd8'; ctx.fillRect(sb.x - 30, sb.y + 8, 18, 5); ctx.fillStyle = '#f2b134'; ctx.beginPath(); ctx.moveTo(sb.x - 10, sb.y + 20); ctx.lineTo(sb.x + 6, sb.y + 20); ctx.lineTo(sb.x - 2, sb.y + 6); ctx.closePath(); ctx.fill();
     for (const r of PG.rides) {
       if (r.kind === 'slide') {
         ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(r.x + 50, r.y + 52, 60, 10, 0, 0, Math.PI * 2); ctx.fill();

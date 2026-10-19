@@ -368,8 +368,8 @@ class IceCreamCustomer {
   constructor(id) {
     const IC = CFG.ICE_CREAM;
     this.id = id;
-    this.x = IC.door.x + U.rand(-30, 30); this.y = 700;
-    this.route = [{ x: IC.door.x, y: IC.door.y + 20 }, { x: IC.inside.x + U.rand(-30, 30), y: IC.inside.y + U.rand(-6, 6) }];
+    this.x = CFG.SPAWN_OUT.x + U.rand(0, 20); this.y = 700 + U.rand(-10, 10);
+    this.route = [{ x: IC.door.x + U.rand(-20, 20), y: 700 }, { x: IC.door.x, y: IC.door.y + 20 }, { x: IC.inside.x + U.rand(-30, 30), y: IC.inside.y + U.rand(-6, 6) }];
     this.state = 'in'; this.timer = U.rand(1.5, 2.5); this.cone = false;
     this.facing = 1; this.moving = false; this.bob = Math.random() * 6; this.speed = U.rand(110, 140);
     this.shirt = U.pick(COLORS.shirts); this.skin = U.pick(COLORS.skins);
@@ -389,7 +389,7 @@ class IceCreamCustomer {
         g.floats.push({ x: IC.cash.x + U.rand(-8, 8), y: IC.cash.y - 18, text: '+' + U.money(amt), color: '#2f9e44', t: 0, dur: 1 });
         g.fx.push({ kind: 'cash', x0: this.x, y0: this.y - 20, x1: IC.cash.x, y1: IC.cash.y, t: 0, dur: 0.35 });
         this.cone = true; this.state = 'out';
-        this.route = [{ x: IC.door.x, y: IC.door.y + 20 }, { x: IC.door.x + U.rand(-40, 40), y: 700 }];
+        this.route = [{ x: IC.door.x, y: IC.door.y + 20 }, { x: IC.door.x + U.rand(-40, 40), y: 700 }, { x: CFG.SPAWN_OUT.x + 10, y: 700 + U.rand(-10, 10) }];
       }
     } else if (this.state === 'out') {
       const wp = this.route[0];

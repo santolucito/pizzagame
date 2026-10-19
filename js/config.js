@@ -11,7 +11,7 @@ const CFG = {
   PLAYER_START: { x: 540, y: 430 }, // open floor in front of the counter, away from every circle
   ENTRANCE: { x: 925, y: 605 },          // just inside the door
   DOOR_OUT: { x: 1000, y: 605 },         // just outside the door
-  SPAWN_OUT: { x: 1215, y: 605 },        // customers appear / vanish here
+  SPAWN_OUT: { x: 1575, y: 605 },        // customers appear / vanish here: just past the east edge, off camera
 
   // Kitchen
   OVENS: [{ x: 90, y: 250 }, { x: 90, y: 350 }],
@@ -107,13 +107,12 @@ const CFG = {
   },
   // Playground south of the farm across South Road
   PLAYGROUND: {
-    x0: -1000, y0: 1015, x1: -520, y1: 1170,
-    sandbox: { x: -580, y: 1070, w: 100, h: 60 },
+    x0: -1000, y0: 1015, x1: -500, y1: 1170,
     rides: [
-      { kind: 'slide', x: -955, y: 1070 },     // ladder base at (x, y+36); slide runs to the right
-      { kind: 'swing', x: -760, y: 1050 },     // two seats at x-24 and x+24
-      { kind: 'seesaw', x: -640, y: 1140 },
-      { kind: 'spring', x: -880, y: 1140 },
+      { kind: 'slide', x: -960, y: 1060 },     // ladder base at (x, y+36); slide runs to the right
+      { kind: 'spring', x: -790, y: 1080 },
+      { kind: 'seesaw', x: -700, y: 1145 },
+      { kind: 'swing', x: -590, y: 1045 },     // two seats at x-24 and x+24
     ],
   },
 

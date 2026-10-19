@@ -3,25 +3,37 @@
 // Extension module: registered with Game.ext and Render.ext. See the hook list in js/EXTENSIONS.md.
 //
 // The clock lives only in runtime state (never saved) and every session starts in the morning. A day is
-// mostly plain daytime; then a short golden hour, a short soft dusk (never darker than a moody evening) and
-// a dawn straight back into the morning. Nothing mechanical changes: no monsters, no "night".
+// mostly plain daytime; then a golden hour, a soft lavender dusk (never darker than a moody evening) and
+// a dawn straight back into the morning. Nothing mechanical changes: no monsters, no "night". The shops
+// stay lit from inside: their interiors are cut out of the dusk tint and leak a little warm light.
 // Rain/snow timers run for their own map all the time (like the town keeps running while you are away) but
 // only draw in that map, never during rides. Particles are updated in `update` and drawn in `screen`.
 CFG.ATMOSPHERE = {
-  DAY: 240, GOLDEN: 10, DUSK: 30, DAWN: 10,       // seconds; the whole cycle is ~5 minutes of play
-  DUSK_RAMP: 6,                                   // seconds for the blue tint to fade in at the start of dusk
+  DAY: 225, GOLDEN: 15, DUSK: 75, DAWN: 15,       // seconds; the whole cycle is 330 s = 5.5 minutes of play
+  DUSK_RAMP: 8,                                   // seconds for the blue tint to fade in at the start of dusk
   DUSK_ALPHA: 0.28,                               // the darkest the tint ever gets
   DUSK_COLOR: [70, 60, 150],                      // soft blue-purple
   DUSK_MODE: 'source-over',                       // 'source-over' (translucent fill) or 'multiply'
   GOLDEN_ALPHA: 0.16, GOLDEN_COLOR: [255, 170, 60],
   DAWN_ALPHA: 0.10, DAWN_COLOR: [255, 150, 120],
+  SPILL_ALPHA: 0.13, SPILL_COLOR: [255, 224, 138], // warm light leaking out of the lit shops at dusk
   STARS: 16,
   RAIN: { first: [120, 240], every: [180, 360], dur: [40, 70], fade: 5, count: [80, 240], tint: [120, 150, 205], tintAlpha: 0.09, alpha: 0.42 },
   SNOW: { first: [120, 240], every: [180, 360], dur: [40, 70], fade: 5, count: [60, 150], tint: [150, 175, 215], tintAlpha: 0.10, alpha: 0.65 },
   RIPPLES: { perSec: 14, dur: 0.75, max: 60, alpha: 0.45 },
   GLOW_MAX_SCALE: 2.2,                            // glows stop growing past this zoom so they never swamp a phone screen
-  // Things that glow at dusk: world position, radius (world px), colour key. Screen-space glows are added at draw time.
   GLOW_COLORS: { warm: [255, 205, 110], neon: [255, 120, 220], red: [255, 80, 80], ice: [255, 220, 240] },
+  // Street lamp posts this file adds to the town (base positions, same look as the park posts in bgPark).
+  // On the sidewalks of the road loop, clear of the crosswalks, the bus stop, the house doors and the ferry dock.
+  LAMPS: [
+    [-800, 6], [-300, 6], [200, 6], [760, 6], [1200, 6],          // Main Street, far sidewalk
+    [-300, 908], [100, 908], [400, 908], [800, 908], [1100, 908],  // South Road, north sidewalk
+    [-168, 1012], [212, 1012], [652, 1012],                        // beside each house door
+    [1227, 500], [1227, 800],                                      // East Road, inner sidewalk
+    [-125, 1172], [-740, -20],                                     // by the ferry dock (west of its sign), on the station path
+  ],
+  // Lit shop interiors (world rects just inside the walls): untinted at dusk, no rain streaks over the pizzeria.
+  INTERIORS: [{ x0: 0, y0: 110, x1: 960, y1: 640 }, { x0: 1026, y0: 118, x1: 1216, y1: 312 }],
 };
 
 const AtmosphereExt = {
@@ -40,7 +52,7 @@ const AtmosphereExt = {
     const A = CFG.ATMOSPHERE;
     this.weather = { town: { wait: U.rand(A.RAIN.first[0], A.RAIN.first[1]), t: -1, dur: 0 }, site: { wait: U.rand(A.SNOW.first[0], A.SNOW.first[1]), t: -1, dur: 0 } };
     this.toasted = { rain: false, snow: false };
-    this.drops = []; this.flakes = []; this.ripples = [];
+    this.drops = []; this.flakes = []; this.ripples = []; this.rippleAcc = 0;
     this.stars = []; for (let i = 0; i < A.STARS; i++) this.stars.push({ x: Math.random(), y: 0.02 + Math.random() * 0.22, s: U.rand(1, 2.2), ph: Math.random() * 6.28, sp: U.rand(1.5, 3.5) });
     this.glowKey = '';
   },
@@ -143,6 +155,16 @@ const AtmosphereExt = {
     }
   },
 
+  // ---------- static art: street lamps along the town's roads (same look as the park posts) ----------
+  paintTown(r, g) {
+    const ctx = r.ctx;
+    for (const [x, y] of CFG.ATMOSPHERE.LAMPS) {
+      ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(x + 2, y + 3, 8, 4, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#2d3a4a'; ctx.fillRect(x - 2, y - 60, 4, 60); ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.arc(x, y - 62, 7, 0, Math.PI * 2); ctx.fill();
+    }
+  },
+
   // ---------- drawing ----------
   // Ripple rings on wet ground (world space, under floats/hint, over people: they are tiny and faint).
   overlay(r, g) {
@@ -157,6 +179,14 @@ const AtmosphereExt = {
     ctx.globalAlpha = 1;
   },
 
+  // Screen-space rects of the lit shop interiors (town only); empty elsewhere.
+  interiorRects(r, g) {
+    if (g.area !== 'town') return [];
+    const sc = r.scale, out = [];
+    for (const q of CFG.ATMOSPHERE.INTERIORS) out.push({ x: (q.x0 - r.camX) * sc, y: (q.y0 - r.camY) * sc, w: (q.x1 - q.x0) * sc, h: (q.y1 - q.y0) * sc });
+    return out;
+  },
+
   screen(r, g) {
     const ctx = r.ctx, W = r.canvas.width / r.dpr, H = r.canvas.height / r.dpr;
     this.W = W; this.H = H;
@@ -167,42 +197,72 @@ const AtmosphereExt = {
       const S = vis.kind === 'rain' ? A.RAIN : A.SNOW, c = S.tint;
       ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${(S.tintAlpha * vis.intensity).toFixed(3)})`; ctx.fillRect(0, 0, W, H);
     }
-    // golden hour / dawn warmth, then the dusk tint
+    // golden hour / dawn warmth, then the dusk tint with the lit shops cut out of it
     if (this.warm > 0) { const c = A.GOLDEN_COLOR; ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${(A.GOLDEN_ALPHA * this.warm).toFixed(3)})`; ctx.fillRect(0, 0, W, H); }
     if (this.dawnWarm > 0) { const c = A.DAWN_COLOR; ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${(A.DAWN_ALPHA * this.dawnWarm).toFixed(3)})`; ctx.fillRect(0, 0, W, H); }
     if (this.dusk > 0) {
-      const c = A.DUSK_COLOR;
+      const c = A.DUSK_COLOR, holes = this.interiorRects(r, g);
+      ctx.save();
+      ctx.beginPath(); ctx.rect(0, 0, W, H); for (const q of holes) ctx.rect(q.x, q.y, q.w, q.h);
+      ctx.clip('evenodd');                      // everything outside the shops
       ctx.globalCompositeOperation = A.DUSK_MODE;
       ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${(A.DUSK_ALPHA * this.dusk).toFixed(3)})`; ctx.fillRect(0, 0, W, H);
       ctx.globalCompositeOperation = 'source-over';
+      if (holes.length) this.drawSpill(r, g, W, H);
+      ctx.restore();
       this.drawGlows(r, g, W, H);
       if (this.dusk > 0.5) this.drawStars(ctx, g, W, H);
     }
     if (this.phase !== 'day') this.drawPip(ctx, g, W, H);
-    if (vis.kind === 'rain') this.drawRain(ctx, vis.intensity);
+    if (vis.kind === 'rain') this.drawRain(r, g, vis.intensity);
     else if (vis.kind === 'snow') this.drawSnow(ctx, vis.intensity);
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  },
+
+  // Warm light leaking out of the lit shops: the pizzeria's front (Main Street side) and door, the ice cream door.
+  // Runs inside the even-odd clip, so it only lands outside the interiors.
+  drawSpill(r, g, W, H) {
+    const ctx = r.ctx, A = CFG.ATMOSPHERE, c = A.SPILL_COLOR, sc = r.scale, a = A.SPILL_ALPHA * this.dusk;
+    const col = (k) => `rgba(${c[0]},${c[1]},${c[2]},${(a * k).toFixed(3)})`;
+    const sx = (x) => (x - r.camX) * sc, sy = (y) => (y - r.camY) * sc;
+    const B = CFG.BUILDING, D = CFG.DOOR, IC = CFG.ICE_CREAM;
+    // front windows: a band fading out across the sidewalk and street above the top wall
+    const fy0 = sy(B.y0), fy1 = sy(B.y0 - 46), fx0 = sx(B.x0), fx1 = sx(B.x1);
+    if (fx1 > 0 && fx0 < W && fy0 > 0 && fy1 < H) {
+      const lg = ctx.createLinearGradient(0, fy0, 0, fy1); lg.addColorStop(0, col(1)); lg.addColorStop(1, col(0));
+      ctx.fillStyle = lg; ctx.fillRect(fx0, fy1, fx1 - fx0, fy0 - fy1);
+    }
+    const radial = (wx, wy, rad) => {
+      const x = sx(wx), y = sy(wy), rr = rad * sc;
+      if (x + rr < 0 || x - rr > W || y + rr < 0 || y - rr > H) return;
+      const rg = ctx.createRadialGradient(x, y, 0, x, y, rr); rg.addColorStop(0, col(1.3)); rg.addColorStop(0.5, col(0.5)); rg.addColorStop(1, col(0));
+      ctx.fillStyle = rg; ctx.fillRect(x - rr, y - rr, rr * 2, rr * 2);
+    };
+    radial(B.x1, (D.y0 + D.y1) / 2, 120);         // the open door
+    radial(IC.door.x, IC.rect.y1, 80);            // the ice cream shop door
   },
 
   // The list of things that glow in the current map (world coords). Rebuilt only when the map/owned stuff changes.
   glowList(g) {
     const key = g.area + '|' + (g.hasDecor('neon') ? 1 : 0) + (g.hasDecor('lights') ? 1 : 0) + (g.isUnlocked('station') ? 1 : 0);
     if (key === this.glowKey && this.glowCache) return this.glowCache;
-    const out = [];
+    const out = [], lamp = (x, y, a = 1) => out.push({ x, y: y - 62, r: 75, c: 'warm', a });
     if (g.area === 'town') {
-      for (const [x, y] of [[-40, 260], [1000, 260], [-40, 720], [1000, 720]]) out.push({ x, y: y - 62, r: 75, c: 'warm', a: 1 });          // park lamp posts
-      const B = CFG.BUILDING, D = CFG.DOOR;
-      out.push({ x: B.x1 + 8, y: (D.y0 + D.y1) / 2, r: 95, c: 'warm', a: 0.9 });                                                        // light spilling out of the door
-      for (const o of CFG.OVENS) out.push({ x: o.x + 18, y: o.y, r: 60, c: 'warm', a: 0.8 });                                            // the ovens
-      if (g.hasDecor('neon')) out.push({ x: 820, y: 126, r: 90, c: 'neon', a: 1 });
-      if (g.hasDecor('lights')) for (const x of [60, 150, 240, 330]) out.push({ x, y: 118, r: 48, c: 'warm', a: 0.55 });                   // string lights
+      for (const [x, y] of [[-40, 260], [1000, 260], [-40, 720], [1000, 720]]) lamp(x, y);                                                 // park lamp posts
+      for (const [x, y] of CFG.ATMOSPHERE.LAMPS) lamp(x, y);                                                                               // street lamps
+      if (g.hasDecor('neon')) out.push({ x: 820, y: 126, r: 90, c: 'neon', a: 0.7 });
+      if (g.hasDecor('lights')) for (const x of [60, 150, 240, 330]) out.push({ x, y: 118, r: 48, c: 'warm', a: 0.35 });                   // string lights
       if (g.isUnlocked('station')) { const P = CFG.STATION.platform; out.push({ x: P.x1 - 18, y: P.y0 + 8, r: 60, c: 'warm', a: 0.9 }); }
       for (const h of CFG.HOUSES) out.push({ x: h.door.x + 6, y: h.y0 + 19, r: 42, c: 'warm', a: 0.8 });                                  // porch lights
-      out.push({ x: CFG.ICE_CREAM.door.x, y: CFG.ICE_CREAM.rect.y1 + 4, r: 55, c: 'ice', a: 0.6 });                                        // ice cream shop door
+      if (CFG.SECRET && CFG.SECRET.cabin) { const w = CFG.SECRET.cabin.window; out.push({ x: w.x, y: w.y, r: 55, c: 'warm', a: 0.9 }); }   // the cabin window in the woods
     } else if (g.area === 'site') {
       const S = CFG.SITE, P = S.STATION.platform;
       out.push({ x: S.CRANE.x, y: S.CRANE.y, r: 80, c: 'red', a: 1, pulse: true });                                                      // crane beacon
       out.push({ x: P.x1 - 18, y: P.y0 + 8, r: 60, c: 'warm', a: 0.9 });                                                                  // platform lamp
+      out.push({ x: S.SIGN.x, y: S.SIGN.y - 44, r: 55, c: 'warm', a: 0.6 });                                                              // site sign floodlight
+      out.push({ x: S.TOILET.x, y: S.TOILET.y - 26, r: 40, c: 'warm', a: 0.5 });
+    } else if (g.area === 'city' && CFG.CITY && CFG.CITY.LAMPS) {
+      for (const [x, y] of CFG.CITY.LAMPS) lamp(x, y);                                                                                     // the city's own lamp posts
     }
     this.glowKey = key; this.glowCache = out;
     return out;
@@ -255,14 +315,15 @@ const AtmosphereExt = {
     ctx.globalAlpha = 1;
   },
 
-  drawRain(ctx, intensity) {
-    const A = CFG.ATMOSPHERE.RAIN;
+  drawRain(r, g, intensity) {
+    const ctx = r.ctx, A = CFG.ATMOSPHERE.RAIN, holes = this.interiorRects(r, g);
+    const inside = (x, y) => { for (const q of holes) if (x > q.x && x < q.x + q.w && y > q.y && y < q.y + q.h) return true; return false; };
     ctx.strokeStyle = '#dcefff'; ctx.lineWidth = 1.3; ctx.lineCap = 'round';
-    // two alpha bands so the streaks have a little depth without a stroke per drop
+    // two alpha bands so the streaks have a little depth without a stroke per drop; none over the lit shops
     for (const band of [0.5, 1]) {
       ctx.globalAlpha = A.alpha * intensity * band;
       ctx.beginPath();
-      for (const d of this.drops) { if ((d.a > 0.65) !== (band === 1)) continue; ctx.moveTo(d.x, d.y); ctx.lineTo(d.x - d.len * 0.22, d.y - d.len); }
+      for (const d of this.drops) { if ((d.a > 0.65) !== (band === 1) || inside(d.x, d.y)) continue; ctx.moveTo(d.x, d.y); ctx.lineTo(d.x - d.len * 0.22, d.y - d.len); }
       ctx.stroke();
     }
     ctx.globalAlpha = 1;

@@ -24,7 +24,7 @@ const MiniGame = {
   start(onDone) {
     this.open = true; this.onDone = onDone;
     this.stage = 'dough'; this.t = 0; this.dough = 0; this.doughBounce = 0;
-    this.sauce = []; this.sauceCells = new Set(); this.cheese = []; this.toppings = []; this.bake = 0; this.baked = false; this.crispy = 0; this.held = null; this.tapFx = [];
+    this.sauce = []; this.sauceCells = new Set(); this.cheese = []; this.toppings = []; this.bake = 0; this.baked = false; this.baking = false; this.crispy = 0; this.held = null; this.tapFx = [];
     this.resize(); this.updateButton();
   },
   stop() { this.open = false; },
@@ -51,7 +51,10 @@ const MiniGame = {
       const item = this.TRAY.find((it) => U.dist(p.x, p.y, it.x, it.y) < 40);
       if (item) { this.held = { kind: item.kind, x: p.x, y: p.y }; Sfx.pickup(); }
       else if (this.inPizza(p, 14)) { this.toppings.push({ kind: this.lastKind || 'pepperoni', x: p.x, y: p.y, a: Math.random() * 6 }); Sfx.drop(); this.checkToppings(); }
-    } else if (this.stage === 'oven' && this.baked) { this.primary(); }
+    } else if (this.stage === 'oven' || this.stage === 'done') {
+      // tapping the oven or the pizza does the same as the big button: in, out, take
+      if (!(this.stage === 'oven' && this.baking && !this.baked)) { this.tapFx.push({ x: p.x, y: p.y, t: 0 }); this.primary(); }
+    }
   },
   onMove(p) {
     if (this.stage === 'sauce') this.paint(p);
@@ -85,6 +88,7 @@ const MiniGame = {
   // the big button under the canvas
   updateButton() {
     const b = this.btn;
+    b.classList.toggle('attention', true);
     if (this.stage === 'oven' && !this.baking && !this.baked) { b.textContent = '🔥 Put it in the oven'; b.classList.remove('hidden'); }
     else if (this.stage === 'oven' && this.baked) { b.textContent = '🧤 Take it out!'; b.classList.remove('hidden'); }
     else if (this.stage === 'done') { b.textContent = '🍕 Take the pizza'; b.classList.remove('hidden'); }
@@ -124,8 +128,8 @@ const MiniGame = {
       sauce: `🥄 Rub the sauce all over!  ${Math.round(this.sauceCoverage() * 100)}%`,
       cheese: `🧀 Tap to sprinkle cheese!  ${Math.min(10, Math.floor(this.cheese.length / 7))}/10`,
       toppings: `🍄 Drag toppings onto the pizza!  ${this.toppings.length}/7`,
-      oven: this.baked ? '🔔 DING! It is ready!' : this.baking ? `⏱ Baking… ${Math.max(0, Math.ceil(this.BAKE_TIME - this.bake))}` : '🔥 Put the pizza in the oven',
-      done: this.crispy > 0 ? '😅 Extra crispy! Still yummy.' : '🎉 Perfect! Family-size pizza!',
+      oven: this.baked ? '🔔 DING! Tap to take it out!' : this.baking ? `⏱ Baking… ${Math.max(0, Math.ceil(this.BAKE_TIME - this.bake))}` : '🔥 Tap the oven to put it in!',
+      done: this.crispy > 0 ? '😅 Extra crispy! Tap to take it.' : '🎉 Perfect! Tap to take it!',
     }[stage];
     ctx.fillStyle = 'rgba(43,29,20,0.85)'; U.roundRect(ctx, 16, 14, W - 32, 44, 14); ctx.fill();
     ctx.fillStyle = '#ffe08a'; ctx.font = Render.font(18); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(msg, W / 2, 36);
@@ -195,6 +199,7 @@ const MiniGame = {
     else this.drawPizza(ox, oy + 20, 96, false);
     ctx.fillStyle = 'rgba(255,255,255,0.18)'; U.roundRect(ctx, ox - 130, oy - 62, 260, 14, 7); ctx.fill();
     if (this.baking || this.baked) { ctx.fillStyle = 'rgba(0,0,0,0.4)'; U.roundRect(ctx, ox - 150, oy + 134, 300, 12, 6); ctx.fill(); ctx.fillStyle = this.baked ? '#2f9e44' : '#ff8c42'; U.roundRect(ctx, ox - 150, oy + 134, 300 * prog, 12, 6); ctx.fill(); }
+    if (this.stage === 'oven' && !this.baking && !this.baked) { const bob = Math.sin(this.t * 5) * 8; ctx.font = Render.font(44); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('👇', ox, oy - 70 + bob); }
     if (this.baked && this.stage === 'oven') { const ring = Math.sin(this.t * 12) * 6; ctx.font = Render.font(40); ctx.textAlign = 'center'; ctx.fillStyle = '#ffe08a'; ctx.fillText('🔔', ox + ring, oy - 180 + 400 * 0); }
     if (this.stage === 'done') { ctx.font = Render.font(44); ctx.textAlign = 'center'; ctx.fillText('✨', ox - 120, oy - 20); ctx.fillText('✨', ox + 120, oy + 40); }
   },

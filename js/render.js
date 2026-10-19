@@ -110,7 +110,7 @@ const Render = {
   ensureBackground(g) {
     const W = g.bounds(), area = (W.x1 - W.x0) * (W.y1 - W.y0);
     const res = Math.min(U.clamp(this.dpr * this.scale, 1, 2), Math.sqrt(9e6 / area)); // keep the cached map under ~9M pixels
-    const key = (g.area === 'site' ? ['site'] : [g.isUnlocked('dining'), g.isUnlocked('tables2'), g.isUnlocked('oven2'), g.isUnlocked('driveThru'), CFG.DECOR_ITEMS.map((it) => g.hasDecor(it.key) ? 1 : 0).join(''), g.s.iceCream.owned, Math.round(g.price())]).concat([Math.round(res * 4) / 4]).join('|');
+    const key = (g.area === 'site' ? ['site'] : [g.isUnlocked('dining'), g.isUnlocked('tables2'), g.isUnlocked('oven2'), g.isUnlocked('driveThru'), g.isUnlocked('station'), CFG.DECOR_ITEMS.map((it) => g.hasDecor(it.key) ? 1 : 0).join(''), g.s.iceCream.owned, Math.round(g.price())]).concat([Math.round(res * 4) / 4]).join('|');
     const now = performance.now();
     if (!this.bgs) this.bgs = {};
     const c = this.bgs[g.area] || (this.bgs[g.area] = { canvas: document.createElement('canvas'), key: null, builtAt: 0, res: 1 });
@@ -791,6 +791,7 @@ const Render = {
   bgStation(g) {
     const ctx = this.ctx, S = CFG.STATION, P = S.platform;
     this.bgPlatform(S, CFG.WORLD, '🚉 STATION');
+    if (!g.isUnlocked('station')) this.bgDerelictStation(S);
     // railway crossing gates where the tracks meet nothing: just a crossing sign near the station path
     ctx.fillStyle = '#d2cbbb'; ctx.fillRect(-712, P.y1, 24, 50); // path down to the sidewalk
     // trash can beside the path: throw away pizzas you are carrying
@@ -801,6 +802,23 @@ const Render = {
     ctx.fillStyle = '#4a7230'; U.roundRect(ctx, T.x - 21, T.y - 36, 42, 9, 4); ctx.fill();
     ctx.fillStyle = '#3d5f27'; U.roundRect(ctx, T.x - 5, T.y - 40, 10, 5, 2); ctx.fill();
     ctx.fillStyle = '#fff'; ctx.font = this.font(8); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('TRASH', T.x, T.y - 12);
+  },
+
+  // Before it is repaired the old station is boarded up: planks over the windows and door, cracks, weeds, a sign.
+  bgDerelictStation(S) {
+    const ctx = this.ctx, P = S.platform, H = S.house;
+    ctx.fillStyle = 'rgba(0,0,0,0.08)'; ctx.fillRect(P.x0, P.y0, P.x1 - P.x0, P.y1 - P.y0);   // grimy platform
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1.5;
+    for (const [x, y] of [[P.x0 + 60, P.y0 + 10], [P.x0 + 180, P.y1 - 8], [P.x1 - 90, P.y0 + 16], [P.x0 + 280, P.y0 + 24]]) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 14, y + 9); ctx.lineTo(x + 10, y + 20); ctx.moveTo(x + 14, y + 9); ctx.lineTo(x + 26, y + 6); ctx.stroke(); }   // cracks
+    const plank = (x, y, w, a) => { ctx.save(); ctx.translate(x, y); ctx.rotate(a); ctx.fillStyle = '#a0754a'; ctx.fillRect(-w / 2, -3, w, 6); ctx.fillStyle = '#2b1d14'; ctx.fillRect(-w / 2 + 3, -1, 2, 2); ctx.fillRect(w / 2 - 5, -1, 2, 2); ctx.restore(); };
+    plank(H.x0 + 22, H.y0 + 27, 30, 0.35); plank(H.x0 + 22, H.y0 + 27, 30, -0.35); plank(H.x1 - 22, H.y0 + 27, 30, 0.35); plank(H.x1 - 22, H.y0 + 27, 30, -0.35);   // boarded windows
+    plank(H.x0 + 50, H.y0 + 26, 26, 0.5); plank(H.x0 + 50, H.y0 + 38, 26, -0.5);   // boarded door
+    ctx.fillStyle = '#6b4a2b'; ctx.fillRect(H.x1 - 30, H.y0, 22, 14);   // missing roof patch
+    ctx.fillStyle = '#5f8f3a';   // weeds along the platform edge and the path
+    for (const [x, y] of [[P.x0 + 20, P.y1 - 4], [P.x0 + 110, P.y1 - 2], [P.x0 + 250, P.y1 - 6], [P.x1 - 40, P.y1 - 3], [-720, P.y1 + 30], [-690, P.y1 + 44], [P.x0 + 330, P.y0 + 30]]) { ctx.beginPath(); ctx.moveTo(x - 6, y); ctx.lineTo(x - 3, y - 12); ctx.lineTo(x, y); ctx.lineTo(x + 2, y - 14); ctx.lineTo(x + 4, y); ctx.lineTo(x + 7, y - 10); ctx.lineTo(x + 8, y); ctx.closePath(); ctx.fill(); }
+    ctx.save(); ctx.translate(H.x1 + 24, P.y1 - 2); ctx.rotate(-0.12);   // leaning sign
+    ctx.fillStyle = '#5b3a1a'; ctx.fillRect(-2, -34, 4, 34); ctx.fillStyle = '#ffe08a'; U.roundRect(ctx, -44, -56, 88, 26, 4); ctx.fill();
+    ctx.fillStyle = '#2b1d14'; ctx.font = this.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('CLOSED', 0, -48); ctx.fillText('needs repair', 0, -37); ctx.restore();
   },
 
   // Tracks across the top of a map, a platform with a little station house. Shared by both towns.

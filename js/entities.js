@@ -206,7 +206,7 @@ class Train {
     const S = this.st, W = this.bounds, home = !this.remote && g.area === 'town';
     for (const p of this.smoke) { p.t += dt; p.y -= 18 * dt; p.x += 8 * dt; } this.smoke = this.smoke.filter((p) => p.t < 1.6);
     if (this.state === 'away') {
-      if (this.remote) return;
+      if (this.remote || !g.isUnlocked('station')) return;   // no trains until the old station is repaired
       this.timer -= dt;
       if (!this.warned && this.timer <= S.warn && !g.onTrain && home) { this.warned = true; g.toast(`🚂 Train in ${S.warn} seconds! Run to the station!`, true); Sfx.whistle(); }
       if (this.timer <= 0) { this.summon(); this.warned = false; if (!g.onTrain && home) { g.toast('🚂 The train is pulling in!', true); Sfx.whistle(); } }

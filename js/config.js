@@ -204,6 +204,7 @@ const CFG = {
     { key: 'oven2', label: '2nd Oven', ico: '🔥', price: 280, pos: { x: 90, y: 350 }, req: [] },
     { key: 'tables2', label: 'More Tables', ico: '🍽️', price: 450, pos: { x: 790, y: 465 }, req: ['dining'] },
     { key: 'driveThru', label: 'Drive-Thru', ico: '🚗', price: 650, pos: { x: 880, y: 170 }, req: [] },
+    { key: 'station', label: 'Fix the Station', ico: '🔧', price: 500, pos: { x: -790, y: -34 }, req: [] },   // trains only run once the old station is repaired
   ],
   PAD_RADIUS: 40,
 

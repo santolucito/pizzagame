@@ -330,7 +330,11 @@ const Game = {
     delete this.s.padPaid[key];
     Sfx.unlock(); Haptics.success();
     const pad = CFG.PADS.find((p) => p.key === key);
-    this.toast(`Unlocked: ${pad.label}!`);
+    if (key === 'station') {
+      // the line reopens: first train in a little while
+      const S = CFG.STATION; this.train.timer = U.rand(S.first[0], S.first[1]); this.train.warned = false;
+      this.toast('🚂 The station is fixed! Trains are running!', true);
+    } else this.toast(`Unlocked: ${pad.label}!`);
     if (this.onUnlock) this.onUnlock(key);
   },
 

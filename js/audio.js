@@ -28,13 +28,15 @@ const Sfx = {
   drop() { if (this.throttle('drop', 60)) this.tone(380, 0.07, 'triangle', 0.05, -120); },
   cash() { if (this.throttle('cash', 120)) { this.tone(880, 0.12, 'sine', 0.07); setTimeout(() => this.tone(1320, 0.18, 'sine', 0.07), 70); } },
   pay() { if (this.throttle('pay', 100)) this.tone(660, 0.1, 'square', 0.03, 200); },
-  unlock() { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => this.tone(f, 0.25, 'triangle', 0.08), i * 90)); },
+  // Alert-style sounds are soft and rate-limited so news never turns into a wall of bleeps.
+  unlock() { if (this.throttle('unlock', 2500)) [523, 659, 784].forEach((f, i) => setTimeout(() => this.tone(f, 0.22, 'triangle', 0.045), i * 90)); },
+  chime() { if (this.throttle('chime', 3000)) this.tone(988, 0.22, 'sine', 0.035); },
   buy() { this.tone(700, 0.1, 'triangle', 0.06, 300); },
-  error() { this.tone(200, 0.2, 'sawtooth', 0.05, -80); },
-  angry() { if (this.throttle('angry', 300)) this.tone(260, 0.25, 'sawtooth', 0.04, -100); },
+  error() { if (this.throttle('error', 500)) this.tone(200, 0.2, 'sawtooth', 0.04, -80); },
+  angry() { if (this.throttle('angry', 2000)) this.tone(260, 0.22, 'sawtooth', 0.025, -100); },
   clean() { if (this.throttle('clean', 200)) this.tone(900, 0.15, 'sine', 0.05, 400); },
-  whistle() { this.tone(660, 0.35, 'square', 0.04); setTimeout(() => this.tone(880, 0.5, 'square', 0.04), 320); },
-  ding() { this.tone(1760, 0.5, 'sine', 0.09); setTimeout(() => this.tone(2093, 0.7, 'sine', 0.08), 180); },
+  whistle() { if (this.throttle('whistle', 5000)) { this.tone(660, 0.3, 'square', 0.022); setTimeout(() => this.tone(880, 0.4, 'square', 0.022), 300); } },
+  ding() { if (this.throttle('ding', 2000)) this.tone(1760, 0.4, 'sine', 0.04); },
 };
 
 // Light haptic feedback where the platform supports it (Android Chrome); silently ignored elsewhere.

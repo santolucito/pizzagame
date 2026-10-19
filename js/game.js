@@ -570,7 +570,7 @@ const Game = {
 
   // ---------- riding the train ----------
   // climbing aboard: the train pulls out right away (a second to settle in)
-  boardTrain() { const t = this.currentTrain(); this.onTrain = true; this.player.moving = false; if (t.remote) t.departIn = 1; else { t.unload = Math.min(t.unload, 1); t.hold = 0; t.toDrop = 0; } Sfx.whistle(); Haptics.tap(); },
+  boardTrain() { const t = this.currentTrain(); this.onTrain = true; this.player.moving = false; if (t.remote) t.departIn = 1; else { t.unload = Math.min(t.unload, 1); t.hold = 0; t.toDrop = 0; } Haptics.tap(); },
   leaveTrain() { const st = this.station(); this.onTrain = false; this.player.x = st.stopX; this.player.y = st.platform.y1 - 12; this.player.hasMoved = true; },
   updateOnTrain(dt) { const t = this.currentTrain(); this.player.x = t.x - 240; this.player.y = t.y; this.player.moving = false; this.player.hasMoved = true; },
 
@@ -857,7 +857,7 @@ const Game = {
           const dur = def.kind === 'slide' ? 2.2 : def.kind === 'swing' ? 4 : def.kind === 'seesaw' ? 2 : 2.2;
           this.ride = { def, t: 0, dur, seatX: sp.x, tilt: 0 };
           this.floats.push({ x: p.x, y: p.y - 60, text: def.kind === 'seesaw' || def.kind === 'spring' ? 'Boing!' : 'Wheee!', color: '#ffe08a', t: 0, dur: 1.2, big: true });
-          Sfx.unlock(); Haptics.tap();
+          Sfx.pickup(); Haptics.tap();
           return;
         }
       }

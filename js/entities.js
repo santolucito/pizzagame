@@ -56,7 +56,7 @@ class Customer {
       case 'route': {
         if (this.special && !this.announced && this.x < CFG.DOOR_OUT.x + 40) {
           this.announced = true;
-          g.toast(SPECIALS[this.special].arrive, true, 'town'); Sfx.unlock();
+          g.toast(SPECIALS[this.special].arrive, true, 'town'); Sfx.chime();
           g.floats.push({ x: this.x, y: this.y - 60, text: SPECIALS[this.special].arrive, color: '#ffe08a', t: 0, dur: 2, big: true });
         }
         const wp = this.route[0];
@@ -209,7 +209,7 @@ class Train {
       if (this.remote || !g.isUnlocked('station')) return;   // no trains until the old station is repaired
       this.timer -= dt;
       if (!this.warned && this.timer <= S.warn && !g.onTrain && home) { this.warned = true; g.toast(`🚂 Train in ${S.warn} seconds! Run to the station!`, true); Sfx.whistle(); }
-      if (this.timer <= 0) { this.summon(); this.warned = false; if (!g.onTrain && home) { g.toast('🚂 The train is pulling in!', true); Sfx.whistle(); } }
+      if (this.timer <= 0) { this.summon(); this.warned = false; if (!g.onTrain && home) g.toast('🚂 The train is pulling in!', true); }
     } else if (this.state === 'arriving') {
       const dist = S.stopX - this.x;
       this.speed = Math.max(40, Math.min(320, dist * 1.2));
@@ -232,7 +232,7 @@ class Train {
       if (this.unload <= 0 && hurrying && this.hold > 0) this.hold -= dt; else this.unload -= dt;
       this.dropT -= dt;
       if (this.toDrop > 0 && this.dropT <= 0) { this.dropT = 0.55; this.toDrop--; g.spawnTrainPassenger(); }
-      if (this.unload <= 0 && this.toDrop === 0 && !(hurrying && this.hold > 0)) { this.state = 'leaving'; this.speed = 0; Sfx.whistle(); }
+      if (this.unload <= 0 && this.toDrop === 0 && !(hurrying && this.hold > 0)) { this.state = 'leaving'; this.speed = 0; if (g.onTrain) Sfx.whistle(); }
     } else if (this.state === 'leaving') {
       this.speed = Math.min(360, this.speed + 160 * dt); this.x += this.speed * dt;
       if (Math.random() < dt * 8) this.smoke.push({ x: this.x - 14, y: this.y - 28, t: 0 });
@@ -256,7 +256,7 @@ class FireTruck {
       this.timer -= dt;
       if (this.timer <= 0 && g.isUnlocked('driveThru')) {
         this.state = 'out'; this.path = CFG.FIRE_TRUCK_OUT.map((p) => ({ x: p.x, y: p.y }));
-        g.toast('🚒 The fire truck is going out for pizza!', true, 'town'); Sfx.unlock();
+        g.toast('🚒 The fire truck is going out for pizza!', true, 'town'); Sfx.chime();
       }
     } else if (this.state === 'out') {
       const wp = this.path[0];

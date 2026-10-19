@@ -76,6 +76,10 @@ No build step, no dependencies: plain HTML5 Canvas + vanilla JavaScript.
     at the platform for a ride.
 13. The **ice cream shop** is for sale. Once bought it runs itself with a scooper and its own customers;
 14. **Construction Town**: repair the boarded-up station first, then ride the train yourself and it takes you through the mountains to a second town that is still being built. Ride the excavator, bulldozer and dump truck, flatten dirt piles for a few coins, and take the waiting train home.
+15. **The City by bus**: a bus stops at the sign north of Main Street; ride it to a downtown with taxis to drive, pigeons to scatter, a street musician, and the Pizza Tower, whose elevator visits six floors with something silly on each.
+16. **The Islands by ferry**: the ferry behind River House crosses to small islands where you set up an island pizza stand and deliver by jet ski. Pizzas you carry wait in a crate on the dock.
+17. **Secret path**: somewhere behind the barn a trail leads into the woods to a cabin and a sleeping bear.
+18. **Dusk and weather**: a soft dusk every few minutes, rain in town now and then, snow at Construction Town.
     walk in to collect the money, and buy More Flavors inside to make it busier.
 
 Impatient customers and cars leave if they wait too long. Progress saves automatically to

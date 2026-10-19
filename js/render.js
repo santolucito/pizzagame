@@ -248,9 +248,10 @@ const Render = {
     }
     ctx.setLineDash([]);
     if (g.isUnlocked('driveThru')) { ctx.fillStyle = '#fff'; ctx.fillRect(CFG.DT_WINDOW.x + 56, r.y1 + 6, 6, r.y2 - r.y1 - 12); }
-    // crosswalk near the park
+    // crosswalk where train passengers cross Main Street to the shop's side path (stripes run with the traffic)
+    const cw = CFG.STATION.route[1].x;
     ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    for (let k = 0; k < 6; k++) ctx.fillRect(-120 + k * 14, r.y1 + 8, 8, r.y2 - r.y1 - 16);
+    for (let k = 0; k < 5; k++) ctx.fillRect(cw - 30, r.y1 + 8 + k * 14, 60, 8);
     // near sidewalk + curb (in front of the building)
     ctx.fillStyle = '#cfc8b8'; ctx.fillRect(W.x0, r.y2 - 10, W.x1 - W.x0, 10);
     ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(W.x0, r.y2 - 10, W.x1 - W.x0, 2);
@@ -605,6 +606,18 @@ const Render = {
       ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, h.door.x - 48, h.y1 - 20, 96, 16, 4); ctx.fill();
       ctx.fillStyle = '#ffe08a'; ctx.font = this.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(h.name.toUpperCase(), h.door.x, h.y1 - 12);
     }
+    // ---- garage paint shop
+    const GA = CFG.GARAGE, gw = GA.x1 - GA.x0, gh = GA.y1 - GA.y0, gd = GA.door;
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(GA.x0 + 5, GA.y0 + 5, gw, gh);
+    ctx.fillStyle = '#6d6d6d'; ctx.fillRect(GA.x0, GA.y0, gw, gh);                          // floor
+    ctx.fillStyle = 'rgba(255,255,255,0.06)'; for (let y = GA.y0; y < GA.y1; y += 20) ctx.fillRect(GA.x0, y, gw, 2);
+    ctx.fillStyle = '#f2c94c'; ctx.fillRect(GA.bay.x - 30, GA.bay.y - 26, 60, 4); ctx.fillRect(GA.bay.x - 30, GA.bay.y + 22, 60, 4); ctx.fillRect(GA.bay.x - 30, GA.bay.y - 26, 4, 52); ctx.fillRect(GA.bay.x + 26, GA.bay.y - 26, 4, 52); // bay markings
+    ctx.fillStyle = '#9aa0a8'; ctx.fillRect(GA.x0, GA.y0, gd.x - gd.half - GA.x0, 8); ctx.fillRect(gd.x + gd.half, GA.y0, GA.x1 - (gd.x + gd.half), 8); ctx.fillRect(GA.x0, GA.y0, 8, gh); ctx.fillRect(GA.x1 - 8, GA.y0, 8, gh); ctx.fillRect(GA.x0, GA.y1 - 8, gw, 8);
+    ctx.fillStyle = '#c62828'; ctx.fillRect(GA.x0 + 8, GA.y1 - 20, gw - 16, 12);              // back wall tool rack
+    for (let i = 0; i < 8; i++) { ctx.fillStyle = CFG.PAINT_COLORS[i]; ctx.beginPath(); ctx.arc(GA.x0 + 24 + i * 18, GA.y1 - 14, 5, 0, Math.PI * 2); ctx.fill(); } // paint cans
+    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, gd.x - 60, GA.y0 - 20, 120, 18, 4); ctx.fill();
+    ctx.fillStyle = '#ffe08a'; ctx.font = this.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🎨 PAINT SHOP', gd.x, GA.y0 - 11);
+    ctx.fillStyle = '#d2cbbb'; ctx.fillRect(gd.x - gd.half, 1000, gd.half * 2, 20);          // driveway from the road
     // ---- fire station
     const F = CFG.FIRE_STATION, fw = F.x1 - F.x0, fh = F.y1 - F.y0;
     ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(F.x0 + 5, F.y0 + 5, fw, fh);
@@ -643,7 +656,9 @@ const Render = {
     fence(F.x0, F.y0, F.x1, F.y0); fence(F.x0, F.y1, F.x1, F.y1); fence(F.x0, F.y0, F.x0, F.y1);
     fence(F.x1 - 10, F.y0, F.x1 - 10, F.gate.y - 40); fence(F.x1 - 10, F.gate.y + 40, F.x1 - 10, F.y1);
     // cow pen fence
-    const P = F.pen; fence(P.x0, P.y0, P.x1, P.y0); fence(P.x0, P.y1, P.x1, P.y1); fence(P.x0, P.y0, P.x0, P.y1); fence(P.x1, P.y0, P.x1, P.y1);
+    const P = F.pen; fence(P.x0, P.y0, P.x1, P.y0); fence(P.x0, P.y1, F.penGate.x - F.penGate.half, P.y1); fence(F.penGate.x + F.penGate.half, P.y1, P.x1, P.y1); fence(P.x0, P.y0, P.x0, P.y1); fence(P.x1, P.y0, P.x1, P.y1);
+    const PGt = F.penGate; ctx.fillStyle = '#6b4a2b'; ctx.fillRect(PGt.x - PGt.half, P.y1 - 10, PGt.half * 2, 20); ctx.fillStyle = '#e0b44c'; ctx.fillRect(PGt.x - PGt.half - 4, P.y1 - 4, 6, 20); ctx.fillRect(PGt.x + PGt.half - 2, P.y1 - 4, 6, 20); // pen gate opening + posts
+    ctx.fillStyle = '#e0b44c'; ctx.fillRect(F.x1 - 14, F.gate.y - F.gate.half - 6, 10, 8); ctx.fillRect(F.x1 - 14, F.gate.y + F.gate.half - 2, 10, 8); // east gate posts
     ctx.fillStyle = '#6b4a2b'; ctx.fillRect(P.x0 + 10, P.y0 + 10, P.x1 - P.x0 - 20, P.y1 - P.y0 - 20);
     ctx.fillStyle = '#7d5a35'; for (let i = 0; i < 40; i++) ctx.fillRect(P.x0 + 14 + ((i * 37) % (P.x1 - P.x0 - 30)), P.y0 + 14 + ((i * 53) % (P.y1 - P.y0 - 30)), 6, 3);
     ctx.fillStyle = '#9fe0ff'; ctx.beginPath(); ctx.ellipse(P.x1 - 40, P.y1 - 30, 22, 10, 0, 0, Math.PI * 2); ctx.fill(); // water trough
@@ -671,7 +686,6 @@ const Render = {
     ctx.fillStyle = '#8d5a2b'; ctx.fillRect(sx - 2, sy - 40, 4, 50); ctx.fillRect(sx - 18, sy - 24, 36, 4);
     ctx.fillStyle = '#3b7dd8'; U.roundRect(ctx, sx - 10, sy - 28, 20, 22, 4); ctx.fill();
     ctx.fillStyle = '#e0b44c'; ctx.beginPath(); ctx.arc(sx, sy - 36, 8, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#8d5a2b'; ctx.fillRect(sx - 12, sy - 44, 24, 4);
-    ctx.save(); ctx.translate(F.tractor.x, F.tractor.y); ctx.rotate(-0.3); this.drawVehicle('tractor', g, '#43a047'); ctx.restore();
     // plot signs
     ctx.font = this.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     for (const [tx, ty, label] of [[-890, 330, '🍅 TOMATOES'], [-665, 330, '🌾 WHEAT'], [-890, 530, '🌿 BASIL'], [-680, 530, '🍄 MUSHROOMS']]) {
@@ -822,6 +836,20 @@ const Render = {
     ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.arc(x + 156, y, 6, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#c62828'; ctx.beginPath(); ctx.moveTo(x + 158, y - 16); ctx.lineTo(x + 176, y); ctx.lineTo(x + 158, y + 16); ctx.closePath(); ctx.fill();
     ctx.fillStyle = '#2b1d14'; for (let k = 0; k < 4; k++) ctx.fillRect(x + 160 + k * 4, y - 12 + k * 2, 2, 24 - k * 4);
+    if (g.onTrain) { const cx = front - 240; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(cx, y, 9, 11, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(cx + 3, y, 6, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(cx + 1, y, 5.5, 0, Math.PI * 2); ctx.fill(); }
+  },
+
+  drawFishing(g) {
+    const f = g.fishing; if (!f) return;
+    const ctx = this.ctx, p = g.player, B = CFG.FISHING.bobber;
+    const dip = f.phase === 'bite' ? 6 + Math.sin(g.time * 30) * 3 : Math.sin(g.time * 2) * 1.5;
+    ctx.strokeStyle = '#5b3a1a'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(p.x + 10, p.y - 20); ctx.lineTo(p.x + 26, p.y - 50); ctx.stroke(); // rod
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(p.x + 26, p.y - 50); ctx.quadraticCurveTo(B.x + 10, p.y - 60, B.x, B.y + dip - 6); ctx.stroke(); // line
+    if (f.splash > 0) { ctx.strokeStyle = `rgba(255,255,255,${f.splash})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(B.x, B.y + 2, 14 * (1 - f.splash) + 4, 6 * (1 - f.splash) + 2, 0, 0, Math.PI * 2); ctx.stroke(); }
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(B.x, B.y + dip, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.arc(B.x, B.y + dip, 6, Math.PI, 0); ctx.fill();
+    if (f.phase === 'bite') { ctx.fillStyle = '#e4572e'; ctx.font = this.font(26); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('!', B.x, B.y - 26 + Math.sin(g.time * 20) * 3); }
+    if (f.phase === 'done' && f.result) { ctx.font = this.font(22); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(f.result.ico, p.x + 30, p.y - 60 - f.t * 20); }
   },
 
   drawPlaygroundDynamic(g) {
@@ -1058,6 +1086,7 @@ const Render = {
     this.drawTownDynamic(g);
     this.drawFarmDynamic(g);
     this.drawPlaygroundDynamic(g);
+    this.drawFishing(g);
   },
 
   drawTownDynamic(g) {
@@ -1085,7 +1114,7 @@ const Render = {
   drawDeliveryCar(g) {
     const ctx = this.ctx, c = g.car;
     ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.angle);
-    this.drawVehicle('car', g, '#e4572e');
+    this.drawVehicle('car', g, g.s.paint.car);
     // roof sign
     ctx.fillStyle = '#fff8ee'; U.roundRect(ctx, -16, -8, 32, 16, 4); ctx.fill();
     this.drawPizza(0, 0, 6);
@@ -1108,13 +1137,22 @@ const Render = {
     }
   },
 
+  drawTractorRide(g) {
+    const ctx = this.ctx, t = g.tractor, riding = g.driving && g.vehicle === t;
+    ctx.save(); ctx.translate(t.x, t.y); ctx.rotate(t.angle);
+    this.drawVehicle('tractor', g, g.s.paint.tractor);
+    if (riding) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(-16, 0, 8, 10, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(-13, 0, 5.5, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-15, 0, 5, 0, Math.PI * 2); ctx.fill(); }
+    ctx.restore();
+    this.drawRidingExtras(g, t, 26);
+  },
+
   drawDeliveryBike(g) {
     const ctx = this.ctx, b = g.bike, riding = g.driving && g.vehicle === b;
     ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.angle);
     // scooter, nose +x
     ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(2, 4, 28, 12, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#1e1e1e'; ctx.beginPath(); ctx.ellipse(-20, 0, 8, 5, 0, 0, Math.PI * 2); ctx.ellipse(22, 0, 8, 5, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#e4572e'; U.roundRect(ctx, -14, -8, 36, 16, 7); ctx.fill();     // body
+    ctx.fillStyle = g.s.paint.bike; U.roundRect(ctx, -14, -8, 36, 16, 7); ctx.fill();     // body
     ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, -10, -6, 16, 12, 5); ctx.fill();     // seat
     ctx.fillStyle = '#c9ccd2'; ctx.fillRect(16, -12, 3, 24);                           // handlebar
     ctx.fillStyle = '#fff6b0'; ctx.beginPath(); ctx.arc(24, 0, 3, 0, Math.PI * 2); ctx.fill(); // headlight
@@ -1177,8 +1215,9 @@ const Render = {
     for (const c of g.icCustomers) items.push({ y: c.y, draw: () => this.drawIceCreamCustomer(c, g) });
     items.push({ y: g.car.y + 10, draw: () => this.drawDeliveryCar(g) });
     items.push({ y: g.bike.y + 8, draw: () => this.drawDeliveryBike(g) });
+    items.push({ y: g.tractor.y + 12, draw: () => this.drawTractorRide(g) });
     items.push({ y: g.train.y + 20, draw: () => this.drawTrain(g) });
-    if (!g.driving) items.push({ y: g.player.y, draw: () => this.drawPlayer(g) });
+    if (!g.driving && !g.onTrain) items.push({ y: g.player.y, draw: () => this.drawPlayer(g) });
     items.sort((a, b) => a.y - b.y);
     for (const it of items) it.draw();
   },
@@ -1460,12 +1499,12 @@ const Render = {
         break;
       }
       case 'tractor': {
-        shadow(80, 20);
+        shadow(80, 20); const tc = color || '#43a047';
         ctx.fillStyle = '#1e1e1e'; ctx.beginPath(); ctx.arc(-22, -20, 13, 0, Math.PI * 2); ctx.arc(-22, 20, 13, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(-22, -20, 5, 0, Math.PI * 2); ctx.arc(-22, 20, 5, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = '#1e1e1e'; U.roundRect(ctx, 20, -22, 12, 8, 3); ctx.fill(); U.roundRect(ctx, 20, 14, 12, 8, 3); ctx.fill();
-        ctx.fillStyle = '#43a047'; U.roundRect(ctx, -34, -15, 76, 30, 8); ctx.fill();
-        ctx.fillStyle = '#2e7d32'; U.roundRect(ctx, -34, -15, 30, 30, 8); ctx.fill();
+        ctx.fillStyle = tc; U.roundRect(ctx, -34, -15, 76, 30, 8); ctx.fill();
+        ctx.fillStyle = 'rgba(0,0,0,0.25)'; U.roundRect(ctx, -34, -15, 30, 30, 8); ctx.fill();
         ctx.fillStyle = '#5b3a1a'; U.roundRect(ctx, -26, -8, 14, 16, 4); ctx.fill();
         ctx.fillStyle = '#bfe3ff'; U.roundRect(ctx, -2, -12, 10, 24, 3); ctx.fill();
         ctx.fillStyle = '#9e9e9e'; ctx.fillRect(12, -10, 4, 8); ctx.fillStyle = '#6d6d6d'; ctx.beginPath(); ctx.arc(14, -12, 3, 0, Math.PI * 2); ctx.fill();

@@ -60,8 +60,10 @@ const CFG = {
     { x0: -300, y0: 1020, x1: -120, y1: 1160, door: { x: -210, y: 1020 }, color: '#f2d6a0', roof: '#b23a48', name: 'Blue Door House' },
     { x0: 80, y0: 1020, x1: 260, y1: 1160, door: { x: 170, y: 1020 }, color: '#cfe3f7', roof: '#2d5a8a', name: 'River House' },
     { x0: 520, y0: 1020, x1: 700, y1: 1160, door: { x: 610, y: 1020 }, color: '#e8f2cf', roof: '#5a8a2d', name: 'Green House' },
-    { x0: 960, y0: 1020, x1: 1140, y1: 1160, door: { x: 1050, y: 1020 }, color: '#f7e0cf', roof: '#8a5a2d', name: 'Corner House' },
   ],
+  // Garage paint shop where the Corner House used to be: drive any vehicle in and pick a colour
+  GARAGE: { x0: 960, y0: 1020, x1: 1140, y1: 1160, door: { x: 1050, half: 46 }, bay: { x: 1050, y: 1100 } },
+  PAINT_COLORS: ['#e4572e', '#3b7dd8', '#41b883', '#f2b134', '#8e5bd1', '#f06292', '#607d8b', '#ffffff'],
   FIRE_STATION: { x0: 1340, y0: 300, x1: 1520, y1: 540, door: { x: 1340, y: 440 } },
   FIRE_TRUCK_HOME: { x: 1400, y: 460 },                 // parked inside the lower garage bay
   // The fire truck's outing: out of the bay, around the block, into the drive-thru line, then home.
@@ -79,7 +81,8 @@ const CFG = {
     silo: { x: -770, y: 225 },
     pen: { x0: -740, y0: 150, x1: -520, y1: 300 },
     cowHome: { x: -630, y: 235 },
-    gate: { x: -500, y: 420 },
+    gate: { x: -500, y: 420, half: 44 },        // opening in the east fence
+    penGate: { x: -630, half: 34 },               // opening in the pen's bottom fence
     tractor: { x: -600, y: 760 },
     plots: [
       { kind: 'tomato', x: -940, y: 370 }, { kind: 'tomato', x: -890, y: 370 }, { kind: 'tomato', x: -840, y: 370 },
@@ -93,6 +96,17 @@ const CFG = {
     max: 9,
   },
   INGREDIENTS: { wheat: '🌾', tomato: '🍅', cheese: '🧀', mushroom: '🍄', basil: '🌿' },
+  // Fishing at the park pond: stand on the south bank, cast, wait for the bobber to dip, tap to reel
+  FISHING: {
+    spot: { x: -150, y: 516 }, bobber: { x: -150, y: 458 },
+    bite: [2, 6], window: 1.3,
+    catches: [
+      { kind: 'fish', label: 'A fish!', ico: '🐟', value: 8, weight: 50 },
+      { kind: 'bigfish', label: 'A BIG fish!', ico: '🐠', value: 20, weight: 25 },
+      { kind: 'boot', label: 'An old boot…', ico: '🥾', value: 0, weight: 15 },
+      { kind: 'treasure', label: 'Treasure!', ico: '💰', value: 50, weight: 10 },
+    ],
+  },
 
   // Train station north of the farm: tracks run along the top of the world
   STATION: {
@@ -122,6 +136,7 @@ const CFG = {
   VEHICLES: {
     car:  { speed: 360, radius: 22, label: '🚗 Drive', exit: '🚶 Get out' },
     bike: { speed: 440, radius: 13, label: '🛵 Ride', exit: '🚶 Hop off' },
+    tractor: { speed: 210, radius: 18, label: '🚜 Drive', exit: '🚶 Hop off' },
   },
   DELIVERY_SPEED: 360,
   DELIVERY_TIP: 2.0,                   // delivered pizzas pay double

@@ -20,7 +20,11 @@ const UI = {
       fsBtn.remove();
     }
     this.els.btnCar.addEventListener('click', () => this.toggleCar());
-    this.els.btnMake.addEventListener('click', () => this.startMinigame());
+    this.els.btnMake.addEventListener('click', () => Game.doAction());
+    Game.onMakePizza = () => this.startMinigame();
+    const sw = $('paint-swatches');
+    for (const c of CFG.PAINT_COLORS) { const b = document.createElement('button'); b.className = 'swatch'; b.style.background = c; b.addEventListener('click', () => Game.paintVehicle(c)); sw.appendChild(b); }
+    this.els.paint = $('paint-bar');
     MiniGame.init($('pizza-canvas'), $('pizza-primary'));
     $('pizza-quit').addEventListener('click', () => { MiniGame.stop(); this.close(); });
     window.addEventListener('resize', () => { if (MiniGame.open) MiniGame.resize(); });
@@ -36,7 +40,7 @@ const UI = {
       if (e.code === 'Escape') this.close();
       else if (e.code === 'KeyM') this.toggleSound();
       else if (e.code === 'KeyE') this.toggleCar();
-      else if (e.code === 'Space' && !this.open && Game.nearPrep) this.startMinigame();
+      else if (e.code === 'Space' && !this.open) { e.preventDefault(); Game.doAction(); }
       else if (e.key === '?') this.toggle('help');
     });
     Game.onToast = (m) => this.toast(m);
@@ -70,8 +74,8 @@ const UI = {
     const el = document.createElement('div');
     el.className = 'toast'; el.textContent = msg;
     this.els.toasts.appendChild(el);
-    while (this.els.toasts.children.length > 3) this.els.toasts.firstChild.remove();
-    setTimeout(() => el.remove(), 2700);
+    while (this.els.toasts.children.length > 2) this.els.toasts.firstChild.remove();
+    setTimeout(() => el.remove(), 4200);
   },
   toggleCar() { if (Game.driving) Game.exitCar(); else Game.enterCar(); },
   startMinigame() {
@@ -100,7 +104,10 @@ const UI = {
     this.els.hint.textContent = g.hint ? g.hint.text : '';
     const inv = Object.keys(CFG.INGREDIENTS).filter((k) => s.farm[k] > 0).map((k) => `${CFG.INGREDIENTS[k]}${s.farm[k]}`).join(' ');
     this.els.farm.textContent = inv; this.els.farm.classList.toggle('hidden', !inv);
-    this.els.btnMake.classList.toggle('hidden', !g.nearPrep || this.open);
+    this.els.paint.classList.toggle('hidden', !g.inPaintBay);
+    const label = g.actionLabel();
+    this.els.btnMake.classList.toggle('hidden', !label || this.open);
+    if (label) this.els.btnMake.textContent = label;
     const showCar = g.driving || g.carNear;
     this.els.btnCar.classList.toggle('hidden', !showCar);
     const v = g.driving ? g.vehicle : g.nearVehicle;

@@ -56,7 +56,7 @@ class Customer {
       case 'route': {
         if (this.special && !this.announced && this.x < CFG.DOOR_OUT.x + 40) {
           this.announced = true;
-          g.toast(SPECIALS[this.special].arrive); Sfx.unlock();
+          g.toast(SPECIALS[this.special].arrive, true); Sfx.unlock();
           g.floats.push({ x: this.x, y: this.y - 60, text: SPECIALS[this.special].arrive, color: '#ffe08a', t: 0, dur: 2, big: true });
         }
         const wp = this.route[0];
@@ -201,7 +201,7 @@ class Train {
     for (const p of this.smoke) { p.t += dt; p.y -= 18 * dt; p.x += 8 * dt; } this.smoke = this.smoke.filter((p) => p.t < 1.6);
     if (this.state === 'away') {
       this.timer -= dt;
-      if (this.timer <= 0) { this.state = 'arriving'; this.x = CFG.WORLD.x0 - 420; this.speed = 320; this.whistled = false; g.toast('🚂 The train is coming!'); Sfx.whistle(); }
+      if (this.timer <= 0) { this.state = 'arriving'; this.x = CFG.WORLD.x0 - 420; this.speed = 320; this.whistled = false; if (!g.onTrain) g.toast('🚂 The train is coming!', true); Sfx.whistle(); }
     } else if (this.state === 'arriving') {
       const dist = S.stopX - this.x;
       this.speed = Math.max(40, Math.min(320, dist * 1.2));
@@ -215,7 +215,7 @@ class Train {
     } else if (this.state === 'leaving') {
       this.speed = Math.min(360, this.speed + 160 * dt); this.x += this.speed * dt;
       if (Math.random() < dt * 8) this.smoke.push({ x: this.x - 14, y: this.y - 28, t: 0 });
-      if (this.x > CFG.WORLD.x1 + 500) { this.state = 'away'; this.timer = U.rand(S.every[0], S.every[1]); }
+      if (this.x > CFG.WORLD.x1 + 500) { this.state = 'away'; this.timer = g.onTrain ? 2.5 : U.rand(S.every[0], S.every[1]); } // with a rider aboard it comes straight back around
     }
   }
 }
@@ -232,7 +232,7 @@ class FireTruck {
       this.timer -= dt;
       if (this.timer <= 0 && g.isUnlocked('driveThru')) {
         this.state = 'out'; this.path = CFG.FIRE_TRUCK_OUT.map((p) => ({ x: p.x, y: p.y }));
-        g.toast('🚒 The fire truck is going out for pizza!'); Sfx.unlock();
+        g.toast('🚒 The fire truck is going out for pizza!', true); Sfx.unlock();
       }
     } else if (this.state === 'out') {
       const wp = this.path[0];
@@ -245,7 +245,7 @@ class FireTruck {
           const car = new Car(g.seq++, U.randInt(3, 4), 'firetruck');
           car.x = this.x; car.speed = 200;
           car.exitPath = CFG.FIRE_TRUCK_BACK.map((p) => ({ x: p.x, y: p.y }));
-          car.onDone = () => { this.state = 'home'; this.x = CFG.FIRE_TRUCK_HOME.x; this.y = CFG.FIRE_TRUCK_HOME.y; this.angle = Math.PI; this.timer = U.rand(CFG.FIRE_TRUCK_EVERY[0], CFG.FIRE_TRUCK_EVERY[1]); g.toast('🚒 The fire truck is back home'); };
+          car.onDone = () => { this.state = 'home'; this.x = CFG.FIRE_TRUCK_HOME.x; this.y = CFG.FIRE_TRUCK_HOME.y; this.angle = Math.PI; this.timer = U.rand(CFG.FIRE_TRUCK_EVERY[0], CFG.FIRE_TRUCK_EVERY[1]); };
           g.cars.push(car);
           this.state = 'away';
         }

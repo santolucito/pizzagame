@@ -24,6 +24,7 @@ const Input = {
     canvas.addEventListener('pointerdown', (e) => {
       if (!this.enabled) return;
       Sfx.init(); Sfx.resume();
+      if (Game.fishing) { Game.reel(); e.preventDefault(); return; } // any tap reels the line in
       const p = this.toScreen(e.clientX, e.clientY);
       this.pointers.set(e.pointerId, p);
       try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }

@@ -27,7 +27,7 @@ const Sfx = {
   pickup() { if (this.throttle('pickup', 60)) this.tone(520, 0.07, 'triangle', 0.05, 200); },
   drop() { if (this.throttle('drop', 60)) this.tone(380, 0.07, 'triangle', 0.05, -120); },
   cash() { if (this.throttle('cash', 120)) { this.tone(880, 0.12, 'sine', 0.07); setTimeout(() => this.tone(1320, 0.18, 'sine', 0.07), 70); } },
-  pay() { if (this.throttle('pay', 100)) this.tone(660, 0.1, 'square', 0.03, 200); },
+  pay() { if (this.throttle('pay', 300)) this.tone(660, 0.1, 'square', 0.025, 200); },
   // Alert-style sounds are soft and rate-limited so news never turns into a wall of bleeps.
   unlock() { if (this.throttle('unlock', 2500)) [523, 659, 784].forEach((f, i) => setTimeout(() => this.tone(f, 0.22, 'triangle', 0.045), i * 90)); },
   chime() { if (this.throttle('chime', 3000)) this.tone(988, 0.22, 'sine', 0.035); },

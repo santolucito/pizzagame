@@ -79,7 +79,6 @@ class Customer {
         if (arrived && idx === 0 && this.takeCd <= 0 && g.s.piles.display > 0 && this.have < this.want) {
           g.s.piles.display--; this.have++; this.takeCd = 0.25;
           g.fx.push({ kind: 'pizza', x0: CFG.DISPLAY.x, y0: CFG.DISPLAY.y - 10, x1: this.x, y1: this.y - 30, t: 0, dur: 0.25 });
-          Sfx.pickup();
         }
         if (this.have >= this.want) { this.state = 'toPay'; this.patience = 70; }
         break;
@@ -99,7 +98,6 @@ class Customer {
             g.earn(amount, CFG.CASH_PILE, 'register');
             if (this.special) { g.floats.push({ x: this.x, y: this.y - 64, text: SPECIALS[this.special].thanks, color: '#ff6b8a', t: 0, dur: 1.6, big: true }); g.s.stats.specials = (g.s.stats.specials || 0) + 1; }
             g.fx.push({ kind: 'cash', x0: this.x, y0: this.y - 20, x1: CFG.CASH_PILE.x, y1: CFG.CASH_PILE.y, t: 0, dur: 0.35 });
-            Sfx.pay();
             const table = g.findFreeTable();
             if (table && Math.random() < 0.65) { table.occupied = this; this.table = table; this.state = 'toTable'; }
             else this.leave();
@@ -160,13 +158,11 @@ class Car {
       if (this.patience <= 0) {
         this.angry = true; this.state = 'leaving'; g.s.stats.lost++;
         g.floats.push({ x: this.x, y: this.y - 30, text: 'Drove off!', color: '#e4572e', t: 0, dur: 1.2 });
-        Sfx.angry();
         return;
       }
       if (this.state === 'waiting' && this.takeCd <= 0 && g.s.piles.dt > 0 && this.have < this.want) {
         g.s.piles.dt--; this.have++; this.takeCd = 0.22;
         g.fx.push({ kind: 'pizza', x0: CFG.DT_STACK.x, y0: CFG.DT_STACK.y - 10, x1: this.x, y1: this.y, t: 0, dur: 0.25 });
-        Sfx.pickup();
         if (this.have >= this.want) {
           const amount = g.price() * this.want * CFG.DT_PRICE_MULT * (this.kind === 'firetruck' ? 2 : 1);
           g.earn(amount, CFG.DT_CASH, 'dt');
@@ -223,7 +219,7 @@ class Train {
     } else if (this.state === 'stopped') {
       if (this.remote) {
         // waits for you; two seconds after you climb aboard it pulls out
-        if (g.onTrain) { this.departIn -= dt; if (this.departIn <= 0) { this.state = 'leaving'; this.speed = 0; Sfx.whistle(); } }
+        if (g.onTrain) { this.departIn -= dt; if (this.departIn <= 0) { this.state = 'leaving'; this.speed = 0; } }
         return;
       }
       // the conductor waits a little longer while somebody is hurrying up the platform path
@@ -232,7 +228,7 @@ class Train {
       if (this.unload <= 0 && hurrying && this.hold > 0) this.hold -= dt; else this.unload -= dt;
       this.dropT -= dt;
       if (this.toDrop > 0 && this.dropT <= 0) { this.dropT = 0.55; this.toDrop--; g.spawnTrainPassenger(); }
-      if (this.unload <= 0 && this.toDrop === 0 && !(hurrying && this.hold > 0)) { this.state = 'leaving'; this.speed = 0; if (g.onTrain) Sfx.whistle(); }
+      if (this.unload <= 0 && this.toDrop === 0 && !(hurrying && this.hold > 0)) { this.state = 'leaving'; this.speed = 0; }
     } else if (this.state === 'leaving') {
       this.speed = Math.min(360, this.speed + 160 * dt); this.x += this.speed * dt;
       if (Math.random() < dt * 8) this.smoke.push({ x: this.x - 14, y: this.y - 28, t: 0 });

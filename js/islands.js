@@ -168,7 +168,6 @@ const IslandsExt = {
       for (let i = 0; i < Math.min(p.carry, 8); i++) g.fx.push({ kind: 'pizza', x0: p.x, y0: p.y - 30, x1: C.x, y1: C.y - 14, t: -i * 0.05, dur: 0.3 });
       st.dockPizzas += p.carry; p.carry = 0;
       g.toast('Pizzas stay on the dock!');
-      Sfx.drop();
     }
     this.horn(); Haptics.tap();
     g.startTravel(to, 'ferry', CFG.ISLANDS.TRAVEL);
@@ -189,7 +188,6 @@ const IslandsExt = {
         for (let i = 0; i < Math.min(take, 8); i++) g.fx.push({ kind: 'pizza', x0: I.TOWN_CRATE.x, y0: I.TOWN_CRATE.y - 14, x1: p.x, y1: p.y - 30, t: -i * 0.05, dur: 0.3 });
         p.carry += take; st.dockPizzas -= take;
         g.floats.push({ x: p.x, y: p.y - 70, text: 'Your pizzas are back!', color: '#ffe08a', t: 0, dur: 1.6, big: true });
-        Sfx.pickup();
       }
     }
     Haptics.success();

@@ -540,7 +540,6 @@ const Game = {
     const F = CFG.FISHING;
     this.player.x = F.spot.x; this.player.y = F.spot.y; this.player.moving = false;
     this.fishing = { phase: 'wait', t: 0, biteT: U.rand(F.bite[0], F.bite[1]), splash: 0 };
-    Sfx.drop();
   },
   reel() {
     const f = this.fishing; if (!f || f.phase === 'done') return;
@@ -627,12 +626,12 @@ const Game = {
     return best;
   },
   canEnterCar() { return !!this.findNearVehicle(); },
-  enterCar() { const v = this.findNearVehicle(); if (!v) return; this.vehicle = v; this.driving = true; v.vx = 0; v.vy = 0; Sfx.buy(); Haptics.tap(); },
+  enterCar() { const v = this.findNearVehicle(); if (!v) return; this.vehicle = v; this.driving = true; v.vx = 0; v.vy = 0; Haptics.tap(); },
   paintVehicle(color) {
     if (!this.driving) return;
     this.s.paint[this.vehicle.kind] = color;
     for (let i = 0; i < 10; i++) this.fx.push({ kind: 'sparkle', x0: this.vehicle.x + U.rand(-30, 30), y0: this.vehicle.y + U.rand(-20, 20), x1: 0, y1: 0, t: -i * 0.05, dur: 0.5 });
-    Sfx.buy(); Haptics.tap();
+    Haptics.tap();
   },
   exitCar() {
     if (!this.driving) return;
@@ -759,7 +758,6 @@ const Game = {
       p.carry--; p.xferCd = CFG.XFER_DELAY * 2;
       this.fx.push({ kind: 'pizza', x0: p.x, y0: p.y - 30, x1: bin.x, y1: bin.y - 24, t: 0, dur: 0.2 });
       if (p.carry === 0) this.floats.push({ x: bin.x, y: bin.y - 40, text: 'All gone!', color: '#8a7a6a', t: 0, dur: 1 });
-      Sfx.drop();
     }
     if (near(CFG.CASH_PILE, 46)) this.collect('cash', CFG.CASH_PILE);
     if (this.isUnlocked('driveThru') && near(CFG.DT_CASH, 46)) this.collect('dtCash', CFG.DT_CASH);
@@ -857,7 +855,7 @@ const Game = {
           const dur = def.kind === 'slide' ? 2.2 : def.kind === 'swing' ? 4 : def.kind === 'seesaw' ? 2 : 2.2;
           this.ride = { def, t: 0, dur, seatX: sp.x, tilt: 0 };
           this.floats.push({ x: p.x, y: p.y - 60, text: def.kind === 'seesaw' || def.kind === 'spring' ? 'Boing!' : 'Wheee!', color: '#ffe08a', t: 0, dur: 1.2, big: true });
-          Sfx.pickup(); Haptics.tap();
+          Haptics.tap();
           return;
         }
       }

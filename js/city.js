@@ -248,7 +248,7 @@ const CityExt = {
     this.st.boarding = { to, t: 0 };
     g.player.moving = false; g.player.hasMoved = true;
     g.floats.push({ x: g.player.x, y: g.player.y - 60, text: 'Ding ding!', color: '#ffe08a', t: 0, dur: 1, big: true });
-    Sfx.ding(); Haptics.tap();
+    Haptics.tap();
   },
 
   arrive(g, tr) {
@@ -264,7 +264,6 @@ const CityExt = {
       g.toast('🍕 Home sweet home!', true);
     }
     p.moving = false; p.hasMoved = true; p.facing = 1;
-    Sfx.ding();
   },
 
   hint(g) {
@@ -615,13 +614,12 @@ const CityExt = {
     this.floor = 1; st.lift = null; st.floorT = 0; st.seenTower = true;
     g.player.x = S.x; g.player.y = S.y - 10; g.player.moving = false; g.player.facing = 1; g.player.hasMoved = true; g.cameraSnap = true;
     g.floats.push({ x: g.player.x, y: g.player.y - 60, text: 'Welcome to the Pizza Tower!', color: '#ffe08a', t: 0, dur: 1.6, big: true });
-    Sfx.ding(); Haptics.tap();
+    Haptics.tap();
   },
   leaveTower(g) {
     const D = CFG.CITY.TOWER.door;
     this.floor = null; this.st.lift = null;
     g.player.x = D.x; g.player.y = D.y + 6; g.player.moving = false; g.cameraSnap = true;
-    Sfx.drop();
   },
   towerAction(g) {
     const st = this.st, p = g.player, T = CFG.CITY.TOWER;
@@ -634,7 +632,7 @@ const CityExt = {
   },
   ride(g, to) {
     this.st.lift = { phase: 'closing', t: 0, from: this.floor, to, shown: this.floor };
-    g.player.moving = false; Sfx.buy(); Haptics.tap();
+    g.player.moving = false; Haptics.tap();
   },
   updateTower(g, dt) {
     const st = this.st, L = st.lift, p = g.player, T = CFG.CITY.TOWER;
@@ -656,7 +654,7 @@ const CityExt = {
       return;
     }
     // the rooftop view through the telescope
-    if (this.floor === T.floors && U.dist(p.x, p.y, this.telescope().x, this.telescope().y) < 50 && !st.seenView) { st.seenView = true; Sfx.unlock(); }
+    if (this.floor === T.floors && U.dist(p.x, p.y, this.telescope().x, this.telescope().y) < 50 && !st.seenView) { st.seenView = true; }
     // rooftop pigeons scatter like the ones on the square
     const R = T.ROOM;
     for (const b of st.roofPigeons) {

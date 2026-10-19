@@ -349,6 +349,17 @@ const Render = {
       // handle
       ctx.fillStyle = '#c9ccd2'; U.roundRect(ctx, o.x - 20, o.y + 25, 40, 3, 2); ctx.fill();
     }
+    // prep table: flour, rolling pin, a sauce bowl
+    const pt = CFG.PREP_TABLE;
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; U.roundRect(ctx, pt.x - pt.w / 2 + 3, pt.y - pt.h / 2 + 4, pt.w, pt.h, 6); ctx.fill();
+    ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, pt.x - pt.w / 2, pt.y - pt.h / 2 + 4, pt.w, pt.h, 6); ctx.fill();
+    ctx.fillStyle = '#c99a5f'; U.roundRect(ctx, pt.x - pt.w / 2, pt.y - pt.h / 2, pt.w, pt.h - 6, 6); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.beginPath(); ctx.ellipse(pt.x - 18, pt.y - 2, 14, 9, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#f1dcb2'; ctx.beginPath(); ctx.arc(pt.x - 18, pt.y - 3, 8, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#b5773a'; U.roundRect(ctx, pt.x + 2, pt.y - 12, 30, 7, 3); ctx.fill(); ctx.fillStyle = '#8d5a2b'; ctx.fillRect(pt.x - 2, pt.y - 10, 5, 3); ctx.fillRect(pt.x + 31, pt.y - 10, 5, 3);
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(pt.x + 18, pt.y + 6, 7, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#c0392b'; ctx.beginPath(); ctx.arc(pt.x + 18, pt.y + 6, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, pt.x - 30, pt.y + 22, 60, 13, 4); ctx.fill();
+    ctx.fillStyle = '#ffe08a'; ctx.font = this.font(8); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('MAKE A PIZZA', pt.x, pt.y + 29);
     // pile tray
     const p = CFG.OVEN_PILE;
     ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(p.x, p.y + 8, 30, 12, 0, 0, Math.PI * 2); ctx.fill();
@@ -1043,6 +1054,7 @@ const Render = {
     this.drawPerson(p.x, p.y, { shirt: '#fff', apron: '#e4572e', skin: '#f1c27d', hat: 'chef', facing: p.facing, moving: p.moving, bob: p.bob, carry: p.carry, pants: '#2d3a4a' });
     if (p.carry > 0) this.drawCountBadge(p.x + 18, p.y - 70 - Math.min(p.carry, 30) * 4, p.carry, g.playerCap());
     if (p.cleanTarget) this.drawProgressRing(p.x, p.y - 20, 22, p.cleanTarget.cleanProg, '#2f9e44');
+    if (g.nearPrep) { const pt = CFG.PREP_TABLE, bob = Math.sin(g.time * 5) * 3; this.drawBubble(pt.x, pt.y - 40 + bob, () => { this.ctx.font = this.font(13); this.ctx.textAlign = 'center'; this.ctx.textBaseline = 'middle'; this.ctx.fillStyle = '#2b1d14'; this.ctx.fillText('👐 Make a pizza!', 0, 0); }, 92); }
   },
 
   drawStaff(st, g) {

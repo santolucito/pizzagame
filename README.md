@@ -42,7 +42,9 @@ No build step, no dependencies: plain HTML5 Canvas + vanilla JavaScript.
 
 ## Gameplay loop
 
-1. **Ovens** bake pizzas onto a tray. Walk up to grab a stack (carry capacity is upgradeable).
+1. **Ovens** bake pizzas onto a tray. Walk up to grab a stack (carry capacity is upgradeable). Or stand at
+   the **prep table** and make one by hand: stretch the dough, spread the sauce, sprinkle cheese, drag on
+   toppings, bake it until the bell dings. A handmade family-size pizza counts as three.
 2. Drop pizzas on the **counter** display. Customers queue, take their order and move to the register.
 3. Stand at the **register** to check them out (or hire a cashier). Cash piles up next to the register.
 4. Walk over the **cash pile** to collect it.

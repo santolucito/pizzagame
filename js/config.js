@@ -17,6 +17,8 @@ const CFG = {
   OVENS: [{ x: 90, y: 250 }, { x: 90, y: 350 }],
   OVEN_PILE: { x: 190, y: 300 },
   OVEN_PILE_STAND: { x: 190, y: 350 },
+  PREP_TABLE: { x: 255, y: 205, w: 76, h: 38 },   // make a pizza by hand here
+  HANDMADE_PIZZAS: 3,                               // a handmade family-size pie counts as three
 
   // Counter
   COUNTER: { x1: 380, x2: 650, y: 212, h: 40 },
@@ -106,7 +108,7 @@ const CFG = {
   DECOR_ITEMS: [
     { key: 'plants',     label: 'Plants',        ico: '🪴', price: 50,  spot: { x: 662, y: 560 } },
     { key: 'posters',    label: 'Posters',       ico: '🖼️', price: 80,  spot: { x: 100, y: 168 } },
-    { key: 'lights',     label: 'String Lights', ico: '💡', price: 120, spot: { x: 250, y: 168 } },
+    { key: 'lights',     label: 'String Lights', ico: '💡', price: 120, spot: { x: 335, y: 150 } },
     { key: 'neon',       label: 'Neon Sign',     ico: '💗', price: 180, spot: { x: 820, y: 240 } },
     { key: 'jukebox',    label: 'Jukebox & Rug', ico: '🎵', price: 260, spot: { x: 918, y: 262 } },
   ],

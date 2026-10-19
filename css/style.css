@@ -66,6 +66,13 @@ html, body {
 
 #btn-car { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 5; font-size: 18px; padding: 12px 22px; min-height: 48px; border-radius: 16px; }
 #btn-car.hidden { display: none; }
+#btn-make { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 5; font-size: 18px; padding: 12px 22px; min-height: 48px; border-radius: 16px; }
+#btn-make.hidden { display: none; }
+.pizza-card { width: min(560px, 100%); max-width: 100%; align-items: stretch; }
+.pizza-body { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 10px; }
+#pizza-canvas { touch-action: none; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.25); }
+.btn.big { font-size: 20px; padding: 14px 26px; min-height: 52px; }
+.btn.hidden { display: none; }
 #zoom-ctl { position: absolute; right: calc(10px + env(safe-area-inset-right)); bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 5; display: flex; flex-direction: column; gap: 6px; }
 #zoom-ctl .hud-btn { width: 40px; font-size: 20px; line-height: 1; }
 

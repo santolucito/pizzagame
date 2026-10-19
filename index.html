@@ -32,6 +32,7 @@
     <canvas id="game" width="960" height="640"></canvas>
 
     <button id="btn-car" class="hud-btn car hidden">🚗 Drive</button>
+    <button id="btn-make" class="hud-btn make hidden">👐 Make a pizza</button>
 
     <div id="zoom-ctl"><button id="btn-zoom-in" class="hud-btn icon" title="Zoom in">+</button><button id="btn-zoom-out" class="hud-btn icon" title="Zoom out">−</button></div>
 
@@ -44,7 +45,7 @@
         <div class="help-body">
           <p><b>Move</b> with <kbd>WASD</kbd> / arrow keys, or drag anywhere on the screen to use the joystick. <b>Pinch</b> (or scroll) to zoom.</p>
           <ol>
-            <li>Walk to the <b>oven</b> to grab fresh pizzas.</li>
+            <li>Walk to the <b>oven</b> to grab fresh pizzas, or stand at the <b>prep table</b> and press Make a pizza to make a family-size one by hand.</li>
             <li>Drop them on the <b>counter</b> so customers can take them.</li>
             <li>Stand at the <b>register</b> to take the money, then walk over the <b>cash pile</b> to pick it up.</li>
             <li>Stand <b>still</b> on a glowing circle to spend money on it: upgrades, helpers, new areas and decorations each have a circle right where they belong.</li>
@@ -58,6 +59,17 @@
           <div class="help-actions">
             <button id="btn-reset" class="btn danger">Reset save</button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: make a pizza mini-game -->
+    <div id="modal-pizza" class="modal hidden">
+      <div class="modal-card pizza-card">
+        <div class="modal-head"><h2>Make a pizza</h2><button id="pizza-quit" class="close">✕</button></div>
+        <div class="pizza-body">
+          <canvas id="pizza-canvas" width="480" height="560"></canvas>
+          <button id="pizza-primary" class="btn primary big hidden">🔥 Put it in the oven</button>
         </div>
       </div>
     </div>
@@ -77,6 +89,7 @@
   <script src="js/audio.js"></script>
   <script src="js/input.js"></script>
   <script src="js/entities.js"></script>
+  <script src="js/minigame.js"></script>
   <script src="js/game.js"></script>
   <script src="js/render.js"></script>
   <script src="js/ui.js"></script>

@@ -9,7 +9,7 @@ const UI = {
     this.els = {
       cash: $('hud-cash'), city: $('hud-city'), hint: $('hint'), toasts: $('toasts'),
       help: $('modal-help'), msg: $('modal-msg'),
-      btnSound: $('btn-sound'), msgTitle: $('msg-title'), msgBody: $('msg-body'), btnCar: $('btn-car'),
+      btnSound: $('btn-sound'), msgTitle: $('msg-title'), msgBody: $('msg-body'), btnCar: $('btn-car'), btnMake: $('btn-make'), pizza: $('modal-pizza'),
     };
     $('btn-help').addEventListener('click', () => this.toggle('help'));
     this.els.btnSound.addEventListener('click', () => this.toggleSound());
@@ -20,6 +20,10 @@ const UI = {
       fsBtn.remove();
     }
     this.els.btnCar.addEventListener('click', () => this.toggleCar());
+    this.els.btnMake.addEventListener('click', () => this.startMinigame());
+    MiniGame.init($('pizza-canvas'), $('pizza-primary'));
+    $('pizza-quit').addEventListener('click', () => { MiniGame.stop(); this.close(); });
+    window.addEventListener('resize', () => { if (MiniGame.open) MiniGame.resize(); });
     $('btn-zoom-in').addEventListener('click', () => Render.setZoom(Render.zoom * 1.25));
     $('btn-zoom-out').addEventListener('click', () => Render.setZoom(Render.zoom / 1.25));
     $('btn-reset').addEventListener('click', () => {
@@ -32,6 +36,7 @@ const UI = {
       if (e.code === 'Escape') this.close();
       else if (e.code === 'KeyM') this.toggleSound();
       else if (e.code === 'KeyE') this.toggleCar();
+      else if (e.code === 'Space' && !this.open && Game.nearPrep) this.startMinigame();
       else if (e.key === '?') this.toggle('help');
     });
     Game.onToast = (m) => this.toast(m);
@@ -48,6 +53,7 @@ const UI = {
   toggle(key) { if (this.open === key) this.close(); else this.show(key); },
   close() {
     if (!this.open) return;
+    if (this.open === 'pizza') MiniGame.stop();
     this.els[this.open].classList.add('hidden');
     this.open = null;
     Input.enabled = true;
@@ -68,6 +74,11 @@ const UI = {
     setTimeout(() => el.remove(), 2700);
   },
   toggleCar() { if (Game.driving) Game.exitCar(); else Game.enterCar(); },
+  startMinigame() {
+    if (!Game.nearPrep || this.open) return;
+    this.show('pizza');
+    MiniGame.start((result) => { this.close(); Game.finishHandmade(result); });
+  },
   toggleSound() {
     Sfx.init(); Sfx.resume();
     Sfx.muted = !Sfx.muted; Game.s.muted = Sfx.muted; Game.save();
@@ -87,6 +98,7 @@ const UI = {
     this.els.cash.textContent = U.money(s.cash);
     this.els.city.textContent = `${CFG.SHOP_NAME} · ${s.stats.served} served`;
     this.els.hint.textContent = g.hint ? g.hint.text : '';
+    this.els.btnMake.classList.toggle('hidden', !g.nearPrep || this.open);
     const showCar = g.driving || g.carNear;
     this.els.btnCar.classList.toggle('hidden', !showCar);
     const v = g.driving ? g.vehicle : g.nearVehicle;

@@ -25,8 +25,8 @@
     dt = Math.min(dt, 0.1);
     // fixed-step simulation keeps interactions deterministic across frame rates
     acc += dt;
-    while (acc >= STEP) { Game.update(STEP); acc -= STEP; }
-    Render.draw(Game);
+    if (MiniGame.open) { MiniGame.update(dt); MiniGame.draw(); acc = 0; }
+    else { while (acc >= STEP) { Game.update(STEP); acc -= STEP; } Render.draw(Game); }
     UI.update(dt);
     requestAnimationFrame(frame);
   }

@@ -33,6 +33,7 @@ const Sfx = {
   error() { this.tone(200, 0.2, 'sawtooth', 0.05, -80); },
   angry() { if (this.throttle('angry', 300)) this.tone(260, 0.25, 'sawtooth', 0.04, -100); },
   clean() { if (this.throttle('clean', 200)) this.tone(900, 0.15, 'sine', 0.05, 400); },
+  ding() { this.tone(1760, 0.5, 'sine', 0.09); setTimeout(() => this.tone(2093, 0.7, 'sine', 0.08), 180); },
 };
 
 // Light haptic feedback where the platform supports it (Android Chrome); silently ignored elsewhere.

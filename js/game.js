@@ -4,7 +4,7 @@ const Game = {
   s: null,
   player: null,
   customers: [], cars: [], staff: [], fx: [], floats: [], tables: [], ovens: [], coins: [], dog: null,
-  houses: [], icCustomers: [], car: null, bike: null, vehicle: null, driving: false, orderT: 30, icSpawnT: 4, carNear: false, nearVehicle: null, fireTruck: null,
+  houses: [], icCustomers: [], car: null, bike: null, vehicle: null, driving: false, orderT: 30, icSpawnT: 4, carNear: false, nearVehicle: null, fireTruck: null, nearPrep: false,
   seq: 0, time: 0, spawnT: 1.5, carT: 4, saveT: 0, secT: 0, secEarned: 0, groupLeft: 0, groupT: 0,
   hint: null, padDwell: Object.create(null), lastTotal: 0,
   onUnlock: null, onToast: null,
@@ -373,6 +373,7 @@ const Game = {
     ];
     for (let i = 0; i < this.ovenCount(); i++) o.push({ x: CFG.OVENS[i].x - 36, y: CFG.OVENS[i].y - 30, w: 72, h: 60 });
     for (const t of this.activeTables()) o.push({ x: t.x - 24, y: t.y - 14, w: 48, h: 30 });
+    const pt = CFG.PREP_TABLE; o.push({ x: pt.x - pt.w / 2, y: pt.y - pt.h / 2, w: pt.w, h: pt.h });
     return o.concat(this.townObstacles(false));
   },
   // Town buildings. The ice cream shop has a door gap in its bottom wall for people; cars see it solid.
@@ -397,6 +398,18 @@ const Game = {
       for (let i = 0; i < 2; i++) o.push({ x: CFG.OVENS[i].x, y: CFG.OVENS[i].y, w: 0, h: 0 });
     }
     return o;
+  },
+
+  // ---------- handmade pizza (mini-game reward) ----------
+  finishHandmade(result) {
+    const p = this.player, n = CFG.HANDMADE_PIZZAS;
+    const room = Math.max(0, this.playerCap() - p.carry);
+    const carried = Math.min(n, room); p.carry += carried;
+    const extra = n - carried; if (extra > 0) this.s.piles.oven = Math.min(this.ovenPileCap() + extra, this.s.piles.oven + extra);
+    this.s.stats.handmade = (this.s.stats.handmade || 0) + 1;
+    for (let i = 0; i < n; i++) this.fx.push({ kind: 'pizza', x0: CFG.PREP_TABLE.x, y0: CFG.PREP_TABLE.y - 10, x1: p.x, y1: p.y - 30, t: -i * 0.08, dur: 0.3 });
+    this.floats.push({ x: p.x, y: p.y - 60, text: result.crispy ? 'Extra crispy pizza!' : 'Handmade pizza!', color: '#ffe08a', t: 0, dur: 1.4, big: true });
+    this.toast(`Family-size pizza: counts as ${n} pizzas!`);
   },
 
   // ---------- delivery vehicles (car and scooter) ----------
@@ -484,6 +497,7 @@ const Game = {
       }
     }
     this.nearVehicle = this.findNearVehicle(); this.carNear = !!this.nearVehicle;
+    this.nearPrep = !this.driving && U.dist(p.x, p.y, CFG.PREP_TABLE.x, CFG.PREP_TABLE.y + 10) < 64;
   },
   hitRect(px, py, r, o) { return px + r > o.x && px - r < o.x + o.w && py + r > o.y && py - r < o.y + o.h; },
 
@@ -627,6 +641,7 @@ const Game = {
       else h = { text: 'Walk back to the pizza shop', target: CFG.DOOR_OUT };
     }
     else if (paying && !hasCashier && !this.cashierPresent()) h = { text: 'Stand at the register to take the money', target: CFG.CASHIER_SPOT };
+    else if (this.nearPrep && p.carry === 0 && s.piles.oven === 0) h = { text: 'Make a pizza by hand!', target: null };
     else if (p.carry > 0) {
       const t = this.bestDropTarget();
       h = t && t.key === 'dt' ? { text: 'Bring pizzas to the drive-thru window', target: CFG.DT_STACK } : { text: 'Put the pizzas on the counter', target: CFG.DISPLAY };

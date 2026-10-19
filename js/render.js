@@ -743,7 +743,7 @@ const Render = {
     ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(-20, -18); ctx.lineTo(-28, -6 + Math.sin(g.time * 3) * 4); ctx.stroke();
     ctx.restore();
     if (c.moo > 0) this.drawBubble(x, y - 50, () => { ctx.font = this.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('Moo!', 0, 0); }, 44);
-    else if (c.ready && g.s.farm.cheese < CFG.FARM.max) this.drawBubble(x, y - 50 + Math.sin(g.time * 4) * 3, () => { ctx.font = this.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('🧀', 0, 0); }, 30);
+    else if (c.ready) this.drawBubble(x, y - 50 + Math.sin(g.time * 4) * 3, () => { ctx.font = this.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('🧀', 0, 0); }, 30);
   },
 
   // Railway along the top of the world, a platform with a little station house opposite the farm.
@@ -772,6 +772,14 @@ const Render = {
     ctx.fillStyle = '#2d3a4a'; ctx.fillRect(P.x1 - 20, P.y0 + 10, 3, 30); ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.arc(P.x1 - 18, P.y0 + 8, 5, 0, Math.PI * 2); ctx.fill();
     // railway crossing gates where the tracks meet nothing: just a crossing sign near the station path
     ctx.fillStyle = '#d2cbbb'; ctx.fillRect(-712, P.y1, 24, 50); // path down to the sidewalk
+    // trash can beside the path: throw away pizzas you are carrying
+    const T = S.trash;
+    ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(T.x + 3, T.y + 4, 16, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#5c8a3c'; U.roundRect(ctx, T.x - 13, T.y - 30, 26, 32, 5); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.14)'; for (let i = 0; i < 3; i++) ctx.fillRect(T.x - 8 + i * 8, T.y - 24, 3, 22);
+    ctx.fillStyle = '#4a7230'; U.roundRect(ctx, T.x - 16, T.y - 36, 32, 9, 4); ctx.fill();
+    ctx.fillStyle = '#3d5f27'; U.roundRect(ctx, T.x - 5, T.y - 40, 10, 5, 2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = this.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('TRASH', T.x, T.y - 12);
   },
 
   // Playground across South Road from the farm.

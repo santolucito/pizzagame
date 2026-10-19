@@ -47,6 +47,7 @@ const CFG = {
   ICE_CREAM: {
     rect: { x0: 1020, y0: 112, x1: 1222, y1: 318 },  // next door, above the parking lot
     door: { x: 1120, y: 318 }, doorW: 60,
+    walkX: 1227,                                      // the sidewalk between the parking lot and East Road
     inside: { x: 1120, y: 250 },                      // where customers stand to order
     counter: { x: 1120, y: 200 },
     cash: { x: 1060, y: 160 },
@@ -93,7 +94,6 @@ const CFG = {
       { kind: 'mushroom', x: -740, y: 580 }, { kind: 'mushroom', x: -680, y: 580 }, { kind: 'mushroom', x: -620, y: 580 }, { kind: 'mushroom', x: -710, y: 640 }, { kind: 'mushroom', x: -650, y: 640 },
     ],
     regrow: { tomato: 40, wheat: 45, basil: 35, mushroom: 45, cheese: 30 },
-    max: 9,
   },
   INGREDIENTS: { wheat: '🌾', tomato: '🍅', cheese: '🧀', mushroom: '🍄', basil: '🌿' },
   // Fishing at the park pond: stand on the south bank, cast, wait for the bobber to dip, tap to reel
@@ -118,6 +118,7 @@ const CFG = {
     // passengers walk along the far sidewalk, down the shop's side path, and in through the door
     route: [{ x: -700, y: -30 }, { x: 990, y: -30 }, { x: 990, y: 560 }],
     overflow: { x: 990, y: 520, dy: -44 },  // where extra customers queue outside the door
+    trash: { x: -530, y: -52 },             // a bin at the end of the platform path: dump pizzas you no longer want
   },
   // Playground south of the farm across South Road
   PLAYGROUND: {

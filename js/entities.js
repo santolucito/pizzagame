@@ -368,13 +368,20 @@ class IceCreamCustomer {
   constructor(id) {
     const IC = CFG.ICE_CREAM;
     this.id = id;
-    this.x = CFG.SPAWN_OUT.x + U.rand(0, 20); this.y = 700 + U.rand(-10, 10);
-    this.route = [{ x: IC.door.x + U.rand(-20, 20), y: 700 }, { x: IC.door.x, y: IC.door.y + 20 }, { x: IC.inside.x + U.rand(-30, 30), y: IC.inside.y + U.rand(-6, 6) }];
+    // same way in as the pizza customers: along the sidewalk, over the East Road crosswalk, then up the
+    // sidewalk beside the parking lot to the ice cream door
+    this.x = CFG.SPAWN_OUT.x + U.rand(0, 20); this.y = CFG.SPAWN_OUT.y + U.rand(-8, 8);
+    this.route = IceCreamCustomer.wayIn().concat([{ x: IC.inside.x + U.rand(-30, 30), y: IC.inside.y + U.rand(-6, 6) }]);
     this.state = 'in'; this.timer = U.rand(1.5, 2.5); this.cone = false;
     this.facing = 1; this.moving = false; this.bob = Math.random() * 6; this.speed = U.rand(110, 140);
     this.shirt = U.pick(COLORS.shirts); this.skin = U.pick(COLORS.skins);
     this.hair = U.pick(['#2b1d14', '#5a3a1a', '#d9a066', '#1a1a1a']); this.hairStyle = U.randInt(0, 3); this.stripes = Math.random() < 0.3;
     this.flavor = U.pick(['#ffb6c1', '#fff3c4', '#8d5a2b', '#b8f2c8', '#cdb4ff']);
+  }
+  // waypoints from the crosswalk to the ice cream door (the far sidewalk strip, then along the top of the lot)
+  static wayIn() {
+    const IC = CFG.ICE_CREAM, walkX = CFG.ICE_CREAM.walkX + U.rand(-6, 6);
+    return [{ x: walkX, y: CFG.DOOR_OUT.y + U.rand(-8, 8) }, { x: walkX, y: IC.door.y + 24 }, { x: IC.door.x, y: IC.door.y + 20 }];
   }
   update(dt, g) {
     const IC = CFG.ICE_CREAM;
@@ -389,7 +396,7 @@ class IceCreamCustomer {
         g.floats.push({ x: IC.cash.x + U.rand(-8, 8), y: IC.cash.y - 18, text: '+' + U.money(amt), color: '#2f9e44', t: 0, dur: 1 });
         g.fx.push({ kind: 'cash', x0: this.x, y0: this.y - 20, x1: IC.cash.x, y1: IC.cash.y, t: 0, dur: 0.35 });
         this.cone = true; this.state = 'out';
-        this.route = [{ x: IC.door.x, y: IC.door.y + 20 }, { x: IC.door.x + U.rand(-40, 40), y: 700 }, { x: CFG.SPAWN_OUT.x + 10, y: 700 + U.rand(-10, 10) }];
+        this.route = IceCreamCustomer.wayIn().reverse().concat([{ x: CFG.SPAWN_OUT.x + 10, y: CFG.SPAWN_OUT.y + U.rand(-8, 8) }]);
       }
     } else if (this.state === 'out') {
       const wp = this.route[0];

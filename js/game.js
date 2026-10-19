@@ -433,7 +433,6 @@ const Game = {
   // ---------- farm: pick ingredients, cow gives cheese ----------
   addIngredient(kind, x, y) {
     const f = this.s.farm;
-    if (f[kind] >= CFG.FARM.max) { this.floats.push({ x, y: y - 30, text: 'Basket full!', color: '#8a7a6a', t: 0, dur: 1 }); return false; }
     f[kind]++;
     this.floats.push({ x, y: y - 34, text: CFG.INGREDIENTS[kind] + ' +1', color: '#ffe08a', t: 0, dur: 1, big: true });
     this.fx.push({ kind: 'sparkle', x0: x, y0: y, x1: x, y1: y, t: 0, dur: 0.5 });
@@ -661,6 +660,14 @@ const Game = {
         Sfx.drop();
       }
     }
+    // the bin by the station: walk up with pizzas to throw them away, one at a time
+    const bin = CFG.STATION.trash;
+    if (!this.driving && !this.onTrain && near(bin, 42) && p.carry > 0 && p.xferCd <= 0) {
+      p.carry--; p.xferCd = CFG.XFER_DELAY * 2;
+      this.fx.push({ kind: 'pizza', x0: p.x, y0: p.y - 30, x1: bin.x, y1: bin.y - 24, t: 0, dur: 0.2 });
+      if (p.carry === 0) this.floats.push({ x: bin.x, y: bin.y - 40, text: 'All gone!', color: '#8a7a6a', t: 0, dur: 1 });
+      Sfx.drop();
+    }
     if (near(CFG.CASH_PILE, 46)) this.collect('cash', CFG.CASH_PILE);
     if (this.isUnlocked('driveThru') && near(CFG.DT_CASH, 46)) this.collect('dtCash', CFG.DT_CASH);
 
@@ -821,14 +828,14 @@ const Game = {
     else if (!this.insideBuilding(p.x, p.y)) {
       const IC = CFG.ICE_CREAM;
       const coin = this.coins.filter((c) => !c.taken).sort((a, b) => U.dist(p.x, p.y, a.x, a.y) - U.dist(p.x, p.y, b.x, b.y))[0];
-      const ripe = this.nearFarm() ? this.plots.filter((pl) => pl.ready && s.farm[pl.kind] < CFG.FARM.max).sort((a, b) => U.dist(p.x, p.y, a.x, a.y) - U.dist(p.x, p.y, b.x, b.y))[0] : null;
+      const ripe = this.nearFarm() ? this.plots.filter((pl) => pl.ready).sort((a, b) => U.dist(p.x, p.y, a.x, a.y) - U.dist(p.x, p.y, b.x, b.y))[0] : null;
       const PG = CFG.PLAYGROUND;
       if (this.onTrain) h = { text: 'Choo choo! Enjoy the ride', target: null };
       else if (this.fishing) h = { text: this.fishing.phase === 'bite' ? 'Now! Tap to reel in!' : 'Shh… wait for the bobber', target: null };
       else if (this.nearTrain) h = { text: 'Hop on the train!', target: null };
       else if (p.x > PG.x0 - 60 && p.x < PG.x1 + 60 && p.y > PG.y0 - 80) h = { text: 'Go play! Try the slide or the swings', target: null };
       else if (ripe) h = { text: `Pick the ${ripe.kind}! ${CFG.INGREDIENTS[ripe.kind]}`, target: ripe };
-      else if (this.nearFarm() && this.cow.ready && s.farm.cheese < CFG.FARM.max) h = { text: 'Say hi to the cow for cheese 🧀', target: this.cow };
+      else if (this.nearFarm() && this.cow.ready) h = { text: 'Say hi to the cow for cheese 🧀', target: this.cow };
       else if (s.iceCream.owned && s.iceCream.cash >= 30 && U.dist(p.x, p.y, IC.cash.x, IC.cash.y) < 500) h = { text: 'Collect the ice cream money', target: IC.cash };
       else if (coin && U.dist(p.x, p.y, coin.x, coin.y) < 420) h = { text: 'Grab the shiny coin!', target: coin };
       else if (order) h = { text: 'Grab pizzas, then deliver by car!', target: CFG.DOOR_OUT };

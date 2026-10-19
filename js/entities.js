@@ -284,6 +284,41 @@ class Staff {
   }
 }
 
+// Customers of the ice cream shop next door: walk in, order, pay, leave with a cone.
+class IceCreamCustomer {
+  constructor(id) {
+    const IC = CFG.ICE_CREAM;
+    this.id = id;
+    this.x = IC.door.x + U.rand(-30, 30); this.y = 700;
+    this.route = [{ x: IC.door.x, y: IC.door.y + 20 }, { x: IC.inside.x + U.rand(-30, 30), y: IC.inside.y + U.rand(-6, 6) }];
+    this.state = 'in'; this.timer = U.rand(1.5, 2.5); this.cone = false;
+    this.facing = 1; this.moving = false; this.bob = Math.random() * 6; this.speed = U.rand(110, 140);
+    this.shirt = U.pick(COLORS.shirts); this.skin = U.pick(COLORS.skins);
+    this.hair = U.pick(['#2b1d14', '#5a3a1a', '#d9a066', '#1a1a1a']); this.hairStyle = U.randInt(0, 3); this.stripes = Math.random() < 0.3;
+    this.flavor = U.pick(['#ffb6c1', '#fff3c4', '#8d5a2b', '#b8f2c8', '#cdb4ff']);
+  }
+  update(dt, g) {
+    const IC = CFG.ICE_CREAM;
+    if (this.state === 'in') {
+      const wp = this.route[0];
+      if (U.moveToward(this, wp.x, wp.y, this.speed, dt)) { this.route.shift(); if (!this.route.length) { this.state = 'order'; this.facing = 1; } }
+    } else if (this.state === 'order') {
+      this.timer -= dt; this.moving = false;
+      if (this.timer <= 0) {
+        const amt = g.iceCreamPrice();
+        g.s.iceCream.cash += amt; g.secEarned += amt; g.s.stats.scoops = (g.s.stats.scoops || 0) + 1;
+        g.floats.push({ x: IC.cash.x + U.rand(-8, 8), y: IC.cash.y - 18, text: '+' + U.money(amt), color: '#2f9e44', t: 0, dur: 1 });
+        g.fx.push({ kind: 'cash', x0: this.x, y0: this.y - 20, x1: IC.cash.x, y1: IC.cash.y, t: 0, dur: 0.35 });
+        this.cone = true; this.state = 'out';
+        this.route = [{ x: IC.door.x, y: IC.door.y + 20 }, { x: IC.door.x + U.rand(-40, 40), y: 700 }];
+      }
+    } else if (this.state === 'out') {
+      const wp = this.route[0];
+      if (U.moveToward(this, wp.x, wp.y, this.speed, dt)) { this.route.shift(); if (!this.route.length) this.state = 'gone'; }
+    }
+  }
+}
+
 // A friendly dog that lives in the park and follows the player around outside.
 class Dog {
   constructor() {

@@ -9,7 +9,7 @@ const UI = {
     this.els = {
       cash: $('hud-cash'), city: $('hud-city'), hint: $('hint'), toasts: $('toasts'),
       help: $('modal-help'), msg: $('modal-msg'),
-      btnSound: $('btn-sound'), msgTitle: $('msg-title'), msgBody: $('msg-body'),
+      btnSound: $('btn-sound'), msgTitle: $('msg-title'), msgBody: $('msg-body'), btnCar: $('btn-car'),
     };
     $('btn-help').addEventListener('click', () => this.toggle('help'));
     this.els.btnSound.addEventListener('click', () => this.toggleSound());
@@ -19,6 +19,7 @@ const UI = {
     } else {
       fsBtn.remove();
     }
+    this.els.btnCar.addEventListener('click', () => this.toggleCar());
     $('btn-zoom-in').addEventListener('click', () => Render.setZoom(Render.zoom * 1.25));
     $('btn-zoom-out').addEventListener('click', () => Render.setZoom(Render.zoom / 1.25));
     $('btn-reset').addEventListener('click', () => {
@@ -30,6 +31,7 @@ const UI = {
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Escape') this.close();
       else if (e.code === 'KeyM') this.toggleSound();
+      else if (e.code === 'KeyE') this.toggleCar();
       else if (e.key === '?') this.toggle('help');
     });
     Game.onToast = (m) => this.toast(m);
@@ -65,6 +67,7 @@ const UI = {
     while (this.els.toasts.children.length > 3) this.els.toasts.firstChild.remove();
     setTimeout(() => el.remove(), 2700);
   },
+  toggleCar() { if (Game.driving) Game.exitCar(); else Game.enterCar(); },
   toggleSound() {
     Sfx.init(); Sfx.resume();
     Sfx.muted = !Sfx.muted; Game.s.muted = Sfx.muted; Game.save();
@@ -84,5 +87,8 @@ const UI = {
     this.els.cash.textContent = U.money(s.cash);
     this.els.city.textContent = `${CFG.SHOP_NAME} · ${s.stats.served} served`;
     this.els.hint.textContent = g.hint ? g.hint.text : '';
+    const showCar = g.driving || g.carNear;
+    this.els.btnCar.classList.toggle('hidden', !showCar);
+    this.els.btnCar.textContent = g.driving ? '🚶 Get out' : '🚗 Drive';
   },
 };

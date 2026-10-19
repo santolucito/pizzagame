@@ -3,7 +3,7 @@
 // (0..960, 98..646); the world extends beyond it so the player can wander outside.
 const CFG = {
   W: 960, H: 640,                                   // reference viewport used for zoom rules
-  WORLD: { x0: -260, y0: -170, x1: 1220, y1: 820 }, // walkable world bounds
+  WORLD: { x0: -560, y0: -170, x1: 1520, y1: 1180 }, // walkable world bounds (the whole tiny town)
   BUILDING: { x0: 0, y0: 98, x1: 966, y1: 646 },    // outer wall rectangle
   DOOR: { y0: 572, y1: 638 },                        // gap in the right wall
   SAVE_KEY: 'pizza-rush-save-v1',
@@ -33,8 +33,41 @@ const CFG = {
   TABLES: [{ x: 720, y: 390 }, { x: 860, y: 390 }, { x: 720, y: 540 }, { x: 860, y: 540 }],
   CLEANER_HOME: { x: 900, y: 300 },
 
-  // Drive-thru (road strip along the top of the building, spanning the whole world)
+  // Roads: the top street (drive-thru) plus a loop around the block. Buildings sit across the loop.
   ROAD: { y1: 18, y2: 98 },
+  ROADS: [
+    { x0: -560, y0: 18, x1: 1520, y1: 98 },      // Main Street (top)
+    { x0: 1240, y0: 18, x1: 1320, y1: 1000 },    // East Road
+    { x0: -560, y0: 920, x1: 1320, y1: 1000 },   // South Road
+    { x0: -480, y0: 18, x1: -400, y1: 1000 },    // West Road
+  ],
+  // Other buildings in town (solid rectangles; doors face a road)
+  ICE_CREAM: {
+    rect: { x0: 1020, y0: 112, x1: 1222, y1: 318 },  // next door, above the parking lot
+    door: { x: 1120, y: 318 }, doorW: 60,
+    inside: { x: 1120, y: 250 },                      // where customers stand to order
+    counter: { x: 1120, y: 200 },
+    cash: { x: 1060, y: 160 },
+    scooper: { x: 1120, y: 165 },
+    buyPad: { x: 1120, y: 360 }, price: 900,
+    flavorsPad: { x: 1180, y: 250 },
+    flavorsBase: 120, flavorsGrowth: 1.5, flavorsMax: 5,
+    price: 8, spawnBase: 7,
+  },
+  HOUSES: [
+    { x0: -300, y0: 1020, x1: -120, y1: 1160, door: { x: -210, y: 1020 }, color: '#f2d6a0', roof: '#b23a48', name: 'Blue Door House' },
+    { x0: 80, y0: 1020, x1: 260, y1: 1160, door: { x: 170, y: 1020 }, color: '#cfe3f7', roof: '#2d5a8a', name: 'River House' },
+    { x0: 520, y0: 1020, x1: 700, y1: 1160, door: { x: 610, y: 1020 }, color: '#e8f2cf', roof: '#5a8a2d', name: 'Green House' },
+    { x0: 960, y0: 1020, x1: 1140, y1: 1160, door: { x: 1050, y: 1020 }, color: '#f7e0cf', roof: '#8a5a2d', name: 'Corner House' },
+  ],
+  FIRE_STATION: { x0: 1340, y0: 300, x1: 1520, y1: 540, door: { x: 1340, y: 440 } },
+  // Pizza delivery
+  DELIVERY_CAR: { x: 1116, y: 596 },   // parked in the shop's lot
+  DELIVERY_SPEED: 360,
+  DELIVERY_TIP: 2.0,                   // delivered pizzas pay double
+  ORDER_EVERY: [25, 45],               // seconds between new house orders
+  ORDER_MAX: 2,
+  ORDER_WAIT: 120,
   DT_WINDOW: { x: 640, y: 58 },
   DT_SLOT_DX: 118,
   DT_SLOTS: 4,
@@ -96,15 +129,18 @@ const CFG = {
   COINS: [
     { x: -180, y: 380 }, { x: -90, y: 480 }, { x: -200, y: 700 }, { x: -60, y: 760 },
     { x: 250, y: 740 }, { x: 620, y: 760 }, { x: 880, y: 730 },
-    { x: 1080, y: 230 }, { x: 1150, y: 480 }, { x: 1060, y: 740 },
+    { x: 1150, y: 480 }, { x: 1060, y: 740 },
     { x: 150, y: -90 }, { x: 560, y: -110 }, { x: 980, y: -70 },
+    { x: -520, y: 500 }, { x: 400, y: 1100 }, { x: 1420, y: 700 }, { x: 1440, y: 150 }, { x: -200, y: 860 },
   ],
   COIN_RESPAWN: 60,
   TREES: [
     { x: -200, y: 230, s: 1.1 }, { x: -90, y: 300, s: 0.9 }, { x: -215, y: 560, s: 1 }, { x: -120, y: 790, s: 1.05 },
     { x: 60, y: -120, s: 1 }, { x: 330, y: -140, s: 0.9 }, { x: 760, y: -125, s: 1.1 }, { x: 1120, y: -130, s: 0.95 },
-    { x: 1090, y: 170, s: 1 }, { x: 1190, y: 280, s: 0.85 },
     { x: 80, y: 780, s: 1 }, { x: 760, y: 790, s: 0.95 }, { x: 1010, y: 800, s: 0.9 },
+    { x: -520, y: 300, s: 1 }, { x: -530, y: 760, s: 0.9 }, { x: -340, y: 880, s: 0.8 },
+    { x: 1420, y: 230, s: 1 }, { x: 1460, y: 650, s: 1.1 }, { x: 1380, y: 860, s: 0.9 },
+    { x: -40, y: 1120, s: 0.9 }, { x: 400, y: 1140, s: 1 }, { x: 840, y: 1130, s: 0.9 }, { x: 1300, y: 1120, s: 1 },
   ],
   POND: { x: -150, y: 460, rx: 70, ry: 42 },
   FOUNTAIN: { x: 450, y: 745 },

@@ -4,6 +4,7 @@ const Game = {
   s: null,
   player: null,
   customers: [], cars: [], staff: [], fx: [], floats: [], tables: [], ovens: [], coins: [], dog: null,
+  houses: [], icCustomers: [], car: null, driving: false, orderT: 30, icSpawnT: 4, carNear: false,
   seq: 0, time: 0, spawnT: 1.5, carT: 4, saveT: 0, secT: 0, secEarned: 0, groupLeft: 0, groupT: 0,
   hint: null, padDwell: Object.create(null), lastTotal: 0,
   onUnlock: null, onToast: null,
@@ -15,13 +16,14 @@ const Game = {
       cash: 0,
       unlocked: {},
       decor: {},
+      iceCream: { owned: false, flavors: 0, cash: 0 },
       padPaid: {},
       upg: { speed: 0, capacity: 0, oven: 0 },
       staff: { cashier: { count: 0, level: 0 }, helper: { count: 0, level: 0 }, cleaner: { count: 0, level: 0 } },
       piles: { oven: 0, display: 0, dt: 0, cash: 0, dtCash: 0 },
       tablesDirty: [false, false, false, false],
       tablesTip: [0, 0, 0, 0],
-      stats: { earned: 0, served: 0, lost: 0, coins: 0 },
+      stats: { earned: 0, served: 0, lost: 0, coins: 0, delivered: 0, scoops: 0 },
       incomeRate: 0,
       savedAt: Date.now(),
       muted: false,
@@ -48,6 +50,10 @@ const Game = {
     }
     this.coins = CFG.COINS.map((c) => ({ x: c.x, y: c.y, taken: false, t: 0, phase: Math.random() * 6 }));
     this.dog = new Dog();
+    this.houses = CFG.HOUSES.map((h, i) => Object.assign({ i, order: null, happy: 0 }, h));
+    this.icCustomers = [];
+    this.car = { x: CFG.DELIVERY_CAR.x, y: CFG.DELIVERY_CAR.y, angle: -Math.PI / 2, vx: 0, vy: 0 };
+    this.driving = false; this.orderT = U.rand(20, 35); this.icSpawnT = 4;
     this.padDwell = Object.create(null);
     this.spawnT = 1.5; this.carT = 4; this.groupLeft = 0;
     Sfx.muted = !!s.muted;
@@ -75,6 +81,7 @@ const Game = {
         staff,
         piles: Object.assign(d.piles, data.piles || {}),
         stats: Object.assign(d.stats, data.stats || {}),
+        iceCream: Object.assign(d.iceCream, data.iceCream || {}),
         unlocked: data.unlocked || {},
         padPaid: data.padPaid || {},
       });
@@ -114,6 +121,9 @@ const Game = {
   costMult() { return 1; },
   price() { return CFG.PIZZA_PRICE; },
   decorCount() { return CFG.DECOR_ITEMS.filter((it) => this.s.decor[it.key]).length; },
+  iceCreamPrice() { return Math.round(CFG.ICE_CREAM.price * (1 + 0.3 * this.s.iceCream.flavors)); },
+  iceCreamSpawn() { return CFG.ICE_CREAM.spawnBase / (1 + 0.25 * this.s.iceCream.flavors); },
+  flavorsCost() { const IC = CFG.ICE_CREAM; return this.s.iceCream.flavors >= IC.flavorsMax ? null : Math.round(IC.flavorsBase * Math.pow(IC.flavorsGrowth, this.s.iceCream.flavors)); },
   hasDecor(key) { return !!this.s.decor[key]; },
   coinValue() { return Math.round(this.price() * 2); },
   playerSpeed() { return 175 + 22 * this.s.upg.speed; },
@@ -189,6 +199,9 @@ const Game = {
         out.push({ key: p.key + (p.mode ? '_' + p.mode : ''), role: p.key, mode: p.mode, kind: 'staff', label, ico: p.mode === 'train' ? '⭐' : st.ico, pos: p.pos, price: a ? a.cost : 0, maxed: !a, sub: p.mode === 'train' ? `Lv ${info.level}/${st.upMax}` : info.count ? `${info.count} hired${p.mode ? '' : ' · Lv ' + info.level}` : '' });
       }
     }
+    const IC = CFG.ICE_CREAM;
+    if (!this.s.iceCream.owned) out.push({ key: 'icecream', kind: 'icecream', label: 'Buy Ice Cream Shop', ico: '🍦', pos: IC.buyPad, price: IC.price, maxed: false, sub: 'earns money for you' });
+    else { const c = this.flavorsCost(); out.push({ key: 'flavors', kind: 'flavors', label: 'More Flavors', ico: '🍨', pos: IC.flavorsPad, price: c || 0, maxed: c === null, sub: `${this.s.iceCream.flavors}/${IC.flavorsMax}` }); }
     for (const it of CFG.DECOR_ITEMS) {
       if (this.s.decor[it.key]) continue;
       out.push({ key: 'decor_' + it.key, kind: 'decor', item: it.key, label: it.label, ico: it.ico, pos: it.spot, price: it.price, maxed: false, sub: '' });
@@ -203,6 +216,8 @@ const Game = {
     this.fx.push({ kind: 'sparkle', x0: pad.pos.x, y0: pad.pos.y, x1: pad.pos.x, y1: pad.pos.y, t: 0, dur: 0.6 });
     if (pad.kind === 'upgrade') this.applyUpgrade(pad.key);
     else if (pad.kind === 'decor') { this.s.decor[pad.item] = true; this.toast(`${pad.label} bought!`); }
+    else if (pad.kind === 'icecream') { this.s.iceCream.owned = true; Sfx.unlock(); Haptics.success(); this.toast('You own the ice cream shop!'); }
+    else if (pad.kind === 'flavors') { this.s.iceCream.flavors++; this.toast(`More flavors! ${this.s.iceCream.flavors}/${CFG.ICE_CREAM.flavorsMax}`); }
     else this.applyStaffPad(pad.role, pad.mode);
   },
 
@@ -295,11 +310,12 @@ const Game = {
   update(dt) {
     const s = this.s;
     this.time += dt;
-    this.updatePlayer(dt);
+    if (this.driving) this.updateDriving(dt); else this.updatePlayer(dt);
     this.updateOvens(dt);
     this.updateInteractions(dt);
     this.updateSpawns(dt);
     this.updateOutside(dt);
+    this.updateTown(dt);
 
     for (const c of this.customers) c.update(dt, this);
     this.customers = this.customers.filter((c) => c.state !== 'gone');
@@ -307,6 +323,8 @@ const Game = {
     this.cars = this.cars.filter((c) => c.state !== 'gone');
     for (const st of this.staff) st.update(dt, this);
     this.dog.update(dt, this);
+    for (const c of this.icCustomers) c.update(dt, this);
+    this.icCustomers = this.icCustomers.filter((c) => c.state !== 'gone');
 
     for (const f of this.fx) f.t += dt;
     this.fx = this.fx.filter((f) => f.t < f.dur);
@@ -352,7 +370,108 @@ const Game = {
     ];
     for (let i = 0; i < this.ovenCount(); i++) o.push({ x: CFG.OVENS[i].x - 36, y: CFG.OVENS[i].y - 30, w: 72, h: 60 });
     for (const t of this.activeTables()) o.push({ x: t.x - 24, y: t.y - 14, w: 48, h: 30 });
+    return o.concat(this.townObstacles(false));
+  },
+  // Town buildings. The ice cream shop has a door gap in its bottom wall for people; cars see it solid.
+  townObstacles(forCar) {
+    const o = [];
+    const IC = CFG.ICE_CREAM.rect, dw = CFG.ICE_CREAM.doorW / 2, dx = CFG.ICE_CREAM.door.x;
+    if (forCar) o.push({ x: IC.x0, y: IC.y0, w: IC.x1 - IC.x0, h: IC.y1 - IC.y0 });
+    else {
+      o.push({ x: IC.x0, y: IC.y0, w: IC.x1 - IC.x0, h: 6 });
+      o.push({ x: IC.x0, y: IC.y0, w: 6, h: IC.y1 - IC.y0 });
+      o.push({ x: IC.x1 - 6, y: IC.y0, w: 6, h: IC.y1 - IC.y0 });
+      o.push({ x: IC.x0, y: IC.y1 - 6, w: dx - dw - IC.x0, h: 6 });
+      o.push({ x: dx + dw, y: IC.y1 - 6, w: IC.x1 - (dx + dw), h: 6 });
+      o.push({ x: CFG.ICE_CREAM.counter.x - 70, y: CFG.ICE_CREAM.counter.y - 12, w: 140, h: 24 });
+    }
+    for (const h of CFG.HOUSES) o.push({ x: h.x0, y: h.y0, w: h.x1 - h.x0, h: h.y1 - h.y0 });
+    const F = CFG.FIRE_STATION; o.push({ x: F.x0, y: F.y0, w: F.x1 - F.x0, h: F.y1 - F.y0 });
+    if (forCar) {
+      const B = CFG.BUILDING; o.push({ x: B.x0 - 6, y: B.y0, w: B.x1 - B.x0 + 6, h: B.y1 - B.y0 });
+      const pd = CFG.POND; o.push({ x: pd.x - pd.rx, y: pd.y - pd.ry, w: pd.rx * 2, h: pd.ry * 2 });
+      const f = CFG.FOUNTAIN; o.push({ x: f.x - 60, y: f.y - 32, w: 120, h: 64 });
+      for (let i = 0; i < 2; i++) o.push({ x: CFG.OVENS[i].x, y: CFG.OVENS[i].y, w: 0, h: 0 });
+    }
     return o;
+  },
+
+  // ---------- delivery car ----------
+  canEnterCar() { return !this.driving && U.dist(this.player.x, this.player.y, this.car.x, this.car.y) < 70; },
+  enterCar() { if (!this.canEnterCar()) return; this.driving = true; this.car.vx = 0; this.car.vy = 0; Sfx.buy(); Haptics.tap(); },
+  exitCar() {
+    if (!this.driving) return;
+    this.driving = false; this.car.vx = 0; this.car.vy = 0;
+    // step out beside the car, on a spot that is not inside anything
+    const cands = [[0, 46], [46, 0], [-46, 0], [0, -46]];
+    for (const [dx, dy] of cands) {
+      const x = this.car.x + dx, y = this.car.y + dy;
+      if (!this.obstacles().some((o) => this.hitRect(x, y, 12, o))) { this.player.x = x; this.player.y = y; return; }
+    }
+    this.player.x = this.car.x; this.player.y = this.car.y + 46;
+  },
+  updateDriving(dt) {
+    const c = this.car, a = Input.axis();
+    const sp = CFG.DELIVERY_SPEED;
+    const tx = a.x * sp, ty = a.y * sp;
+    const k = (a.x || a.y) ? 1 - Math.pow(0.02, dt) : 1 - Math.pow(0.001, dt); // snappy accelerate, quick stop
+    c.vx += (tx - c.vx) * k; c.vy += (ty - c.vy) * k;
+    const speed = Math.hypot(c.vx, c.vy);
+    if (speed > 15) { const target = Math.atan2(c.vy, c.vx); let d = target - c.angle; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; c.angle += d * Math.min(1, dt * 10); }
+    const r = 22, w = CFG.WORLD, obs = this.townObstacles(true);
+    c.x = U.clamp(c.x + c.vx * dt, w.x0 + 30, w.x1 - 30);
+    for (const o of obs) if (o.w && this.hitRect(c.x, c.y, r, o)) { c.x = c.vx > 0 ? o.x - r : o.x + o.w + r; c.vx = 0; }
+    c.y = U.clamp(c.y + c.vy * dt, w.y0 + 30, w.y1 - 30);
+    for (const o of obs) if (o.w && this.hitRect(c.x, c.y, r, o)) { c.y = c.vy > 0 ? o.y - r : o.y + o.h + r; c.vy = 0; }
+    this.player.x = c.x; this.player.y = c.y; this.player.moving = speed > 15; this.player.hasMoved = true;
+  },
+
+  // ---------- town: house orders, ice cream shop ----------
+  updateTown(dt) {
+    const s = this.s, p = this.player;
+    // new orders
+    this.orderT -= dt;
+    if (this.orderT <= 0) {
+      this.orderT = U.rand(CFG.ORDER_EVERY[0], CFG.ORDER_EVERY[1]);
+      const open = this.houses.filter((h) => !h.order);
+      if (open.length && this.houses.filter((h) => h.order).length < CFG.ORDER_MAX) {
+        const h = U.pick(open);
+        h.order = { want: U.randInt(1, 3), have: 0, t: CFG.ORDER_WAIT };
+        this.toast(`${h.name} wants pizza!`);
+      }
+    }
+    for (const h of this.houses) {
+      h.happy = Math.max(0, h.happy - dt);
+      if (!h.order) continue;
+      h.order.t -= dt;
+      if (h.order.t <= 0) { h.order = null; this.floats.push({ x: h.door.x, y: h.door.y - 40, text: 'Maybe next time', color: '#8a7a6a', t: 0, dur: 1.5 }); continue; }
+      // deliver: by car or on foot, standing by the door with pizzas
+      if (p.carry > 0 && U.dist(p.x, p.y, h.door.x, h.door.y) < 80 && p.xferCd <= 0) {
+        p.carry--; h.order.have++; p.xferCd = CFG.XFER_DELAY * 2;
+        const amt = Math.round(this.price() * CFG.DELIVERY_TIP);
+        s.cash += amt; s.stats.earned += amt;
+        this.fx.push({ kind: 'pizza', x0: p.x, y0: p.y - 30, x1: h.door.x, y1: h.door.y - 10, t: 0, dur: 0.25 });
+        this.floats.push({ x: h.door.x, y: h.door.y - 30, text: '+' + U.money(amt), color: '#ffe08a', t: 0, dur: 1, big: true });
+        Sfx.cash();
+        if (h.order.have >= h.order.want) { h.order = null; h.happy = 3; s.stats.delivered++; this.floats.push({ x: h.door.x, y: h.door.y - 56, text: 'Thank you!', color: '#ff6b8a', t: 0, dur: 1.5, big: true }); Haptics.success(); }
+      }
+    }
+    // ice cream shop runs itself once owned
+    if (s.iceCream.owned) {
+      this.icSpawnT -= dt;
+      if (this.icSpawnT <= 0) {
+        this.icSpawnT = this.iceCreamSpawn() * U.rand(0.6, 1.5);
+        if (this.icCustomers.length < 4) this.icCustomers.push(new IceCreamCustomer(this.seq++));
+      }
+      const IC = CFG.ICE_CREAM;
+      if (s.iceCream.cash > 0 && U.dist(p.x, p.y, IC.cash.x, IC.cash.y) < 50) {
+        const amt = s.iceCream.cash; s.iceCream.cash = 0; s.cash += amt; s.stats.earned += amt;
+        for (let i = 0; i < Math.min(8, Math.ceil(amt / 15)); i++) this.fx.push({ kind: 'bill', x0: IC.cash.x + U.rand(-14, 14), y0: IC.cash.y, x1: p.x, y1: p.y - 10, t: -i * 0.04, dur: 0.3, follow: true });
+        this.floats.push({ x: p.x, y: p.y - 46, text: '+' + U.money(amt), color: '#ffe08a', t: 0, dur: 1, big: true });
+        Sfx.cash(); Haptics.tap();
+      }
+    }
+    this.carNear = this.canEnterCar();
   },
   hitRect(px, py, r, o) { return px + r > o.x && px - r < o.x + o.w && py + r > o.y && py - r < o.y + o.h; },
 
@@ -403,7 +522,7 @@ const Game = {
     // Pads: stand on one for a moment, then money flows in until it is paid.
     // Nothing is bought until the player has moved at least once after loading, so a reload never buys by itself.
     for (const pad of this.allPads()) {
-      if (pad.maxed || !p.hasMoved) continue;
+      if (pad.maxed || !p.hasMoved || this.driving) continue;
       if (!near(pad.pos, CFG.PAD_RADIUS + 6)) { this.padDwell[pad.key] = 0; continue; }
       if (p.moving) { this.padDwell[pad.key] = Math.min(this.padDwell[pad.key] || 0, 0); continue; } // only while standing still
       this.padDwell[pad.key] = (this.padDwell[pad.key] || 0) + dt;
@@ -483,9 +602,15 @@ const Game = {
     const paying = this.customers.some((c) => c.state === 'paying' || c.state === 'toPay');
     const hasHelper = this.staff.some((st) => st.role === 'helper');
     let h = null;
-    if (!this.insideBuilding(p.x, p.y)) {
+    const order = this.houses.find((hh) => hh.order);
+    if (order && p.carry > 0) h = { text: `Deliver to ${order.name}!`, target: order.door };
+    else if (this.driving) { const IC = CFG.ICE_CREAM; h = s.iceCream.owned && s.iceCream.cash > 20 ? { text: 'Pick up the ice cream money', target: IC.cash } : { text: 'Vroom! Drive around town', target: null }; }
+    else if (!this.insideBuilding(p.x, p.y)) {
+      const IC = CFG.ICE_CREAM;
       const coin = this.coins.filter((c) => !c.taken).sort((a, b) => U.dist(p.x, p.y, a.x, a.y) - U.dist(p.x, p.y, b.x, b.y))[0];
-      if (coin && U.dist(p.x, p.y, coin.x, coin.y) < 420) h = { text: 'Grab the shiny coin!', target: coin };
+      if (s.iceCream.owned && s.iceCream.cash >= 30 && U.dist(p.x, p.y, IC.cash.x, IC.cash.y) < 500) h = { text: 'Collect the ice cream money', target: IC.cash };
+      else if (coin && U.dist(p.x, p.y, coin.x, coin.y) < 420) h = { text: 'Grab the shiny coin!', target: coin };
+      else if (order) h = { text: 'Grab pizzas, then deliver by car!', target: CFG.DOOR_OUT };
       else h = { text: 'Walk back to the pizza shop', target: CFG.DOOR_OUT };
     }
     else if (paying && !hasCashier && !this.cashierPresent()) h = { text: 'Stand at the register to take the money', target: CFG.CASHIER_SPOT };

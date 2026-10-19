@@ -102,8 +102,9 @@ const Render = {
 
   // ======================= static background =======================
   ensureBackground(g) {
-    const res = U.clamp(this.dpr * this.scale, 1, 2);
-    const key = [g.isUnlocked('dining'), g.isUnlocked('tables2'), g.isUnlocked('oven2'), g.isUnlocked('driveThru'), CFG.DECOR_ITEMS.map((it) => g.hasDecor(it.key) ? 1 : 0).join(''), Math.round(g.price()), Math.round(res * 4) / 4].join('|');
+    const Wd = CFG.WORLD, area = (Wd.x1 - Wd.x0) * (Wd.y1 - Wd.y0);
+    const res = Math.min(U.clamp(this.dpr * this.scale, 1, 2), Math.sqrt(9e6 / area)); // keep the cached map under ~9M pixels
+    const key = [g.isUnlocked('dining'), g.isUnlocked('tables2'), g.isUnlocked('oven2'), g.isUnlocked('driveThru'), CFG.DECOR_ITEMS.map((it) => g.hasDecor(it.key) ? 1 : 0).join(''), g.s.iceCream.owned, Math.round(g.price()), Math.round(res * 4) / 4].join('|');
     const now = performance.now();
     if (this.bg && key === this.bgKey) return;
     // During a pinch the resolution changes continuously; rebuild at most every 150 ms.
@@ -132,6 +133,7 @@ const Render = {
     this.bgEntrance(g);
     this.bgDecor(g);
     this.bgPark(g);
+    this.bgTown(g);
   },
 
   // Grass over the whole world, sidewalks around the building, the parking lot.
@@ -153,8 +155,13 @@ const Render = {
     walk(B.x1, CFG.ROAD.y2, 48, B.y1 - CFG.ROAD.y2 + 48);
     walk(B.x0 - 48, CFG.ROAD.y2, 48, B.y1 - CFG.ROAD.y2 + 48);
     walk(W.x0, CFG.ROAD.y1 - 22, W.x1 - W.x0, 22);
-    // path from the door to the park at the bottom-left
-    walk(W.x0, B.y1 + 48, 48, 120);
+    // sidewalks hugging the inside of the road loop, and along the house fronts and the fire station
+    walk(-400, CFG.ROAD.y2, 26, 920 - CFG.ROAD.y2);
+    walk(1214, CFG.ROAD.y2, 26, 920 - CFG.ROAD.y2);
+    walk(-400, 894, 1614, 26);
+    walk(-480, 1000, 1800, 20);
+    walk(1320, 300, 20, 240);
+    for (const h of CFG.HOUSES) walk(h.door.x - 14, 1000, 28, 22);
     // parking lot
     const P = CFG.PARKING;
     ctx.fillStyle = '#5a5d63'; ctx.fillRect(P.x0, P.y0, P.x1 - P.x0, P.y1 - P.y0);
@@ -216,7 +223,7 @@ const Render = {
     ctx.fillStyle = '#5b3a1a'; ctx.fillRect(-150, 180, 6, 40); ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, -185, 160, 76, 24, 4); ctx.fill();
     ctx.fillStyle = '#ffe08a'; ctx.font = this.font(11); ctx.fillText('PARK', -147, 172);
     // parked cars (static)
-    for (const [i, col] of [['#41b883', 0], ['#f06292', 1], ['#607d8b', 3]].map((v, i) => [v[1], v[0]])) {
+    for (const [i, col] of [[0, '#41b883'], [1, '#f06292']]) {
       this.drawCar({ x: CFG.PARKING.x0 + 75, y: CFG.PARKING.y0 + 50 + i * 72, color: col, state: 'parked', want: 0, have: 0, patience: 99 }, g);
     }
   },
@@ -224,11 +231,19 @@ const Render = {
   // The street along the top of the building. It is always a road now (the drive-thru window is what unlocks).
   bgOutside(g) {
     const ctx = this.ctx, r = CFG.ROAD, W = CFG.WORLD;
-    ctx.fillStyle = '#474a50'; ctx.fillRect(W.x0, r.y1, W.x1 - W.x0, r.y2 - r.y1);
-    ctx.fillStyle = 'rgba(255,255,255,0.05)';
-    for (let i = 0; i < 400; i++) { const x = W.x0 + ((i * 97) % (W.x1 - W.x0)), y = r.y1 + ((i * 53) % (r.y2 - r.y1)); ctx.fillRect(x, y, 2, 2); }
+    for (const rd of CFG.ROADS) {
+      ctx.fillStyle = '#474a50'; ctx.fillRect(rd.x0, rd.y0, rd.x1 - rd.x0, rd.y1 - rd.y0);
+      ctx.fillStyle = 'rgba(255,255,255,0.05)';
+      for (let i = 0; i < 300; i++) { const x = rd.x0 + ((i * 97) % (rd.x1 - rd.x0)), y = rd.y0 + ((i * 53) % (rd.y1 - rd.y0)); ctx.fillRect(x, y, 2, 2); }
+    }
     ctx.strokeStyle = '#f2c94c'; ctx.lineWidth = 3; ctx.setLineDash([22, 16]);
-    ctx.beginPath(); ctx.moveTo(W.x0, (r.y1 + r.y2) / 2); ctx.lineTo(W.x1, (r.y1 + r.y2) / 2); ctx.stroke(); ctx.setLineDash([]);
+    for (const rd of CFG.ROADS) {
+      ctx.beginPath();
+      if (rd.x1 - rd.x0 > rd.y1 - rd.y0) { const y = (rd.y0 + rd.y1) / 2; ctx.moveTo(rd.x0 + 40, y); ctx.lineTo(rd.x1 - 40, y); }
+      else { const x = (rd.x0 + rd.x1) / 2; ctx.moveTo(x, rd.y0 + 40); ctx.lineTo(x, rd.y1 - 40); }
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
     if (g.isUnlocked('driveThru')) { ctx.fillStyle = '#fff'; ctx.fillRect(CFG.DT_WINDOW.x + 56, r.y1 + 6, 6, r.y2 - r.y1 - 12); }
     // crosswalk near the park
     ctx.fillStyle = 'rgba(255,255,255,0.85)';
@@ -522,6 +537,79 @@ const Render = {
     });
   },
 
+  // Ice cream shop next door, houses across the south road, the fire station across the east road.
+  bgTown(g) {
+    const ctx = this.ctx;
+    // ---- ice cream shop
+    const IC = CFG.ICE_CREAM, R = IC.rect, owned = g.s.iceCream.owned;
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(R.x0 + 4, R.y0 + 4, R.x1 - R.x0, R.y1 - R.y0);
+    // floor
+    for (let y = R.y0; y < R.y1; y += 24) for (let x = R.x0; x < R.x1; x += 24) { ctx.fillStyle = ((x - R.x0) / 24 + (y - R.y0) / 24) % 2 ? '#ffe1ea' : '#fff7f9'; ctx.fillRect(x, y, Math.min(24, R.x1 - x), Math.min(24, R.y1 - y)); }
+    // walls (door gap on the bottom)
+    ctx.fillStyle = '#c45c7a';
+    ctx.fillRect(R.x0, R.y0, R.x1 - R.x0, 8); ctx.fillRect(R.x0, R.y0, 6, R.y1 - R.y0); ctx.fillRect(R.x1 - 6, R.y0, 6, R.y1 - R.y0);
+    ctx.fillRect(R.x0, R.y1 - 6, IC.door.x - IC.doorW / 2 - R.x0, 6); ctx.fillRect(IC.door.x + IC.doorW / 2, R.y1 - 6, R.x1 - IC.door.x - IC.doorW / 2, 6);
+    // door awning (pink/white)
+    for (let i = 0; i < 6; i++) { ctx.fillStyle = i % 2 ? '#fff' : '#ff8fab'; ctx.fillRect(IC.door.x - 36 + i * 12, R.y1 - 2, 12, 12); }
+    // freezer with tubs
+    ctx.fillStyle = '#9fb3c8'; U.roundRect(ctx, R.x0 + 14, R.y0 + 16, R.x1 - R.x0 - 28, 36, 5); ctx.fill();
+    const tubs = ['#ffb6c1', '#fff3c4', '#8d5a2b', '#b8f2c8', '#cdb4ff', '#ffd166', '#f8c8dc'];
+    for (let i = 0; i < 7; i++) { ctx.fillStyle = tubs[i]; ctx.beginPath(); ctx.arc(R.x0 + 30 + i * 24, R.y0 + 34, 9, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.beginPath(); ctx.arc(R.x0 + 27 + i * 24, R.y0 + 31, 3, 0, Math.PI * 2); ctx.fill(); }
+    // counter
+    ctx.fillStyle = '#8a5527'; U.roundRect(ctx, IC.counter.x - 60, IC.counter.y - 8, 120, 24, 6); ctx.fill();
+    ctx.fillStyle = '#ffd6e3'; U.roundRect(ctx, IC.counter.x - 60, IC.counter.y - 14, 120, 20, 6); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.07)'; ctx.beginPath(); ctx.ellipse(IC.cash.x, IC.cash.y + 6, 26, 12, 0, 0, Math.PI * 2); ctx.fill();
+    // big cone sign on the roof edge
+    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, IC.door.x - 60, R.y0 - 26, 120, 22, 6); ctx.fill();
+    ctx.fillStyle = '#ff8fab'; ctx.font = this.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('🍦 ICE CREAM', IC.door.x, R.y0 - 15);
+    if (!owned) {
+      ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fillRect(R.x0, R.y0, R.x1 - R.x0, R.y1 - R.y0);
+      ctx.fillStyle = '#5b3a1a'; ctx.fillRect(IC.door.x + 70, R.y1 + 6, 5, 34);
+      ctx.fillStyle = '#fff8ee'; U.roundRect(ctx, IC.door.x + 44, R.y1 - 4, 58, 26, 4); ctx.fill();
+      ctx.strokeStyle = '#b23a48'; ctx.lineWidth = 2; U.roundRect(ctx, IC.door.x + 44, R.y1 - 4, 58, 26, 4); ctx.stroke();
+      ctx.fillStyle = '#b23a48'; ctx.font = this.font(10); ctx.fillText('FOR SALE', IC.door.x + 73, R.y1 + 9);
+    }
+    // ---- houses
+    for (const h of CFG.HOUSES) {
+      const w = h.x1 - h.x0, hh = h.y1 - h.y0;
+      ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(h.x0 + 5, h.y0 + 5, w, hh);
+      // facade (door side faces the road at the top)
+      ctx.fillStyle = h.color; ctx.fillRect(h.x0, h.y0, w, 34);
+      ctx.fillStyle = '#5b3a1a'; ctx.fillRect(h.door.x - 11, h.y0 + 4, 22, 28); ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.arc(h.door.x + 6, h.y0 + 19, 2, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#9fe0ff'; ctx.fillRect(h.x0 + 18, h.y0 + 8, 24, 18); ctx.fillRect(h.x1 - 42, h.y0 + 8, 24, 18);
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(h.x0 + 18, h.y0 + 8, 24, 18); ctx.strokeRect(h.x1 - 42, h.y0 + 8, 24, 18);
+      // roof
+      ctx.fillStyle = h.roof; ctx.fillRect(h.x0, h.y0 + 34, w, hh - 34);
+      ctx.fillStyle = 'rgba(0,0,0,0.12)';
+      for (let y = h.y0 + 34; y < h.y1; y += 16) ctx.fillRect(h.x0, y, w, 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(h.x0, h.y0 + 34, w, 6);
+      ctx.fillStyle = '#6b4a2b'; ctx.fillRect(h.x1 - 40, h.y0 + 60, 18, 24); ctx.fillStyle = '#4a2d12'; ctx.fillRect(h.x1 - 42, h.y0 + 58, 22, 5);
+      // mailbox by the path
+      ctx.fillStyle = '#2d3a4a'; ctx.fillRect(h.door.x + 22, h.y0 - 16, 3, 16); ctx.fillStyle = '#3b7dd8'; U.roundRect(ctx, h.door.x + 17, h.y0 - 24, 14, 9, 3); ctx.fill();
+      // name plate
+      ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, h.door.x - 48, h.y1 - 20, 96, 16, 4); ctx.fill();
+      ctx.fillStyle = '#ffe08a'; ctx.font = this.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(h.name.toUpperCase(), h.door.x, h.y1 - 12);
+    }
+    // ---- fire station
+    const F = CFG.FIRE_STATION, fw = F.x1 - F.x0, fh = F.y1 - F.y0;
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(F.x0 + 5, F.y0 + 5, fw, fh);
+    ctx.fillStyle = '#c62828'; ctx.fillRect(F.x0, F.y0, fw, fh);
+    ctx.fillStyle = '#8e1c1c'; ctx.fillRect(F.x0 + 40, F.y0, fw - 40, fh);
+    ctx.fillStyle = 'rgba(255,255,255,0.08)'; for (let y = F.y0; y < F.y1; y += 14) ctx.fillRect(F.x0 + 40, y, fw - 40, 2);
+    // two garage doors on the road side
+    for (const dy of [70, 160]) { ctx.fillStyle = '#e0e0e0'; ctx.fillRect(F.x0 + 4, F.y0 + dy - 30, 32, 60); ctx.fillStyle = 'rgba(0,0,0,0.15)'; for (let k = 0; k < 4; k++) ctx.fillRect(F.x0 + 4, F.y0 + dy - 30 + k * 15, 32, 2); }
+    // fire truck peeking out of the lower door
+    ctx.fillStyle = '#d32f2f'; U.roundRect(ctx, F.x0 - 20, F.y0 + 140, 70, 40, 6); ctx.fill();
+    ctx.fillStyle = '#ffeb3b'; ctx.fillRect(F.x0 - 10, F.y0 + 150, 50, 4); ctx.fillStyle = '#9fe0ff'; ctx.fillRect(F.x0 - 16, F.y0 + 146, 10, 28);
+    ctx.fillStyle = '#1e1e1e'; ctx.fillRect(F.x0 - 12, F.y0 + 136, 12, 6); ctx.fillRect(F.x0 + 28, F.y0 + 136, 12, 6); ctx.fillRect(F.x0 - 12, F.y0 + 178, 12, 6); ctx.fillRect(F.x0 + 28, F.y0 + 178, 12, 6);
+    ctx.fillStyle = '#c0c0c0'; for (let k = 0; k < 5; k++) ctx.fillRect(F.x0 + 2 + k * 9, F.y0 + 158, 6, 2);
+    // sign + hydrant
+    ctx.fillStyle = '#fff'; U.roundRect(ctx, F.x0 + 50, F.y0 + 10, fw - 60, 20, 4); ctx.fill();
+    ctx.fillStyle = '#c62828'; ctx.font = this.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🚒 FIRE DEPT', F.x0 + 50 + (fw - 60) / 2, F.y0 + 20);
+    ctx.fillStyle = '#e53935'; U.roundRect(ctx, 1326, 560, 10, 18, 3); ctx.fill(); ctx.fillRect(1323, 566, 16, 4);
+  },
+
   // ======================= dynamic scenery =======================
   drawDecorDynamic(g) {
     const ctx = this.ctx, t = g.time;
@@ -715,6 +803,48 @@ const Render = {
       ctx.fillStyle = '#ff8c42'; ctx.fillRect(dx + (Math.cos(a + 1.57) < 0 ? -12 : 8), dy - 6, 4, 2);
     }
     this.drawDog(g.dog, g);
+    this.drawTownDynamic(g);
+  },
+
+  drawTownDynamic(g) {
+    const ctx = this.ctx;
+    for (const h of g.houses) {
+      if (h.order) {
+        const left = h.order.want - h.order.have;
+        const bob = Math.sin(g.time * 4) * 3;
+        this.drawBubble(h.door.x, h.y0 - 40 + bob, () => {
+          this.drawPizza(-10, 0, 8);
+          ctx.fillStyle = '#2b1d14'; ctx.font = this.font(13); ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText('×' + left, 2, 1);
+        }, 46);
+        this.drawProgressBar(h.door.x, h.y0 - 22 + bob, 40, h.order.t / CFG.ORDER_WAIT, '#f2b134');
+      } else if (h.happy > 0) {
+        this.drawBubble(h.door.x, h.y0 - 40, () => { ctx.font = this.font(14); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('😋', 0, 0); }, 30);
+      }
+    }
+    if (g.s.iceCream.owned) {
+      const IC = CFG.ICE_CREAM;
+      this.drawPerson(IC.scooper.x, IC.scooper.y, { shirt: '#fff', skin: '#e0ac69', hat: 'cap', capColor: '#ff8fab', facing: 1, moving: false, bob: 0, carry: 0, apron: '#ffb6c1', pants: '#4a4a4a' });
+      this.drawCashPile(IC.cash.x, IC.cash.y, g.s.iceCream.cash);
+    }
+  },
+
+  drawDeliveryCar(g) {
+    const ctx = this.ctx, c = g.car;
+    ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.angle);
+    this.drawCar({ x: 0, y: 0, color: '#e4572e', state: 'parked', want: 0, have: 0, patience: 99 }, g);
+    // roof sign
+    ctx.fillStyle = '#fff8ee'; U.roundRect(ctx, -16, -8, 32, 16, 4); ctx.fill();
+    this.drawPizza(0, 0, 6);
+    ctx.restore();
+    if (g.driving && g.player.carry > 0) {
+      const n = Math.min(g.player.carry, 30);
+      for (let i = 0; i < n; i++) { ctx.fillStyle = '#b86f2d'; ctx.beginPath(); ctx.arc(c.x, c.y - 30 - i * 4 + 2, 11, 0, Math.PI * 2); ctx.fill(); this.drawPizza(c.x, c.y - 30 - i * 4, 11); }
+      this.drawCountBadge(c.x + 18, c.y - 40 - n * 4, g.player.carry, g.playerCap());
+    }
+    if (!g.driving && g.carNear) {
+      const bob = Math.sin(g.time * 5) * 3;
+      this.drawBubble(c.x, c.y - 48 + bob, () => { ctx.font = this.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('🚗 Drive!', 0, 0); }, 60);
+    }
   },
 
   drawDog(d, g) {
@@ -758,7 +888,9 @@ const Render = {
     for (const c of g.customers) items.push({ y: c.y, draw: () => this.drawCustomer(c, g) });
     for (const st of g.staff) items.push({ y: st.y, draw: () => this.drawStaff(st, g) });
     for (const c of g.cars) items.push({ y: c.y, draw: () => this.drawCar(c, g) });
-    items.push({ y: g.player.y, draw: () => this.drawPlayer(g) });
+    for (const c of g.icCustomers) items.push({ y: c.y, draw: () => this.drawIceCreamCustomer(c, g) });
+    items.push({ y: g.car.y + 10, draw: () => this.drawDeliveryCar(g) });
+    if (!g.driving) items.push({ y: g.player.y, draw: () => this.drawPlayer(g) });
     items.sort((a, b) => a.y - b.y);
     for (const it of items) it.draw();
   },
@@ -924,6 +1056,20 @@ const Render = {
     } else if (c.state === 'eating') {
       const t = (Math.sin(g.time * 8 + c.id) + 1) / 2;
       this.drawBubble(c.x, c.y - 66, () => { ctx.font = this.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText(t > 0.5 ? '😋' : '🍕', 0, 0); }, 30);
+    }
+  },
+
+  drawIceCreamCustomer(c, g) {
+    const ctx = this.ctx;
+    c.bob = (c.bob || 0) + (c.moving ? 0.25 : 0);
+    this.drawPerson(c.x, c.y, { shirt: c.shirt, skin: c.skin, hair: c.hair, hairStyle: c.hairStyle, stripes: c.stripes, facing: c.facing, moving: c.moving, bob: c.bob, carry: 0, pants: '#4a4a4a' });
+    if (c.cone) {
+      const x = c.x + c.facing * 14, y = c.y - 22;
+      ctx.fillStyle = '#d98a3c'; ctx.beginPath(); ctx.moveTo(x - 5, y); ctx.lineTo(x + 5, y); ctx.lineTo(x, y + 12); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = c.flavor; ctx.beginPath(); ctx.arc(x, y - 3, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ff6b6b'; ctx.beginPath(); ctx.arc(x + 1, y - 9, 2, 0, Math.PI * 2); ctx.fill();
+    } else if (c.state === 'order') {
+      this.drawBubble(c.x, c.y - 66, () => { ctx.font = this.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('🍦', 0, 0); }, 30);
     }
   },
 

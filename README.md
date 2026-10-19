@@ -15,7 +15,8 @@ it is built so a five‑year‑old can play it:
   pizza and finding coins outside.
 - **No menus.** Everything is bought by standing still on a glowing circle placed where the thing lives:
   the oven upgrade is by the oven, the cashier by the register, each decoration where it will appear.
-- **A cosy world to explore**, with a park, a dog, ducks and a fountain, rather than a treadmill.
+- **A cosy world to explore**, a tiny town with a park, a dog, ducks, a fountain, houses to deliver to,
+  a fire station and a second shop to own, rather than a treadmill.
 
 No build step, no dependencies: plain HTML5 Canvas + vanilla JavaScript.
 
@@ -34,7 +35,8 @@ No build step, no dependencies: plain HTML5 Canvas + vanilla JavaScript.
 | Action | Desktop | Touch |
 | --- | --- | --- |
 | Move | `WASD` / arrow keys | drag anywhere on the game to use the joystick |
-| Buy anything | stand on a glowing floor circle | stand on a glowing floor circle |
+| Buy anything | stand still on a glowing floor circle | stand still on a glowing floor circle |
+| Delivery car | walk up to it and press `E` or the Drive button | tap the Drive button |
 | Zoom | mouse wheel or +/− buttons | pinch |
 | Help / Sound | `?` / `M` | tap the buttons |
 
@@ -53,7 +55,13 @@ No build step, no dependencies: plain HTML5 Canvas + vanilla JavaScript.
    trains that person: a trained helper walks faster and carries a bigger stack.
 7. Grayed-out **decorations** (plants, posters, string lights, neon sign, jukebox) show where
    they will go; buy them to bring more, and more patient, customers.
-8. Walk out of the door to explore the **park, street and parking lot**: collect coins and meet the dog.
+8. Walk out of the door to explore the **tiny town**: a park with a pond and fountain, a street loop, a
+   parking lot, four houses, a fire station, and an ice cream shop next door. Coins respawn outside and a
+   dog follows you around.
+9. Houses order pizza now and then. Carry pizzas out, hop into the **delivery car** in the parking lot
+   (Drive button or `E`) and drive to their door; delivered pizzas pay double.
+10. The **ice cream shop** is for sale. Once bought it runs itself with a scooper and its own customers;
+    walk in to collect the money, and buy More Flavors inside to make it busier.
 
 Impatient customers and cars leave if they wait too long. Progress saves automatically to
 `localStorage` and never resets; once you have a cashier and a helper the shop keeps earning a reduced

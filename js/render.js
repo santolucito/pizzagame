@@ -776,6 +776,17 @@ const Render = {
     for (const it of items) it.draw();
   },
 
+  specialLook(kind) {
+    switch (kind) {
+      case 'santa': return { shirt: '#d62828', pants: '#d62828', skin: '#f1c27d', hat: 'santa', beard: '#fff', belt: true, stripes: false };
+      case 'cat': return { shirt: '#fff', pants: '#8a8a8a', skin: '#a9a9a9', hat: 'tallhat', cat: true, bowtie: '#e4572e', stripes: false };
+      case 'robot': return { shirt: '#8c97a3', pants: '#5c6670', skin: '#b8c2cc', hat: 'antenna', robot: true, stripes: false };
+      case 'pirate': return { shirt: '#fff', pants: '#2b1d14', hat: 'bandana', eyepatch: true, stripes: true };
+      case 'dino': return { shirt: '#4caf50', pants: '#3b8f3f', skin: '#5cc466', hat: 'spikes', dino: true, stripes: false };
+    }
+    return {};
+  },
+
   drawPerson(x, y, o) {
     const ctx = this.ctx;
     const bob = o.moving ? Math.sin(o.bob || 0) * 2 : 0;
@@ -797,14 +808,45 @@ const Render = {
       ctx.fillStyle = o.apron; U.roundRect(ctx, x - 8, y - 24 + bob, 16, 17, 4); ctx.fill();
       ctx.fillStyle = 'rgba(0,0,0,0.12)'; U.roundRect(ctx, x - 5, y - 14 + bob, 10, 5, 2); ctx.fill();
     }
+    if (o.belt) { ctx.fillStyle = '#2b1d14'; ctx.fillRect(x - 13, y - 14 + bob, 26, 4); ctx.fillStyle = '#f2b134'; ctx.fillRect(x - 3, y - 15 + bob, 6, 6); }
+    if (o.bowtie) { ctx.fillStyle = o.bowtie; ctx.beginPath(); ctx.moveTo(x, y - 27 + bob); ctx.lineTo(x - 7, y - 31 + bob); ctx.lineTo(x - 7, y - 23 + bob); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(x, y - 27 + bob); ctx.lineTo(x + 7, y - 31 + bob); ctx.lineTo(x + 7, y - 23 + bob); ctx.closePath(); ctx.fill(); }
+    if (o.dino) { ctx.fillStyle = o.shirt; ctx.beginPath(); ctx.moveTo(x - f * 12, y - 14 + bob); ctx.quadraticCurveTo(x - f * 26, y - 10 + bob, x - f * 28, y - 22 + bob); ctx.lineTo(x - f * 12, y - 20 + bob); ctx.closePath(); ctx.fill(); }
     // arms
     ctx.fillStyle = o.skin;
     ctx.beginPath(); ctx.arc(x - 14, y - 16 + bob, 3.5, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.arc(x + 14, y - 16 + bob, 3.5, 0, Math.PI * 2); ctx.fill();
     // head
-    ctx.fillStyle = o.skin; ctx.beginPath(); ctx.arc(x, y - 38 + bob, 10.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    if (o.robot) { ctx.fillStyle = o.skin; U.roundRect(ctx, x - 10, y - 48 + bob, 20, 20, 4); ctx.fill(); ctx.stroke(); }
+    else { ctx.fillStyle = o.skin; ctx.beginPath(); ctx.arc(x, y - 38 + bob, 10.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+    if (o.cat) {
+      ctx.fillStyle = o.skin; ctx.beginPath(); ctx.moveTo(x - 10, y - 42 + bob); ctx.lineTo(x - 8, y - 54 + bob); ctx.lineTo(x - 2, y - 46 + bob); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(x + 10, y - 42 + bob); ctx.lineTo(x + 8, y - 54 + bob); ctx.lineTo(x + 2, y - 46 + bob); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1; for (const d of [-1, 1]) { ctx.beginPath(); ctx.moveTo(x + d * 6, y - 34 + bob); ctx.lineTo(x + d * 16, y - 36 + bob); ctx.moveTo(x + d * 6, y - 32 + bob); ctx.lineTo(x + d * 16, y - 31 + bob); ctx.stroke(); }
+      ctx.lineWidth = 1.5;
+    }
+    if (o.dino) {
+      ctx.fillStyle = o.skin; U.roundRect(ctx, x + f * 4, y - 38 + bob, 14, 9, 4); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.fillRect(x + f * 9, y - 31 + bob, 2, 2); ctx.fillRect(x + f * 13, y - 31 + bob, 2, 2);
+    }
+    if (o.beard) { ctx.fillStyle = o.beard; ctx.beginPath(); ctx.arc(x, y - 33 + bob, 9, 0, Math.PI); ctx.fill(); ctx.beginPath(); ctx.ellipse(x, y - 26 + bob, 6, 5, 0, 0, Math.PI * 2); ctx.fill(); }
     // hair / hat
-    if (o.hat === 'chef') {
+    if (o.hat === 'santa') {
+      ctx.fillStyle = '#d62828'; ctx.beginPath(); ctx.moveTo(x - 11, y - 44 + bob); ctx.lineTo(x + 11, y - 44 + bob); ctx.lineTo(x + f * 6, y - 64 + bob); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#fff'; U.roundRect(ctx, x - 12, y - 47 + bob, 24, 6, 3); ctx.fill(); ctx.beginPath(); ctx.arc(x + f * 6, y - 64 + bob, 4, 0, Math.PI * 2); ctx.fill();
+    } else if (o.hat === 'tallhat') {
+      for (let k = 0; k < 5; k++) { ctx.fillStyle = k % 2 ? '#fff' : '#d62828'; ctx.fillRect(x - 8, y - 52 - k * 7 + bob, 16, 7); }
+      ctx.fillStyle = '#d62828'; U.roundRect(ctx, x - 13, y - 48 + bob, 26, 4, 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(43,29,20,0.45)'; ctx.strokeRect(x - 8, y - 87 + bob, 16, 39);
+    } else if (o.hat === 'antenna') {
+      ctx.strokeStyle = '#5c6670'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, y - 48 + bob); ctx.lineTo(x, y - 58 + bob); ctx.stroke();
+      ctx.fillStyle = '#ff5252'; ctx.beginPath(); ctx.arc(x, y - 60 + bob, 3.5, 0, Math.PI * 2); ctx.fill(); ctx.lineWidth = 1.5;
+    } else if (o.hat === 'bandana') {
+      ctx.fillStyle = '#d62828'; ctx.beginPath(); ctx.arc(x, y - 40 + bob, 11, Math.PI, 0); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(x - f * 10, y - 40 + bob); ctx.lineTo(x - f * 20, y - 34 + bob); ctx.lineTo(x - f * 9, y - 36 + bob); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#fff'; for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.arc(x - 6 + k * 6, y - 45 + bob, 1.3, 0, Math.PI * 2); ctx.fill(); }
+    } else if (o.hat === 'spikes') {
+      ctx.fillStyle = '#2e7d32'; for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.moveTo(x - 8 + k * 7, y - 44 + bob); ctx.lineTo(x - 4 + k * 7, y - 54 + bob); ctx.lineTo(x + k * 7, y - 44 + bob); ctx.closePath(); ctx.fill(); }
+    } else if (o.hat === 'chef') {
       ctx.fillStyle = '#fff'; U.roundRect(ctx, x - 9, y - 54 + bob, 18, 10, 3); ctx.fill(); ctx.stroke();
       ctx.beginPath(); ctx.arc(x - 5, y - 56 + bob, 6, 0, Math.PI * 2); ctx.arc(x + 5, y - 56 + bob, 6, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#2b1d14'; // mustache
@@ -828,8 +870,12 @@ const Render = {
       ctx.beginPath(); ctx.moveTo(x + f * 2 - 4, y - 41 + bob); ctx.lineTo(x + f * 2 + 1, y - 38 + bob); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(x + f * 2 + 6, y - 41 + bob); ctx.lineTo(x + f * 2 + 1, y - 38 + bob); ctx.stroke();
       ctx.beginPath(); ctx.arc(x + f * 2, y - 31 + bob, 3, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+    } else if (o.robot) {
+      ctx.fillStyle = '#6bd3ff'; ctx.fillRect(x + f * 3 - 6, y - 41 + bob, 5, 4); ctx.fillRect(x + f * 3 + 1, y - 41 + bob, 5, 4);
+      ctx.fillStyle = '#2b1d14'; for (let k = 0; k < 4; k++) ctx.fillRect(x - 5 + k * 3, y - 33 + bob, 2, 2);
     } else {
       ctx.beginPath(); ctx.arc(x + f * 3 - 3, y - 38 + bob, 1.7, 0, Math.PI * 2); ctx.arc(x + f * 3 + 3, y - 38 + bob, 1.7, 0, Math.PI * 2); ctx.fill();
+      if (o.eyepatch) { ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.arc(x + f * 3 + 3, y - 38 + bob, 3.5, 0, Math.PI * 2); ctx.fill(); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x - 10, y - 43 + bob); ctx.lineTo(x + 10, y - 36 + bob); ctx.stroke(); ctx.lineWidth = 1.5; }
       ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.arc(x + f * 2, y - 35 + bob, 3, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke();
       ctx.fillStyle = 'rgba(255,120,120,0.35)';
@@ -861,7 +907,9 @@ const Render = {
   drawCustomer(c, g) {
     const ctx = this.ctx;
     c.bob = (c.bob || 0) + (c.moving ? 0.25 : 0);
-    this.drawPerson(c.x, c.y, { shirt: c.shirt, skin: c.skin, hair: c.hair, hairStyle: c.hairStyle, stripes: c.stripes, facing: c.facing, moving: c.moving, bob: c.bob, carry: c.state === 'eating' ? 0 : c.have, angry: c.angry, pants: '#4a4a4a' });
+    const look = { shirt: c.shirt, skin: c.skin, hair: c.hair, hairStyle: c.hairStyle, stripes: c.stripes, facing: c.facing, moving: c.moving, bob: c.bob, carry: c.state === 'eating' ? 0 : c.have, angry: c.angry, pants: '#4a4a4a' };
+    if (c.special) Object.assign(look, this.specialLook(c.special));
+    this.drawPerson(c.x, c.y, look);
     const idx = c.inMainQueue ? g.queueIndex(c) : -1;
     const bubbleY = c.y - 66 - Math.min(c.have, 30) * 4;
     const maxPat = CFG.PATIENCE * g.patienceBonus();

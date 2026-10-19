@@ -1,4 +1,12 @@
 'use strict';
+// Rare special visitors: how they look is handled by Render.drawPerson; here is what they say and tip.
+const SPECIALS = {
+  santa:  { arrive: 'Ho ho ho! Santa is here!', thanks: 'Ho ho ho! Big tip!', tip: 3 },
+  cat:    { arrive: 'A cat in a tall hat walks in!', thanks: 'Purr-fect pizza!', tip: 3 },
+  robot:  { arrive: 'Beep boop. Robot customer!', thanks: 'PIZZA = OPTIMAL', tip: 3 },
+  pirate: { arrive: 'Arrr! A pirate wants pizza!', thanks: 'Arrr, me treasure!', tip: 3 },
+  dino:   { arrive: 'RAWR! A dinosaur is hungry!', thanks: 'RAWR! (thank you)', tip: 3 },
+};
 // Runtime actors: customers, drive-thru cars, hired staff and the park dog. Game drives their updates.
 
 class Customer {
@@ -22,6 +30,9 @@ class Customer {
     this.hairStyle = U.randInt(0, 3);
     this.stripes = Math.random() < 0.3;
     this.bob = Math.random() * Math.PI * 2;
+    // 1 in 100 customers is somebody special
+    this.special = Math.random() < 0.01 ? U.pick(Object.keys(SPECIALS)) : null;
+    if (this.special) { this.announced = false; }
   }
 
   get entering() { return this.state === 'route' && this.after === 'toQueue'; }
@@ -38,6 +49,11 @@ class Customer {
     this.takeCd -= dt;
     switch (this.state) {
       case 'route': {
+        if (this.special && !this.announced && this.x < CFG.DOOR_OUT.x + 40) {
+          this.announced = true;
+          g.toast(SPECIALS[this.special].arrive); Sfx.unlock();
+          g.floats.push({ x: this.x, y: this.y - 60, text: SPECIALS[this.special].arrive, color: '#ffe08a', t: 0, dur: 2, big: true });
+        }
         const wp = this.route[0];
         const sp = this.after === 'gone' ? this.speed * 1.1 : this.speed;
         if (U.moveToward(this, wp.x, wp.y, sp, dt)) {
@@ -73,8 +89,9 @@ class Customer {
         if (this.state === 'paying' && g.cashierPresent()) {
           this.payProg += dt / g.checkoutTime();
           if (this.payProg >= 1) {
-            const amount = g.price() * this.want;
+            const amount = g.price() * this.want * (this.special ? SPECIALS[this.special].tip : 1);
             g.earn(amount, CFG.CASH_PILE, 'register');
+            if (this.special) { g.floats.push({ x: this.x, y: this.y - 64, text: SPECIALS[this.special].thanks, color: '#ff6b8a', t: 0, dur: 1.6, big: true }); g.s.stats.specials = (g.s.stats.specials || 0) + 1; }
             g.fx.push({ kind: 'cash', x0: this.x, y0: this.y - 20, x1: CFG.CASH_PILE.x, y1: CFG.CASH_PILE.y, t: 0, dur: 0.35 });
             Sfx.pay();
             const table = g.findFreeTable();

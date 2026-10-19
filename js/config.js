@@ -70,7 +70,7 @@ const CFG = {
     { key: 'dining', label: 'Tables', ico: '🍽️', price: 180, pos: { x: 790, y: 465 }, req: [] },
     { key: 'oven2', label: '2nd Oven', ico: '🔥', price: 280, pos: { x: 90, y: 350 }, req: [] },
     { key: 'tables2', label: 'More Tables', ico: '🍽️', price: 450, pos: { x: 790, y: 465 }, req: ['dining'] },
-    { key: 'driveThru', label: 'Drive-Thru', ico: '🚗', price: 650, pos: { x: 880, y: 170 }, req: ['dining'] },
+    { key: 'driveThru', label: 'Drive-Thru', ico: '🚗', price: 650, pos: { x: 880, y: 170 }, req: [] },
   ],
   PAD_RADIUS: 40,
 

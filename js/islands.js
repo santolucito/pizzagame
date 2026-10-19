@@ -2,7 +2,7 @@
 // The river, the ferry and the islands.
 // Extension module: registered with Game.ext and Render.ext. See the hook list in js/EXTENSIONS.md.
 //
-// A river runs along the south edge of town, behind the houses. A wooden dock behind River House has a
+// A river runs along the south edge of town, behind the houses. A wooden dock beside River House has a
 // little ferry moored at it: stand on the dock and press the big button to sail to the Islands, a map of
 // water with a few islands. On the main island you set up a pizza stand (a pad); it bakes pizzas on its
 // own. Huts on the other islands order pizza now and then; hop on the jet ski parked at the beach and
@@ -14,13 +14,13 @@ CFG.ISLANDS = {
   WORLD: CFG.AREAS.islands.WORLD,
   // ---- in town: the river across the whole south edge, the dock behind River House
   RIVER: { x0: -1320, y0: 1200, x1: 1520, y1: 1300 },
-  TOWN_DOCK: { x0: 130, y0: 1172, x1: 210, y1: 1268 },     // planks from the grass out over the water
-  TOWN_FERRY: { x: 290, y: 1247 },                         // moored on the east side of the dock
-  TOWN_CRATE: { x: 146, y: 1252 },                          // pizzas wait here while you are away
-  TOWN_ARRIVE: { x: 178, y: 1228 },
-  SIGN: { x: 110, y: 1180 }, BENCH: { x: 250, y: 1182 },
+  TOWN_DOCK: { x0: -30, y0: 1172, x1: 50, y1: 1268 },      // planks from the grass out over the water, in the gap west of River House
+  TOWN_FERRY: { x: 130, y: 1247 },                         // moored on the east side of the dock
+  TOWN_CRATE: { x: -14, y: 1252 },                          // pizzas wait here while you are away
+  TOWN_ARRIVE: { x: 18, y: 1228 },
+  SIGN: { x: -60, y: 1180 }, BENCH: { x: 90, y: 1182 },
   LILIES: [[-900, 1270, 1], [-860, 1282, 0], [-420, 1230, 0], [760, 1278, 1], [800, 1265, 0], [1180, 1240, 1]],
-  REEDS: [-1200, -1030, -640, -230, 20, 440, 880, 1060, 1400],
+  REEDS: [-1200, -1030, -640, -230, 200, 440, 880, 1060, 1400],
   ROCKS: [[-1100, 1296, 14], [-560, 1204, 11], [-120, 1298, 16], [340, 1206, 12], [660, 1300, 12], [990, 1208, 10], [1330, 1296, 14]],
   // ---- the Islands map
   ISLANDS: [

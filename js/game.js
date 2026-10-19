@@ -126,6 +126,7 @@ const Game = {
   reset() {
     try { localStorage.removeItem(CFG.SAVE_KEY); } catch (e) { /* ignore */ }
     this.s = this.defaultState();
+    for (const e of this.ext) if (e.defaults) for (const k of Object.keys(e.defaults)) this.s[k] = JSON.parse(JSON.stringify(e.defaults[k]));
     this.buildRuntime();
   },
 

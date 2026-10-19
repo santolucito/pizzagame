@@ -56,7 +56,7 @@ class Customer {
       case 'route': {
         if (this.special && !this.announced && this.x < CFG.DOOR_OUT.x + 40) {
           this.announced = true;
-          g.toast(SPECIALS[this.special].arrive, true); Sfx.unlock();
+          g.toast(SPECIALS[this.special].arrive, true, 'town'); Sfx.unlock();
           g.floats.push({ x: this.x, y: this.y - 60, text: SPECIALS[this.special].arrive, color: '#ffe08a', t: 0, dur: 2, big: true });
         }
         const wp = this.route[0];
@@ -256,7 +256,7 @@ class FireTruck {
       this.timer -= dt;
       if (this.timer <= 0 && g.isUnlocked('driveThru')) {
         this.state = 'out'; this.path = CFG.FIRE_TRUCK_OUT.map((p) => ({ x: p.x, y: p.y }));
-        g.toast('🚒 The fire truck is going out for pizza!', true); Sfx.unlock();
+        g.toast('🚒 The fire truck is going out for pizza!', true, 'town'); Sfx.unlock();
       }
     } else if (this.state === 'out') {
       const wp = this.path[0];

@@ -974,7 +974,10 @@ const Render = {
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     if (tr.via !== 'train') { const e = this.ext.find((x) => x.travel && x.travel[tr.via]); if (e) e.travel[tr.via](this, g, W, H); return; }
     const k = tr.t / tr.dur, ease = k < 0.15 ? k / 0.15 : k > 0.85 ? (1 - k) / 0.15 : 1; // slow out, slow in
-    const dist = (tr.t < 1.2 ? tr.t * tr.t / 2.4 : tr.t - 0.6) * 420 * (tr.to === 'site' ? 1 : 1); // scrolled distance (px)
+    const dist = (tr.t < 1.2 ? tr.t * tr.t / 2.4 : tr.t - 0.6) * 420; // scrolled distance (px)
+    // heading home the train runs the other way: mirror the whole scene (the banner is drawn unmirrored below)
+    const mirrored = tr.to === 'town';
+    ctx.save(); if (mirrored) { ctx.translate(W, 0); ctx.scale(-1, 1); }
     const sky = ctx.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#79c6f2'); sky.addColorStop(0.6, '#d9f0ff'); sky.addColorStop(1, '#eaf7ff');
     ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = '#fff7c2'; ctx.beginPath(); ctx.arc(W * 0.8, H * 0.18, Math.min(W, H) * 0.06, 0, Math.PI * 2); ctx.fill();
@@ -1030,6 +1033,7 @@ const Render = {
     ctx.restore();
     // smoke puffs trailing back from the chimney
     for (let i = 0; i < 7; i++) { const age = ((g.time * 1.3 + i * 0.6) % 4.2) / 4.2; const sx = tx0 + (lx + 168) * scale - age * 260, sy = by - 92 * scale - age * 70; ctx.fillStyle = `rgba(240,240,240,${0.75 * (1 - age)})`; ctx.beginPath(); ctx.arc(sx, sy, (6 + age * 22) * scale, 0, Math.PI * 2); ctx.fill(); }
+    ctx.restore();
     // destination banner
     const msg = tr.to === 'site' ? '🚂 Next stop: Construction Town! 🏗️' : '🚂 Next stop: home! 🍕';
     ctx.fillStyle = 'rgba(43,29,20,0.85)'; const bw = Math.min(W - 24, 360); U.roundRect(ctx, W / 2 - bw / 2, 60, bw, 44, 12); ctx.fill();

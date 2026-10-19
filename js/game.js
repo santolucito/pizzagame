@@ -326,8 +326,9 @@ const Game = {
     Sfx.clean();
   },
   // Only important news goes to the big toasts at the top; small stuff floats up from the chef.
-  toast(msg, important = false) {
-    if (important) { if (this.onToast) this.onToast(msg); return; }
+  // where: the map the news is about; an important toast about the town is not shown while you are away
+  toast(msg, important = false, where = 'any') {
+    if (important) { if (where !== 'any' && this.area !== where) return; if (this.onToast) this.onToast(msg); return; }
     this.floats.push({ x: this.player.x, y: this.player.y - 70, text: msg, color: '#ffe08a', t: 0, dur: 1.6, big: true });
   },
 
@@ -558,7 +559,8 @@ const Game = {
   },
 
   // ---------- riding the train ----------
-  boardTrain() { const t = this.currentTrain(); this.onTrain = true; this.player.moving = false; if (t.remote) t.departIn = 2; Sfx.whistle(); Haptics.tap(); },
+  // climbing aboard: the train pulls out right away (a second to settle in)
+  boardTrain() { const t = this.currentTrain(); this.onTrain = true; this.player.moving = false; if (t.remote) t.departIn = 1; else { t.unload = Math.min(t.unload, 1); t.hold = 0; t.toDrop = 0; } Sfx.whistle(); Haptics.tap(); },
   leaveTrain() { const st = this.station(); this.onTrain = false; this.player.x = st.stopX; this.player.y = st.platform.y1 - 12; this.player.hasMoved = true; },
   updateOnTrain(dt) { const t = this.currentTrain(); this.player.x = t.x - 240; this.player.y = t.y; this.player.moving = false; this.player.hasMoved = true; },
 
@@ -664,7 +666,7 @@ const Game = {
       if (open.length && this.houses.filter((h) => h.order).length < CFG.ORDER_MAX) {
         const h = U.pick(open);
         h.order = { want: U.randInt(1, 3), have: 0, t: CFG.ORDER_WAIT };
-        this.toast(`🍕 ${h.name} wants pizza!`, true);
+        this.toast(`🍕 ${h.name} wants pizza!`, true, 'town');
       }
     }
     for (const h of this.houses) {

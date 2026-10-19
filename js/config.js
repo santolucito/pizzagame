@@ -8,7 +8,7 @@ const CFG = {
   DOOR: { y0: 572, y1: 638 },                        // gap in the right wall
   SAVE_KEY: 'pizza-rush-save-v1',
 
-  PLAYER_START: { x: 300, y: 420 },
+  PLAYER_START: { x: 540, y: 430 }, // open floor in front of the counter, away from every circle
   ENTRANCE: { x: 925, y: 605 },          // just inside the door
   DOOR_OUT: { x: 1000, y: 605 },         // just outside the door
   SPAWN_OUT: { x: 1215, y: 605 },        // customers appear / vanish here

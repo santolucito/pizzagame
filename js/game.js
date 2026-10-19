@@ -38,7 +38,8 @@ const Game = {
 
   buildRuntime() {
     const s = this.s;
-    this.player = { x: CFG.PLAYER_START.x, y: CFG.PLAYER_START.y, carry: 0, facing: 1, moving: false, xferCd: 0, bob: 0, cleanTarget: null };
+    const start = s.playerPos || CFG.PLAYER_START;
+    this.player = { x: start.x, y: start.y, carry: 0, facing: 1, moving: false, xferCd: 0, bob: 0, cleanTarget: null, hasMoved: false };
     this.customers = []; this.cars = []; this.staff = []; this.fx = []; this.floats = [];
     this.tables = CFG.TABLES.map((t, i) => ({ x: t.x, y: t.y, i, dirty: !!s.tablesDirty[i], tip: (s.tablesTip || [])[i] || 0, occupied: null, cleanProg: 0, cleaner: null }));
     this.ovens = CFG.OVENS.map(() => ({ t: 0 }));
@@ -85,6 +86,7 @@ const Game = {
     try {
       this.s.tablesDirty = this.tables.map((t) => t.dirty);
       this.s.tablesTip = this.tables.map((t) => t.tip);
+      this.s.playerPos = { x: Math.round(this.player.x), y: Math.round(this.player.y) };
       this.s.savedAt = Date.now();
       this.s.muted = Sfx.muted;
       localStorage.setItem(CFG.SAVE_KEY, JSON.stringify(this.s));
@@ -328,6 +330,7 @@ const Game = {
     const sp = this.playerSpeed();
     p.moving = !!(a.x || a.y);
     if (p.moving) {
+      p.hasMoved = true;
       if (a.x) p.facing = a.x < 0 ? -1 : 1;
       p.bob += dt * 14;
       const r = 12, w = CFG.WORLD;
@@ -399,8 +402,9 @@ const Game = {
     }
 
     // Pads: stand on one for a moment, then money flows in until it is paid.
+    // Nothing is bought until the player has moved at least once after loading, so a reload never buys by itself.
     for (const pad of this.allPads()) {
-      if (pad.maxed) continue;
+      if (pad.maxed || !p.hasMoved) continue;
       if (!near(pad.pos, CFG.PAD_RADIUS + 6)) { this.padDwell[pad.key] = 0; continue; }
       if (p.moving) { this.padDwell[pad.key] = Math.min(this.padDwell[pad.key] || 0, 0); continue; } // only while standing still
       this.padDwell[pad.key] = (this.padDwell[pad.key] || 0) + dt;

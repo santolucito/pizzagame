@@ -44,7 +44,6 @@ html, body {
   box-shadow: 0 2px 0 rgba(0,0,0,0.3);
 }
 .pill.cash { color: #ffe08a; font-size: 20px; min-width: 110px; text-align: center; }
-.pill.farm { background: rgba(47, 158, 68, 0.9); font-size: 14px; }
 .pill.hidden { display: none; }
 .pill.city { background: rgba(228, 87, 46, 0.9); font-size: 13px; white-space: nowrap; max-width: 48vw; overflow: hidden; text-overflow: ellipsis; }
 .hud-btn {

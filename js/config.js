@@ -98,7 +98,7 @@ const CFG = {
   INGREDIENTS: { wheat: '🌾', tomato: '🍅', cheese: '🧀', mushroom: '🍄', basil: '🌿' },
   // Fishing at the park pond: stand on the south bank, cast, wait for the bobber to dip, tap to reel
   FISHING: {
-    spot: { x: -150, y: 516 }, bobber: { x: -150, y: 458 },
+    spot: { x: -150, y: 516 }, bobber: { x: -108, y: 462 },
     bite: [2, 6], window: 1.3,
     catches: [
       { kind: 'fish', label: 'A fish!', ico: '🐟', value: 8, weight: 50 },
@@ -114,7 +114,8 @@ const CFG = {
     house: { x0: -890, y0: -118, x1: -790, y1: -72 },
     stopX: -700,                            // where the locomotive's front stops
     first: [50, 80], every: [180, 300],     // seconds until the first / next train
-    dwell: 9, passengers: [5, 8],
+    dwell: 16, passengers: [5, 8],         // seconds the train waits at the platform
+    warn: 20, hold: 12,                     // heads-up before it appears; extra wait while you are hurrying onto the platform
     // passengers walk along the far sidewalk, down the shop's side path, and in through the door
     route: [{ x: -700, y: -30 }, { x: 990, y: -30 }, { x: 990, y: 560 }],
     overflow: { x: 990, y: 520, dy: -44 },  // where extra customers queue outside the door

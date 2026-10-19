@@ -852,6 +852,11 @@ const Render = {
     ctx.fillStyle = '#c62828'; ctx.beginPath(); ctx.moveTo(x + 158, y - 16); ctx.lineTo(x + 176, y); ctx.lineTo(x + 158, y + 16); ctx.closePath(); ctx.fill();
     ctx.fillStyle = '#2b1d14'; for (let k = 0; k < 4; k++) ctx.fillRect(x + 160 + k * 4, y - 12 + k * 2, 2, 24 - k * 4);
     if (g.onTrain) { const cx = front - 240; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(cx, y, 9, 11, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(cx + 3, y, 6, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(cx + 1, y, 5.5, 0, Math.PI * 2); ctx.fill(); }
+    // countdown over the locomotive while it waits
+    if (stopped && !g.onTrain) {
+      const n = Math.ceil(t.leavesIn), urgent = n <= 5;
+      this.drawBubble(front - 40, y - 52 + (urgent ? Math.sin(g.time * 12) * 3 : 0), () => { ctx.font = this.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = urgent ? '#e4572e' : '#2b1d14'; ctx.fillText(`Leaves in ${n}s`, 0, 0); }, 92);
+    }
   },
 
   drawFishing(g) {

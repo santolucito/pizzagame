@@ -819,6 +819,7 @@ const Game = {
     let h = null;
     const order = this.houses.find((hh) => hh.order);
     if (order && p.carry > 0) h = { text: `Deliver to ${order.name}!`, target: order.door };
+    else if (this.train.state === 'stopped' && !this.onTrain && !this.nearTrain && !this.driving) h = { text: `🚂 Train leaves in ${Math.ceil(this.train.leavesIn)}s!`, target: { x: CFG.STATION.stopX, y: CFG.STATION.platform.y1 } };
     else if (this.driving) {
       const IC = CFG.ICE_CREAM;
       if (order && this.isUnlocked('driveThru') && s.piles.dt > 0) h = { text: 'Swing by the drive-thru window to load pizzas', target: CFG.DT_WINDOW };

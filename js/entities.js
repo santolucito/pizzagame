@@ -194,24 +194,31 @@ class Train {
   constructor() {
     const S = CFG.STATION;
     this.x = CFG.WORLD.x0 - 500; this.y = S.trackY; this.state = 'away'; this.timer = U.rand(S.first[0], S.first[1]);
-    this.speed = 0; this.unload = 0; this.toDrop = 0; this.dropT = 0; this.smoke = []; this.whistled = false;
+    this.speed = 0; this.unload = 0; this.toDrop = 0; this.dropT = 0; this.smoke = []; this.whistled = false; this.warned = false; this.hold = 0;
   }
+  // seconds until the train leaves the platform (for the countdown)
+  get leavesIn() { return this.state === 'stopped' ? Math.max(0, this.unload + (this.hurrying ? this.hold : 0) + this.toDrop * 0.55) : 0; }
   update(dt, g) {
     const S = CFG.STATION;
     for (const p of this.smoke) { p.t += dt; p.y -= 18 * dt; p.x += 8 * dt; } this.smoke = this.smoke.filter((p) => p.t < 1.6);
     if (this.state === 'away') {
       this.timer -= dt;
-      if (this.timer <= 0) { this.state = 'arriving'; this.x = CFG.WORLD.x0 - 420; this.speed = 320; this.whistled = false; if (!g.onTrain) g.toast('🚂 The train is coming!', true); Sfx.whistle(); }
+      if (!this.warned && this.timer <= S.warn && !g.onTrain) { this.warned = true; g.toast(`🚂 Train in ${S.warn} seconds! Run to the station!`, true); Sfx.whistle(); }
+      if (this.timer <= 0) { this.state = 'arriving'; this.x = CFG.WORLD.x0 - 420; this.speed = 320; this.whistled = false; this.warned = false; if (!g.onTrain) g.toast('🚂 The train is pulling in!', true); Sfx.whistle(); }
     } else if (this.state === 'arriving') {
       const dist = S.stopX - this.x;
       this.speed = Math.max(40, Math.min(320, dist * 1.2));
       this.x += this.speed * dt;
       if (Math.random() < dt * 6) this.smoke.push({ x: this.x - 14, y: this.y - 28, t: 0 });
-      if (dist <= 2) { this.x = S.stopX; this.state = 'stopped'; this.unload = S.dwell; this.toDrop = U.randInt(S.passengers[0], S.passengers[1]); this.dropT = 1.2; Sfx.whistle(); }
+      if (dist <= 2) { this.x = S.stopX; this.state = 'stopped'; this.unload = S.dwell; this.hold = S.hold; this.toDrop = U.randInt(S.passengers[0], S.passengers[1]); this.dropT = 1.2; Sfx.whistle(); }
     } else if (this.state === 'stopped') {
-      this.unload -= dt; this.dropT -= dt;
+      // the conductor waits a little longer while somebody is hurrying up the platform path
+      const p = g.player, hurrying = !g.onTrain && !g.driving && p.y < 120 && Math.abs(p.x - S.stopX) < 420;
+      this.hurrying = hurrying;
+      if (this.unload <= 0 && hurrying && this.hold > 0) this.hold -= dt; else this.unload -= dt;
+      this.dropT -= dt;
       if (this.toDrop > 0 && this.dropT <= 0) { this.dropT = 0.55; this.toDrop--; g.spawnTrainPassenger(); }
-      if (this.unload <= 0 && this.toDrop === 0) { this.state = 'leaving'; this.speed = 0; Sfx.whistle(); }
+      if (this.unload <= 0 && this.toDrop === 0 && !(hurrying && this.hold > 0)) { this.state = 'leaving'; this.speed = 0; Sfx.whistle(); }
     } else if (this.state === 'leaving') {
       this.speed = Math.min(360, this.speed + 160 * dt); this.x += this.speed * dt;
       if (Math.random() < dt * 8) this.smoke.push({ x: this.x - 14, y: this.y - 28, t: 0 });

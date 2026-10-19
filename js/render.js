@@ -35,8 +35,9 @@ const Render = {
     this.fitScale = fit;
     this.baseScale = fit >= this.FULL_MAP_MIN_SCALE ? fit : Math.min(this.FULL_MAP_MIN_SCALE, Math.max(fit, Math.min(vw / this.MIN_VIEW_W, vh / this.MIN_VIEW_H)));
     this.scale = U.clamp(this.baseScale * this.zoom, fit * 0.8, Math.max(fit, this.maxScale()));
-    this.viewW = Math.min(CFG.W, vw / this.scale);
-    this.viewH = Math.min(CFG.H, vh / this.scale);
+    const W = CFG.WORLD;
+    this.viewW = Math.min(W.x1 - W.x0, vw / this.scale);
+    this.viewH = Math.min(W.y1 - W.y0, vh / this.scale);
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
     const cw = Math.floor(this.viewW * this.scale), ch = Math.floor(this.viewH * this.scale);
     this.canvas.style.width = cw + 'px'; this.canvas.style.height = ch + 'px';
@@ -54,10 +55,11 @@ const Render = {
 
   // Camera follows the player only along axes where the map is larger than the view.
   updateCamera(g, snap) {
-    const tx = U.clamp(g.player.x - this.viewW / 2, 0, CFG.W - this.viewW);
-    // When the map is taller than the view, let it scroll a little below the HUD so the road is not hidden.
-    const hudPad = this.viewH < CFG.H ? this.HUD_PAD_PX / this.scale : 0;
-    const ty = U.clamp(g.player.y - this.viewH / 2, -hudPad, CFG.H - this.viewH);
+    const W = CFG.WORLD;
+    const tx = U.clamp(g.player.x - this.viewW / 2, W.x0, W.x1 - this.viewW);
+    // Let the world scroll a little below the HUD so the top edge is never hidden under it.
+    const hudPad = this.HUD_PAD_PX / this.scale;
+    const ty = U.clamp(g.player.y - this.viewH / 2, W.y0 - hudPad, W.y1 - this.viewH);
     if (snap) { this.camX = tx; this.camY = ty; return; }
     this.camX = U.lerp(this.camX, tx, 0.12);
     this.camY = U.lerp(this.camY, ty, 0.12);
@@ -81,7 +83,9 @@ const Render = {
     ctx.fillStyle = '#2b1d14'; ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     ctx.setTransform(this.dpr * this.scale, 0, 0, this.dpr * this.scale, -this.camX * this.dpr * this.scale, -this.camY * this.dpr * this.scale);
     this.ensureBackground(g);
-    ctx.drawImage(this.bg, 0, 0, CFG.W, CFG.H);
+    const W = CFG.WORLD;
+    ctx.drawImage(this.bg, W.x0, W.y0, W.x1 - W.x0, W.y1 - W.y0);
+    this.drawOutsideDynamic(g);
     this.drawDecorDynamic(g);
     this.drawKitchenDynamic(g);
     this.drawCounterDynamic(g);
@@ -89,6 +93,7 @@ const Render = {
     this.drawTablesDynamic(g);
     this.drawPads(g);
     this.drawEntities(g);
+    this.drawForeground(g);
     this.drawFx(g);
     this.drawFloats(g);
     this.drawHint(g);
@@ -97,7 +102,7 @@ const Render = {
 
   // ======================= static background =======================
   ensureBackground(g) {
-    const res = U.clamp(this.dpr * this.scale, 1, 3);
+    const res = U.clamp(this.dpr * this.scale, 1, 2);
     const key = [g.isUnlocked('dining'), g.isUnlocked('tables2'), g.isUnlocked('oven2'), g.isUnlocked('driveThru'), g.s.upg.decor, Math.round(g.price()), Math.round(res * 4) / 4].join('|');
     const now = performance.now();
     if (this.bg && key === this.bgKey) return;
@@ -105,58 +110,134 @@ const Render = {
     if (this.bg && now - this.bgBuiltAt < 150 && key.split('|').slice(0, 6).join('|') === this.bgKey.split('|').slice(0, 6).join('|')) return;
     this.bgKey = key; this.bgBuiltAt = now; this.bgRes = Math.round(res * 4) / 4;
     if (!this.bg) this.bg = document.createElement('canvas');
-    this.bg.width = Math.ceil(CFG.W * this.bgRes); this.bg.height = Math.ceil(CFG.H * this.bgRes);
+    const W = CFG.WORLD;
+    this.bg.width = Math.ceil((W.x1 - W.x0) * this.bgRes); this.bg.height = Math.ceil((W.y1 - W.y0) * this.bgRes);
     const ctx = this.bg.getContext('2d');
-    ctx.setTransform(this.bgRes, 0, 0, this.bgRes, 0, 0);
+    ctx.setTransform(this.bgRes, 0, 0, this.bgRes, -W.x0 * this.bgRes, -W.y0 * this.bgRes);
     const main = this.ctx; this.ctx = ctx;
     this.paintBackground(g);
     this.ctx = main;
   },
 
   paintBackground(g) {
+    this.bgGrounds(g);
     this.bgOutside(g);
     this.bgFloors(g);
     this.bgWalls(g);
     this.bgKitchen(g);
     this.bgCounter(g);
     this.bgDriveThru(g);
-    this.bgDesks(g);
+    this.bgOffice(g);
     this.bgTables(g);
     this.bgEntrance(g);
     this.bgDecor(g);
+    this.bgPark(g);
   },
 
-  bgOutside(g) {
-    const ctx = this.ctx, r = CFG.ROAD;
-    if (g.isUnlocked('driveThru')) {
-      ctx.fillStyle = '#474a50'; ctx.fillRect(0, 0, CFG.W, r.y2);
-      // asphalt speckle
-      ctx.fillStyle = 'rgba(255,255,255,0.05)';
-      for (let i = 0; i < 260; i++) { const x = (i * 97) % CFG.W, y = (i * 53) % r.y2; ctx.fillRect(x, y, 2, 2); }
-      ctx.strokeStyle = '#f2c94c'; ctx.lineWidth = 3; ctx.setLineDash([22, 16]);
-      ctx.beginPath(); ctx.moveTo(0, (r.y1 + r.y2) / 2); ctx.lineTo(CFG.W, (r.y1 + r.y2) / 2); ctx.stroke(); ctx.setLineDash([]);
-      ctx.fillStyle = '#fff'; ctx.fillRect(CFG.DT_WINDOW.x + 56, r.y1 + 6, 6, r.y2 - r.y1 - 12);
-      ctx.fillStyle = '#e8e2d2'; ctx.fillRect(0, 0, CFG.W, r.y1 - 6); // far sidewalk
-    } else {
-      const grd = ctx.createLinearGradient(0, 0, 0, r.y2);
-      grd.addColorStop(0, '#73b35a'); grd.addColorStop(1, '#5f9c48');
-      ctx.fillStyle = grd; ctx.fillRect(0, 0, CFG.W, r.y2);
-      ctx.fillStyle = '#558f40';
-      for (let x = 10; x < CFG.W; x += 47) { ctx.beginPath(); ctx.ellipse(x, 30 + ((x / 47) % 3) * 18, 9, 5, 0, 0, Math.PI * 2); ctx.fill(); }
-      // flowers
-      const cols = ['#ff8fab', '#ffd166', '#fff', '#9ad0ff'];
-      for (let i = 0; i < 26; i++) {
-        const x = (i * 137 + 20) % CFG.W, y = 14 + ((i * 71) % (r.y2 - 30));
-        ctx.fillStyle = cols[i % 4];
-        for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.arc(x + Math.cos(k * 1.57) * 3, y + Math.sin(k * 1.57) * 3, 2.2, 0, Math.PI * 2); ctx.fill(); }
-        ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.arc(x, y, 1.6, 0, Math.PI * 2); ctx.fill();
-      }
+  // Grass over the whole world, sidewalks around the building, the parking lot.
+  bgGrounds(g) {
+    const ctx = this.ctx, W = CFG.WORLD, B = CFG.BUILDING;
+    const grd = ctx.createLinearGradient(0, W.y0, 0, W.y1);
+    grd.addColorStop(0, '#79b85e'); grd.addColorStop(1, '#5f9c48');
+    ctx.fillStyle = grd; ctx.fillRect(W.x0, W.y0, W.x1 - W.x0, W.y1 - W.y0);
+    ctx.fillStyle = 'rgba(0,0,0,0.06)';
+    for (let i = 0; i < 520; i++) { const x = W.x0 + ((i * 193) % (W.x1 - W.x0)), y = W.y0 + ((i * 101) % (W.y1 - W.y0)); ctx.beginPath(); ctx.ellipse(x, y, 7, 3.5, 0, 0, Math.PI * 2); ctx.fill(); }
+    // sidewalks: along the bottom and both sides of the building, plus the far side of the road
+    const walk = (x, y, w, h) => {
+      ctx.fillStyle = '#d2cbbb'; ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = 'rgba(0,0,0,0.09)'; ctx.lineWidth = 1;
+      for (let xx = x; xx <= x + w; xx += 48) { ctx.beginPath(); ctx.moveTo(xx + 0.5, y); ctx.lineTo(xx + 0.5, y + h); ctx.stroke(); }
+      for (let yy = y; yy <= y + h; yy += 48) { ctx.beginPath(); ctx.moveTo(x, yy + 0.5); ctx.lineTo(x + w, yy + 0.5); ctx.stroke(); }
+    };
+    walk(W.x0, B.y1, W.x1 - W.x0, 48);
+    walk(B.x1, CFG.ROAD.y2, 48, B.y1 - CFG.ROAD.y2 + 48);
+    walk(B.x0 - 48, CFG.ROAD.y2, 48, B.y1 - CFG.ROAD.y2 + 48);
+    walk(W.x0, CFG.ROAD.y1 - 22, W.x1 - W.x0, 22);
+    // path from the door to the park at the bottom-left
+    walk(W.x0, B.y1 + 48, 48, 120);
+    // parking lot
+    const P = CFG.PARKING;
+    ctx.fillStyle = '#5a5d63'; ctx.fillRect(P.x0, P.y0, P.x1 - P.x0, P.y1 - P.y0);
+    ctx.fillStyle = 'rgba(255,255,255,0.05)';
+    for (let i = 0; i < 90; i++) ctx.fillRect(P.x0 + ((i * 37) % (P.x1 - P.x0)), P.y0 + ((i * 53) % (P.y1 - P.y0)), 2, 2);
+    ctx.strokeStyle = '#f3efe3'; ctx.lineWidth = 3;
+    for (let k = 0; k <= 4; k++) { const y = P.y0 + 14 + k * 72; ctx.beginPath(); ctx.moveTo(P.x0 + 20, y); ctx.lineTo(P.x0 + 130, y); ctx.stroke(); }
+    ctx.fillStyle = '#f3efe3'; ctx.font = this.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.save(); ctx.translate(P.x0 + 170, P.y0 + 150); ctx.rotate(-Math.PI / 2); ctx.fillText('PARKING', 0, 0); ctx.restore();
+  },
+
+  // Park furniture, pond, fountain basin, tree trunks, lamp posts, bus stop. Canopies are drawn in the foreground.
+  bgPark(g) {
+    const ctx = this.ctx;
+    // pond
+    const pd = CFG.POND;
+    ctx.fillStyle = '#4d8a5a'; ctx.beginPath(); ctx.ellipse(pd.x, pd.y, pd.rx + 8, pd.ry + 8, 0, 0, Math.PI * 2); ctx.fill();
+    const wg = ctx.createRadialGradient(pd.x - 15, pd.y - 10, 5, pd.x, pd.y, pd.rx);
+    wg.addColorStop(0, '#9fdcff'); wg.addColorStop(1, '#4aa3d8');
+    ctx.fillStyle = wg; ctx.beginPath(); ctx.ellipse(pd.x, pd.y, pd.rx, pd.ry, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#3f9a4a'; for (const [dx, dy] of [[-40, 10], [25, 20], [10, -22]]) { ctx.beginPath(); ctx.ellipse(pd.x + dx, pd.y + dy, 8, 5, 0, 0, Math.PI * 2); ctx.fill(); }
+    // bench
+    const bench = (x, y) => {
+      ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(x - 24, y + 6, 50, 6);
+      ctx.fillStyle = '#8d5a2b'; ctx.fillRect(x - 26, y - 4, 52, 10); ctx.fillRect(x - 26, y - 16, 52, 7);
+      ctx.fillStyle = '#4a2d12'; ctx.fillRect(x - 22, y + 6, 5, 8); ctx.fillRect(x + 17, y + 6, 5, 8);
+    };
+    bench(-120, 350); bench(600, 790); bench(1150, 250);
+    // fountain basin
+    const f = CFG.FOUNTAIN;
+    ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(f.x + 2, f.y + 6, 60, 32, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#b9b2a4'; ctx.beginPath(); ctx.ellipse(f.x, f.y, 60, 32, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#6cc2ec'; ctx.beginPath(); ctx.ellipse(f.x, f.y, 50, 24, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#9d968a'; ctx.beginPath(); ctx.ellipse(f.x, f.y - 6, 14, 8, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillRect(f.x - 4, f.y - 30, 8, 24);
+    // flower beds
+    const bed = (x, y) => {
+      ctx.fillStyle = '#6b4a2b'; ctx.beginPath(); ctx.ellipse(x, y, 34, 16, 0, 0, Math.PI * 2); ctx.fill();
+      const cols = ['#ff8fab', '#ffd166', '#fff', '#ff6b6b', '#9ad0ff'];
+      for (let i = 0; i < 9; i++) { ctx.fillStyle = cols[i % 5]; ctx.beginPath(); ctx.arc(x - 26 + i * 6.5, y + Math.sin(i * 1.7) * 7, 3, 0, Math.PI * 2); ctx.fill(); }
+    };
+    bed(-180, 300); bed(300, 790); bed(1100, 300); bed(900, -40);
+    // tree trunks + shadows
+    for (const t of CFG.TREES) {
+      ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(t.x + 4, t.y + 6, 30 * t.s, 12 * t.s, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#6b4a2b'; U.roundRect(ctx, t.x - 7 * t.s, t.y - 30 * t.s, 14 * t.s, 36 * t.s, 4); ctx.fill();
     }
-    // sidewalk + curb
-    ctx.fillStyle = '#cfc8b8'; ctx.fillRect(0, r.y2 - 10, CFG.W, 10);
-    ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(0, r.y2 - 10, CFG.W, 2);
+    // lamp posts
+    for (const [x, y] of [[-40, 260], [1000, 260], [-40, 720], [1000, 720]]) {
+      ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(x + 2, y + 3, 8, 4, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#2d3a4a'; ctx.fillRect(x - 2, y - 60, 4, 60); ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.arc(x, y - 62, 7, 0, Math.PI * 2); ctx.fill();
+    }
+    // bus stop sign on the far sidewalk
+    ctx.fillStyle = '#2d3a4a'; ctx.fillRect(498, -60, 4, 52);
+    ctx.fillStyle = '#3b7dd8'; U.roundRect(ctx, 486, -74, 28, 18, 4); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = this.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('BUS', 500, -65);
+    // park sign
+    ctx.fillStyle = '#5b3a1a'; ctx.fillRect(-150, 180, 6, 40); ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, -185, 160, 76, 24, 4); ctx.fill();
+    ctx.fillStyle = '#ffe08a'; ctx.font = this.font(11); ctx.fillText('PARK', -147, 172);
+    // parked cars (static)
+    for (const [i, col] of [['#41b883', 0], ['#f06292', 1], ['#607d8b', 3]].map((v, i) => [v[1], v[0]])) {
+      this.drawCar({ x: CFG.PARKING.x0 + 75, y: CFG.PARKING.y0 + 50 + i * 72, color: col, state: 'parked', want: 0, have: 0, patience: 99 }, g);
+    }
+  },
+
+  // The street along the top of the building. It is always a road now (the drive-thru window is what unlocks).
+  bgOutside(g) {
+    const ctx = this.ctx, r = CFG.ROAD, W = CFG.WORLD;
+    ctx.fillStyle = '#474a50'; ctx.fillRect(W.x0, r.y1, W.x1 - W.x0, r.y2 - r.y1);
+    ctx.fillStyle = 'rgba(255,255,255,0.05)';
+    for (let i = 0; i < 400; i++) { const x = W.x0 + ((i * 97) % (W.x1 - W.x0)), y = r.y1 + ((i * 53) % (r.y2 - r.y1)); ctx.fillRect(x, y, 2, 2); }
+    ctx.strokeStyle = '#f2c94c'; ctx.lineWidth = 3; ctx.setLineDash([22, 16]);
+    ctx.beginPath(); ctx.moveTo(W.x0, (r.y1 + r.y2) / 2); ctx.lineTo(W.x1, (r.y1 + r.y2) / 2); ctx.stroke(); ctx.setLineDash([]);
+    if (g.isUnlocked('driveThru')) { ctx.fillStyle = '#fff'; ctx.fillRect(CFG.DT_WINDOW.x + 56, r.y1 + 6, 6, r.y2 - r.y1 - 12); }
+    // crosswalk near the park
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    for (let k = 0; k < 6; k++) ctx.fillRect(-120 + k * 14, r.y1 + 8, 8, r.y2 - r.y1 - 16);
+    // near sidewalk + curb (in front of the building)
+    ctx.fillStyle = '#cfc8b8'; ctx.fillRect(W.x0, r.y2 - 10, W.x1 - W.x0, 10);
+    ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(W.x0, r.y2 - 10, W.x1 - W.x0, 2);
     ctx.strokeStyle = 'rgba(0,0,0,0.08)'; ctx.lineWidth = 1;
-    for (let x = 0; x < CFG.W; x += 60) { ctx.beginPath(); ctx.moveTo(x, r.y2 - 10); ctx.lineTo(x, r.y2); ctx.stroke(); }
+    for (let x = W.x0; x < W.x1; x += 60) { ctx.beginPath(); ctx.moveTo(x, r.y2 - 10); ctx.lineTo(x, r.y2); ctx.stroke(); }
   },
 
   bgFloors(g) {
@@ -206,7 +287,12 @@ const Render = {
       ctx.fillStyle = '#7a5235'; ctx.fillRect(x, y, w, h);
       ctx.fillStyle = '#9c6b45'; ctx.fillRect(x, y, w, Math.min(4, h));
     };
-    wall(0, CFG.ROAD.y2, CFG.W, 12);
+    const B = CFG.BUILDING, D = CFG.DOOR;
+    wall(B.x0 - 6, B.y0, B.x1 - B.x0 + 6, 12);
+    wall(B.x0 - 6, B.y0, 6, B.y1 - B.y0);
+    wall(B.x0 - 6, B.y1 - 6, B.x1 - B.x0 + 6, 6);
+    wall(B.x1 - 6, B.y0, 6, D.y0 - B.y0);
+    wall(B.x1 - 6, D.y1, 6, B.y1 - D.y1);
     wall(372, CFG.ROAD.y2 + 12, 6, 40);
     wall(372, 300, 6, 112);
     wall(0, 472, 372, 6);
@@ -308,9 +394,9 @@ const Render = {
     ctx.fillStyle = 'rgba(0,0,0,0.07)'; ctx.beginPath(); ctx.ellipse(CFG.DT_CASH.x, CFG.DT_CASH.y + 6, 30, 14, 0, 0, Math.PI * 2); ctx.fill();
   },
 
-  bgDesks(g) {
+  bgOffice(g) {
     const ctx = this.ctx;
-    for (const [pos, label, ico] of [[CFG.UPG_PAD, 'UPGRADES', '⬆'], [CFG.HR_PAD, 'STAFF', '👥']]) {
+    for (const [pos, label, ico] of []) {
       ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.beginPath(); ctx.ellipse(pos.x, pos.y, 36, 20, 0, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = 'rgba(43,29,20,0.5)'; ctx.lineWidth = 2; ctx.setLineDash([6, 5]); ctx.stroke(); ctx.setLineDash([]);
       ctx.fillStyle = 'rgba(0,0,0,0.2)'; U.roundRect(ctx, pos.x - 38, pos.y + 28, 80, 24, 5); ctx.fill();
@@ -357,11 +443,15 @@ const Render = {
 
   bgEntrance(g) {
     const ctx = this.ctx, e = CFG.ENTRANCE;
-    // door on the right wall
-    ctx.fillStyle = '#7a5235'; ctx.fillRect(942, 570, 18, 70);
-    ctx.fillStyle = '#9fe0ff'; ctx.fillRect(946, 576, 10, 58);
-    ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillRect(948, 580, 2, 50);
-    ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.arc(945, 606, 1.8, 0, Math.PI * 2); ctx.fill();
+    // open glass door swung outward from the gap in the right wall
+    const D = CFG.DOOR, B = CFG.BUILDING;
+    ctx.fillStyle = '#7a5235'; ctx.fillRect(B.x1 - 8, D.y0 - 4, 10, 6); ctx.fillRect(B.x1 - 8, D.y1 - 2, 10, 6);
+    ctx.save(); ctx.translate(B.x1, D.y0); ctx.rotate(0.55);
+    ctx.fillStyle = '#7a5235'; ctx.fillRect(0, 0, 8, D.y1 - D.y0 - 4);
+    ctx.fillStyle = '#9fe0ff'; ctx.fillRect(2, 4, 4, D.y1 - D.y0 - 12);
+    ctx.restore();
+    // awning over the door
+    for (let i = 0; i < 5; i++) { ctx.fillStyle = i % 2 ? '#fff' : '#e4572e'; ctx.fillRect(B.x1 - 2, D.y0 - 12 + i * 14, 24, 14); }
     // mat
     ctx.fillStyle = 'rgba(0,0,0,0.15)'; U.roundRect(ctx, e.x - 40, e.y - 16, 68, 36, 6); ctx.fill();
     ctx.fillStyle = '#b23a48'; U.roundRect(ctx, e.x - 42, e.y - 18, 68, 36, 6); ctx.fill();
@@ -538,27 +628,103 @@ const Render = {
   drawPads(g) {
     const ctx = this.ctx;
     const pulse = 0.5 + 0.5 * Math.sin(g.time * 3);
-    for (const pad of g.visiblePads()) {
-      const price = g.padPrice(pad);
+    const R = CFG.PAD_RADIUS;
+    for (const pad of g.allPads()) {
       const paid = g.s.padPaid[pad.key] || 0;
-      const afford = g.s.cash + paid >= price;
+      const afford = !pad.maxed && g.s.cash + paid >= pad.price;
       const { x, y } = pad.pos;
-      const R = CFG.PAD_RADIUS;
       ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.beginPath(); ctx.ellipse(x + 2, y + 4, R, R * 0.6, 0, 0, Math.PI * 2); ctx.fill();
       const grd = ctx.createRadialGradient(x, y, 4, x, y, R);
-      if (afford) { grd.addColorStop(0, `rgba(255,236,170,${0.75 + 0.2 * pulse})`); grd.addColorStop(1, `rgba(242,177,52,${0.45 + 0.2 * pulse})`); }
-      else { grd.addColorStop(0, 'rgba(255,255,255,0.7)'); grd.addColorStop(1, 'rgba(255,255,255,0.3)'); }
+      if (pad.maxed) { grd.addColorStop(0, 'rgba(230,225,215,0.8)'); grd.addColorStop(1, 'rgba(200,195,185,0.5)'); }
+      else if (afford) { grd.addColorStop(0, `rgba(255,236,170,${0.8 + 0.2 * pulse})`); grd.addColorStop(1, `rgba(242,177,52,${0.5 + 0.2 * pulse})`); }
+      else { grd.addColorStop(0, 'rgba(255,255,255,0.75)'); grd.addColorStop(1, 'rgba(255,255,255,0.35)'); }
       ctx.fillStyle = grd; ctx.beginPath(); ctx.ellipse(x, y, R, R * 0.6, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = afford ? '#e4572e' : '#8a7a6a'; ctx.lineWidth = 3; ctx.setLineDash([8, 6]);
+      ctx.strokeStyle = pad.maxed ? '#a79d90' : afford ? '#e4572e' : '#8a7a6a'; ctx.lineWidth = 3; ctx.setLineDash([8, 6]);
       ctx.beginPath(); ctx.ellipse(x, y, R, R * 0.6, 0, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
-      if (paid > 0) {
+      if (paid > 0 && !pad.maxed) {
         ctx.strokeStyle = '#2f9e44'; ctx.lineWidth = 5;
-        ctx.beginPath(); ctx.ellipse(x, y, R, R * 0.6, 0, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (paid / price)); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(x, y, R, R * 0.6, 0, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (paid / pad.price)); ctx.stroke();
       }
-      ctx.font = this.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillStyle = '#2b1d14'; ctx.fillText(pad.label, x, y - 8);
-      ctx.fillStyle = afford ? '#1f6e2e' : '#b8401c'; ctx.font = this.font(14);
-      ctx.fillText(U.money(price - paid), x, y + 9);
+      // icon floating above, label + price on the pad
+      const bob = afford ? Math.sin(g.time * 4 + x) * 2 : 0;
+      ctx.font = this.font(20); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.globalAlpha = pad.maxed ? 0.6 : 1;
+      ctx.fillStyle = '#2b1d14'; ctx.fillText(pad.ico, x, y - 44 + bob);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#2b1d14'; ctx.font = this.font(11); ctx.fillText(pad.label, x, y - 7);
+      if (pad.maxed) { ctx.fillStyle = '#6f665c'; ctx.font = this.font(12); ctx.fillText(pad.locked ? 'LOCKED' : 'MAX', x, y + 9); }
+      else { ctx.fillStyle = afford ? '#1f6e2e' : '#b8401c'; ctx.font = this.font(14); ctx.fillText(U.money(pad.price - paid), x, y + 9); }
+      if (pad.sub) {
+        ctx.fillStyle = 'rgba(43,29,20,0.75)'; U.roundRect(ctx, x - 30, y + 20, 60, 13, 6); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.font = this.font(9); ctx.fillText(pad.sub, x, y + 27);
+      }
+    }
+  },
+
+  // Coins, fountain water and the dog.
+  drawOutsideDynamic(g) {
+    const ctx = this.ctx;
+    for (const c of g.coins) {
+      if (c.taken) continue;
+      const t = g.time * 3 + c.phase;
+      const w = Math.abs(Math.cos(t)) * 11 + 2, lift = Math.sin(t * 0.7) * 3;
+      ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(c.x, c.y + 8, 10, 4, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#c99a1e'; ctx.beginPath(); ctx.ellipse(c.x, c.y - 8 + lift + 2, w, 12, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ffd54a'; ctx.beginPath(); ctx.ellipse(c.x, c.y - 8 + lift, w, 12, 0, 0, Math.PI * 2); ctx.fill();
+      if (w > 6) { ctx.fillStyle = '#c99a1e'; ctx.font = this.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('$', c.x, c.y - 7 + lift); }
+      ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.beginPath(); ctx.arc(c.x - w * 0.4, c.y - 13 + lift, 2, 0, Math.PI * 2); ctx.fill();
+    }
+    const f = CFG.FOUNTAIN;
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    for (let k = 0; k < 10; k++) {
+      const ph = (g.time * 0.9 + k * 0.1) % 1, a = (k / 10) * Math.PI * 2;
+      const r = ph * 34, h = Math.sin(ph * Math.PI) * 26;
+      ctx.beginPath(); ctx.arc(f.x + Math.cos(a) * r, f.y - 28 - h + ph * 26, 2.5, 0, Math.PI * 2); ctx.fill();
+    }
+    // ducks on the pond
+    const pd = CFG.POND;
+    for (let k = 0; k < 2; k++) {
+      const a = g.time * 0.3 + k * 2.6;
+      const dx = pd.x + Math.cos(a) * 30, dy = pd.y + Math.sin(a) * 16 + 6;
+      ctx.fillStyle = '#ffd54a'; ctx.beginPath(); ctx.ellipse(dx, dy, 8, 5, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(dx + (Math.cos(a + 1.57) < 0 ? -6 : 6), dy - 5, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ff8c42'; ctx.fillRect(dx + (Math.cos(a + 1.57) < 0 ? -12 : 8), dy - 6, 4, 2);
+    }
+    this.drawDog(g.dog, g);
+  },
+
+  drawDog(d, g) {
+    const ctx = this.ctx, x = d.x, y = d.y, f = d.facing;
+    const bob = d.moving ? Math.sin(d.bob) * 1.5 : 0;
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(x, y + 4, 14, 5, 0, 0, Math.PI * 2); ctx.fill();
+    // legs
+    ctx.fillStyle = '#a66a2c';
+    const st = d.moving ? Math.sin(d.bob) * 3 : 0;
+    ctx.fillRect(x - 10, y - 6 + st, 4, 9); ctx.fillRect(x + 6, y - 6 - st, 4, 9); ctx.fillRect(x - 4, y - 6 - st, 4, 9); ctx.fillRect(x + 1, y - 6 + st, 4, 9);
+    // body
+    ctx.fillStyle = '#c17f3a'; U.roundRect(ctx, x - 14, y - 18 + bob, 28, 15, 7); ctx.fill();
+    // tail (wags)
+    ctx.strokeStyle = '#c17f3a'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x - f * 13, y - 12 + bob); ctx.lineTo(x - f * 21, y - 20 + bob + Math.sin(d.wag) * 5); ctx.stroke();
+    // head
+    ctx.fillStyle = '#c17f3a'; ctx.beginPath(); ctx.arc(x + f * 12, y - 20 + bob, 9, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#8a5a26'; ctx.beginPath(); ctx.ellipse(x + f * 6, y - 24 + bob, 4, 6, f * 0.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#f1d3a8'; ctx.beginPath(); ctx.ellipse(x + f * 17, y - 17 + bob, 5, 4, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.arc(x + f * 20, y - 18 + bob, 1.8, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + f * 13, y - 22 + bob, 1.6, 0, Math.PI * 2); ctx.fill();
+    if (d.happy > 0) { ctx.fillStyle = '#ff6b8a'; ctx.font = this.font(10); ctx.textAlign = 'center'; ctx.fillText('♥', x + f * 12, y - 34 + bob); }
+  },
+
+  // Tree canopies are drawn over everything so you can walk "under" them.
+  drawForeground(g) {
+    const ctx = this.ctx;
+    for (const t of CFG.TREES) {
+      const sway = Math.sin(g.time * 1.2 + t.x) * 2;
+      ctx.globalAlpha = 0.93;
+      ctx.fillStyle = '#3f9a4a'; ctx.beginPath(); ctx.arc(t.x + sway, t.y - 44 * t.s, 30 * t.s, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(t.x - 18 * t.s + sway, t.y - 30 * t.s, 22 * t.s, 0, Math.PI * 2); ctx.arc(t.x + 18 * t.s + sway, t.y - 30 * t.s, 22 * t.s, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#56b862'; ctx.beginPath(); ctx.arc(t.x - 8 * t.s + sway, t.y - 52 * t.s, 14 * t.s, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
     }
   },
 

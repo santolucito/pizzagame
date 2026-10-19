@@ -21,7 +21,8 @@ No build step, no dependencies: plain HTML5 Canvas + vanilla JavaScript.
 | Action | Desktop | Touch |
 | --- | --- | --- |
 | Move | `WASD` / arrow keys | drag anywhere on the game to use the joystick |
-| Upgrades / Staff | `U` / `H`, or walk onto the desks | tap the buttons, or walk onto the desks |
+| Buy anything | stand on a glowing floor circle | stand on a glowing floor circle |
+| Zoom | mouse wheel or +/− buttons | pinch |
 | Help / Sound | `?` / `M` | tap the buttons |
 
 ## Gameplay loop
@@ -35,8 +36,9 @@ No build step, no dependencies: plain HTML5 Canvas + vanilla JavaScript.
    - **2nd Oven** — doubles production.
    - **Drive‑Thru** — cars queue at a window on the road and pay 1.5× for pizzas you drop at the window.
    - **Open Next City** — franchise: start a fresh shop where pizzas sell for 1.8× (and costs are 1.5×).
-6. Visit the **Upgrades** desk (speed, capacity, price, oven speed, oven storage, marketing) and the
-   **Staff** desk (cashier, up to three kitchen helpers, cleaner, each with training levels).
+6. The **shop corner** has one circle per upgrade (Speed, Carry More, Better Oven, Pretty Shop) and one per
+   staff member (Cashier, Helper, Cleaner): stand on it to hire, then to train.
+7. Walk out of the door to explore the **park, street and parking lot**: collect coins and meet the dog.
 
 Impatient customers and cars leave if they wait too long. Progress saves automatically to
 `localStorage`, and once you have a cashier and a helper the shop keeps earning a reduced rate for up

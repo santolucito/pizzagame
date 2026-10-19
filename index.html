@@ -21,8 +21,6 @@
         <div id="hud-city" class="pill city">Naples Street</div>
       </div>
       <div class="hud-right">
-        <button id="btn-upgrades" class="hud-btn" title="Upgrades (U)">⬆ Upgrades</button>
-        <button id="btn-staff" class="hud-btn" title="Staff (H)">👥 Staff</button>
         <button id="btn-help" class="hud-btn icon" title="Help (?)">?</button>
         <button id="btn-sound" class="hud-btn icon" title="Toggle sound (M)">🔊</button>
         <button id="btn-fullscreen" class="hud-btn icon" title="Fullscreen">⛶</button>
@@ -37,22 +35,6 @@
 
     <div id="toasts"></div>
 
-    <!-- Modal: Upgrades -->
-    <div id="modal-upgrades" class="modal hidden">
-      <div class="modal-card">
-        <div class="modal-head"><h2>Upgrades</h2><button class="close" data-close>✕</button></div>
-        <div id="upgrade-rows" class="rows"></div>
-      </div>
-    </div>
-
-    <!-- Modal: Staff -->
-    <div id="modal-staff" class="modal hidden">
-      <div class="modal-card">
-        <div class="modal-head"><h2>Staff</h2><button class="close" data-close>✕</button></div>
-        <div id="staff-rows" class="rows"></div>
-      </div>
-    </div>
-
     <!-- Modal: Help -->
     <div id="modal-help" class="modal hidden">
       <div class="modal-card">
@@ -60,14 +42,13 @@
         <div class="help-body">
           <p><b>Move</b> with <kbd>WASD</kbd> / arrow keys, or drag anywhere on the screen to use the joystick. <b>Pinch</b> (or scroll) to zoom.</p>
           <ol>
-            <li>Walk to the <b>oven</b> to grab fresh pizzas (you carry a limited stack).</li>
+            <li>Walk to the <b>oven</b> to grab fresh pizzas.</li>
             <li>Drop them on the <b>counter</b> so customers can take them.</li>
-            <li>Stand at the <b>register</b> to check customers out, or hire a cashier.</li>
-            <li>Walk over the <b>cash pile</b> to collect your money.</li>
-            <li>Stand on glowing <b>pads</b> to spend cash and unlock dining tables, a second oven and a drive‑thru.</li>
-            <li>Visit the <b>Upgrades</b> and <b>Staff</b> desks (or use the buttons) to get faster, carry more and hire help.</li>
+            <li>Stand at the <b>register</b> to take the money, then walk over the <b>cash pile</b> to pick it up.</li>
+            <li>Stand on any <b>glowing circle</b> to spend money: upgrades and helpers are in the shop corner, new areas have their own circles.</li>
             <li>Dirty tables need cleaning: stand next to one, or hire a cleaner.</li>
-            <li>Unlock everything, then <b>franchise</b> to open a bigger, more profitable pizzeria in a new city.</li>
+            <li>Go <b>outside</b> through the door: there are shiny coins in the park and a dog who likes you.</li>
+            <li>Unlock everything, then stand on <b>New City!</b> to open a bigger pizzeria.</li>
           </ol>
           <p class="muted">Your game saves automatically. Staff keep earning a little while you are away.</p>
           <div class="help-actions">

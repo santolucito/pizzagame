@@ -3,9 +3,9 @@
 const Game = {
   s: null,
   player: null,
-  customers: [], cars: [], staff: [], fx: [], floats: [], tables: [], ovens: [],
+  customers: [], cars: [], staff: [], fx: [], floats: [], tables: [], ovens: [], coins: [], dog: null,
   seq: 0, time: 0, spawnT: 1.5, carT: 4, saveT: 0, secT: 0, secEarned: 0, groupLeft: 0, groupT: 0,
-  hint: null, padInside: Object.create(null), lastTotal: 0,
+  hint: null, padDwell: Object.create(null), lastTotal: 0,
   onUnlock: null, onFranchise: null, onToast: null,
 
   // ---------- state ----------
@@ -15,11 +15,11 @@ const Game = {
       cash: 0, city: 0,
       unlocked: {},
       padPaid: {},
-      upg: { speed: 0, capacity: 0, profit: 0, ovenSpeed: 0, ovenCap: 0, marketing: 0, decor: 0 },
+      upg: { speed: 0, capacity: 0, oven: 0, decor: 0 },
       staff: { cashier: { count: 0, level: 0 }, helper: { count: 0, level: 0 }, cleaner: { count: 0, level: 0 } },
       piles: { oven: 0, display: 0, dt: 0, cash: 0, dtCash: 0 },
       tablesDirty: [false, false, false, false],
-      stats: { earned: 0, served: 0, lost: 0, franchises: 0 },
+      stats: { earned: 0, served: 0, lost: 0, franchises: 0, coins: 0 },
       incomeRate: 0,
       savedAt: Date.now(),
       muted: false,
@@ -43,8 +43,10 @@ const Game = {
     for (const role of Object.keys(s.staff)) {
       for (let i = 0; i < s.staff[role].count; i++) this.staff.push(new Staff(role, i));
     }
-    this.padInside = Object.create(null);
-    this.spawnT = 1.5; this.carT = 4;
+    this.coins = CFG.COINS.map((c) => ({ x: c.x, y: c.y, taken: false, t: 0, phase: Math.random() * 6 }));
+    this.dog = new Dog();
+    this.padDwell = Object.create(null);
+    this.spawnT = 1.5; this.carT = 4; this.groupLeft = 0;
     Sfx.muted = !!s.muted;
   },
 
@@ -55,9 +57,12 @@ const Game = {
       const data = JSON.parse(raw);
       if (!data || data.v !== 1) return false;
       const d = this.defaultState();
-      // shallow-merge nested objects so new fields get defaults
+      const upg = Object.assign(d.upg, data.upg || {});
+      // migrate older saves that had separate oven speed / storage / marketing upgrades
+      if (upg.oven === 0 && (data.upg || {}).ovenSpeed) upg.oven = Math.min(CFG.UPGRADES.oven.max, data.upg.ovenSpeed);
+      for (const k of Object.keys(upg)) if (!(k in CFG.UPGRADES)) delete upg[k];
       this.s = Object.assign(d, data, {
-        upg: Object.assign(d.upg, data.upg || {}),
+        upg,
         staff: Object.assign(d.staff, data.staff || {}),
         piles: Object.assign(d.piles, data.piles || {}),
         stats: Object.assign(d.stats, data.stats || {}),
@@ -98,14 +103,15 @@ const Game = {
   // ---------- derived values ----------
   priceMult() { return Math.pow(CFG.CITY_PRICE_GROWTH, this.s.city); },
   costMult() { return Math.pow(CFG.CITY_COST_GROWTH, this.s.city); },
-  price() { return CFG.PIZZA_PRICE * this.priceMult() * (1 + 0.15 * this.s.upg.profit); },
+  price() { return CFG.PIZZA_PRICE * this.priceMult(); },
+  coinValue() { return Math.round(this.price() * 2); },
   playerSpeed() { return 175 + 22 * this.s.upg.speed; },
   playerCap() { return Math.round(4 * Math.pow(1.5, this.s.upg.capacity)); },
-  bakeTime() { return CFG.BAKE_TIME / (1 + 0.25 * this.s.upg.ovenSpeed); },
-  ovenPileCap() { return 6 + 3 * this.s.upg.ovenCap; },
+  bakeTime() { return CFG.BAKE_TIME / (1 + 0.25 * this.s.upg.oven); },
+  ovenPileCap() { return 6 + 2 * this.s.upg.oven; },
   ovenCount() { return this.isUnlocked('oven2') ? 2 : 1; },
-  spawnInterval() { return CFG.SPAWN_BASE / (1 + 0.12 * this.s.upg.marketing + 0.1 * this.s.upg.decor); },
-  carSpawnInterval() { return CFG.CAR_SPAWN_BASE / (1 + 0.1 * this.s.upg.marketing + 0.05 * this.s.upg.decor); },
+  spawnInterval() { return CFG.SPAWN_BASE / (1 + 0.15 * this.s.upg.decor); },
+  carSpawnInterval() { return CFG.CAR_SPAWN_BASE / (1 + 0.08 * this.s.upg.decor); },
   patienceBonus() { return 1 + 0.08 * this.s.upg.decor; },
   checkoutTime() {
     const staffed = this.staff.some((st) => st.role === 'cashier' && st.state === 'working');
@@ -119,40 +125,67 @@ const Game = {
 
   upgradeCost(key) { const u = CFG.UPGRADES[key]; return Math.round(u.base * Math.pow(u.growth, this.s.upg[key]) * this.costMult()); },
   upgradeMaxed(key) { return this.s.upg[key] >= CFG.UPGRADES[key].max; },
-  buyUpgrade(key) {
-    if (this.upgradeMaxed(key)) return false;
-    const c = this.upgradeCost(key);
-    if (this.s.cash < c) { Sfx.error(); return false; }
-    this.s.cash -= c; this.s.upg[key]++; Sfx.buy();
-    this.toast(`${CFG.UPGRADES[key].name} → Lv ${this.s.upg[key]}`);
-    return true;
+  applyUpgrade(key) {
+    this.s.upg[key]++;
+    this.toast(`${CFG.UPGRADES[key].name} ${this.s.upg[key]}/${CFG.UPGRADES[key].max}`);
   },
-  staffHireCost(role) { const st = CFG.STAFF[role]; const n = this.s.staff[role].count; return n >= st.hire.length ? null : Math.round(st.hire[n] * this.costMult()); },
   staffAvailable(role) { const st = CFG.STAFF[role]; return !st.needs || this.isUnlocked(st.needs); },
-  hireStaff(role) {
-    const c = this.staffHireCost(role);
-    if (c === null || !this.staffAvailable(role)) return false;
-    if (this.s.cash < c) { Sfx.error(); return false; }
-    this.s.cash -= c;
-    const idx = this.s.staff[role].count++;
-    this.staff.push(new Staff(role, idx));
-    Sfx.buy();
-    this.toast(`Hired a ${CFG.STAFF[role].name}!`);
-    return true;
-  },
+  staffHireCost(role) { const st = CFG.STAFF[role]; const n = this.s.staff[role].count; return n >= st.hire.length ? null : Math.round(st.hire[n] * this.costMult()); },
   staffUpgradeCost(role) { const st = CFG.STAFF[role]; const l = this.s.staff[role].level; return l >= st.upMax ? null : Math.round(st.upBase * Math.pow(st.upGrowth, l) * this.costMult()); },
-  upgradeStaff(role) {
-    const c = this.staffUpgradeCost(role);
-    if (c === null || this.s.staff[role].count < 1) return false;
-    if (this.s.cash < c) { Sfx.error(); return false; }
-    this.s.cash -= c; this.s.staff[role].level++; Sfx.buy();
-    this.toast(`${CFG.STAFF[role].name} → Lv ${this.s.staff[role].level}`);
-    return true;
+  // What the staff pad does next: hire while there are openings, then train.
+  staffPadAction(role) {
+    const hire = this.staffHireCost(role);
+    if (hire !== null) return { action: 'hire', cost: hire };
+    const up = this.staffUpgradeCost(role);
+    if (up !== null) return { action: 'train', cost: up };
+    return null;
+  },
+  applyStaffPad(role) {
+    const a = this.staffPadAction(role);
+    if (!a) return;
+    if (a.action === 'hire') {
+      const idx = this.s.staff[role].count++;
+      this.staff.push(new Staff(role, idx));
+      this.toast(`Hired a ${CFG.STAFF[role].name}!`);
+    } else {
+      this.s.staff[role].level++;
+      this.toast(`${CFG.STAFF[role].name} trained! Lv ${this.s.staff[role].level}`);
+    }
   },
 
   isUnlocked(key) { return !!this.s.unlocked[key]; },
   padPrice(pad) { return Math.round(pad.price * this.costMult()); },
   visiblePads() { return CFG.PADS.filter((p) => !this.isUnlocked(p.key) && p.req.every((r) => this.isUnlocked(r))); },
+
+  // Every pad the player can stand on, unified: unlock pads, upgrade pads, staff pads.
+  allPads() {
+    const out = [];
+    for (const p of this.visiblePads()) out.push({ key: p.key, kind: 'unlock', label: p.label, ico: p.ico, pos: p.pos, price: this.padPrice(p), maxed: false, sub: '' });
+    for (const p of CFG.SHOP_PADS) {
+      if (p.kind === 'upgrade') {
+        const u = CFG.UPGRADES[p.key];
+        const maxed = this.upgradeMaxed(p.key);
+        out.push({ key: p.key, kind: 'upgrade', label: u.name, ico: u.ico, pos: p.pos, price: maxed ? 0 : this.upgradeCost(p.key), maxed, sub: `${this.s.upg[p.key]}/${u.max}` });
+      } else {
+        const st = CFG.STAFF[p.key];
+        if (!this.staffAvailable(p.key)) { out.push({ key: p.key, kind: 'staff', label: st.name, ico: st.ico, pos: p.pos, price: 0, maxed: true, locked: true, sub: 'needs tables' }); continue; }
+        const a = this.staffPadAction(p.key);
+        const info = this.s.staff[p.key];
+        out.push({ key: p.key, kind: 'staff', label: a ? (a.action === 'hire' ? 'Hire ' + st.name : 'Train ' + st.name) : st.name, ico: st.ico, pos: p.pos, price: a ? a.cost : 0, maxed: !a, sub: info.count ? `${info.count} hired · Lv ${info.level}` : '' });
+      }
+    }
+    return out;
+  },
+  completePad(pad) {
+    delete this.s.padPaid[pad.key];
+    this.padDwell[pad.key] = -1.0; // short breather before the same pad can take money again
+    if (pad.kind === 'unlock') { this.unlock(pad.key); return; }
+    Sfx.buy(); Haptics.tap();
+    this.fx.push({ kind: 'sparkle', x0: pad.pos.x, y0: pad.pos.y, x1: pad.pos.x, y1: pad.pos.y, t: 0, dur: 0.6 });
+    if (pad.kind === 'upgrade') this.applyUpgrade(pad.key);
+    else this.applyStaffPad(pad.key);
+  },
+
   activeTables() { const n = this.isUnlocked('tables2') ? 4 : this.isUnlocked('dining') ? 2 : 0; return this.tables.slice(0, n); },
   findFreeTable() { return this.activeTables().find((t) => !t.dirty && !t.occupied) || null; },
   cashierPresent() {
@@ -175,7 +208,8 @@ const Game = {
   queueIndex(c) { let i = 0; for (const o of this.customers) { if (o === c) return i; if (o.inMainQueue) i++; } return i; },
   payIndex(c) { let i = 0; for (const o of this.customers) { if (o === c) return i; if (o.inPayQueue) i++; } return i; },
   carIndex(c) { let i = 0; for (const o of this.cars) { if (o === c) return i; if (o.inLine) i++; } return i; },
-  countMainQueue() { return this.customers.filter((c) => c.inMainQueue).length; },
+  countMainQueue() { return this.customers.filter((c) => c.inMainQueue || c.entering).length; },
+  insideBuilding(x, y) { const b = CFG.BUILDING; return x > b.x0 && x < b.x1 && y > b.y0 && y < b.y1; },
 
   earn(amount, pos, pileKey) {
     if (pileKey === 'register') this.s.piles.cash += amount; else this.s.piles.dtCash += amount;
@@ -232,19 +266,20 @@ const Game = {
     this.updateOvens(dt);
     this.updateInteractions(dt);
     this.updateSpawns(dt);
+    this.updateOutside(dt);
 
     for (const c of this.customers) c.update(dt, this);
     this.customers = this.customers.filter((c) => c.state !== 'gone');
     for (const c of this.cars) c.update(dt, this);
     this.cars = this.cars.filter((c) => c.state !== 'gone');
     for (const st of this.staff) st.update(dt, this);
+    this.dog.update(dt, this);
 
     for (const f of this.fx) f.t += dt;
     this.fx = this.fx.filter((f) => f.t < f.dur);
     for (const f of this.floats) { f.t += dt; f.y -= 28 * dt; }
     this.floats = this.floats.filter((f) => f.t < f.dur);
 
-    // income rate (EMA of $/s), used for offline earnings
     this.secT += dt;
     if (this.secT >= 1) {
       s.incomeRate = U.lerp(s.incomeRate, this.secEarned / this.secT, 0.04);
@@ -263,20 +298,26 @@ const Game = {
     if (p.moving) {
       if (a.x) p.facing = a.x < 0 ? -1 : 1;
       p.bob += dt * 14;
-      const r = 12;
+      const r = 12, w = CFG.WORLD;
       const obstacles = this.obstacles();
-      p.x = U.clamp(p.x + a.x * sp * dt, 20, CFG.W - 20);
+      p.x = U.clamp(p.x + a.x * sp * dt, w.x0 + 16, w.x1 - 16);
       for (const o of obstacles) if (this.hitRect(p.x, p.y, r, o)) p.x = a.x > 0 ? o.x - r : o.x + o.w + r;
-      p.y = U.clamp(p.y + a.y * sp * dt, CFG.ROAD.y2 + 16, CFG.H - 16);
+      p.y = U.clamp(p.y + a.y * sp * dt, w.y0 + 16, w.y1 - 16);
       for (const o of obstacles) if (this.hitRect(p.x, p.y, r, o)) p.y = a.y > 0 ? o.y - r : o.y + o.h + r;
     }
   },
   obstacles() {
-    const o = [{ x: CFG.COUNTER.x1, y: CFG.COUNTER.y, w: CFG.COUNTER.x2 - CFG.COUNTER.x1, h: CFG.COUNTER.h }];
+    const b = CFG.BUILDING, d = CFG.DOOR;
+    const o = [
+      { x: b.x0 - 6, y: b.y0, w: b.x1 - b.x0 + 6, h: 12 },               // top wall
+      { x: b.x0 - 6, y: b.y0, w: 6, h: b.y1 - b.y0 },                      // left wall
+      { x: b.x0 - 6, y: b.y1 - 6, w: b.x1 - b.x0 + 6, h: 6 },              // bottom wall
+      { x: b.x1 - 6, y: b.y0, w: 6, h: d.y0 - b.y0 },                      // right wall above door
+      { x: b.x1 - 6, y: d.y1, w: 6, h: b.y1 - d.y1 },                      // right wall below door
+      { x: CFG.COUNTER.x1, y: CFG.COUNTER.y, w: CFG.COUNTER.x2 - CFG.COUNTER.x1, h: CFG.COUNTER.h },
+    ];
     for (let i = 0; i < this.ovenCount(); i++) o.push({ x: CFG.OVENS[i].x - 36, y: CFG.OVENS[i].y - 30, w: 72, h: 60 });
     for (const t of this.activeTables()) o.push({ x: t.x - 24, y: t.y - 14, w: 48, h: 30 });
-    o.push({ x: CFG.UPG_PAD.x - 40, y: CFG.UPG_PAD.y + 18, w: 80, h: 30 });
-    o.push({ x: CFG.HR_PAD.x - 40, y: CFG.HR_PAD.y + 18, w: 80, h: 30 });
     return o;
   },
   hitRect(px, py, r, o) { return px + r > o.x && px - r < o.x + o.w && py + r > o.y && py - r < o.y + o.h; },
@@ -299,13 +340,11 @@ const Game = {
     p.xferCd -= dt;
     const near = (pos, r) => U.dist(p.x, p.y, pos.x, pos.y) < r;
 
-    // Pick up from the oven pile
     if (near(CFG.OVEN_PILE, 52) && s.piles.oven > 0 && p.carry < this.playerCap() && p.xferCd <= 0) {
       s.piles.oven--; p.carry++; p.xferCd = CFG.XFER_DELAY;
       this.fx.push({ kind: 'pizza', x0: CFG.OVEN_PILE.x, y0: CFG.OVEN_PILE.y - 10, x1: p.x, y1: p.y - 30, t: 0, dur: 0.15 });
       Sfx.pickup();
     }
-    // Drop on counter / drive-thru
     for (const t of this.dropTargets()) {
       if (near(t.pos, 54) && p.carry > 0 && s.piles[t.key] < t.cap && p.xferCd <= 0) {
         s.piles[t.key]++; p.carry--; p.xferCd = CFG.XFER_DELAY;
@@ -313,11 +352,9 @@ const Game = {
         Sfx.drop();
       }
     }
-    // Collect cash
     if (near(CFG.CASH_PILE, 46)) this.collect('cash', CFG.CASH_PILE);
     if (this.isUnlocked('driveThru') && near(CFG.DT_CASH, 46)) this.collect('dtCash', CFG.DT_CASH);
 
-    // Clean tables by standing next to them
     p.cleanTarget = null;
     for (const t of this.activeTables()) {
       if (t.dirty && near(t, 58)) {
@@ -328,38 +365,49 @@ const Game = {
       }
     }
 
-    // Unlock pads: stand on them to pour money in
-    for (const pad of this.visiblePads()) {
-      if (!near(pad.pos, CFG.PAD_RADIUS + 6)) continue;
-      const price = this.padPrice(pad);
+    // Pads: stand on one for a moment, then money flows in until it is paid.
+    for (const pad of this.allPads()) {
+      if (pad.maxed) continue;
+      if (!near(pad.pos, CFG.PAD_RADIUS + 6)) { this.padDwell[pad.key] = 0; continue; }
+      this.padDwell[pad.key] = (this.padDwell[pad.key] || 0) + dt;
+      if (this.padDwell[pad.key] < CFG.PAD_DWELL) continue;
       const paid = s.padPaid[pad.key] || 0;
-      const remaining = price - paid;
-      if (remaining <= 0) { this.unlock(pad.key); break; }
+      const remaining = pad.price - paid;
+      if (remaining <= 0.01) { this.completePad(pad); break; }
       if (s.cash <= 0) continue;
-      const chunk = Math.min(s.cash, remaining, Math.max(1, price * dt * 0.6));
+      const chunk = Math.min(s.cash, remaining, Math.max(1, pad.price * dt * 0.6));
       s.cash -= chunk; s.padPaid[pad.key] = paid + chunk;
       if (p.xferCd <= 0) {
         p.xferCd = 0.08;
         this.fx.push({ kind: 'bill', x0: p.x, y0: p.y - 10, x1: pad.pos.x + U.rand(-10, 10), y1: pad.pos.y + U.rand(-6, 6), t: 0, dur: 0.25 });
         Sfx.pay();
       }
-      if (s.padPaid[pad.key] >= price - 0.01) { this.unlock(pad.key); break; }
+      if (s.padPaid[pad.key] >= pad.price - 0.01) { this.completePad(pad); break; }
     }
 
-    // Menu desks
-    for (const [key, pos] of [['upgrades', CFG.UPG_PAD], ['staff', CFG.HR_PAD]]) {
-      const inside = near(pos, 44);
-      if (inside && !this.padInside[key]) { this.padInside[key] = true; if (this.onDesk) this.onDesk(key); }
-      else if (!inside) this.padInside[key] = false;
+    // Coins outside
+    for (const c of this.coins) {
+      if (!c.taken && near(c, 30)) {
+        c.taken = true; c.t = CFG.COIN_RESPAWN;
+        const v = this.coinValue();
+        s.cash += v; s.stats.earned += v; s.stats.coins++;
+        this.floats.push({ x: c.x, y: c.y - 24, text: '+' + U.money(v), color: '#ffe08a', t: 0, dur: 1, big: true });
+        this.fx.push({ kind: 'sparkle', x0: c.x, y0: c.y, x1: c.x, y1: c.y, t: 0, dur: 0.5 });
+        Sfx.cash(); Haptics.tap();
+      }
     }
+  },
+
+  updateOutside(dt) {
+    for (const c of this.coins) if (c.taken) { c.t -= dt; if (c.t <= 0) c.taken = false; }
   },
 
   spawnCustomer() {
     const s = this.s;
     if (this.countMainQueue() >= CFG.QUEUE.max || this.customers.length >= 16) return;
-    const want = U.randInt(1, 2 + Math.floor(s.upg.marketing / 3));
+    const want = U.randInt(1, 2 + Math.floor(s.upg.decor / 3));
     const c = new Customer(this.seq++, want);
-    c.x += U.rand(-12, 10); c.y += U.rand(-10, 10);
+    c.y += U.rand(-12, 12);
     this.customers.push(c);
   },
 
@@ -370,7 +418,7 @@ const Game = {
     if (this.spawnT <= 0) {
       const r = Math.random();
       this.spawnT = this.spawnInterval() * (r < 0.2 ? U.rand(0.25, 0.6) : r < 0.85 ? U.rand(0.6, 1.4) : U.rand(1.4, 2.2));
-      const groupChance = 0.22 + 0.03 * s.upg.decor + 0.02 * s.upg.marketing;
+      const groupChance = 0.22 + 0.04 * s.upg.decor;
       const size = Math.random() < groupChance ? U.randInt(2, Math.random() < 0.3 ? 4 : 3) : 1;
       this.spawnCustomer();
       this.groupLeft = size - 1; this.groupT = U.rand(0.35, 0.7);
@@ -385,20 +433,25 @@ const Game = {
       if (this.carT <= 0) {
         this.carT = this.carSpawnInterval() * U.rand(0.5, 1.6);
         if (this.cars.filter((c) => c.inLine).length < CFG.DT_SLOTS) {
-          this.cars.push(new Car(this.seq++, U.randInt(1, 3 + Math.floor(s.upg.marketing / 4))));
+          this.cars.push(new Car(this.seq++, U.randInt(1, 3 + Math.floor(s.upg.decor / 4))));
         }
       }
     }
   },
 
-  // Contextual hint: what should the player do next?
+  // Contextual hint: what should the player do next? Kept short and simple.
   computeHint() {
     const s = this.s, p = this.player;
     const hasCashier = this.staff.some((st) => st.role === 'cashier');
     const paying = this.customers.some((c) => c.state === 'paying' || c.state === 'toPay');
     const hasHelper = this.staff.some((st) => st.role === 'helper');
     let h = null;
-    if (paying && !hasCashier && !this.cashierPresent()) h = { text: 'Stand at the register to check out customers', target: CFG.CASHIER_SPOT };
+    if (!this.insideBuilding(p.x, p.y)) {
+      const coin = this.coins.filter((c) => !c.taken).sort((a, b) => U.dist(p.x, p.y, a.x, a.y) - U.dist(p.x, p.y, b.x, b.y))[0];
+      if (coin && U.dist(p.x, p.y, coin.x, coin.y) < 420) h = { text: 'Grab the shiny coin!', target: coin };
+      else h = { text: 'Walk back to the pizza shop', target: CFG.DOOR_OUT };
+    }
+    else if (paying && !hasCashier && !this.cashierPresent()) h = { text: 'Stand at the register to take the money', target: CFG.CASHIER_SPOT };
     else if (p.carry > 0) {
       const t = this.bestDropTarget();
       h = t && t.key === 'dt' ? { text: 'Bring pizzas to the drive-thru window', target: CFG.DT_STACK } : { text: 'Put the pizzas on the counter', target: CFG.DISPLAY };
@@ -410,13 +463,9 @@ const Game = {
     else if (s.piles.dtCash > 0) h = { text: 'Collect the drive-thru cash!', target: CFG.DT_CASH };
     else {
       const dirty = this.activeTables().find((t) => t.dirty && !t.cleaner);
-      const pad = this.visiblePads().find((pd) => s.cash + (s.padPaid[pd.key] || 0) >= this.padPrice(pd) * 0.999);
-      const upg = Object.keys(CFG.UPGRADES).find((k) => !this.upgradeMaxed(k) && s.cash >= this.upgradeCost(k));
-      const hire = Object.keys(CFG.STAFF).find((k) => this.staffAvailable(k) && this.staffHireCost(k) !== null && s.cash >= this.staffHireCost(k));
+      const pad = this.allPads().find((pd) => !pd.maxed && s.cash + (s.padPaid[pd.key] || 0) >= pd.price);
       if (dirty && !this.staff.some((st) => st.role === 'cleaner')) h = { text: 'Clean the dirty table', target: dirty };
-      else if (pad) h = { text: `Stand on the pad to unlock ${pad.label}`, target: pad.pos };
-      else if (hire) h = { text: `You can hire a ${CFG.STAFF[hire].name} at the Staff desk`, target: CFG.HR_PAD };
-      else if (upg && s.cash >= this.upgradeCost(upg) * 1.5) h = { text: 'Visit the Upgrades desk', target: CFG.UPG_PAD };
+      else if (pad) h = { text: `Stand on the glowing circle: ${pad.label}`, target: pad.pos };
       else if (!hasHelper) h = { text: 'Pizzas are baking… get ready!', target: null };
       else h = null;
     }

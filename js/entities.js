@@ -1,11 +1,12 @@
 'use strict';
-// Runtime actors: customers, drive-thru cars and hired staff. The Game object drives their updates.
+// Runtime actors: customers, drive-thru cars, hired staff and the park dog. Game drives their updates.
 
 class Customer {
   constructor(id, want) {
     this.id = id;
-    this.x = CFG.ENTRANCE.x; this.y = CFG.ENTRANCE.y;
-    this.state = 'toQueue';
+    this.x = CFG.SPAWN_OUT.x; this.y = CFG.SPAWN_OUT.y;
+    this.route = [CFG.DOOR_OUT, CFG.ENTRANCE]; this.after = 'toQueue';
+    this.state = 'route';
     this.want = want; this.have = 0;
     this.patience = CFG.PATIENCE * Game.patienceBonus();
     this.takeCd = 0;
@@ -23,18 +24,34 @@ class Customer {
     this.bob = Math.random() * Math.PI * 2;
   }
 
+  get entering() { return this.state === 'route' && this.after === 'toQueue'; }
   get inMainQueue() { return this.state === 'toQueue' || this.state === 'queue'; }
   get inPayQueue() { return this.state === 'toPay' || this.state === 'paying'; }
+
+  leave() {
+    if (this.table) { this.table.occupied = null; this.table = null; }
+    this.route = [CFG.ENTRANCE, CFG.DOOR_OUT, { x: CFG.SPAWN_OUT.x + U.rand(0, 10), y: CFG.SPAWN_OUT.y + U.rand(-12, 12) }];
+    this.after = 'gone'; this.state = 'route';
+  }
 
   update(dt, g) {
     this.takeCd -= dt;
     switch (this.state) {
+      case 'route': {
+        const wp = this.route[0];
+        const sp = this.after === 'gone' ? this.speed * 1.1 : this.speed;
+        if (U.moveToward(this, wp.x, wp.y, sp, dt)) {
+          this.route.shift();
+          if (this.route.length === 0) this.state = this.after;
+        }
+        break;
+      }
       case 'toQueue':
       case 'queue': {
         const idx = g.queueIndex(this);
         const tx = CFG.QUEUE.x, ty = CFG.QUEUE.y + idx * CFG.QUEUE.dy;
         const arrived = U.moveToward(this, tx, ty, this.speed, dt);
-        if (arrived) this.state = 'queue'; else this.state = 'toQueue';
+        this.state = arrived ? 'queue' : 'toQueue';
         this.patience -= dt;
         if (this.patience <= 0) { this.leaveAngry(g); break; }
         if (arrived && idx === 0 && this.takeCd <= 0 && g.s.piles.display > 0 && this.have < this.want) {
@@ -42,7 +59,7 @@ class Customer {
           g.fx.push({ kind: 'pizza', x0: CFG.DISPLAY.x, y0: CFG.DISPLAY.y - 10, x1: this.x, y1: this.y - 30, t: 0, dur: 0.25 });
           Sfx.pickup();
         }
-        if (this.have >= this.want) { this.state = 'toPay'; this.patience = 60; }
+        if (this.have >= this.want) { this.state = 'toPay'; this.patience = 70; }
         break;
       }
       case 'toPay':
@@ -61,11 +78,8 @@ class Customer {
             g.fx.push({ kind: 'cash', x0: this.x, y0: this.y - 20, x1: CFG.CASH_PILE.x, y1: CFG.CASH_PILE.y, t: 0, dur: 0.35 });
             Sfx.pay();
             const table = g.findFreeTable();
-            if (table && Math.random() < 0.65) {
-              table.occupied = this; this.table = table; this.state = 'toTable';
-            } else {
-              this.state = 'leaving';
-            }
+            if (table && Math.random() < 0.65) { table.occupied = this; this.table = table; this.state = 'toTable'; }
+            else this.leave();
           }
         }
         break;
@@ -79,36 +93,32 @@ class Customer {
         this.timer -= dt;
         if (this.timer <= 0) {
           this.table.occupied = null; this.table.dirty = true; this.table.cleanProg = 0; this.table = null;
-          this.have = 0; this.state = 'leaving';
+          this.have = 0; this.leave();
         }
-        break;
-      }
-      case 'leaving': {
-        if (U.moveToward(this, CFG.ENTRANCE.x, CFG.ENTRANCE.y, this.speed * 1.1, dt)) this.state = 'gone';
         break;
       }
     }
   }
 
   leaveAngry(g) {
-    this.angry = true; this.state = 'leaving';
-    if (this.table) { this.table.occupied = null; this.table = null; }
+    this.angry = true;
     g.floats.push({ x: this.x, y: this.y - 40, text: 'Too slow!', color: '#e4572e', t: 0, dur: 1.2 });
     g.s.stats.lost++;
     Sfx.angry();
+    this.leave();
   }
 }
 
 class Car {
   constructor(id, want) {
     this.id = id;
-    this.x = -110; this.y = (CFG.ROAD.y1 + CFG.ROAD.y2) / 2;
+    this.x = CFG.WORLD.x0 - 110; this.y = (CFG.ROAD.y1 + CFG.ROAD.y2) / 2;
     this.state = 'arriving';
     this.want = want; this.have = 0;
     this.patience = CFG.CAR_PATIENCE;
     this.takeCd = 0;
     this.color = U.pick(COLORS.cars);
-    this.speed = 220;
+    this.speed = 240;
     this.angry = false;
   }
   get inLine() { return this.state === 'arriving' || this.state === 'waiting'; }
@@ -140,7 +150,7 @@ class Car {
       }
     } else if (this.state === 'leaving') {
       this.x += this.speed * 1.2 * dt;
-      if (this.x > CFG.W + 130) this.state = 'gone';
+      if (this.x > CFG.WORLD.x1 + 130) this.state = 'gone';
     }
   }
 }
@@ -148,7 +158,7 @@ class Car {
 class Staff {
   constructor(role, index) {
     this.role = role; this.index = index;
-    this.x = CFG.HR_PAD.x; this.y = CFG.HR_PAD.y - 40;
+    this.x = CFG.SHOP_PADS[4].pos.x + 40; this.y = CFG.SHOP_PADS[4].pos.y - 40;
     this.carry = 0;
     this.state = 'init';
     this.timer = 0; this.cd = 0;
@@ -214,7 +224,7 @@ class Staff {
         else if (g.s.piles[t.key] >= t.cap && this.timer > 0.6) {
           const other = g.bestDropTarget();
           if (other && other.key !== t.key) { this.target = other; this.state = 'toTarget'; }
-          else this.timer = 0; // wait here until space frees up
+          else this.timer = 0;
         }
         break;
       }
@@ -247,5 +257,35 @@ class Staff {
         break;
       }
     }
+  }
+}
+
+// A friendly dog that lives in the park and follows the player around outside.
+class Dog {
+  constructor() {
+    this.x = CFG.DOG_HOME.x; this.y = CFG.DOG_HOME.y;
+    this.state = 'wander'; this.target = null; this.timer = 0;
+    this.facing = 1; this.moving = false; this.bob = 0; this.wag = 0; this.happy = 0;
+  }
+  update(dt, g) {
+    const p = g.player;
+    this.timer -= dt; this.wag += dt * 10; this.happy = Math.max(0, this.happy - dt);
+    const playerOutside = !g.insideBuilding(p.x, p.y);
+    const d = U.dist(this.x, this.y, p.x, p.y);
+    if (playerOutside && d < 170) {
+      this.state = 'follow';
+      if (d > 48) { U.moveToward(this, p.x, p.y, 150, dt); this.bob += dt * 16; }
+      else { this.moving = false; this.facing = p.x < this.x ? -1 : 1; if (d < 36 && this.happy <= 0) { this.happy = 1.2; g.floats.push({ x: this.x, y: this.y - 36, text: '♥', color: '#ff6b8a', t: 0, dur: 1 }); } }
+    } else {
+      this.state = 'wander';
+      if (!this.target || this.timer <= 0) {
+        this.target = { x: CFG.DOG_HOME.x + U.rand(-110, 110), y: CFG.DOG_HOME.y + U.rand(-140, 120) };
+        this.timer = U.rand(2, 5);
+      }
+      if (U.moveToward(this, this.target.x, this.target.y, 70, dt)) { this.moving = false; this.target = null; this.timer = U.rand(1, 3); }
+      else this.bob += dt * 10;
+    }
+    // keep the dog out of the building
+    if (g.insideBuilding(this.x, this.y)) { this.x = CFG.BUILDING.x1 + 20; }
   }
 }

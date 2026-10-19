@@ -1,11 +1,17 @@
 'use strict';
-// Static layout + balance configuration. All positions are in logical canvas pixels (960x640).
+// Static layout + balance configuration. Positions are in logical pixels. The restaurant occupies
+// (0..960, 98..646); the world extends beyond it so the player can wander outside.
 const CFG = {
-  W: 960, H: 640,
+  W: 960, H: 640,                                   // reference viewport used for zoom rules
+  WORLD: { x0: -260, y0: -170, x1: 1220, y1: 820 }, // walkable world bounds
+  BUILDING: { x0: 0, y0: 98, x1: 966, y1: 646 },    // outer wall rectangle
+  DOOR: { y0: 572, y1: 638 },                        // gap in the right wall
   SAVE_KEY: 'pizza-rush-save-v1',
 
   PLAYER_START: { x: 300, y: 420 },
-  ENTRANCE: { x: 925, y: 605 },
+  ENTRANCE: { x: 925, y: 605 },          // just inside the door
+  DOOR_OUT: { x: 1000, y: 605 },         // just outside the door
+  SPAWN_OUT: { x: 1215, y: 605 },        // customers appear / vanish here
 
   // Kitchen
   OVENS: [{ x: 90, y: 250 }, { x: 90, y: 350 }],
@@ -27,7 +33,7 @@ const CFG = {
   TABLES: [{ x: 720, y: 390 }, { x: 860, y: 390 }, { x: 720, y: 540 }, { x: 860, y: 540 }],
   CLEANER_HOME: { x: 900, y: 300 },
 
-  // Drive-thru (road strip along the top of the map)
+  // Drive-thru (road strip along the top of the building, spanning the whole world)
   ROAD: { y1: 18, y2: 98 },
   DT_WINDOW: { x: 640, y: 58 },
   DT_SLOT_DX: 118,
@@ -37,17 +43,25 @@ const CFG = {
   DT_STACK_CAP: 10,
   DT_CASH: { x: 705, y: 128 },
 
-  // Desks (open menus)
-  UPG_PAD: { x: 120, y: 550 },
-  HR_PAD: { x: 265, y: 550 },
+  // Shop pads (office corner): stand on one to pour money in. No menus.
+  SHOP_PADS: [
+    { key: 'speed',    kind: 'upgrade', pos: { x: 55,  y: 522 } },
+    { key: 'capacity', kind: 'upgrade', pos: { x: 145, y: 522 } },
+    { key: 'oven',     kind: 'upgrade', pos: { x: 235, y: 522 } },
+    { key: 'decor',    kind: 'upgrade', pos: { x: 325, y: 522 } },
+    { key: 'cashier',  kind: 'staff',   pos: { x: 55,  y: 602 } },
+    { key: 'helper',   kind: 'staff',   pos: { x: 145, y: 602 } },
+    { key: 'cleaner',  kind: 'staff',   pos: { x: 235, y: 602 } },
+  ],
+  PAD_DWELL: 0.35, // seconds to stand on a pad before money starts flowing
 
   // Unlockable areas. Price is multiplied by the city cost multiplier.
   PADS: [
-    { key: 'dining', label: 'Dining Area', price: 180, pos: { x: 790, y: 465 }, req: [] },
-    { key: 'oven2', label: '2nd Oven', price: 280, pos: { x: 90, y: 350 }, req: [] },
-    { key: 'tables2', label: 'More Tables', price: 450, pos: { x: 790, y: 465 }, req: ['dining'] },
-    { key: 'driveThru', label: 'Drive-Thru', price: 650, pos: { x: 850, y: 165 }, req: ['dining'] },
-    { key: 'franchise', label: 'Open Next City', price: 3500, pos: { x: 480, y: 560 }, req: ['tables2', 'oven2', 'driveThru'] },
+    { key: 'dining', label: 'Tables', ico: '🍽️', price: 180, pos: { x: 790, y: 465 }, req: [] },
+    { key: 'oven2', label: '2nd Oven', ico: '🔥', price: 280, pos: { x: 90, y: 350 }, req: [] },
+    { key: 'tables2', label: 'More Tables', ico: '🍽️', price: 450, pos: { x: 790, y: 465 }, req: ['dining'] },
+    { key: 'driveThru', label: 'Drive-Thru', ico: '🚗', price: 650, pos: { x: 850, y: 165 }, req: ['dining'] },
+    { key: 'franchise', label: 'New City!', ico: '🏙️', price: 3500, pos: { x: 480, y: 560 }, req: ['tables2', 'oven2', 'driveThru'] },
   ],
   PAD_RADIUS: 40,
 
@@ -58,34 +72,48 @@ const CFG = {
   CITY_COST_GROWTH: 1.4,
   CITIES: ['Naples Street', 'Brooklyn', 'Chicago', 'Austin', 'Los Angeles', 'Tokyo', 'Rome', 'Sydney', 'Paris', 'Mars Colony'],
 
-  // Player upgrades: {base cost, growth, max}
+  // Simplified upgrades: four things, each does one obvious thing.
   UPGRADES: {
-    speed:     { name: 'Move Speed',     ico: '👟', base: 35,  growth: 1.45, max: 8,  desc: 'Run faster around the shop' },
-    capacity:  { name: 'Carry Capacity', ico: '📦', base: 45,  growth: 1.5, max: 8,  desc: '+50% carry capacity per level' },
-    profit:    { name: 'Pizza Price',    ico: '💰', base: 70,  growth: 1.55, max: 10, desc: '+15% income per level' },
-    ovenSpeed: { name: 'Oven Speed',     ico: '🔥', base: 55,  growth: 1.5, max: 10, desc: 'Bake pizzas faster' },
-    ovenCap:   { name: 'Oven Storage',   ico: '🍕', base: 40,  growth: 1.45, max: 6,  desc: 'Bigger pile next to the oven' },
-    marketing: { name: 'Marketing',      ico: '📣', base: 90,  growth: 1.55, max: 8,  desc: 'More customers, bigger orders' },
-    decor:     { name: 'Decorations',    ico: '🪴', base: 50,  growth: 1.5,  max: 6,  desc: 'A prettier shop draws more (and more patient) customers' },
+    speed:    { name: 'Speed',       ico: '👟', base: 35, growth: 1.45, max: 8,  desc: 'Run faster' },
+    capacity: { name: 'Carry More',  ico: '📦', base: 45, growth: 1.5,  max: 8,  desc: 'Carry a bigger pizza stack' },
+    oven:     { name: 'Better Oven', ico: '🔥', base: 50, growth: 1.5,  max: 10, desc: 'Bakes faster and holds more' },
+    decor:    { name: 'Pretty Shop', ico: '🪴', base: 50, growth: 1.5,  max: 6,  desc: 'Decorations bring more customers' },
   },
-
-  // What each Decorations level adds to the shop (purely cosmetic names shown in the panel)
   DECOR_LEVELS: ['Potted plants', 'Framed posters', 'String lights', 'Neon sign', 'Jukebox & rug', 'Chandelier & award'],
 
-  // Staff
+  // Staff: the pad hires first, then trains.
   STAFF: {
-    cashier: { name: 'Cashier', ico: '🧑‍💼', hire: [140], upBase: 90, upGrowth: 1.5, upMax: 5, desc: 'Checks customers out at the register' },
-    helper:  { name: 'Kitchen Helper', ico: '👨‍🍳', hire: [160, 350, 700], upBase: 110, upGrowth: 1.5, upMax: 5, desc: 'Carries pizzas from the oven to the counter' },
-    cleaner: { name: 'Cleaner', ico: '🧹', hire: [110], upBase: 70, upGrowth: 1.5, upMax: 3, desc: 'Cleans dirty tables (needs Dining Area)', needs: 'dining' },
+    cashier: { name: 'Cashier', ico: '🧑‍💼', hire: [140], upBase: 90, upGrowth: 1.5, upMax: 5, desc: 'Takes the money at the register' },
+    helper:  { name: 'Helper',  ico: '👨‍🍳', hire: [160, 350, 700], upBase: 110, upGrowth: 1.5, upMax: 5, desc: 'Carries pizzas from the oven' },
+    cleaner: { name: 'Cleaner', ico: '🧹', hire: [110], upBase: 70, upGrowth: 1.5, upMax: 3, desc: 'Cleans the tables', needs: 'dining' },
   },
+
+  // Outside: coins to collect (respawn), trees, parked cars, fountain, pond, dog
+  COINS: [
+    { x: -180, y: 380 }, { x: -90, y: 480 }, { x: -200, y: 700 }, { x: -60, y: 760 },
+    { x: 250, y: 740 }, { x: 620, y: 760 }, { x: 880, y: 730 },
+    { x: 1080, y: 230 }, { x: 1150, y: 480 }, { x: 1060, y: 740 },
+    { x: 150, y: -90 }, { x: 560, y: -110 }, { x: 980, y: -70 },
+  ],
+  COIN_RESPAWN: 60,
+  TREES: [
+    { x: -200, y: 230, s: 1.1 }, { x: -90, y: 300, s: 0.9 }, { x: -215, y: 560, s: 1 }, { x: -120, y: 790, s: 1.05 },
+    { x: 60, y: -120, s: 1 }, { x: 330, y: -140, s: 0.9 }, { x: 760, y: -125, s: 1.1 }, { x: 1120, y: -130, s: 0.95 },
+    { x: 1090, y: 170, s: 1 }, { x: 1190, y: 280, s: 0.85 },
+    { x: 80, y: 780, s: 1 }, { x: 760, y: 790, s: 0.95 }, { x: 1010, y: 800, s: 0.9 },
+  ],
+  POND: { x: -150, y: 460, rx: 70, ry: 42 },
+  FOUNTAIN: { x: 450, y: 745 },
+  PARKING: { x0: 1012, y0: 330, x1: 1220, y1: 646 },
+  DOG_HOME: { x: -120, y: 640 },
 
   // Timing
   BAKE_TIME: 2.4,
   CHECKOUT_TIME: 1.6,
   EAT_TIME: 6,
   CLEAN_TIME: 1.3,
-  PATIENCE: 45,
-  CAR_PATIENCE: 50,
+  PATIENCE: 60,
+  CAR_PATIENCE: 55,
   SPAWN_BASE: 5.0,
   CAR_SPAWN_BASE: 7.5,
   XFER_DELAY: 0.11,

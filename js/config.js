@@ -45,13 +45,14 @@ const CFG = {
 
   // Buy pads: stand still on one to pour money in. Each sits where it makes sense in the shop.
   SHOP_PADS: [
-    { key: 'speed',    kind: 'upgrade', pos: { x: 70,  y: 540 } },   // office corner
-    { key: 'capacity', kind: 'upgrade', pos: { x: 250, y: 540 } },   // office corner
+    { key: 'speed',    kind: 'upgrade', pos: { x: 300, y: 290 } },   // kitchen, right side
+    { key: 'capacity', kind: 'upgrade', pos: { x: 300, y: 400 } },   // kitchen, right side
     { key: 'oven',     kind: 'upgrade', pos: { x: 90,  y: 432 } },   // below the ovens
-    { key: 'helper',   kind: 'staff',   pos: { x: 300, y: 300 } },   // kitchen, by the pizza tray
-    { key: 'cashier',  kind: 'staff',   pos: { x: 760, y: 180 } },   // behind the counter, by the register
-    { key: 'cleaner',  kind: 'staff',   pos: { x: 920, y: 460 } },   // dining area (needs tables)
+    { key: 'cashier',  kind: 'staff',   pos: { x: 60,  y: 535 } },   // office desk: hiring
+    { key: 'helper',   kind: 'staff',   pos: { x: 170, y: 535 } },
+    { key: 'cleaner',  kind: 'staff',   pos: { x: 280, y: 535 } },   // appears once there are tables
   ],
+  OFFICE_DESK: { x: 170, y: 612 },
   PAD_DWELL: 0.45, // seconds standing still on a pad before money starts flowing
 
   // Decorations: grayed-out items shown where they will appear; stand on one to buy it.
@@ -59,7 +60,7 @@ const CFG = {
     { key: 'plants',     label: 'Plants',        ico: '🪴', price: 50,  spot: { x: 662, y: 560 } },
     { key: 'posters',    label: 'Posters',       ico: '🖼️', price: 80,  spot: { x: 100, y: 168 } },
     { key: 'lights',     label: 'String Lights', ico: '💡', price: 120, spot: { x: 250, y: 168 } },
-    { key: 'neon',       label: 'Neon Sign',     ico: '💗', price: 180, spot: { x: 760, y: 178 } },
+    { key: 'neon',       label: 'Neon Sign',     ico: '💗', price: 180, spot: { x: 820, y: 240 } },
     { key: 'jukebox',    label: 'Jukebox & Rug', ico: '🎵', price: 260, spot: { x: 918, y: 262 } },
     { key: 'chandelier', label: 'Chandelier',    ico: '✨', price: 400, spot: { x: 790, y: 300 } },
   ],

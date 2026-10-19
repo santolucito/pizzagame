@@ -396,8 +396,8 @@ const Render = {
 
   bgOffice(g) {
     const ctx = this.ctx;
-    // manager's desk in the office corner (decorative)
-    const dx = 160, dy = 600;
+    // manager's desk in the office corner: staff are hired here
+    const dx = CFG.OFFICE_DESK.x, dy = CFG.OFFICE_DESK.y;
     ctx.fillStyle = 'rgba(0,0,0,0.2)'; U.roundRect(ctx, dx - 38, dy + 4, 80, 24, 5); ctx.fill();
     ctx.fillStyle = '#5b3a1a'; U.roundRect(ctx, dx - 40, dy, 80, 24, 5); ctx.fill();
     ctx.fillStyle = '#9b6531'; U.roundRect(ctx, dx - 40, dy - 6, 80, 24, 5); ctx.fill();
@@ -407,6 +407,9 @@ const Render = {
     ctx.fillStyle = '#5a2a10'; ctx.beginPath(); ctx.arc(dx + 28, dy + 5, 3, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#2d3a4a'; U.roundRect(ctx, dx - 4, dy - 20, 26, 18, 3); ctx.fill();
     ctx.fillStyle = '#7fd1ff'; U.roundRect(ctx, dx - 1, dy - 17, 20, 12, 2); ctx.fill();
+    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, dx - 36, dy + 22, 72, 14, 4); ctx.fill();
+    ctx.fillStyle = '#ffe08a'; ctx.font = this.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('HIRING', dx, dy + 29);
     for (const [pos, label, ico] of []) {
       ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.beginPath(); ctx.ellipse(pos.x, pos.y, 36, 20, 0, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = 'rgba(43,29,20,0.5)'; ctx.lineWidth = 2; ctx.setLineDash([6, 5]); ctx.stroke(); ctx.setLineDash([]);
@@ -650,6 +653,23 @@ const Render = {
       const paid = g.s.padPaid[pad.key] || 0;
       const afford = !pad.maxed && g.s.cash + paid >= pad.price;
       const { x, y } = pad.pos;
+      if (pad.kind === 'decor') {
+        // ghost items carry just a price tag; the circle appears when you come close
+        const nearBy = U.dist(g.player.x, g.player.y, x, y) < 110;
+        if (nearBy) {
+          ctx.fillStyle = afford ? `rgba(242,177,52,${0.35 + 0.2 * pulse})` : 'rgba(255,255,255,0.35)';
+          ctx.beginPath(); ctx.ellipse(x, y, R, R * 0.6, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = afford ? '#e4572e' : '#8a7a6a'; ctx.lineWidth = 3; ctx.setLineDash([8, 6]);
+          ctx.beginPath(); ctx.ellipse(x, y, R, R * 0.6, 0, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+          if (paid > 0) { ctx.strokeStyle = '#2f9e44'; ctx.lineWidth = 5; ctx.beginPath(); ctx.ellipse(x, y, R, R * 0.6, 0, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (paid / pad.price)); ctx.stroke(); }
+        }
+        const tag = `${pad.ico} ${U.money(pad.price - paid)}`;
+        ctx.font = this.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        const w = ctx.measureText(tag).width + 14;
+        ctx.fillStyle = afford ? 'rgba(31,110,46,0.9)' : 'rgba(43,29,20,0.75)'; U.roundRect(ctx, x - w / 2, y - 10 + (nearBy ? -26 : 0), w, 18, 9); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.fillText(tag, x, y - 1 + (nearBy ? -26 : 0));
+        continue;
+      }
       ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.beginPath(); ctx.ellipse(x + 2, y + 4, R, R * 0.6, 0, 0, Math.PI * 2); ctx.fill();
       const grd = ctx.createRadialGradient(x, y, 4, x, y, R);
       if (pad.maxed) { grd.addColorStop(0, 'rgba(230,225,215,0.8)'); grd.addColorStop(1, 'rgba(200,195,185,0.5)'); }

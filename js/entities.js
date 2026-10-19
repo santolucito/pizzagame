@@ -158,7 +158,7 @@ class Car {
 class Staff {
   constructor(role, index) {
     this.role = role; this.index = index;
-    this.x = CFG.SHOP_PADS[4].pos.x + 40; this.y = CFG.SHOP_PADS[4].pos.y - 40;
+    const desk = CFG.OFFICE_DESK; this.x = desk.x; this.y = desk.y - 50;
     this.carry = 0;
     this.state = 'init';
     this.timer = 0; this.cd = 0;

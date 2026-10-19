@@ -94,6 +94,29 @@ const CFG = {
   },
   INGREDIENTS: { wheat: '🌾', tomato: '🍅', cheese: '🧀', mushroom: '🍄', basil: '🌿' },
 
+  // Train station north of the farm: tracks run along the top of the world
+  STATION: {
+    trackY: -140, platform: { x0: -900, y0: -118, x1: -560, y1: -72 },
+    house: { x0: -890, y0: -118, x1: -790, y1: -72 },
+    stopX: -700,                            // where the locomotive's front stops
+    first: [50, 80], every: [180, 300],     // seconds until the first / next train
+    dwell: 9, passengers: [5, 8],
+    // passengers walk along the far sidewalk, down the shop's side path, and in through the door
+    route: [{ x: -700, y: -30 }, { x: 990, y: -30 }, { x: 990, y: 560 }],
+    overflow: { x: 990, y: 520, dy: -44 },  // where extra customers queue outside the door
+  },
+  // Playground south of the farm across South Road
+  PLAYGROUND: {
+    x0: -1000, y0: 1015, x1: -520, y1: 1170,
+    sandbox: { x: -600, y: 1095, w: 110, h: 70 },
+    rides: [
+      { kind: 'slide', x: -940, y: 1070 },     // ladder base at (x, y+36); slide runs to the right
+      { kind: 'swing', x: -800, y: 1060 },     // two seats at x-24 and x+24
+      { kind: 'seesaw', x: -690, y: 1130 },
+      { kind: 'spring', x: -780, y: 1140 },
+    ],
+  },
+
   // Pizza delivery
   DELIVERY_CAR: { x: 1116, y: 596 },   // parked in the shop's lot
   DELIVERY_BIKE: { x: 990, y: 520 },   // scooter on the sidewalk by the door

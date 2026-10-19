@@ -135,6 +135,8 @@ const Render = {
     this.bgPark(g);
     this.bgTown(g);
     this.bgFarm(g);
+    this.bgStation(g);
+    this.bgPlayground(g);
   },
 
   // Grass over the whole world, sidewalks around the building, the parking lot.
@@ -723,6 +725,128 @@ const Render = {
     else if (c.ready && g.s.farm.cheese < CFG.FARM.max) this.drawBubble(x, y - 50 + Math.sin(g.time * 4) * 3, () => { ctx.font = this.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('🧀', 0, 0); }, 30);
   },
 
+  // Railway along the top of the world, a platform with a little station house opposite the farm.
+  bgStation(g) {
+    const ctx = this.ctx, S = CFG.STATION, W = CFG.WORLD, ty = S.trackY;
+    ctx.fillStyle = '#8d7b63'; ctx.fillRect(W.x0, ty - 18, W.x1 - W.x0, 36);           // ballast
+    ctx.fillStyle = '#6b4a2b'; for (let x = W.x0; x < W.x1; x += 22) ctx.fillRect(x, ty - 12, 10, 24); // ties
+    ctx.fillStyle = '#9aa0a8'; ctx.fillRect(W.x0, ty - 8, W.x1 - W.x0, 4); ctx.fillRect(W.x0, ty + 4, W.x1 - W.x0, 4); // rails
+    const P = S.platform;
+    ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(P.x0 + 3, P.y0 + 3, P.x1 - P.x0, P.y1 - P.y0);
+    ctx.fillStyle = '#d2cbbb'; ctx.fillRect(P.x0, P.y0, P.x1 - P.x0, P.y1 - P.y0);
+    ctx.fillStyle = '#f2c94c'; ctx.fillRect(P.x0, P.y0, P.x1 - P.x0, 4); // safety line
+    ctx.strokeStyle = 'rgba(0,0,0,0.08)'; ctx.lineWidth = 1; for (let x = P.x0; x < P.x1; x += 40) { ctx.beginPath(); ctx.moveTo(x + 0.5, P.y0); ctx.lineTo(x + 0.5, P.y1); ctx.stroke(); }
+    // station house
+    const H = S.house;
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(H.x0 + 4, H.y0 + 4, H.x1 - H.x0, H.y1 - H.y0);
+    ctx.fillStyle = '#c98a4b'; ctx.fillRect(H.x0, H.y0, H.x1 - H.x0, H.y1 - H.y0);
+    ctx.fillStyle = '#8a5527'; ctx.fillRect(H.x0, H.y0, H.x1 - H.x0, 14);
+    ctx.fillStyle = '#9fe0ff'; ctx.fillRect(H.x0 + 12, H.y0 + 20, 20, 14); ctx.fillRect(H.x1 - 32, H.y0 + 20, 20, 14);
+    ctx.fillStyle = '#5b3a1a'; ctx.fillRect(H.x0 + 42, H.y0 + 18, 16, 28);
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(H.x0 + 50, H.y0 - 2, 8, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(H.x0 + 50, H.y0 - 2); ctx.lineTo(H.x0 + 50, H.y0 - 8); ctx.moveTo(H.x0 + 50, H.y0 - 2); ctx.lineTo(H.x0 + 54, H.y0 - 2); ctx.stroke(); // clock
+    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, P.x0 + 150, P.y1 - 14, 90, 16, 4); ctx.fill();
+    ctx.fillStyle = '#ffe08a'; ctx.font = this.font(10); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🚉 STATION', P.x0 + 195, P.y1 - 6);
+    // bench + lamp on the platform
+    ctx.fillStyle = '#8d5a2b'; ctx.fillRect(P.x1 - 70, P.y0 + 14, 40, 8); ctx.fillRect(P.x1 - 70, P.y0 + 24, 40, 6); ctx.fillStyle = '#4a2d12'; ctx.fillRect(P.x1 - 66, P.y0 + 30, 4, 8); ctx.fillRect(P.x1 - 38, P.y0 + 30, 4, 8);
+    ctx.fillStyle = '#2d3a4a'; ctx.fillRect(P.x1 - 20, P.y0 + 10, 3, 30); ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.arc(P.x1 - 18, P.y0 + 8, 5, 0, Math.PI * 2); ctx.fill();
+    // railway crossing gates where the tracks meet nothing: just a crossing sign near the station path
+    ctx.fillStyle = '#d2cbbb'; ctx.fillRect(-712, P.y1, 24, 50); // path down to the sidewalk
+  },
+
+  // Playground across South Road from the farm.
+  bgPlayground(g) {
+    const ctx = this.ctx, PG = CFG.PLAYGROUND;
+    // soft rubber surface
+    ctx.fillStyle = '#c9b7e8'; U.roundRect(ctx, PG.x0 + 10, PG.y0, PG.x1 - PG.x0 - 20, PG.y1 - PG.y0, 24); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.15)'; for (let i = 0; i < 60; i++) ctx.fillRect(PG.x0 + 20 + ((i * 53) % (PG.x1 - PG.x0 - 40)), PG.y0 + 8 + ((i * 31) % (PG.y1 - PG.y0 - 16)), 3, 3);
+    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, PG.x0 + 20, PG.y0 + 6, 96, 16, 4); ctx.fill();
+    ctx.fillStyle = '#ffe08a'; ctx.font = this.font(10); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🛝 PLAYGROUND', PG.x0 + 68, PG.y0 + 14);
+    // sandbox
+    const sb = PG.sandbox;
+    ctx.fillStyle = '#8d5a2b'; ctx.fillRect(sb.x - sb.w / 2 - 6, sb.y - sb.h / 2 - 6, sb.w + 12, sb.h + 12);
+    ctx.fillStyle = '#f3dfa8'; ctx.fillRect(sb.x - sb.w / 2, sb.y - sb.h / 2, sb.w, sb.h);
+    ctx.fillStyle = '#e4572e'; U.roundRect(ctx, sb.x + 20, sb.y - 10, 16, 14, 3); ctx.fill(); ctx.fillStyle = '#3b7dd8'; ctx.fillRect(sb.x - 30, sb.y + 8, 18, 5); ctx.fillStyle = '#f2b134'; ctx.beginPath(); ctx.moveTo(sb.x - 10, sb.y + 20); ctx.lineTo(sb.x + 6, sb.y + 20); ctx.lineTo(sb.x - 2, sb.y + 6); ctx.closePath(); ctx.fill();
+    for (const r of PG.rides) {
+      if (r.kind === 'slide') {
+        ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(r.x + 50, r.y + 52, 60, 10, 0, 0, Math.PI * 2); ctx.fill();
+        // ladder
+        ctx.fillStyle = '#3b7dd8'; ctx.fillRect(r.x - 10, r.y - 24, 5, 64); ctx.fillRect(r.x + 5, r.y - 24, 5, 64);
+        for (let k = 0; k < 5; k++) ctx.fillRect(r.x - 10, r.y - 20 + k * 13, 20, 4);
+        // top platform + slide
+        ctx.fillStyle = '#2d5a8a'; ctx.fillRect(r.x - 14, r.y - 30, 30, 10);
+        ctx.fillStyle = '#f2b134'; ctx.beginPath(); ctx.moveTo(r.x + 8, r.y - 30); ctx.lineTo(r.x + 110, r.y + 42); ctx.lineTo(r.x + 110, r.y + 56); ctx.lineTo(r.x + 8, r.y - 16); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#e09a1c'; ctx.beginPath(); ctx.moveTo(r.x + 8, r.y - 16); ctx.lineTo(r.x + 110, r.y + 56); ctx.lineTo(r.x + 110, r.y + 62); ctx.lineTo(r.x + 8, r.y - 10); ctx.closePath(); ctx.fill();
+      } else if (r.kind === 'swing') {
+        ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(r.x, r.y + 70, 70, 10, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#e4572e'; ctx.fillRect(r.x - 66, r.y - 6, 132, 8);
+        for (const dx of [-62, 62]) { ctx.fillRect(dx + r.x - 3, r.y - 6, 6, 76); }
+      } else if (r.kind === 'seesaw') {
+        ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(r.x, r.y + 14, 60, 8, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#3b7dd8'; ctx.beginPath(); ctx.moveTo(r.x - 12, r.y + 12); ctx.lineTo(r.x + 12, r.y + 12); ctx.lineTo(r.x, r.y - 6); ctx.closePath(); ctx.fill();
+      } else if (r.kind === 'spring') {
+        ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(r.x, r.y + 22, 20, 6, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#9aa0a8'; ctx.lineWidth = 3; ctx.beginPath(); for (let k = 0; k < 5; k++) { ctx.moveTo(r.x - 8, r.y + 4 + k * 4); ctx.lineTo(r.x + 8, r.y + 6 + k * 4); } ctx.stroke();
+      }
+    }
+  },
+
+  // Train and the moving parts of the playground (swing ropes, seesaw plank, spring horse).
+  drawTrain(g) {
+    const ctx = this.ctx, t = g.train;
+    if (t.state === 'away') return;
+    const y = t.y;
+    for (const p of t.smoke) { ctx.fillStyle = `rgba(230,230,230,${0.6 * (1 - p.t / 1.6)})`; ctx.beginPath(); ctx.arc(p.x, p.y, 5 + p.t * 9, 0, Math.PI * 2); ctx.fill(); }
+    // two coaches behind the locomotive (front at t.x)
+    const coach = (x, col) => {
+      ctx.fillStyle = 'rgba(0,0,0,0.25)'; U.roundRect(ctx, x + 3, y - 18, 150, 44, 8); ctx.fill();
+      ctx.fillStyle = col; U.roundRect(ctx, x, y - 22, 150, 44, 8); ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,0.15)'; U.roundRect(ctx, x, y + 8, 150, 14, 6); ctx.fill();
+      ctx.fillStyle = '#bfe3ff'; for (let k = 0; k < 6; k++) U.roundRect(ctx, x + 10 + k * 23, y - 16, 15, 12, 3), ctx.fill();
+      ctx.fillStyle = t.state === 'stopped' ? '#ffe08a' : '#2b1d14'; ctx.fillRect(x + 66, y + 2, 18, 18); // door (lit when open)
+      ctx.fillStyle = '#1e1e1e'; for (const wx of [20, 40, 110, 130]) { ctx.beginPath(); ctx.arc(x + wx, y + 24, 5, 0, Math.PI * 2); ctx.fill(); }
+    };
+    coach(t.x - 170, '#2d8a5a'); coach(t.x - 330, '#2d8a5a');
+    // locomotive
+    const x = t.x - 150;
+    ctx.fillStyle = 'rgba(0,0,0,0.25)'; U.roundRect(ctx, x + 3, y - 18, 150, 44, 10); ctx.fill();
+    ctx.fillStyle = '#2d3a4a'; U.roundRect(ctx, x, y - 22, 150, 44, 10); ctx.fill();
+    ctx.fillStyle = '#c62828'; U.roundRect(ctx, x + 90, y - 26, 60, 52, 10); ctx.fill(); // cab
+    ctx.fillStyle = '#bfe3ff'; U.roundRect(ctx, x + 100, y - 18, 18, 14, 3); ctx.fill(); U.roundRect(ctx, x + 124, y - 18, 18, 14, 3); ctx.fill();
+    ctx.fillStyle = '#9aa0a8'; U.roundRect(ctx, x + 10, y - 14, 70, 28, 14); ctx.fill(); // boiler
+    ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.arc(x + 24, y, 7, 0, Math.PI * 2); ctx.fill(); // chimney top
+    ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.arc(x + 150, y, 6, 0, Math.PI * 2); ctx.fill(); // headlamp
+    ctx.fillStyle = '#c62828'; ctx.beginPath(); ctx.moveTo(x + 150, y - 14); ctx.lineTo(x + 166, y); ctx.lineTo(x + 150, y + 14); ctx.closePath(); ctx.fill(); // cowcatcher
+    ctx.fillStyle = '#1e1e1e'; for (const wx of [30, 60, 120]) { ctx.beginPath(); ctx.arc(x + wx, y + 24, 7, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#9aa0a8'; ctx.beginPath(); ctx.arc(x + wx, y + 24, 3, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#1e1e1e'; }
+  },
+
+  drawPlaygroundDynamic(g) {
+    const ctx = this.ctx, PG = CFG.PLAYGROUND, ride = g.ride;
+    for (const r of PG.rides) {
+      if (r.kind === 'swing') {
+        for (const dx of [-24, 24]) {
+          const active = ride && ride.def === r && Math.abs(ride.seatX - (r.x + dx)) < 1;
+          const a = active ? Math.sin(ride.t * 4) * 0.8 : Math.sin(g.time * 1.2 + dx) * 0.06;
+          const sx = r.x + dx + Math.sin(a) * 46, sy = r.y + 46 - Math.cos(a) * 46 + 46;
+          ctx.strokeStyle = '#8d5a2b'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(r.x + dx - 8, r.y); ctx.lineTo(sx - 8, sy); ctx.moveTo(r.x + dx + 8, r.y); ctx.lineTo(sx + 8, sy); ctx.stroke();
+          ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, sx - 12, sy - 3, 24, 6, 3); ctx.fill();
+        }
+      } else if (r.kind === 'seesaw') {
+        const tilt = ride && ride.def === r ? ride.tilt * 0.35 : 0.12;
+        ctx.save(); ctx.translate(r.x, r.y - 4); ctx.rotate(tilt);
+        ctx.fillStyle = '#f2b134'; U.roundRect(ctx, -60, -5, 120, 10, 5); ctx.fill();
+        ctx.fillStyle = '#e4572e'; U.roundRect(ctx, -60, -9, 16, 8, 3); ctx.fill(); U.roundRect(ctx, 44, -9, 16, 8, 3); ctx.fill();
+        ctx.restore();
+      } else if (r.kind === 'spring') {
+        const b = ride && ride.def === r ? Math.abs(Math.sin(ride.t * 9)) * 12 : 0;
+        const hx = r.x, hy = r.y - b;
+        ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, hx - 16, hy - 14, 32, 14, 7); ctx.fill();
+        ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, hx + 10, hy - 26, 12, 16, 5); ctx.fill();
+        ctx.fillStyle = '#2b1d14'; ctx.fillRect(hx + 16, hy - 22, 2, 2); ctx.fillStyle = '#5b3a1a'; ctx.fillRect(hx + 8, hy - 28, 14, 4);
+        ctx.fillStyle = '#e4572e'; U.roundRect(ctx, hx - 6, hy - 18, 12, 5, 2); ctx.fill(); // saddle
+      }
+    }
+  },
+
   // ======================= dynamic scenery =======================
   drawDecorDynamic(g) {
     const ctx = this.ctx, t = g.time;
@@ -918,6 +1042,7 @@ const Render = {
     this.drawDog(g.dog, g);
     this.drawTownDynamic(g);
     this.drawFarmDynamic(g);
+    this.drawPlaygroundDynamic(g);
   },
 
   drawTownDynamic(g) {
@@ -1037,6 +1162,7 @@ const Render = {
     for (const c of g.icCustomers) items.push({ y: c.y, draw: () => this.drawIceCreamCustomer(c, g) });
     items.push({ y: g.car.y + 10, draw: () => this.drawDeliveryCar(g) });
     items.push({ y: g.bike.y + 8, draw: () => this.drawDeliveryBike(g) });
+    items.push({ y: g.train.y + 20, draw: () => this.drawTrain(g) });
     if (!g.driving) items.push({ y: g.player.y, draw: () => this.drawPlayer(g) });
     items.sort((a, b) => a.y - b.y);
     for (const it of items) it.draw();

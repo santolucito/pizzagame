@@ -68,7 +68,10 @@ No build step, no dependencies: plain HTML5 Canvas + vanilla JavaScript.
 10. The **farm** past the west road grows tomatoes, wheat, basil and mushrooms, and the cow gives cheese.
     Walk up to pick; everything regrows. Farm ingredients go into handmade pizzas (flour, sauce, cheese,
     and the mushroom and basil tray items), and each one used makes the pizza count for one more.
-11. The **ice cream shop** is for sale. Once bought it runs itself with a scooper and its own customers;
+11. A **train** arrives at the station north of the farm every few minutes with a crowd of passengers who
+    walk to the shop (extra people wait in a line outside the door). The **playground** across the south
+    road has a slide, swings, a seesaw and a spring horse you can ride.
+12. The **ice cream shop** is for sale. Once bought it runs itself with a scooper and its own customers;
     walk in to collect the money, and buy More Flavors inside to make it busier.
 
 Impatient customers and cars leave if they wait too long. Progress saves automatically to

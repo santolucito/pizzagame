@@ -33,6 +33,7 @@ const Sfx = {
   error() { this.tone(200, 0.2, 'sawtooth', 0.05, -80); },
   angry() { if (this.throttle('angry', 300)) this.tone(260, 0.25, 'sawtooth', 0.04, -100); },
   clean() { if (this.throttle('clean', 200)) this.tone(900, 0.15, 'sine', 0.05, 400); },
+  whistle() { this.tone(660, 0.35, 'square', 0.04); setTimeout(() => this.tone(880, 0.5, 'square', 0.04), 320); },
   ding() { this.tone(1760, 0.5, 'sine', 0.09); setTimeout(() => this.tone(2093, 0.7, 'sine', 0.08), 180); },
 };
 

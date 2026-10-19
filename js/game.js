@@ -5,7 +5,7 @@ const Game = {
   player: null,
   customers: [], cars: [], staff: [], fx: [], floats: [], tables: [], ovens: [], coins: [], dog: null,
   houses: [], icCustomers: [], car: null, bike: null, vehicle: null, driving: false, orderT: 30, icSpawnT: 4, carNear: false, nearVehicle: null, fireTruck: null, nearPrep: false,
-  plots: [], cow: null,
+  plots: [], cow: null, train: null, ride: null, rideLeft: true,
   seq: 0, time: 0, spawnT: 1.5, carT: 4, saveT: 0, secT: 0, secEarned: 0, groupLeft: 0, groupT: 0,
   hint: null, padDwell: Object.create(null), lastTotal: 0,
   onUnlock: null, onToast: null,
@@ -58,6 +58,7 @@ const Game = {
     this.bike = { kind: 'bike', x: CFG.DELIVERY_BIKE.x, y: CFG.DELIVERY_BIKE.y, angle: -Math.PI / 2, vx: 0, vy: 0 };
     this.vehicle = null; this.driving = false; this.orderT = U.rand(20, 35); this.icSpawnT = 4;
     this.fireTruck = new FireTruck();
+    this.train = new Train(); this.ride = null; this.rideLeft = true;
     this.plots = CFG.FARM.plots.map((pl, i) => ({ i, kind: pl.kind, x: pl.x, y: pl.y, ready: true, t: 0, phase: Math.random() * 6 }));
     this.cow = { x: CFG.FARM.cowHome.x, y: CFG.FARM.cowHome.y, facing: 1, moving: false, bob: 0, target: null, timer: 0, ready: true, t: 0, moo: 0 };
     this.padDwell = Object.create(null);
@@ -317,7 +318,7 @@ const Game = {
   update(dt) {
     const s = this.s;
     this.time += dt;
-    if (this.driving) this.updateDriving(dt); else this.updatePlayer(dt);
+    if (this.driving) this.updateDriving(dt); else if (this.ride) this.updateRide(dt); else this.updatePlayer(dt);
     this.updateOvens(dt);
     this.updateInteractions(dt);
     this.updateSpawns(dt);
@@ -333,6 +334,7 @@ const Game = {
     this.dog.update(dt, this);
     for (const c of this.icCustomers) c.update(dt, this);
     this.fireTruck.update(dt, this);
+    this.train.update(dt, this);
     this.icCustomers = this.icCustomers.filter((c) => c.state !== 'gone');
 
     for (const f of this.fx) f.t += dt;
@@ -366,6 +368,7 @@ const Game = {
       p.y = U.clamp(p.y + a.y * sp * dt, w.y0 + 16, w.y1 - 16);
       for (const o of obstacles) if (this.hitRect(p.x, p.y, r, o)) p.y = a.y > 0 ? o.y - r : o.y + o.h + r;
     }
+    this.checkRides();
   },
   obstacles() {
     const b = CFG.BUILDING, d = CFG.DOOR;
@@ -398,6 +401,7 @@ const Game = {
     for (const h of CFG.HOUSES) o.push({ x: h.x0, y: h.y0, w: h.x1 - h.x0, h: h.y1 - h.y0 });
     const F = CFG.FIRE_STATION; o.push({ x: F.x0, y: F.y0, w: F.x1 - F.x0, h: F.y1 - F.y0 });
     const B2 = CFG.FARM.barn; o.push({ x: B2.x0, y: B2.y0, w: B2.x1 - B2.x0, h: B2.y1 - B2.y0 });
+    const H = CFG.STATION.house; o.push({ x: H.x0, y: H.y0, w: H.x1 - H.x0, h: H.y1 - H.y0 });
     o.push({ x: CFG.FARM.silo.x - 22, y: CFG.FARM.silo.y - 40, w: 44, h: 80 });
     if (forCar) {
       const B = CFG.BUILDING; o.push({ x: B.x0 - 6, y: B.y0, w: B.x1 - B.x0 + 6, h: B.y1 - B.y0 });
@@ -583,7 +587,7 @@ const Game = {
     // Pads: stand on one for a moment, then money flows in until it is paid.
     // Nothing is bought until the player has moved at least once after loading, so a reload never buys by itself.
     for (const pad of this.allPads()) {
-      if (pad.maxed || !p.hasMoved || this.driving) continue;
+      if (pad.maxed || !p.hasMoved || this.driving || this.ride) continue;
       if (!near(pad.pos, CFG.PAD_RADIUS + 6)) { this.padDwell[pad.key] = 0; continue; }
       if (p.moving) { this.padDwell[pad.key] = Math.min(this.padDwell[pad.key] || 0, 0); continue; } // only while standing still
       this.padDwell[pad.key] = (this.padDwell[pad.key] || 0) + dt;
@@ -617,6 +621,56 @@ const Game = {
 
   updateOutside(dt) {
     for (const c of this.coins) if (c.taken) { c.t -= dt; if (c.t <= 0) c.taken = false; }
+  },
+
+  spawnTrainPassenger() {
+    if (this.customers.length >= 22) return;
+    const want = U.randInt(1, 2 + Math.floor(this.decorCount() / 3));
+    const c = new Customer(this.seq++, want, true);
+    this.customers.push(c);
+  },
+
+  // ---------- playground rides: walk onto a ride and it plays out on its own ----------
+  updateRide(dt) {
+    const r = this.ride, p = this.player; r.t += dt;
+    const k = r.t / r.dur, def = r.def, x = def.x, y = def.y;
+    p.moving = true; p.bob += dt * 10;
+    if (def.kind === 'slide') {
+      if (k < 0.45) { const c = k / 0.45; p.x = x; p.y = y + 36 - 56 * c; p.facing = 1; }
+      else { const c = (k - 0.45) / 0.55; p.x = x + 80 * c; p.y = y - 20 + 60 * c; p.facing = 1; }
+    } else if (def.kind === 'swing') {
+      const a = Math.sin(r.t * 4) * 0.8; p.x = r.seatX + Math.sin(a) * 46; p.y = y + 46 - Math.cos(a) * 46 + 10; p.facing = a < 0 ? -1 : 1;
+    } else if (def.kind === 'seesaw') {
+      const b = Math.abs(Math.sin(r.t * 5)); p.x = x - 40; p.y = y - 10 - b * 26; r.tilt = Math.sin(r.t * 5);
+    } else if (def.kind === 'spring') {
+      p.x = x; p.y = y - 14 - Math.abs(Math.sin(r.t * 9)) * 12; p.facing = 1;
+    }
+    if (r.t >= r.dur) {
+      if (def.kind === 'slide') { p.x = x + 100; p.y = y + 46; }
+      else if (def.kind === 'swing') { p.x = r.seatX; p.y = y + 70; }
+      else if (def.kind === 'seesaw') { p.x = x - 40; p.y = y + 28; }
+      else { p.x = x; p.y = y + 30; }
+      this.ride = null; this.rideLeft = false; p.moving = false;
+    }
+  },
+  checkRides() {
+    const p = this.player;
+    let nearAny = false;
+    for (const def of CFG.PLAYGROUND.rides) {
+      const spots = def.kind === 'swing' ? [{ x: def.x - 24, y: def.y + 56 }, { x: def.x + 24, y: def.y + 56 }] : def.kind === 'slide' ? [{ x: def.x, y: def.y + 40 }] : def.kind === 'seesaw' ? [{ x: def.x - 40, y: def.y + 2 }] : [{ x: def.x, y: def.y + 16 }];
+      for (const sp of spots) {
+        if (U.dist(p.x, p.y, sp.x, sp.y) < 22) {
+          nearAny = true;
+          if (!this.rideLeft) return;
+          const dur = def.kind === 'slide' ? 2.2 : def.kind === 'swing' ? 4 : def.kind === 'seesaw' ? 2 : 2.2;
+          this.ride = { def, t: 0, dur, seatX: sp.x, tilt: 0 };
+          this.floats.push({ x: p.x, y: p.y - 60, text: def.kind === 'seesaw' || def.kind === 'spring' ? 'Boing!' : 'Wheee!', color: '#ffe08a', t: 0, dur: 1.2, big: true });
+          Sfx.unlock(); Haptics.tap();
+          return;
+        }
+      }
+    }
+    if (!nearAny) this.rideLeft = true;
   },
 
   spawnCustomer() {
@@ -671,7 +725,9 @@ const Game = {
       const IC = CFG.ICE_CREAM;
       const coin = this.coins.filter((c) => !c.taken).sort((a, b) => U.dist(p.x, p.y, a.x, a.y) - U.dist(p.x, p.y, b.x, b.y))[0];
       const ripe = this.nearFarm() ? this.plots.filter((pl) => pl.ready && s.farm[pl.kind] < CFG.FARM.max).sort((a, b) => U.dist(p.x, p.y, a.x, a.y) - U.dist(p.x, p.y, b.x, b.y))[0] : null;
-      if (ripe) h = { text: `Pick the ${ripe.kind}! ${CFG.INGREDIENTS[ripe.kind]}`, target: ripe };
+      const PG = CFG.PLAYGROUND;
+      if (p.x > PG.x0 - 60 && p.x < PG.x1 + 60 && p.y > PG.y0 - 80) h = { text: 'Go play! Try the slide or the swings', target: null };
+      else if (ripe) h = { text: `Pick the ${ripe.kind}! ${CFG.INGREDIENTS[ripe.kind]}`, target: ripe };
       else if (this.nearFarm() && this.cow.ready && s.farm.cheese < CFG.FARM.max) h = { text: 'Say hi to the cow for cheese 🧀', target: this.cow };
       else if (s.iceCream.owned && s.iceCream.cash >= 30 && U.dist(p.x, p.y, IC.cash.x, IC.cash.y) < 500) h = { text: 'Collect the ice cream money', target: IC.cash };
       else if (coin && U.dist(p.x, p.y, coin.x, coin.y) < 420) h = { text: 'Grab the shiny coin!', target: coin };

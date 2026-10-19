@@ -10,10 +10,15 @@ const SPECIALS = {
 // Runtime actors: customers, drive-thru cars, hired staff and the park dog. Game drives their updates.
 
 class Customer {
-  constructor(id, want) {
+  constructor(id, want, fromTrain = false) {
     this.id = id;
     this.x = CFG.SPAWN_OUT.x; this.y = CFG.SPAWN_OUT.y;
     this.route = [CFG.DOOR_OUT, CFG.ENTRANCE]; this.after = 'toQueue';
+    if (fromTrain) {
+      const S = CFG.STATION; this.x = S.stopX + U.rand(-120, 20); this.y = S.platform.y1 - 10;
+      this.route = S.route.map((p) => ({ x: p.x + U.rand(-8, 8), y: p.y + U.rand(-6, 6) })).concat([CFG.DOOR_OUT, CFG.ENTRANCE]);
+      this.fromTrain = true;
+    }
     this.state = 'route';
     this.want = want; this.have = 0;
     this.patience = CFG.PATIENCE * Game.patienceBonus();
@@ -65,10 +70,11 @@ class Customer {
       case 'toQueue':
       case 'queue': {
         const idx = g.queueIndex(this);
-        const tx = CFG.QUEUE.x, ty = CFG.QUEUE.y + idx * CFG.QUEUE.dy;
+        let tx = CFG.QUEUE.x, ty = CFG.QUEUE.y + idx * CFG.QUEUE.dy;
+        if (idx >= CFG.QUEUE.max) { const o = CFG.STATION.overflow; tx = o.x; ty = o.y + (idx - CFG.QUEUE.max) * o.dy; } // wait outside the door
         const arrived = U.moveToward(this, tx, ty, this.speed, dt);
         this.state = arrived ? 'queue' : 'toQueue';
-        this.patience -= dt;
+        if (idx < CFG.QUEUE.max) this.patience -= dt; // nobody gets grumpy while waiting outside
         if (this.patience <= 0) { this.leaveAngry(g); break; }
         if (arrived && idx === 0 && this.takeCd <= 0 && g.s.piles.display > 0 && this.have < this.want) {
           g.s.piles.display--; this.have++; this.takeCd = 0.25;
@@ -179,6 +185,37 @@ class Car {
       const ang = Math.atan2(wp.y - this.y, wp.x - this.x);
       let d = ang - this.angle; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; this.angle += d * Math.min(1, dt * 6);
       if (U.moveToward(this, wp.x, wp.y, this.speed, dt)) { this.exitPath.shift(); if (!this.exitPath.length) { this.state = 'gone'; if (this.onDone) this.onDone(); } }
+    }
+  }
+}
+
+// The train: lives off-screen, rolls in along the top tracks, stops at the platform, lets a crowd off, leaves.
+class Train {
+  constructor() {
+    const S = CFG.STATION;
+    this.x = CFG.WORLD.x0 - 500; this.y = S.trackY; this.state = 'away'; this.timer = U.rand(S.first[0], S.first[1]);
+    this.speed = 0; this.unload = 0; this.toDrop = 0; this.dropT = 0; this.smoke = []; this.whistled = false;
+  }
+  update(dt, g) {
+    const S = CFG.STATION;
+    for (const p of this.smoke) { p.t += dt; p.y -= 18 * dt; p.x += 8 * dt; } this.smoke = this.smoke.filter((p) => p.t < 1.6);
+    if (this.state === 'away') {
+      this.timer -= dt;
+      if (this.timer <= 0) { this.state = 'arriving'; this.x = CFG.WORLD.x0 - 420; this.speed = 320; this.whistled = false; g.toast('🚂 The train is coming!'); Sfx.whistle(); }
+    } else if (this.state === 'arriving') {
+      const dist = S.stopX - this.x;
+      this.speed = Math.max(40, Math.min(320, dist * 1.2));
+      this.x += this.speed * dt;
+      if (Math.random() < dt * 6) this.smoke.push({ x: this.x - 14, y: this.y - 28, t: 0 });
+      if (dist <= 2) { this.x = S.stopX; this.state = 'stopped'; this.unload = S.dwell; this.toDrop = U.randInt(S.passengers[0], S.passengers[1]); this.dropT = 1.2; Sfx.whistle(); }
+    } else if (this.state === 'stopped') {
+      this.unload -= dt; this.dropT -= dt;
+      if (this.toDrop > 0 && this.dropT <= 0) { this.dropT = 0.55; this.toDrop--; g.spawnTrainPassenger(); }
+      if (this.unload <= 0 && this.toDrop === 0) { this.state = 'leaving'; this.speed = 0; Sfx.whistle(); }
+    } else if (this.state === 'leaving') {
+      this.speed = Math.min(360, this.speed + 160 * dt); this.x += this.speed * dt;
+      if (Math.random() < dt * 8) this.smoke.push({ x: this.x - 14, y: this.y - 28, t: 0 });
+      if (this.x > CFG.WORLD.x1 + 500) { this.state = 'away'; this.timer = U.rand(S.every[0], S.every[1]); }
     }
   }
 }

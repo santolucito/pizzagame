@@ -67,9 +67,11 @@ const Game = {
       if (data.upg && data.upg.decor) CFG.DECOR_ITEMS.slice(0, data.upg.decor).forEach((it) => { decor[it.key] = true; });
       for (const k of Object.keys(upg)) if (!(k in CFG.UPGRADES)) delete upg[k];
       for (const k of Object.keys(decor)) if (!CFG.DECOR_ITEMS.some((it) => it.key === k)) delete decor[k];
+      const staff = Object.assign(d.staff, data.staff || {});
+      for (const role of Object.keys(staff)) staff[role].count = Math.min(staff[role].count, CFG.STAFF[role].hire.length); // one of each now
       this.s = Object.assign(d, data, {
         upg, decor,
-        staff: Object.assign(d.staff, data.staff || {}),
+        staff,
         piles: Object.assign(d.piles, data.piles || {}),
         stats: Object.assign(d.stats, data.stats || {}),
         unlocked: data.unlocked || {},
@@ -126,8 +128,8 @@ const Game = {
     const lvl = staffed ? this.s.staff.cashier.level : 0;
     return CFG.CHECKOUT_TIME / (1 + 0.3 * lvl);
   },
-  staffSpeed(role) { return 145 + 16 * this.s.staff[role].level; },
-  helperCap() { return 3 + this.s.staff.helper.level; },
+  staffSpeed(role) { return 145 + 20 * this.s.staff[role].level; },
+  helperCap() { return 3 + 2 * this.s.staff.helper.level; },
   cleanTime(who) { return who === 'cleaner' ? CFG.CLEAN_TIME / (1 + 0.35 * this.s.staff.cleaner.level) : CFG.CLEAN_TIME; },
 
   upgradeCost(key) { const u = CFG.UPGRADES[key]; return Math.round(u.base * Math.pow(u.growth, this.s.upg[key]) * this.costMult()); },

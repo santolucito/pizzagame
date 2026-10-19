@@ -48,8 +48,9 @@ No build step, no dependencies: plain HTML5 Canvas + vanilla JavaScript.
    - **Tables / More Tables** — some customers eat in, leave a tip on the table (half their bill) and a mess to clean.
    - **2nd Oven** — doubles production.
    - **Drive‑Thru** — cars queue at a window on the road and pay 1.5× for pizzas you drop at the window.
-6. Upgrade circles (Speed, Carry More, Better Oven) and staff circles (Cashier, Helper, Cleaner) sit where
-   they belong in the shop; stand still on one to buy. Staff circles hire first, then train.
+6. Upgrade circles (Speed, Carry More, Better Oven) sit in the kitchen; the three staff circles (Cashier,
+   Helper, Cleaner) are at the office desk. Stand still on one to buy. Each staff circle hires once, then
+   trains that person: a trained helper walks faster and carries a bigger stack.
 7. Grayed-out **decorations** (plants, posters, string lights, neon sign, jukebox) show where
    they will go; buy them to bring more, and more patient, customers.
 8. Walk out of the door to explore the **park, street and parking lot**: collect coins and meet the dog.

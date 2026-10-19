@@ -48,10 +48,9 @@ const CFG = {
     { key: 'speed',    kind: 'upgrade', pos: { x: 300, y: 290 } },   // kitchen, right side
     { key: 'capacity', kind: 'upgrade', pos: { x: 300, y: 400 } },   // kitchen, right side
     { key: 'oven',     kind: 'upgrade', pos: { x: 90,  y: 432 } },   // below the ovens
-    { key: 'cashier',  kind: 'staff',   pos: { x: 60,  y: 535 } },   // office desk: hiring, then training
-    { key: 'helper',   kind: 'staff',   mode: 'hire',  pos: { x: 170, y: 535 } },
+    { key: 'cashier',  kind: 'staff',   pos: { x: 60,  y: 535 } },   // office desk: hire once, then train
+    { key: 'helper',   kind: 'staff',   pos: { x: 170, y: 535 } },
     { key: 'cleaner',  kind: 'staff',   pos: { x: 280, y: 535 } },   // appears once there are tables
-    { key: 'helper',   kind: 'staff',   mode: 'train', pos: { x: 300, y: 612 } }, // appears once a helper is hired
   ],
   OFFICE_DESK: { x: 170, y: 612 },
   PAD_DWELL: 0.45, // seconds standing still on a pad before money starts flowing
@@ -89,7 +88,7 @@ const CFG = {
   // Staff: the pad hires first, then trains.
   STAFF: {
     cashier: { name: 'Cashier', ico: '🧑‍💼', hire: [140], upBase: 90, upGrowth: 1.5, upMax: 5, desc: 'Takes the money at the register' },
-    helper:  { name: 'Helper',  ico: '👨‍🍳', hire: [160, 350, 700], upBase: 110, upGrowth: 1.5, upMax: 5, desc: 'Carries pizzas from the oven' },
+    helper:  { name: 'Helper',  ico: '👨‍🍳', hire: [160], upBase: 110, upGrowth: 1.5, upMax: 6, desc: 'Carries pizzas from the oven' },
     cleaner: { name: 'Cleaner', ico: '🧹', hire: [110], upBase: 70, upGrowth: 1.5, upMax: 3, desc: 'Cleans the tables', needs: 'dining' },
   },
 

@@ -444,14 +444,16 @@ const Game = {
     const p = this.player, F = CFG.FARM;
     for (const pl of this.plots) {
       if (!pl.ready) { pl.t -= dt; if (pl.t <= 0) pl.ready = true; continue; }
-      if (!this.driving && U.dist(p.x, p.y, pl.x, pl.y) < 34) { if (this.addIngredient(pl.kind, pl.x, pl.y)) { pl.ready = false; pl.t = F.regrow[pl.kind]; } }
+      // on foot, or riding the tractor (a car or scooter cannot harvest)
+      const harvester = !this.driving || this.vehicle.kind === 'tractor';
+      if (harvester && U.dist(p.x, p.y, pl.x, pl.y) < (this.driving ? 44 : 34)) { if (this.addIngredient(pl.kind, pl.x, pl.y)) { pl.ready = false; pl.t = F.regrow[pl.kind]; } }
     }
     const c = this.cow;
     c.moo = Math.max(0, c.moo - dt); c.timer -= dt;
     if (!c.ready) { c.t -= dt; if (c.t <= 0) c.ready = true; }
     if (!c.target || c.timer <= 0) { c.target = { x: U.rand(F.pen.x0 + 30, F.pen.x1 - 30), y: U.rand(F.pen.y0 + 30, F.pen.y1 - 24) }; c.timer = U.rand(3, 7); }
     if (U.moveToward(c, c.target.x, c.target.y, 28, dt)) { c.moving = false; c.target = null; c.timer = U.rand(2, 5); } else c.bob += dt * 6;
-    if (c.ready && !this.driving && U.dist(p.x, p.y, c.x, c.y) < 56) {
+    if (c.ready && (!this.driving || this.vehicle.kind === 'tractor') && U.dist(p.x, p.y, c.x, c.y) < 56) {
       if (this.addIngredient('cheese', c.x, c.y)) { c.ready = false; c.t = F.regrow.cheese; c.moo = 1.5; this.floats.push({ x: c.x, y: c.y - 56, text: 'Moo!', color: '#2b1d14', t: 0, dur: 1.2, big: true }); }
     }
   },
@@ -646,7 +648,13 @@ const Game = {
       this.fx.push({ kind: 'pizza', x0: CFG.OVEN_PILE.x, y0: CFG.OVEN_PILE.y - 10, x1: p.x, y1: p.y - 30, t: 0, dur: 0.15 });
       Sfx.pickup();
     }
-    for (const t of this.dropTargets()) {
+    // driving past the drive-thru window loads pizzas from the window stack onto the vehicle
+    if (this.driving && this.isUnlocked('driveThru') && near(CFG.DT_WINDOW, 84) && s.piles.dt > 0 && p.carry < this.playerCap() && p.xferCd <= 0) {
+      s.piles.dt--; p.carry++; p.xferCd = CFG.XFER_DELAY;
+      this.fx.push({ kind: 'pizza', x0: CFG.DT_STACK.x, y0: CFG.DT_STACK.y - 10, x1: p.x, y1: p.y - 30, t: 0, dur: 0.2 });
+      Sfx.pickup();
+    }
+    for (const t of this.driving ? [] : this.dropTargets()) {
       if (near(t.pos, 54) && p.carry > 0 && s.piles[t.key] < t.cap && p.xferCd <= 0) {
         s.piles[t.key]++; p.carry--; p.xferCd = CFG.XFER_DELAY;
         this.fx.push({ kind: 'pizza', x0: p.x, y0: p.y - 30, x1: t.pos.x, y1: t.pos.y - 10, t: 0, dur: 0.15 });
@@ -804,7 +812,12 @@ const Game = {
     let h = null;
     const order = this.houses.find((hh) => hh.order);
     if (order && p.carry > 0) h = { text: `Deliver to ${order.name}!`, target: order.door };
-    else if (this.driving) { const IC = CFG.ICE_CREAM; h = s.iceCream.owned && s.iceCream.cash > 20 ? { text: 'Pick up the ice cream money', target: IC.cash } : { text: this.vehicle.kind === 'bike' ? 'Zoom! Ride around town' : 'Vroom! Drive around town', target: null }; }
+    else if (this.driving) {
+      const IC = CFG.ICE_CREAM;
+      if (order && this.isUnlocked('driveThru') && s.piles.dt > 0) h = { text: 'Swing by the drive-thru window to load pizzas', target: CFG.DT_WINDOW };
+      else if (s.iceCream.owned && s.iceCream.cash > 20) h = { text: 'Pick up the ice cream money', target: IC.cash };
+      else h = { text: this.vehicle.kind === 'bike' ? 'Zoom! Ride around town' : 'Vroom! Drive around town', target: null };
+    }
     else if (!this.insideBuilding(p.x, p.y)) {
       const IC = CFG.ICE_CREAM;
       const coin = this.coins.filter((c) => !c.taken).sort((a, b) => U.dist(p.x, p.y, a.x, a.y) - U.dist(p.x, p.y, b.x, b.y))[0];

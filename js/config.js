@@ -131,7 +131,7 @@ const CFG = {
   },
 
   // Pizza delivery
-  DELIVERY_CAR: { x: 1116, y: 596 },   // parked in the shop's lot
+  DELIVERY_CAR: { x: 1116, y: 524 },   // parked in the shop's lot
   DELIVERY_BIKE: { x: 990, y: 520 },   // scooter on the sidewalk by the door
   VEHICLES: {
     car:  { speed: 360, radius: 22, label: '🚗 Drive', exit: '🚶 Get out' },
@@ -219,7 +219,7 @@ const CFG = {
   ],
   POND: { x: -150, y: 460, rx: 70, ry: 42 },
   FOUNTAIN: { x: 450, y: 745 },
-  PARKING: { x0: 1012, y0: 330, x1: 1220, y1: 646 },
+  PARKING: { x0: 1012, y0: 330, x1: 1220, y1: 576 },   // a sidewalk runs below it to the door
   DOG_HOME: { x: -120, y: 640 },
 
   // Timing

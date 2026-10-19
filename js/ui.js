@@ -103,6 +103,7 @@ const UI = {
     this.els.city.textContent = `${CFG.SHOP_NAME} · ${s.stats.served} served`;
     this.els.hint.textContent = g.hint ? g.hint.text : '';
     this.els.paint.classList.toggle('hidden', !g.inPaintBay);
+    document.body.classList.toggle('painting', !!g.inPaintBay);
     const label = g.actionLabel();
     this.els.btnMake.classList.toggle('hidden', !label || this.open);
     if (label) this.els.btnMake.textContent = label;

@@ -165,13 +165,15 @@ const Render = {
     walk(-480, 1000, 1800, 20);
     walk(1320, 300, 20, 240);
     for (const h of CFG.HOUSES) walk(h.door.x - 14, 1000, 28, 22);
+    // the walk-in customers' path: from the east edge of town, over East Road, past the parking lot to the door
+    walk(B.x1 + 48, CFG.DOOR_OUT.y - 20, W.x1 - B.x1 - 48, 40);
     // parking lot
     const P = CFG.PARKING;
     ctx.fillStyle = '#5a5d63'; ctx.fillRect(P.x0, P.y0, P.x1 - P.x0, P.y1 - P.y0);
     ctx.fillStyle = 'rgba(255,255,255,0.05)';
     for (let i = 0; i < 90; i++) ctx.fillRect(P.x0 + ((i * 37) % (P.x1 - P.x0)), P.y0 + ((i * 53) % (P.y1 - P.y0)), 2, 2);
     ctx.strokeStyle = '#f3efe3'; ctx.lineWidth = 3;
-    for (let k = 0; k <= 4; k++) { const y = P.y0 + 14 + k * 72; ctx.beginPath(); ctx.moveTo(P.x0 + 20, y); ctx.lineTo(P.x0 + 130, y); ctx.stroke(); }
+    for (let k = 0; k <= 3; k++) { const y = P.y0 + 14 + k * 72; ctx.beginPath(); ctx.moveTo(P.x0 + 20, y); ctx.lineTo(P.x0 + 130, y); ctx.stroke(); }
     ctx.fillStyle = '#f3efe3'; ctx.font = this.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.save(); ctx.translate(P.x0 + 170, P.y0 + 150); ctx.rotate(-Math.PI / 2); ctx.fillText('PARKING', 0, 0); ctx.restore();
   },
@@ -252,6 +254,9 @@ const Render = {
     const cw = CFG.STATION.route[1].x;
     ctx.fillStyle = 'rgba(255,255,255,0.85)';
     for (let k = 0; k < 5; k++) ctx.fillRect(cw - 30, r.y1 + 8 + k * 14, 60, 8);
+    // crosswalk over East Road where walk-in customers come in from the edge of town
+    const er = CFG.ROADS[1], cy = CFG.DOOR_OUT.y;
+    for (let k = 0; k < 5; k++) ctx.fillRect(er.x0 + 8 + k * 14, cy - 18, 8, 36);
     // near sidewalk + curb (in front of the building)
     ctx.fillStyle = '#cfc8b8'; ctx.fillRect(W.x0, r.y2 - 10, W.x1 - W.x0, 10);
     ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(W.x0, r.y2 - 10, W.x1 - W.x0, 2);
@@ -728,13 +733,15 @@ const Render = {
     ctx.fillStyle = '#fff'; U.roundRect(ctx, x - 22, y - 24 + bob, 44, 24, 10); ctx.fill();
     ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.ellipse(x - 8, y - 14 + bob, 8, 6, 0.4, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.ellipse(x + 10, y - 18 + bob, 6, 5, -0.3, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#f8c8dc'; ctx.beginPath(); ctx.ellipse(x, y - 4 + bob, 8, 5, 0, 0, Math.PI * 2); ctx.fill(); // udder
-    // head
-    ctx.fillStyle = '#fff'; U.roundRect(ctx, x + f * 14, y - 30 + bob, 20, 18, 7); ctx.fill();
-    ctx.fillStyle = '#f8c8dc'; U.roundRect(ctx, x + f * 20 + (f > 0 ? 2 : -2), y - 20 + bob, 12, 8, 4); ctx.fill();
-    ctx.fillStyle = '#2b1d14'; ctx.fillRect(x + f * 22 + (f > 0 ? 3 : -7), y - 27 + bob, 3, 3); ctx.fillRect(x + f * 22 + (f > 0 ? 9 : -1), y - 27 + bob, 3, 3);
-    ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.ellipse(x + f * 18, y - 32 + bob, 5, 3, 0, 0, Math.PI * 2); ctx.ellipse(x + f * 30, y - 32 + bob, 5, 3, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#c9a36b'; ctx.fillRect(x + f * 24 - 1, y - 38 + bob, 3, 7);
-    ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x - f * 20, y - 18 + bob); ctx.lineTo(x - f * 28, y - 6 + bob + Math.sin(g.time * 3) * 4); ctx.stroke();
+    // head and tail: drawn facing right, then mirrored as a whole when the cow faces left
+    ctx.save(); ctx.translate(x, y + bob); ctx.scale(f, 1);
+    ctx.fillStyle = '#fff'; U.roundRect(ctx, 14, -30, 20, 18, 7); ctx.fill();
+    ctx.fillStyle = '#f8c8dc'; U.roundRect(ctx, 22, -20, 12, 8, 4); ctx.fill();
+    ctx.fillStyle = '#2b1d14'; ctx.fillRect(25, -27, 3, 3); ctx.fillRect(31, -27, 3, 3);
+    ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.ellipse(18, -32, 5, 3, 0, 0, Math.PI * 2); ctx.ellipse(30, -32, 5, 3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#c9a36b'; ctx.fillRect(23, -38, 3, 7);
+    ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(-20, -18); ctx.lineTo(-28, -6 + Math.sin(g.time * 3) * 4); ctx.stroke();
+    ctx.restore();
     if (c.moo > 0) this.drawBubble(x, y - 50, () => { ctx.font = this.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('Moo!', 0, 0); }, 44);
     else if (c.ready && g.s.farm.cheese < CFG.FARM.max) this.drawBubble(x, y - 50 + Math.sin(g.time * 4) * 3, () => { ctx.font = this.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('🧀', 0, 0); }, 30);
   },

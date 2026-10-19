@@ -48,9 +48,10 @@ const CFG = {
     { key: 'speed',    kind: 'upgrade', pos: { x: 300, y: 290 } },   // kitchen, right side
     { key: 'capacity', kind: 'upgrade', pos: { x: 300, y: 400 } },   // kitchen, right side
     { key: 'oven',     kind: 'upgrade', pos: { x: 90,  y: 432 } },   // below the ovens
-    { key: 'cashier',  kind: 'staff',   pos: { x: 60,  y: 535 } },   // office desk: hiring
-    { key: 'helper',   kind: 'staff',   pos: { x: 170, y: 535 } },
+    { key: 'cashier',  kind: 'staff',   pos: { x: 60,  y: 535 } },   // office desk: hiring, then training
+    { key: 'helper',   kind: 'staff',   mode: 'hire',  pos: { x: 170, y: 535 } },
     { key: 'cleaner',  kind: 'staff',   pos: { x: 280, y: 535 } },   // appears once there are tables
+    { key: 'helper',   kind: 'staff',   mode: 'train', pos: { x: 300, y: 612 } }, // appears once a helper is hired
   ],
   OFFICE_DESK: { x: 170, y: 612 },
   PAD_DWELL: 0.45, // seconds standing still on a pad before money starts flowing

@@ -139,16 +139,19 @@ const Game = {
   staffAvailable(role) { const st = CFG.STAFF[role]; return !st.needs || this.isUnlocked(st.needs); },
   staffHireCost(role) { const st = CFG.STAFF[role]; const n = this.s.staff[role].count; return n >= st.hire.length ? null : Math.round(st.hire[n] * this.costMult()); },
   staffUpgradeCost(role) { const st = CFG.STAFF[role]; const l = this.s.staff[role].level; return l >= st.upMax ? null : Math.round(st.upBase * Math.pow(st.upGrowth, l) * this.costMult()); },
-  // What the staff pad does next: hire while there are openings, then train.
-  staffPadAction(role) {
+  // What a staff pad does next. Default: hire while there are openings, then train.
+  // mode 'hire' / 'train' splits the two onto separate pads (used for helpers).
+  staffPadAction(role, mode) {
     const hire = this.staffHireCost(role);
-    if (hire !== null) return { action: 'hire', cost: hire };
     const up = this.staffUpgradeCost(role);
+    if (mode === 'hire') return hire !== null ? { action: 'hire', cost: hire } : null;
+    if (mode === 'train') return up !== null && this.s.staff[role].count > 0 ? { action: 'train', cost: up } : null;
+    if (hire !== null) return { action: 'hire', cost: hire };
     if (up !== null) return { action: 'train', cost: up };
     return null;
   },
-  applyStaffPad(role) {
-    const a = this.staffPadAction(role);
+  applyStaffPad(role, mode) {
+    const a = this.staffPadAction(role, mode);
     if (!a) return;
     if (a.action === 'hire') {
       const idx = this.s.staff[role].count++;
@@ -176,9 +179,11 @@ const Game = {
       } else {
         const st = CFG.STAFF[p.key];
         if (!this.staffAvailable(p.key)) continue; // appears once the dining area exists
-        const a = this.staffPadAction(p.key);
         const info = this.s.staff[p.key];
-        out.push({ key: p.key, kind: 'staff', label: a ? (a.action === 'hire' ? 'Hire ' + st.name : 'Train ' + st.name) : st.name, ico: st.ico, pos: p.pos, price: a ? a.cost : 0, maxed: !a, sub: info.count ? `${info.count} hired · Lv ${info.level}` : '' });
+        if (p.mode === 'train' && info.count < 1) continue; // training pad appears once somebody is hired
+        const a = this.staffPadAction(p.key, p.mode);
+        const label = a ? (a.action === 'hire' ? 'Hire ' + st.name : 'Train ' + st.name) : (p.mode === 'hire' ? st.name + 's' : st.name);
+        out.push({ key: p.key + (p.mode ? '_' + p.mode : ''), role: p.key, mode: p.mode, kind: 'staff', label, ico: p.mode === 'train' ? '⭐' : st.ico, pos: p.pos, price: a ? a.cost : 0, maxed: !a, sub: p.mode === 'train' ? `Lv ${info.level}/${st.upMax}` : info.count ? `${info.count} hired${p.mode ? '' : ' · Lv ' + info.level}` : '' });
       }
     }
     for (const it of CFG.DECOR_ITEMS) {
@@ -195,7 +200,7 @@ const Game = {
     this.fx.push({ kind: 'sparkle', x0: pad.pos.x, y0: pad.pos.y, x1: pad.pos.x, y1: pad.pos.y, t: 0, dur: 0.6 });
     if (pad.kind === 'upgrade') this.applyUpgrade(pad.key);
     else if (pad.kind === 'decor') { this.s.decor[pad.item] = true; this.toast(`${pad.label} bought!`); }
-    else this.applyStaffPad(pad.key);
+    else this.applyStaffPad(pad.role, pad.mode);
   },
 
   activeTables() { const n = this.isUnlocked('tables2') ? 4 : this.isUnlocked('dining') ? 2 : 0; return this.tables.slice(0, n); },

@@ -73,6 +73,12 @@ const Game = {
     this.dumptruck = { kind: 'dumptruck', x: SV.dumptruck.x, y: SV.dumptruck.y, angle: Math.PI, vx: 0, vy: 0 };
     this.bulldozer = { kind: 'bulldozer', x: SV.bulldozer.x, y: SV.bulldozer.y, angle: -0.5, vx: 0, vy: 0 };
     this.mounds = CFG.SITE.MOUNDS.map((m, i) => ({ i, x: m.x, y: m.y, r: m.r, flat: 0, t: 0 }));
+    // pick up where you left off (circles stay inert until you move, so reloading onto one costs nothing)
+    const pos = s.pos;
+    if (pos && CFG.AREAS[pos.area]) {
+      this.area = pos.area; this.player.x = pos.x; this.player.y = pos.y;
+      if (this.area === 'site') { const t = this.siteTrain, st = CFG.SITE.STATION; t.state = 'stopped'; t.x = st.stopX; t.unload = Infinity; t.departIn = Infinity; t.toDrop = 0; }
+    }
     this.plots = CFG.FARM.plots.map((pl, i) => ({ i, kind: pl.kind, x: pl.x, y: pl.y, ready: true, t: 0, phase: Math.random() * 6 }));
     this.cow = { x: CFG.FARM.cowHome.x, y: CFG.FARM.cowHome.y, facing: 1, moving: false, bob: 0, target: null, timer: 0, ready: true, t: 0, moo: 0 };
     this.padDwell = Object.create(null);
@@ -108,6 +114,7 @@ const Game = {
         paint: Object.assign(d.paint, data.paint || {}),
         unlocked: data.unlocked || {},
         padPaid: data.padPaid || {},
+        pos: data.pos || null,
       });
       return true;
     } catch (e) { console.warn('Save load failed', e); return false; }
@@ -119,6 +126,8 @@ const Game = {
       this.s.tablesTip = this.tables.map((t) => t.tip);
       this.s.savedAt = Date.now();
       this.s.muted = Sfx.muted;
+      // remember where you are (on foot only; mid-ride the last spot stands)
+      if (this.player && !this.driving && !this.onTrain && !this.travel && !this.ride) this.s.pos = { x: Math.round(this.player.x), y: Math.round(this.player.y), area: this.area };
       localStorage.setItem(CFG.SAVE_KEY, JSON.stringify(this.s));
     } catch (e) { /* storage may be unavailable */ }
   },

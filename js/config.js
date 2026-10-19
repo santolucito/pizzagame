@@ -118,7 +118,7 @@ const CFG = {
     // passengers walk along the far sidewalk, down the shop's side path, and in through the door
     route: [{ x: -700, y: -30 }, { x: 990, y: -30 }, { x: 990, y: 560 }],
     overflow: { x: 990, y: 520, dy: -44 },  // where extra customers queue outside the door
-    trash: { x: -530, y: -52 },             // a bin at the end of the platform path: dump pizzas you no longer want
+    trash: { x: -660, y: -46 },             // a bin at the end of the platform path: dump pizzas you no longer want
   },
   // Playground south of the farm across South Road
   PLAYGROUND: {

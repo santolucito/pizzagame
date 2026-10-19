@@ -775,11 +775,11 @@ const Render = {
     // trash can beside the path: throw away pizzas you are carrying
     const T = S.trash;
     ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(T.x + 3, T.y + 4, 16, 6, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#5c8a3c'; U.roundRect(ctx, T.x - 13, T.y - 30, 26, 32, 5); ctx.fill();
-    ctx.fillStyle = 'rgba(0,0,0,0.14)'; for (let i = 0; i < 3; i++) ctx.fillRect(T.x - 8 + i * 8, T.y - 24, 3, 22);
-    ctx.fillStyle = '#4a7230'; U.roundRect(ctx, T.x - 16, T.y - 36, 32, 9, 4); ctx.fill();
+    ctx.fillStyle = '#5c8a3c'; U.roundRect(ctx, T.x - 18, T.y - 30, 36, 32, 5); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.14)'; for (let i = 0; i < 4; i++) ctx.fillRect(T.x - 13 + i * 8, T.y - 24, 3, 22);
+    ctx.fillStyle = '#4a7230'; U.roundRect(ctx, T.x - 21, T.y - 36, 42, 9, 4); ctx.fill();
     ctx.fillStyle = '#3d5f27'; U.roundRect(ctx, T.x - 5, T.y - 40, 10, 5, 2); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.font = this.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('TRASH', T.x, T.y - 12);
+    ctx.fillStyle = '#fff'; ctx.font = this.font(8); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('TRASH', T.x, T.y - 12);
   },
 
   // Playground across South Road from the farm.

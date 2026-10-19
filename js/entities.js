@@ -242,9 +242,13 @@ class Staff {
         }
         if (this.carry === 0) { this.state = 'toOven'; this.target = null; }
         else if (g.s.piles[t.key] >= t.cap && this.timer > 0.6) {
-          const other = g.bestDropTarget();
-          if (other && other.key !== t.key) { this.target = other; this.state = 'toTarget'; }
+          const other = g.bestDropTarget(t.key);
+          if (other) { this.target = other; this.state = 'toTarget'; }
           else this.timer = 0;
+        } else if (g.stackNeed(t.key) <= -1) {
+          // this stack has what its people want; if the other one is short, take the rest there
+          const other = g.bestDropTarget(t.key);
+          if (other && g.stackNeed(other.key) > 0) { this.target = other; this.state = 'toTarget'; }
         }
         break;
       }

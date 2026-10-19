@@ -216,11 +216,22 @@ const Game = {
     if (this.isUnlocked('driveThru')) t.push({ key: 'dt', pos: CFG.DT_STACK, stand: CFG.DT_STACK_STAND, cap: CFG.DT_STACK_CAP });
     return t;
   },
-  bestDropTarget() {
-    let best = null, bestRatio = 1;
+  // How many more pizzas a stack needs: what the people waiting on it still want, minus what is already there.
+  stackNeed(key) {
+    const wanted = key === 'display'
+      ? this.customers.filter((c) => c.inMainQueue || c.entering).reduce((n, c) => n + (c.want - c.have), 0)
+      : this.cars.filter((c) => c.inLine).reduce((n, c) => n + (c.want - c.have), 0);
+    return wanted - this.s.piles[key];
+  },
+  // Where a helper should take pizzas: the stack with the biggest unmet demand, else the emptiest one.
+  bestDropTarget(exclude) {
+    let best = null, bestScore = -Infinity;
     for (const t of this.dropTargets()) {
-      const r = this.s.piles[t.key] / t.cap;
-      if (r < bestRatio) { bestRatio = r; best = t; }
+      if (exclude && t.key === exclude) continue;
+      if (this.s.piles[t.key] >= t.cap) continue;
+      const need = this.stackNeed(t.key);
+      const score = need > 0 ? 100 + need : (1 - this.s.piles[t.key] / t.cap);
+      if (score > bestScore) { bestScore = score; best = t; }
     }
     return best;
   },

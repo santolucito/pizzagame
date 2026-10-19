@@ -456,7 +456,7 @@ const Game = {
     o.push({ x: GA.x0, y: GA.y0, w: gd.x - gd.half - GA.x0, h: 8 }, { x: gd.x + gd.half, y: GA.y0, w: GA.x1 - (gd.x + gd.half), h: 8 });
     o.push({ x: GA.x0, y: GA.y0, w: 8, h: GA.y1 - GA.y0 }, { x: GA.x1 - 8, y: GA.y0, w: 8, h: GA.y1 - GA.y0 }, { x: GA.x0, y: GA.y1 - 8, w: GA.x1 - GA.x0, h: 8 });
     const F = CFG.FIRE_STATION; o.push({ x: F.x0, y: F.y0, w: F.x1 - F.x0, h: F.y1 - F.y0 });
-    const B2 = CFG.FARM.barn; o.push({ x: B2.x0, y: B2.y0, w: B2.x1 - B2.x0, h: B2.y1 - B2.y0 });
+    const B2 = CFG.FARM.barn; o.push({ x: B2.x0 + 24, y: B2.y0, w: B2.x1 - B2.x0 - 24, h: B2.y1 - B2.y0 });   // a slot behind the barn leads to the hidden fence gap
     // farm fences: perimeter with the east gate open, cow pen with a gate in its bottom rail
     const FA = CFG.FARM, G = FA.gate, P = FA.pen, PG = FA.penGate, fw = 8;
     const SG = FA.secretGate;   // the west fence has a hidden gap behind the barn

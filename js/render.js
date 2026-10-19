@@ -520,19 +520,6 @@ const Render = {
       ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, jx - 10, jy - 6, 20, 14, 3); ctx.fill();
       ctx.fillStyle = '#7fd1ff'; ctx.fillRect(jx - 8, jy - 4, 16, 4);
     });
-    ghost('chandelier', () => {
-      const ax = 300, ay = 142;
-      ctx.fillStyle = '#5b3a1a'; U.roundRect(ctx, ax - 22, ay - 16, 44, 32, 3); ctx.fill();
-      ctx.fillStyle = '#f2b134'; ctx.fillRect(ax - 19, ay - 13, 38, 26);
-      ctx.fillStyle = '#2b1d14'; ctx.font = this.font(8); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText('★ 5 STARS ★', ax, ay - 4); ctx.fillText('CITY BEST', ax, ay + 6);
-      if (!g.hasDecor('chandelier')) {
-        ctx.fillStyle = '#f2b134';
-        for (let k = 0; k < 5; k++) { const a = (k / 5) * Math.PI * 2; ctx.beginPath(); ctx.arc(790 + Math.cos(a) * 16, 300 + Math.sin(a) * 6, 3, 0, Math.PI * 2); ctx.fill(); }
-        ctx.beginPath(); ctx.arc(790, 300, 5, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = '#f2b134'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(790, 300); ctx.lineTo(790, 270); ctx.stroke();
-      }
-    });
   },
 
   // ======================= dynamic scenery =======================
@@ -557,16 +544,6 @@ const Render = {
       ctx.fillStyle = `rgba(255,120,220,${flicker})`; ctx.font = this.font(17); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText('♥ PIZZA ♥', 820, 126);
       ctx.restore();
-    }
-    if (g.hasDecor('chandelier')) {
-      // chandelier warm glow over the dining area
-      const grd = ctx.createRadialGradient(790, 380, 10, 790, 380, 170);
-      grd.addColorStop(0, 'rgba(255,220,140,0.28)'); grd.addColorStop(1, 'rgba(255,220,140,0)');
-      ctx.fillStyle = grd; ctx.fillRect(620, 220, 340, 320);
-      ctx.fillStyle = '#f2b134';
-      for (let k = 0; k < 5; k++) { const a = (k / 5) * Math.PI * 2 + t; ctx.beginPath(); ctx.arc(790 + Math.cos(a) * 16, 300 + Math.sin(a) * 6, 3, 0, Math.PI * 2); ctx.fill(); }
-      ctx.beginPath(); ctx.arc(790, 300, 5, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#f2b134'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(790, 300); ctx.lineTo(790, 270); ctx.stroke();
     }
   },
 
@@ -641,6 +618,16 @@ const Render = {
         if (t.cleanProg > 0) this.drawProgressRing(t.x, t.y, 30, t.cleanProg, '#2f9e44');
       } else if (t.occupied) {
         this.drawPizza(t.x, t.y + 2, 10);
+      }
+      if (t.tip > 0) {
+        for (let i = 0; i < Math.min(4, Math.ceil(t.tip / 10)); i++) {
+          ctx.fillStyle = '#2f9e44'; U.roundRect(ctx, t.x - 14 + i * 7, t.y - 2 - i * 2, 18, 9, 2); ctx.fill();
+          ctx.fillStyle = '#4caf50'; U.roundRect(ctx, t.x - 14 + i * 7, t.y - 4 - i * 2, 18, 9, 2); ctx.fill();
+          ctx.fillStyle = '#a5d6a7'; ctx.beginPath(); ctx.arc(t.x - 5 + i * 7, t.y + 0.5 - i * 2, 2.5, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.fillStyle = '#1f6e2e'; U.roundRect(ctx, t.x - 20, t.y - 30, 40, 15, 7); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.font = this.font(10); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(U.money(t.tip), t.x, t.y - 22);
       }
     }
   },

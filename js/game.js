@@ -20,6 +20,7 @@ const Game = {
       staff: { cashier: { count: 0, level: 0 }, helper: { count: 0, level: 0 }, cleaner: { count: 0, level: 0 } },
       piles: { oven: 0, display: 0, dt: 0, cash: 0, dtCash: 0 },
       tablesDirty: [false, false, false, false],
+      tablesTip: [0, 0, 0, 0],
       stats: { earned: 0, served: 0, lost: 0, coins: 0 },
       incomeRate: 0,
       savedAt: Date.now(),
@@ -39,7 +40,7 @@ const Game = {
     const s = this.s;
     this.player = { x: CFG.PLAYER_START.x, y: CFG.PLAYER_START.y, carry: 0, facing: 1, moving: false, xferCd: 0, bob: 0, cleanTarget: null };
     this.customers = []; this.cars = []; this.staff = []; this.fx = []; this.floats = [];
-    this.tables = CFG.TABLES.map((t, i) => ({ x: t.x, y: t.y, i, dirty: !!s.tablesDirty[i], occupied: null, cleanProg: 0, cleaner: null }));
+    this.tables = CFG.TABLES.map((t, i) => ({ x: t.x, y: t.y, i, dirty: !!s.tablesDirty[i], tip: (s.tablesTip || [])[i] || 0, occupied: null, cleanProg: 0, cleaner: null }));
     this.ovens = CFG.OVENS.map(() => ({ t: 0 }));
     for (const role of Object.keys(s.staff)) {
       for (let i = 0; i < s.staff[role].count; i++) this.staff.push(new Staff(role, i));
@@ -65,6 +66,7 @@ const Game = {
       const decor = Object.assign({}, data.decor || {});
       if (data.upg && data.upg.decor) CFG.DECOR_ITEMS.slice(0, data.upg.decor).forEach((it) => { decor[it.key] = true; });
       for (const k of Object.keys(upg)) if (!(k in CFG.UPGRADES)) delete upg[k];
+      for (const k of Object.keys(decor)) if (!CFG.DECOR_ITEMS.some((it) => it.key === k)) delete decor[k];
       this.s = Object.assign(d, data, {
         upg, decor,
         staff: Object.assign(d.staff, data.staff || {}),
@@ -80,6 +82,7 @@ const Game = {
   save() {
     try {
       this.s.tablesDirty = this.tables.map((t) => t.dirty);
+      this.s.tablesTip = this.tables.map((t) => t.tip);
       this.s.savedAt = Date.now();
       this.s.muted = Sfx.muted;
       localStorage.setItem(CFG.SAVE_KEY, JSON.stringify(this.s));
@@ -238,7 +241,22 @@ const Game = {
     this.floats.push({ x: this.player.x, y: this.player.y - 46, text: '+' + U.money(amt), color: '#ffe08a', t: 0, dur: 1, big: true });
     Sfx.cash(); Haptics.tap();
   },
+  // Tips left on tables: the player pockets them directly; the cleaner carries them to the register pile.
+  collectTip(t, byPlayer) {
+    const amt = t.tip; t.tip = 0;
+    if (amt <= 0) return;
+    if (byPlayer) {
+      this.s.cash += amt; this.s.stats.earned += amt;
+      for (let i = 0; i < Math.min(5, Math.ceil(amt / 10)); i++) this.fx.push({ kind: 'bill', x0: t.x + U.rand(-10, 10), y0: t.y - 6, x1: this.player.x, y1: this.player.y - 10, t: -i * 0.04, dur: 0.3, follow: true });
+      this.floats.push({ x: this.player.x, y: this.player.y - 46, text: 'Tip +' + U.money(amt), color: '#ffe08a', t: 0, dur: 1, big: true });
+      Sfx.cash(); Haptics.tap();
+    } else {
+      this.s.piles.cash += amt;
+      this.fx.push({ kind: 'cash', x0: t.x, y0: t.y - 6, x1: CFG.CASH_PILE.x, y1: CFG.CASH_PILE.y, t: 0, dur: 0.5 });
+    }
+  },
   cleanTable(t) {
+    if (t.tip > 0) this.collectTip(t, false);
     t.dirty = false; t.cleanProg = 0;
     this.fx.push({ kind: 'sparkle', x0: t.x, y0: t.y, x1: t.x, y1: t.y, t: 0, dur: 0.6 });
     Sfx.clean();
@@ -353,6 +371,7 @@ const Game = {
 
     p.cleanTarget = null;
     for (const t of this.activeTables()) {
+      if (t.tip > 0 && near(t, 58)) this.collectTip(t, true);
       if (t.dirty && near(t, 58)) {
         p.cleanTarget = t;
         t.cleanProg += dt / this.cleanTime('player');

@@ -109,6 +109,9 @@ class Customer {
       case 'eating': {
         this.timer -= dt;
         if (this.timer <= 0) {
+          const tip = Math.round(g.price() * this.want * CFG.TIP_RATE * (this.special ? SPECIALS[this.special].tip : 1));
+          this.table.tip += tip;
+          g.floats.push({ x: this.table.x, y: this.table.y - 30, text: 'Tip ' + U.money(tip), color: '#2f9e44', t: 0, dur: 1.2 });
           this.table.occupied = null; this.table.dirty = true; this.table.cleanProg = 0; this.table = null;
           this.have = 0; this.leave();
         }

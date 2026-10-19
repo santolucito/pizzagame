@@ -62,7 +62,6 @@ const CFG = {
     { key: 'lights',     label: 'String Lights', ico: '💡', price: 120, spot: { x: 250, y: 168 } },
     { key: 'neon',       label: 'Neon Sign',     ico: '💗', price: 180, spot: { x: 820, y: 240 } },
     { key: 'jukebox',    label: 'Jukebox & Rug', ico: '🎵', price: 260, spot: { x: 918, y: 262 } },
-    { key: 'chandelier', label: 'Chandelier',    ico: '✨', price: 400, spot: { x: 790, y: 300 } },
   ],
 
   // Unlockable areas.
@@ -116,6 +115,7 @@ const CFG = {
   BAKE_TIME: 2.4,
   CHECKOUT_TIME: 1.6,
   EAT_TIME: 6,
+  TIP_RATE: 0.5, // diners leave half their bill on the table as a tip
   CLEAN_TIME: 1.3,
   PATIENCE: 60,
   CAR_PATIENCE: 55,

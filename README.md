@@ -45,12 +45,12 @@ No build step, no dependencies: plain HTML5 Canvas + vanilla JavaScript.
 3. Stand at the **register** to check them out (or hire a cashier). Cash piles up next to the register.
 4. Walk over the **cash pile** to collect it.
 5. Stand on glowing **pads** to pour money into unlocks:
-   - **Dining Area / More Tables** — some customers eat in and leave dirty tables to clean.
+   - **Tables / More Tables** — some customers eat in, leave a tip on the table (half their bill) and a mess to clean.
    - **2nd Oven** — doubles production.
    - **Drive‑Thru** — cars queue at a window on the road and pay 1.5× for pizzas you drop at the window.
 6. Upgrade circles (Speed, Carry More, Better Oven) and staff circles (Cashier, Helper, Cleaner) sit where
    they belong in the shop; stand still on one to buy. Staff circles hire first, then train.
-7. Grayed-out **decorations** (plants, posters, string lights, neon sign, jukebox, chandelier) show where
+7. Grayed-out **decorations** (plants, posters, string lights, neon sign, jukebox) show where
    they will go; buy them to bring more, and more patient, customers.
 8. Walk out of the door to explore the **park, street and parking lot**: collect coins and meet the dog.
 

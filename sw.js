@@ -1,7 +1,7 @@
 'use strict';
 // Service worker: caches the app shell so the game installs to the home screen and loads offline.
 // Network-first so a new deploy is picked up on the next load; cache is the fallback.
-const CACHE = 'pizza-rush-v54';
+const CACHE = 'pizza-rush-v55';
 const SHELL = ['./', 'index.html', 'css/style.css', 'js/config.js', 'js/utils.js', 'js/audio.js', 'js/input.js',
   'js/entities.js', 'js/minigame.js', 'js/game.js', 'js/render.js', 'js/ui.js', 'js/city.js', 'js/islands.js', 'js/atmosphere.js', 'js/secret.js', 'js/balloons.js', 'js/icdrivethru.js', 'js/upstairs.js', 'js/airfield.js', 'js/main.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png'];

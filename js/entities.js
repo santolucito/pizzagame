@@ -445,7 +445,8 @@ class Dog {
     const d = U.dist(this.x, this.y, p.x, p.y);
     if (playerOutside && d < 170) {
       this.state = 'follow';
-      if (d > 48) { U.moveToward(this, p.x, p.y, 150, dt); this.bob += dt * 16; }
+      // trot after the player, but never into the building: wait outside the door instead of jumping out
+      if (d > 48) { const nx = { x: this.x, y: this.y }; U.moveToward(nx, p.x, p.y, 150, dt); if (g.insideBuilding(nx.x, nx.y)) { this.moving = false; } else { this.x = nx.x; this.y = nx.y; this.moving = true; this.facing = p.x < this.x ? -1 : 1; this.bob += dt * 16; } }
       else { this.moving = false; this.facing = p.x < this.x ? -1 : 1; if (d < 36 && this.happy <= 0) { this.happy = 1.2; g.floats.push({ x: this.x, y: this.y - 36, text: '♥', color: '#ff6b8a', t: 0, dur: 1 }); } }
     } else {
       this.state = 'wander';
@@ -456,7 +457,7 @@ class Dog {
       if (U.moveToward(this, this.target.x, this.target.y, 70, dt)) { this.moving = false; this.target = null; this.timer = U.rand(1, 3); }
       else this.bob += dt * 10;
     }
-    // keep the dog out of the building
-    if (g.insideBuilding(this.x, this.y)) { this.x = CFG.BUILDING.x1 + 20; }
+    // safety net only (the follow logic above never steps inside): ease back out through the door side
+    if (g.insideBuilding(this.x, this.y)) { this.x = Math.min(CFG.BUILDING.x1 + 20, this.x + 120 * dt); }
   }
 }

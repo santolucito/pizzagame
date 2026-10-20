@@ -121,7 +121,7 @@ const IslandsExt = {
       { x: D.x1, y: R.y0, w: R.x1 - D.x1, h: R.y1 - R.y0 },           // water east of the dock
     ], 300);
     o.push({ x: D.x0, y: D.y1, w: D.x1 - D.x0, h: R.y1 - D.y1 });     // water past the end of the dock
-    o.push({ x: I.SIGN.x - 4, y: I.SIGN.y - 4, w: 8, h: 8 }, { x: I.BENCH.x - 20, y: I.BENCH.y - 4, w: 40, h: 10 });
+    o.push({ x: I.SIGN.x - 4, y: I.SIGN.y - 4, w: 8, h: 8 });   // the bench by the ferry stop is walk-through
     return o;
   },
   obstacles(g, forCar) {

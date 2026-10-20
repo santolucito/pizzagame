@@ -81,11 +81,10 @@ const AirfieldExt = {
   onRunway(v, area) { return this.inRect(v.x, v.y, area === 'town' ? CFG.AIRFIELD.RUNWAY : CFG.CLOUD.RUNWAY, -30); },   // a little slack past the edge lines
   aligned(v, area) { return area === 'town' ? Math.abs(Math.sin(v.angle)) > 0.8 : Math.abs(Math.cos(v.angle)) > 0.8; },
   planeOf(g) { return !this.rt ? null : g.area === 'town' ? this.rt.plane : g.area === 'cloud' ? this.rt.cloudPlane : null; },
-  // driving the plane down the runway fast enough and straight enough to lift off
+  // sitting in the plane is enough: pressing the button taxis it onto the runway and takes off (kid-simple)
   readyToFly(g) {
     const v = this.planeOf(g);
-    if (!v || !g.driving || g.vehicle !== v || this.rt.runup || this.rt.roll) return false;
-    return this.onRunway(v, g.area) && Math.hypot(v.vx, v.vy) > CFG.VEHICLES.plane.speed * 0.4 && this.aligned(v, g.area);
+    return !!v && g.driving && g.vehicle === v && !this.rt.runup && !this.rt.roll;
   },
   chunk(rects, max) {
     const out = [];
@@ -173,8 +172,12 @@ const AirfieldExt = {
   },
   takeOff(g) {
     const rt = this.rt, v = this.planeOf(g), town = g.area === 'town', R = town ? CFG.AIRFIELD.RUNWAY : CFG.CLOUD.RUNWAY;
-    const dir = town ? { x: 0, y: v.vy < 0 ? -1 : 1 } : { x: v.vx < 0 ? -1 : 1, y: 0 };
-    rt.runup = { plane: v, t: 0, dur: CFG.AIRFIELD.RUNUP, dir, centre: town ? (R.x0 + R.x1) / 2 : (R.y0 + R.y1) / 2, to: town ? 'cloud' : 'town' };
+    // head whichever way leaves the most runway, then taxi to the centreline first if the plane is not on it
+    const dir = town ? { x: 0, y: v.y > (R.y0 + R.y1) / 2 ? -1 : 1 } : { x: v.x > (R.x0 + R.x1) / 2 ? -1 : 1, y: 0 };
+    const entry = town ? { x: (R.x0 + R.x1) / 2, y: U.clamp(v.y, R.y0 + 120, R.y1 - 120) } : { x: U.clamp(v.x, R.x0 + 120, R.x1 - 120), y: (R.y0 + R.y1) / 2 };
+    const far = U.dist(v.x, v.y, entry.x, entry.y);
+    const taxi = far > 12 ? { from: { x: v.x, y: v.y }, to: entry, t: 0, dur: U.clamp(far / 260, 0.4, 1.6) } : null;
+    rt.runup = { plane: v, t: 0, dur: CFG.AIRFIELD.RUNUP, dir, centre: town ? (R.x0 + R.x1) / 2 : (R.y0 + R.y1) / 2, to: town ? 'cloud' : 'town', taxi };
     g.floats.push({ x: v.x, y: v.y - 60, text: town ? 'Up, up and away! ✈️' : 'Home we go! ✈️', color: '#ffe08a', t: 0, dur: 1.4, big: true });
     Sfx.tone(110, 1.1, 'sawtooth', 0.03, 260); Haptics.success();
   },
@@ -228,6 +231,15 @@ const AirfieldExt = {
   updateRunup(g, dt) {
     const rt = this.rt, ru = rt.runup, v = ru.plane;
     if (!g.driving || g.vehicle !== v) { rt.runup = null; v.lift = 0; return; }   // hopped out: never mind
+    if (ru.taxi) {   // roll gently onto the runway first
+      const tx = ru.taxi; tx.t += dt; const k = U.easeOut(Math.min(1, tx.t / tx.dur));
+      v.x = U.lerp(tx.from.x, tx.to.x, k); v.y = U.lerp(tx.from.y, tx.to.y, k);
+      const ang = Math.atan2(tx.to.y - tx.from.y, tx.to.x - tx.from.x), want = k > 0.7 ? Math.atan2(ru.dir.y, ru.dir.x) : ang;
+      let d = want - v.angle; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; v.angle += d * Math.min(1, dt * 6);
+      v.vx = 60 * ru.dir.x; v.vy = 60 * ru.dir.y; g.player.x = v.x; g.player.y = v.y;
+      if (tx.t >= tx.dur) ru.taxi = null;
+      return;
+    }
     ru.t += dt;
     const k = Math.min(1, ru.t / ru.dur), sp = 150 + 520 * k, W = g.bounds();
     v.x += ru.dir.x * sp * dt; v.y += ru.dir.y * sp * dt;
@@ -335,8 +347,7 @@ const AirfieldExt = {
       if (g.driving) {
         if (g.vehicle !== rt.plane) return undefined;
         if (this.readyToFly(g)) return { text: '🛫 Press the button to take off!', target: null };
-        if (this.onRunway(rt.plane, 'town')) return { text: 'Zoom down the runway to take off!', target: null };
-        const R = A.RUNWAY; return { text: 'Taxi onto the runway to take off', target: { x: (R.x0 + R.x1) / 2, y: U.clamp(p.y, R.y0 + 80, R.y1 - 80) } };
+        return { text: '🛫 Press the button to take off!', target: null };
       }
       if (p.carry > 0 && g.houses.some((h) => h.order)) return undefined;   // a delivery is more urgent
       const coin = this.nearCoin(g, A.STRIP, 300); if (coin) return { text: 'Grab the shiny coin!', target: coin };
@@ -349,8 +360,7 @@ const AirfieldExt = {
       if (g.vehicle === rt.balloon) return { text: 'Float around! Hop out over a cloud', target: null };
       if (g.vehicle !== rt.cloudPlane) return { text: 'Vroom!', target: null };
       if (this.readyToFly(g)) return { text: '🛫 Press the button to fly home!', target: null };
-      if (this.onRunway(rt.cloudPlane, 'cloud')) return { text: 'Zoom down the runway to fly home!', target: null };
-      const R = C.RUNWAY; return { text: 'Taxi onto the runway to fly home', target: { x: U.clamp(p.x, R.x0 + 80, R.x1 - 80), y: (R.y0 + R.y1) / 2 } };
+      return { text: '🛫 Press the button to fly home!', target: null };
     }
     if (!rt.balloonRidden) return { text: 'Ride the balloon!', target: U.dist(p.x, p.y, rt.balloon.x, rt.balloon.y) < 70 ? null : rt.balloon };
     if (!rt.glided) return { text: 'Try the glider ramp!', target: C.GLIDER.top };

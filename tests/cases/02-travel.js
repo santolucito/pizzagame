@@ -43,15 +43,13 @@ module.exports = async (t) => {
   // ---- plane to Cloud Harbor and back
   await t.ev(() => { T.tp(1900, 520, 'town'); T.step(2); Game.enterCar(); });
   t.expectEq(await t.ev(() => Game.vehicle && Game.vehicle.kind), 'plane', 'hopped into the plane by the hangar');
-  await t.ev(() => { T.steer(-1, 0); T.until(() => Game.vehicle.x < 1752, 400); T.steer(0, -1); T.until(() => T.label() === '🛫 Take off!', 600); T.unsteer(); });
-  t.expectEq(await t.ev(() => T.label()), '🛫 Take off!', 'take-off offered on the runway');
+  t.expectEq(await t.ev(() => T.label()), '🛫 Take off!', 'take-off offered as soon as you sit in the plane');
   await t.ev(() => { T.act(); T.until(() => Game.area === 'cloud' && !Game.travel && !Game.driving, 4000); });
   t.expectEq(await t.ev(() => Game.area), 'cloud', 'landed at Cloud Harbor');
   await t.ev(() => { T.step(200); const v = AirfieldExt.rt.cloudPlane; Game.player.x = v.x; Game.player.y = v.y + 46; T.step(2); Game.enterCar(); });
   t.expectEq(await t.ev(() => Game.vehicle && Game.vehicle.kind), 'plane', 'hopped into the plane at Cloud Harbor');
-  await t.ev(() => { T.steer(-1, 0); T.until(() => T.label() === '🛫 Fly home!', 800); });
-  t.expectEq(await t.ev(() => T.label()), '🛫 Fly home!', 'fly-home offered on the cloud runway');
-  await t.ev(() => { T.act(); T.unsteer(); T.until(() => Game.area === 'town' && !Game.travel && !Game.driving, 4000); });
+  t.expectEq(await t.ev(() => T.label()), '🛫 Fly home!', 'fly-home offered as soon as you sit in the cloud plane');
+  await t.ev(() => { T.act(); T.until(() => Game.area === 'town' && !Game.travel && !Game.driving, 4000); });
   t.expectEq(await t.ev(() => Game.area), 'town', 'flew home');
 
   // ---- the cabin

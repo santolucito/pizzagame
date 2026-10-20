@@ -74,12 +74,14 @@ CFG.CITY = {
   TOWN_ARRIVE: { x: 500, y: -30 },
   RIDE: 7,
   // the Pizza Tower: walk in through the lobby door and ride the elevator. Each floor is one wide room,
-  // drawn over the city (the room sits at the top of the map; the player is teleported into it)
+  // drawn over the city in the middle of the map (the player is teleported into it); the elevator car is set
+  // into the back wall and a row of numbered buttons in front of it picks the floor
   TOWER: {
     door: { x: 5115, y: 472 },
-    ROOM: { x0: 4960, y0: -165, x1: 5400, y1: 0 },
-    wall: 44, floors: 6,
+    ROOM: { x0: 5000, y0: 595, x1: 5600, y1: 865 },
+    wall: 70, floors: 6,
     names: ['', 'Lobby', 'Pizza Party Office', 'Gym', 'Aquarium', 'Dentist', 'Rooftop Garden'],
+    icons: ['', '🛎️', '🍕', '🏋️', '🐠', '🦷', '🌳'],
   },
   coins: [{ x: 5560, y: 390 }, { x: 4760, y: 132 }, { x: 6040, y: 992 }, { x: 5200, y: 572 }, { x: 4700, y: 1050 }, { x: 5620, y: 1050 }],
 };
@@ -91,6 +93,7 @@ const CityExt = {
   name: 'city',
   st: null,
   floor: null,   // which floor of the Pizza Tower the chef is on (null = outside)
+  viewing: null, // looking through the rooftop telescope: { t, x, y }
 
   // ---------- small helpers ----------
   hash(i) { const v = Math.sin(i * 12.9898 + 78.233) * 43758.5453; return v - Math.floor(v); },
@@ -98,11 +101,10 @@ const CityExt = {
   nearTownStop(g) { const p = g.player, S = CFG.CITY.TOWN_STOP; return !g.driving && !g.onTrain && !g.ride && !g.fishing && p.x > S.x - 80 && p.x < S.x + 80 && p.y > -100 && p.y < 16; },
   nearCityStop(g) { const p = g.player, S = CFG.CITY.STOP; return !g.driving && !g.onTrain && !this.floor && U.dist(p.x, p.y, S.x, S.y) < 95; },
   nearTowerDoor(g) { const p = g.player, D = CFG.CITY.TOWER.door; return !g.driving && !g.onTrain && !this.floor && U.dist(p.x, p.y, D.x, D.y) < 36; },
-  liftSpot() { const R = CFG.CITY.TOWER.ROOM; return { x: (R.x0 + R.x1) / 2, y: R.y0 + 62 }; },
-  upPad() { const R = CFG.CITY.TOWER.ROOM; return { x: (R.x0 + R.x1) / 2 - 48, y: R.y0 + 92 }; },
-  downPad() { const R = CFG.CITY.TOWER.ROOM; return { x: (R.x0 + R.x1) / 2 + 48, y: R.y0 + 92 }; },
-  exitSpot() { const R = CFG.CITY.TOWER.ROOM; return { x: (R.x0 + R.x1) / 2, y: R.y1 - 22 }; },
-  telescope() { const R = CFG.CITY.TOWER.ROOM; return { x: R.x1 - 70, y: R.y0 + 110 }; },
+  liftSpot() { const R = CFG.CITY.TOWER.ROOM; return { x: (R.x0 + R.x1) / 2, y: R.y0 + 64 }; },
+  padPos(i) { const R = CFG.CITY.TOWER.ROOM; return { x: R.x0 + 90 + (i - 1) * 84, y: R.y0 + 96 }; },   // the six floor buttons in front of the car
+  exitSpot() { const R = CFG.CITY.TOWER.ROOM; return { x: (R.x0 + R.x1) / 2, y: R.y1 - 24 }; },
+  telescope() { const R = CFG.CITY.TOWER.ROOM; return { x: R.x1 - 60, y: R.y1 - 56 }; },
   busDoor(bus) { return { x: bus.x - 44, y: bus.y - 28 }; },   // westbound: the front door is on the sidewalk side near the nose
 
   // ---------- game hooks ----------
@@ -127,12 +129,12 @@ const CityExt = {
       cityBus: { x: C.STOP.x, y: C.STOP.y, angle: Math.PI, state: 'stopped' },
       taxi: { kind: 'taxi', x: C.TAXI.x, y: C.TAXI.y, angle: 0, vx: 0, vy: 0 },
       taxis, peds, pigeons, boarding: null, taxiDriven: false, scattered: 0, notes: [],
-      lift: null, floorT: 0, seenTower: false, seenView: false, roofPigeons: [{ x: 60, y: 80 }, { x: 120, y: 95 }, { x: 330, y: 70 }].map((q) => ({ x: q.x, y: q.y, lift: 0, state: 'walk', facing: 1, flap: 0, t: 0 })),
+      lift: null, floorT: 0, seenTower: false, seenView: false, padSel: null, padT: 0, pickerT: 0, roofPigeons: [{ x: 60, y: 240 }, { x: 250, y: 150 }, { x: 470, y: 250 }].map((q) => ({ x: q.x, y: q.y, lift: 0, state: 'walk', facing: 1, flap: 0, t: 0 })),
     };
-    this.floor = null;
+    this.floor = null; this.viewing = null;
     // a save made inside the Pizza Tower reloads onto the room's spot: put the chef back in the lobby
     const R = C.TOWER.ROOM, p = g.player;
-    if (g.area === 'city' && p.x > R.x0 - 20 && p.x < R.x1 + 20 && p.y > R.y0 - 20 && p.y < R.y1 + 20) { this.floor = 1; this.st.seenTower = true; const e = this.exitSpot(); p.x = e.x; p.y = e.y - 10; }
+    if (g.area === 'city' && p.x > R.x0 - 20 && p.x < R.x1 + 20 && p.y > R.y0 - 20 && p.y < R.y1 + 20) { this.floor = 1; this.st.seenTower = true; const e = this.exitSpot(); p.x = e.x; p.y = e.y - 14; }
   },
 
   update(g, dt) {
@@ -608,38 +610,43 @@ const CityExt = {
     ctx.globalAlpha = 1;
   },
 
-  // ---------- the Pizza Tower: lobby door, elevator, six floors ----------
+  // ---------- the Pizza Tower: lobby door, elevator with a floor picker, six floors, the rooftop telescope ----------
   enterTower(g) {
     const st = this.st, S = this.exitSpot();
-    this.floor = 1; st.lift = null; st.floorT = 0; st.seenTower = true;
-    g.player.x = S.x; g.player.y = S.y - 10; g.player.moving = false; g.player.facing = 1; g.player.hasMoved = true; g.cameraSnap = true;
+    this.floor = 1; this.viewing = null; st.lift = null; st.floorT = 0; st.seenTower = true; st.padSel = null; st.padT = 0; st.pickerT = 0;
+    g.player.x = S.x; g.player.y = S.y - 14; g.player.moving = false; g.player.facing = 1; g.player.hasMoved = true; g.cameraSnap = true;
     g.floats.push({ x: g.player.x, y: g.player.y - 60, text: 'Welcome to the Pizza Tower!', color: '#ffe08a', t: 0, dur: 1.6, big: true });
     Haptics.tap();
   },
   leaveTower(g) {
     const D = CFG.CITY.TOWER.door;
-    this.floor = null; this.st.lift = null;
+    this.floor = null; this.viewing = null; this.st.lift = null;
     g.player.x = D.x; g.player.y = D.y + 6; g.player.moving = false; g.cameraSnap = true;
   },
+  inCar(p) { const R = CFG.CITY.TOWER.ROOM, cx = (R.x0 + R.x1) / 2; return Math.abs(p.x - cx) < 80 && p.y < R.y0 + 78; },
+  onPad(p, i) { const q = this.padPos(i), dx = (p.x - q.x) / 36, dy = (p.y - q.y) / 19; return dx * dx + dy * dy < 1; },
   towerAction(g) {
-    const st = this.st, p = g.player, T = CFG.CITY.TOWER;
+    const st = this.st, p = g.player, T = CFG.CITY.TOWER, ex = this.exitSpot(), tl = this.telescope();
+    if (this.viewing) return { label: '🚶 Done looking', run: () => { this.viewing = null; } };
     if (st.lift) return null;
-    const up = this.upPad(), down = this.downPad(), ex = this.exitSpot();
-    if (this.floor === 1 && U.dist(p.x, p.y, ex.x, ex.y) < 34) return { label: '🚪 Out to the street', run: (gg) => this.leaveTower(gg) };
-    if (this.floor < T.floors && U.dist(p.x, p.y, up.x, up.y) < 30) return { label: '🛗 Up a floor', run: (gg) => this.ride(gg, this.floor + 1) };
-    if (this.floor > 1 && U.dist(p.x, p.y, down.x, down.y) < 30) return { label: '🛗 Down a floor', run: (gg) => this.ride(gg, this.floor - 1) };
+    if (this.floor === 1 && U.dist(p.x, p.y, ex.x, ex.y) < 36) return { label: '🚪 Out to the street', run: (gg) => this.leaveTower(gg) };
+    if (this.floor === T.floors && U.dist(p.x, p.y, tl.x, tl.y) < 52) return { label: '🔭 Look through the telescope', run: (gg) => { this.viewing = { t: 0, x: gg.player.x, y: gg.player.y }; st.seenView = true; gg.player.moving = false; Haptics.tap(); } };
+    if (this.inCar(p)) return { label: '🛗 Pick a floor', run: (gg) => { st.pickerT = 4; gg.floats.push({ x: gg.player.x, y: gg.player.y - 64, text: 'Step on a floor button!', color: '#ffe08a', t: 0, dur: 1.4, big: true }); } };
     return null;
   },
   ride(g, to) {
+    if (to === this.floor) return;
     this.st.lift = { phase: 'closing', t: 0, from: this.floor, to, shown: this.floor };
+    this.st.padSel = null; this.st.padT = 0; this.st.pickerT = 0;
     g.player.moving = false; Haptics.tap();
   },
   updateTower(g, dt) {
-    const st = this.st, L = st.lift, p = g.player, T = CFG.CITY.TOWER;
-    st.floorT += dt;
+    const st = this.st, L = st.lift, p = g.player, T = CFG.CITY.TOWER, R = T.ROOM;
+    st.floorT += dt; st.pickerT = Math.max(0, st.pickerT - dt);
+    if (this.viewing) { const v = this.viewing; v.t += dt; p.x = v.x; p.y = v.y; p.moving = false; return; }   // eyes on the telescope
     if (L) {
       const sp = this.liftSpot();
-      // slide into the doorway, then the doors close, the counter ticks, ding, the doors open on the new floor
+      // slide into the car, then the doors close, the counter ticks, ding, the doors open on the new floor
       p.x = U.lerp(p.x, sp.x, Math.min(1, dt * 10)); p.y = U.lerp(p.y, sp.y, Math.min(1, dt * 10)); p.moving = false;
       L.t += dt;
       if (L.phase === 'closing' && L.t >= 0.7) { L.phase = 'moving'; L.t = 0; }
@@ -649,184 +656,341 @@ const CityExt = {
         if (L.t >= n * 0.45 + 0.3) { this.floor = L.to; L.shown = L.to; L.phase = 'opening'; L.t = 0; st.floorT = 0; Sfx.ding(); }
       } else if (L.phase === 'opening' && L.t >= 0.7) {
         st.lift = null; p.x = sp.x; p.y = sp.y;
-        g.floats.push({ x: p.x, y: p.y - 64, text: `${this.floor === T.floors ? '🌤️' : '🛗'} ${T.names[this.floor]}!`, color: '#ffe08a', t: 0, dur: 1.5, big: true });
+        g.floats.push({ x: p.x, y: p.y - 64, text: `${T.icons[this.floor]} ${T.names[this.floor]}!`, color: '#ffe08a', t: 0, dur: 1.5, big: true });
       }
       return;
     }
-    // the rooftop view through the telescope
-    if (this.floor === T.floors && U.dist(p.x, p.y, this.telescope().x, this.telescope().y) < 50 && !st.seenView) { st.seenView = true; }
+    // the floor picker: stand on one of the numbered buttons for a moment
+    let on = null;
+    for (let i = 1; i <= T.floors; i++) if (this.onPad(p, i)) on = i;
+    if (on && on !== this.floor) { if (st.padSel !== on) st.padT = 0; st.padSel = on; st.padT += dt; if (st.padT >= 0.45) this.ride(g, on); }
+    else { st.padSel = null; st.padT = 0; }
     // rooftop pigeons scatter like the ones on the square
-    const R = T.ROOM;
-    for (const b of st.roofPigeons) {
+    if (this.floor === T.floors) for (const b of st.roofPigeons) {
       b.t -= dt; b.flap += dt * 24;
       const wx = R.x0 + b.x, wy = R.y0 + b.y, d = U.dist(wx, wy, p.x, p.y);
-      if (b.state !== 'fly' && d < 60) { b.state = 'fly'; b.t = 1.2; const a = Math.atan2(wy - p.y, wx - p.x); b.tx = U.clamp(b.x + Math.cos(a) * 160, 30, R.x1 - R.x0 - 30); b.ty = U.clamp(b.y + Math.sin(a) * 60, 60, 150); }
+      if (b.state !== 'fly' && d < 60) { b.state = 'fly'; b.t = 1.2; const a = Math.atan2(wy - p.y, wx - p.x); b.tx = U.clamp(b.x + Math.cos(a) * 160, 24, R.x1 - R.x0 - 24); b.ty = U.clamp(b.y + Math.sin(a) * 60, 100, 220); }
       if (b.state === 'fly') { b.lift = Math.min(36, b.lift + dt * 90); if (U.moveToward(b, b.tx, b.ty, 220, dt) || b.t <= 0) b.state = 'land'; }
       else if (b.state === 'land') { b.lift = Math.max(0, b.lift - dt * 100); if (b.lift === 0) { b.state = 'walk'; b.t = U.rand(1, 3); } }
-      else if (b.t <= 0) { b.tx = U.clamp(b.x + U.rand(-40, 40), 30, R.x1 - R.x0 - 30); b.ty = U.clamp(b.y + U.rand(-20, 20), 60, 150); b.t = U.rand(1.5, 4); }
+      else if (b.t <= 0) { b.tx = U.clamp(b.x + U.rand(-40, 40), 24, R.x1 - R.x0 - 24); b.ty = U.clamp(b.y + U.rand(-20, 20), 100, 220); b.t = U.rand(1.5, 4); }
       else if (!U.moveToward(b, b.tx, b.ty, 24, dt)) b.facing = b.tx < b.x ? -1 : 1;
     }
   },
   roomObstacles() {
     const T = CFG.CITY.TOWER, R = T.ROOM, w = R.x1 - R.x0, cx = (R.x0 + R.x1) / 2, o = [];
-    o.push({ x: R.x0 - 10, y: R.y0 - 10, w: w + 20, h: T.wall + 10 }, { x: R.x0 - 10, y: R.y0, w: 18, h: R.y1 - R.y0 }, { x: R.x1 - 8, y: R.y0, w: 18, h: R.y1 - R.y0 }, { x: R.x0, y: R.y1 - 8, w: w, h: 18 });
+    const X = R.x0, Y = R.y0, box = (x, y, bw, bh) => o.push({ x: X + x, y: Y + y, w: bw, h: bh });
+    // walls: the lintel over the elevator car, the back wall on both sides of the car, the sides and the front
+    o.push({ x: R.x0 - 10, y: R.y0 - 10, w: w + 20, h: 26 }, { x: R.x0 - 10, y: R.y0, w: cx - 80 - (R.x0 - 10), h: T.wall }, { x: cx + 80, y: R.y0, w: R.x1 + 10 - (cx + 80), h: T.wall });
+    o.push({ x: R.x0 - 10, y: R.y0, w: 18, h: R.y1 - R.y0 }, { x: R.x1 - 8, y: R.y0, w: 18, h: R.y1 - R.y0 }, { x: R.x0, y: R.y1 - 8, w: w, h: 18 });
     const f = this.floor;
-    if (f === 1) o.push({ x: R.x0 + 40, y: R.y0 + 60, w: 90, h: 26 }, { x: R.x1 - 110, y: R.y0 + 70, w: 70, h: 36 });                // desk, fountain
-    else if (f === 2) for (let i = 0; i < 3; i++) o.push({ x: R.x0 + 50 + i * 130, y: R.y0 + 64, w: 70, h: 24 });                  // desks
-    else if (f === 3) for (let i = 0; i < 3; i++) o.push({ x: R.x0 + 60 + i * 110, y: R.y0 + 58, w: 56, h: 30 });                   // treadmills
-    else if (f === 4) o.push({ x: cx - 40, y: R.y0 + 120, w: 80, h: 14 });                                                           // bench
-    else if (f === 5) o.push({ x: R.x0 + 30, y: R.y0 + 60, w: 130, h: 26 }, { x: R.x1 - 100, y: R.y0 + 54, w: 70, h: 30 });          // chairs, reception
-    else if (f === 6) { const tl = this.telescope(); o.push({ x: tl.x - 12, y: tl.y - 10, w: 24, h: 18 }); for (let i = 0; i < 3; i++) o.push({ x: R.x0 + 40 + i * 140, y: R.y0 + 60, w: 60, h: 20 }); }
+    if (f === 1) { box(28, 160, 130, 30); box(164, 172, 22, 20); box(426, 180, 88, 34); box(336, 214, 90, 28); }                                   // desk, plant, fountain, sofa
+    else if (f === 2) { box(18, 150, 72, 24); box(108, 150, 72, 24); box(400, 150, 72, 24); box(490, 150, 72, 24); box(270, 188, 60, 24); }         // desks, party table
+    else if (f === 3) { box(30, 170, 58, 30); box(125, 170, 58, 30); box(390, 170, 58, 30); box(30, 238, 64, 12); box(548, 150, 24, 32); box(470, 236, 70, 18); }   // treadmills, rack, cooler, yoga mat
+    else if (f === 4) { box(262, 184, 76, 14); box(60, 192, 36, 18); }                                                                              // bench, toy chest
+    else if (f === 5) { box(28, 150, 136, 30); box(460, 165, 96, 32); box(380, 232, 30, 16); }                                                      // chairs, reception, toy box
+    else if (f === 6) { const tl = this.telescope(); o.push({ x: tl.x - 12, y: tl.y - 10, w: 24, h: 18 }); box(28, 124, 72, 26); box(500, 124, 72, 26); box(73, 184, 34, 22); box(360, 196, 76, 22); }   // telescope, planters, tree tub, lounger
     return o;
   },
   towerHint(g) {
-    const st = this.st, p = g.player, T = CFG.CITY.TOWER, f = this.floor, L = st.lift, up = this.upPad(), down = this.downPad();
+    const st = this.st, p = g.player, T = CFG.CITY.TOWER, f = this.floor, L = st.lift, tl = this.telescope();
+    if (this.viewing) return null;   // the eyepiece view carries its own banner
     if (L) return { text: L.phase === 'moving' ? (L.to > L.from ? '🛗 Going up!' : '🛗 Going down!') : L.phase === 'opening' ? '🛗 Ding! Doors opening' : '🛗 Doors closing…', target: null };
-    const goUp = { text: 'Stand on ▲ and go up!', target: up }, goDown = { text: 'Stand on ▼ to go down', target: down };
+    if (st.padSel) return { text: `🛗 Going to ${T.names[st.padSel]}…`, target: null };
+    const next = f < T.floors ? f + 1 : 1, pick = { text: `Step on a floor button to ride! ${T.icons[next]}`, target: this.padPos(next) };
     const early = st.floorT < 5;
-    if (f === 1) return st.seenView ? { text: 'Walk out the door to the street', target: this.exitSpot() } : goUp;
-    if (f === 2) return early ? { text: 'Everybody loves the pizza chef! 🍕', target: null } : goUp;
-    if (f === 3) return early ? { text: 'Run, run, run! 🏃', target: null } : goUp;
-    if (f === 4) return early ? { text: 'Look at all the fish! 🐠', target: null } : goUp;
-    if (f === 5) return early ? { text: 'The shark is waiting for the dentist 🦈', target: null } : goUp;
-    const tl = this.telescope();
+    if (f === 1) return st.seenView ? { text: 'Walk out the door to the street', target: this.exitSpot() } : pick;
+    if (f === 2) return early ? { text: 'Everybody loves the pizza chef! 🍕', target: null } : pick;
+    if (f === 3) return early ? { text: 'Run, run, run! 🏃', target: null } : pick;
+    if (f === 4) return early ? { text: 'Look at all the fish! 🐠', target: null } : pick;
+    if (f === 5) return early ? { text: 'The shark is waiting for the dentist 🦈', target: null } : pick;
+    if (U.dist(p.x, p.y, tl.x, tl.y) < 52) return { text: 'Press the button to look through the telescope!', target: null };
     if (!st.seenView) return { text: 'Look through the telescope! 🔭', target: tl };
-    if (U.dist(p.x, p.y, tl.x, tl.y) < 50) return { text: 'You can see the pizza shop from here!', target: null };
-    return goDown;
+    return pick;
   },
 
   // the room the chef is in, drawn over the whole view
   drawRoom(r, g) {
-    const ctx = r.ctx, st = this.st, T = CFG.CITY.TOWER, R = T.ROOM, w = R.x1 - R.x0, h = R.y1 - R.y0, cx = (R.x0 + R.x1) / 2, f = this.floor, t = g.time, L = st.lift;
+    const ctx = r.ctx, st = this.st, T = CFG.CITY.TOWER, R = T.ROOM, w = R.x1 - R.x0, h = R.y1 - R.y0, cx = (R.x0 + R.x1) / 2, f = this.floor, L = st.lift;
     ctx.fillStyle = '#2b1d14'; ctx.fillRect(r.camX - 200, r.camY - 200, r.viewW + 400, r.viewH + 400);
     ctx.save(); ctx.beginPath(); ctx.rect(R.x0, R.y0, w, h); ctx.clip();
     this.paintFloor(r, g, f);
-    // the elevator on the back wall: frame, dark car, the two sliding doors, a floor counter above
+    // the elevator car set into the back wall: lit interior, the chef, two sliding doors, frame and counter
     const open = !L ? 1 : L.phase === 'closing' ? 1 - L.t / 0.7 : L.phase === 'opening' ? Math.min(1, L.t / 0.7) : 0;
-    const ex = cx, ey = R.y0 + 2;
-    ctx.fillStyle = '#5c6670'; ctx.fillRect(ex - 38, ey, 76, 68);
-    ctx.fillStyle = '#4a3a2a'; ctx.fillRect(ex - 32, ey + 4, 64, 60);
-    ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(ex - 32, ey + 4, 64, 20);
-    // the chef inside the car (drawn here so the doors can close over them)
-    if (!L || L.phase !== 'moving') r.drawPlayer(g);
-    ctx.fillStyle = '#9aa0a8'; ctx.fillRect(ex - 32, ey + 4, 32 * (1 - open), 60); ctx.fillRect(ex + 32 - 32 * (1 - open), ey + 4, 32 * (1 - open), 60);
-    ctx.fillStyle = 'rgba(0,0,0,0.2)'; if (open < 1) { ctx.fillRect(ex - 32 + 32 * (1 - open) - 2, ey + 4, 2, 60); ctx.fillRect(ex + 32 - 32 * (1 - open), ey + 4, 2, 60); }
-    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, ex - 22, ey - 2, 44, 14, 3); ctx.fill();
-    ctx.fillStyle = '#ff7a1a'; ctx.font = r.font(10); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(`${L && L.phase === 'moving' ? (L.to > L.from ? '▲ ' : '▼ ') : ''}${L ? L.shown : f}`, ex, ey + 5);
-    // call pads on the floor
-    const pad = (q, label, on) => { ctx.fillStyle = on ? 'rgba(255,224,138,0.9)' : 'rgba(255,255,255,0.35)'; ctx.beginPath(); ctx.ellipse(q.x, q.y, 26, 13, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = on ? '#2b1d14' : 'rgba(43,29,20,0.5)'; ctx.font = r.font(11); ctx.fillText(label, q.x, q.y); };
-    pad(this.upPad(), '▲ UP', f < T.floors); pad(this.downPad(), '▼ DOWN', f > 1);
-    if (!L && f === 1) { const e = this.exitSpot(); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.beginPath(); ctx.ellipse(e.x, e.y, 30, 13, 0, 0, Math.PI * 2); ctx.fill(); }
-    // floor name plate on the wall
-    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, R.x0 + 12, R.y1 - 26, 150, 18, 4); ctx.fill(); ctx.fillStyle = '#ffe08a'; ctx.font = r.font(10); ctx.textAlign = 'left'; ctx.fillText(`Floor ${f} · ${T.names[f]}`, R.x0 + 20, R.y1 - 17);
+    const ex = cx, ey = R.y0;
+    ctx.fillStyle = '#5c6670'; ctx.fillRect(ex - 88, ey, 176, T.wall + 4);
+    ctx.fillStyle = '#6b5a4a'; ctx.fillRect(ex - 80, ey + 14, 160, T.wall - 14);
+    ctx.fillStyle = '#d9b382'; ctx.fillRect(ex - 80, ey + 14, 160, 26); ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(ex - 76, ey + 18, 152, 6);   // wood panel + strip light
+    ctx.fillStyle = '#8d7b63'; ctx.fillRect(ex - 80, ey + 40, 160, T.wall - 40);
+    ctx.fillStyle = 'rgba(255,255,255,0.08)'; for (let k = -80; k < 80; k += 20) ctx.fillRect(ex + k, ey + 40, 1, T.wall - 40);
+    // floor buttons
+    for (let i = 1; i <= T.floors; i++) {
+      const q = this.padPos(i), here = i === f, sel = st.padSel === i, k = sel ? st.padT / 0.45 : 0;
+      ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.beginPath(); ctx.ellipse(q.x + 2, q.y + 4, 36, 19, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = here ? '#9aa0a8' : sel ? '#ffd166' : '#fff8ee'; ctx.beginPath(); ctx.ellipse(q.x, q.y, 36, 19, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = here ? '#5c6670' : '#e4572e'; ctx.lineWidth = 2.5; ctx.stroke();
+      if (sel) { ctx.strokeStyle = '#2f9e44'; ctx.lineWidth = 4; ctx.beginPath(); ctx.ellipse(q.x, q.y, 36, 19, 0, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k); ctx.stroke(); }
+      ctx.fillStyle = here ? '#fff' : '#2b1d14'; ctx.font = r.font(15); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(i), q.x - 11, q.y + 1);
+      ctx.font = r.font(12); ctx.fillText(T.icons[i], q.x + 11, q.y + 1);
+    }
+    if (!L || open >= 0.2) r.drawPlayer(g);
+    for (const b of this.bubbles) r.drawBubble(b.x, b.y, () => { ctx.font = r.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText(b.text, 0, 0); }, b.w);
+    ctx.fillStyle = '#9aa0a8'; ctx.fillRect(ex - 80, ey + 12, 80 * (1 - open), T.wall - 12); ctx.fillRect(ex + 80 - 80 * (1 - open), ey + 12, 80 * (1 - open), T.wall - 12);
+    if (open < 1) { ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(ex - 80 + 80 * (1 - open) - 2, ey + 12, 2, T.wall - 12); ctx.fillRect(ex + 80 - 80 * (1 - open), ey + 12, 2, T.wall - 12); ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(ex - 78, ey + 16, 80 * (1 - open) - 4, 3); ctx.fillRect(ex + 80 - 80 * (1 - open) + 2, ey + 16, 80 * (1 - open) - 4, 3); }
+    ctx.fillStyle = '#5c6670'; ctx.fillRect(ex - 88, ey, 176, 14); ctx.fillRect(ex - 88, ey, 8, T.wall + 4); ctx.fillRect(ex + 80, ey, 8, T.wall + 4);
+    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, ex - 30, ey + 1, 60, 12, 3); ctx.fill();
+    ctx.fillStyle = '#ff7a1a'; ctx.font = r.font(10); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(`${L && L.phase === 'moving' ? (L.to > L.from ? '▲ ' : '▼ ') : ''}${L ? L.shown : f}`, ex, ey + 7);
+    // floor name plate in the corner
+    ctx.font = r.font(10); const name = `Floor ${f} · ${T.names[f]}`, nw = ctx.measureText(name).width + 18;
+    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, R.x1 - 10 - nw, R.y1 - 26, nw, 18, 4); ctx.fill(); ctx.fillStyle = '#ffe08a'; ctx.textAlign = 'center'; ctx.fillText(name, R.x1 - 10 - nw / 2, R.y1 - 17);
     ctx.restore();
     ctx.strokeStyle = '#5c6670'; ctx.lineWidth = 6; ctx.strokeRect(R.x0, R.y0, w, h);
   },
 
   paintFloor(r, g, f) {
     const ctx = r.ctx, st = this.st, T = CFG.CITY.TOWER, R = T.ROOM, w = R.x1 - R.x0, h = R.y1 - R.y0, cx = (R.x0 + R.x1) / 2, t = g.time, wall = T.wall, p = g.player;
-    const x0 = R.x0, y0 = R.y0, fy = y0 + wall;   // fy: where the floor starts
-    const bubble = (x, y, text, wd) => r.drawBubble(x, y, () => { ctx.font = r.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText(text, 0, 0); }, wd);
-    const label = (x, y, text, col = '#ffe08a') => { ctx.font = r.font(10); const tw = ctx.measureText(text).width + 16; ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, x - tw / 2, y - 8, tw, 16, 4); ctx.fill(); ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, x, y); };
-    const near = (x, y, d) => U.dist(p.x, p.y, x, y) < d;
+    const x0 = R.x0, y0 = R.y0, fy = y0 + wall, X = (v) => x0 + v, Y = (v) => y0 + v;
+    this.bubbles = [];
+    const bubble = (x, y, text, wd) => this.bubbles.push({ x: U.clamp(x, x0 + wd / 2 + 6, R.x1 - wd / 2 - 6), y: Math.max(y, y0 + 16), text, w: wd });
+    const label = (x, y, text, col = '#ffe08a', bg = '#2b1d14') => { ctx.font = r.font(10); const tw = ctx.measureText(text).width + 16; ctx.fillStyle = bg; U.roundRect(ctx, x - tw / 2, y - 9, tw, 18, 4); ctx.fill(); ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, x, y); };
+    const near = (x, y, d) => U.dist(p.x, p.y, X(x), Y(y)) < d;
+    const person = (x, y, o) => r.drawPerson(X(x), Y(y), o);
+    const plant = (x, y) => { ctx.fillStyle = '#c62828'; U.roundRect(ctx, X(x) - 9, Y(y) - 12, 18, 20, 3); ctx.fill(); ctx.fillStyle = '#3f9a4a'; ctx.beginPath(); ctx.arc(X(x), Y(y) - 24, 14, 0, Math.PI * 2); ctx.arc(X(x) - 10, Y(y) - 16, 9, 0, Math.PI * 2); ctx.arc(X(x) + 11, Y(y) - 16, 9, 0, Math.PI * 2); ctx.fill(); };
+    const shadow = (x, y, rx, ry) => { ctx.fillStyle = 'rgba(0,0,0,0.14)'; ctx.beginPath(); ctx.ellipse(X(x), Y(y), rx, ry, 0, 0, Math.PI * 2); ctx.fill(); };
     if (f === 1) {
-      ctx.fillStyle = '#d7ccc8'; ctx.fillRect(x0, y0, w, wall); ctx.fillStyle = '#bcaaa4'; ctx.fillRect(x0, fy - 6, w, 6);
-      for (let yy = fy; yy < R.y1; yy += 24) for (let xx = x0; xx < R.x1; xx += 24) { ctx.fillStyle = ((xx - x0) / 24 + (yy - fy) / 24) % 2 ? '#f3efe3' : '#e0d8cc'; ctx.fillRect(xx, yy, 24, 24); }
-      label(x0 + 300, y0 + 20, '🍕 PIZZA TOWER');
-      // reception desk + receptionist, a plant, a little fountain, the way out
-      ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, x0 + 40, fy + 16, 90, 26, 5); ctx.fill(); ctx.fillStyle = '#a86b36'; ctx.fillRect(x0 + 40, fy + 16, 90, 6);
-      r.drawPerson(x0 + 85, fy + 14, { shirt: '#3f6fb5', skin: '#e0ac69', hair: '#2b1d14', hairStyle: 1, facing: 1, moving: false, carry: 0 });
-      if (near(x0 + 85, fy + 30, 90)) bubble(x0 + 85, fy - 48, 'Welcome, chef!', 100);
-      ctx.fillStyle = '#c62828'; U.roundRect(ctx, x0 + 150, fy + 24, 18, 20, 3); ctx.fill(); ctx.fillStyle = '#3f9a4a'; ctx.beginPath(); ctx.arc(x0 + 159, fy + 12, 14, 0, Math.PI * 2); ctx.arc(x0 + 149, fy + 20, 9, 0, Math.PI * 2); ctx.arc(x0 + 170, fy + 20, 9, 0, Math.PI * 2); ctx.fill();
-      const F = { x: R.x1 - 75, y: fy + 44 };
-      ctx.fillStyle = '#b9b2a4'; ctx.beginPath(); ctx.ellipse(F.x, F.y, 36, 18, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#6cc2ec'; ctx.beginPath(); ctx.ellipse(F.x, F.y, 28, 13, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#9d968a'; ctx.fillRect(F.x - 3, F.y - 24, 6, 20);
-      ctx.fillStyle = 'rgba(255,255,255,0.8)'; for (let k = 0; k < 8; k++) { const ph = (t * 0.9 + k * 0.125) % 1, a = (k / 8) * Math.PI * 2; ctx.beginPath(); ctx.arc(F.x + Math.cos(a) * ph * 22, F.y - 22 - Math.sin(ph * Math.PI) * 18 + ph * 18, 2.2, 0, Math.PI * 2); ctx.fill(); }
-      const e = this.exitSpot(); ctx.fillStyle = '#e4572e'; U.roundRect(ctx, e.x - 44, R.y1 - 22, 88, 16, 3); ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = r.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🚪 TO THE STREET', e.x, R.y1 - 14);
+      // warm wood-panelled lobby with a marble floor
+      ctx.fillStyle = '#e8d9c8'; ctx.fillRect(x0, y0, w, wall); ctx.fillStyle = '#c9a279'; ctx.fillRect(x0, Y(44), w, wall - 44); ctx.fillStyle = 'rgba(0,0,0,0.08)'; for (let k = 0; k < w; k += 26) ctx.fillRect(X(k), Y(44), 2, wall - 44);
+      for (let yy = 0; yy < h - wall; yy += 24) for (let xx = 0; xx < w; xx += 24) { ctx.fillStyle = (xx / 24 + yy / 24) % 2 ? '#f3efe3' : '#e0d8cc'; ctx.fillRect(X(xx), fy + yy, 24, 24); }
+      ctx.fillStyle = 'rgba(0,0,0,0.1)'; ctx.fillRect(x0, fy, w, 4);
+      ctx.fillStyle = '#e4572e'; U.roundRect(ctx, X(22), Y(10), 130, 26, 6); ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🍕 PIZZA TOWER', X(87), Y(23));
+      // the directory board and a clock to the right of the elevator
+      ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, X(408), Y(6), 140, 58, 4); ctx.fill(); ctx.fillStyle = '#ffe08a'; ctx.font = r.font(9); ctx.textAlign = 'left';
+      ['6 🌳 Roof garden', '5 🦷 Dentist', '4 🐠 Aquarium', '3 🏋️ Gym', '2 🍕 Party office'].forEach((s, i) => ctx.fillText(s, X(418), Y(15) + i * 11));
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(X(572), Y(30), 14, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(X(572), Y(30)); ctx.lineTo(X(572), Y(21)); ctx.moveTo(X(572), Y(30)); ctx.lineTo(X(572) + Math.cos(t * 0.3) * 9, Y(30) + Math.sin(t * 0.3) * 9); ctx.stroke();
+      // reception desk with the receptionist, a bell, a plant; the fountain on the right
+      shadow(95, 194, 70, 10);
+      person(92, 158, { shirt: '#3f6fb5', skin: '#e0ac69', hair: '#2b1d14', hairStyle: 1, facing: 1, moving: false, carry: 0 });
+      ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, X(28), Y(160), 130, 30, 5); ctx.fill(); ctx.fillStyle = '#a86b36'; ctx.fillRect(X(28), Y(160), 130, 7);
+      ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(X(140), Y(156), 5, Math.PI, 0); ctx.fill(); ctx.fillRect(X(134), Y(156), 12, 2);
+      ctx.fillStyle = '#fff'; ctx.font = r.font(7); ctx.textAlign = 'center'; ctx.fillText('RECEPTION', X(92), Y(178));
+      if (near(92, 172, 110)) bubble(X(92), Y(102), 'Welcome, chef! 🛎️', 124);
+      plant(175, 182);
+      // a sofa to wait on
+      ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(X(339), Y(218), 90, 28); ctx.fillStyle = '#c62828'; U.roundRect(ctx, X(336), Y(214), 90, 28, 6); ctx.fill(); ctx.fillStyle = '#e53935'; U.roundRect(ctx, X(342), Y(210), 38, 16, 5); ctx.fill(); U.roundRect(ctx, X(382), Y(210), 38, 16, 5); ctx.fill(); ctx.fillStyle = '#8e1c1c'; ctx.fillRect(X(336), Y(236), 90, 6);
+      const F = { x: X(470), y: Y(198) };
+      ctx.fillStyle = 'rgba(0,0,0,0.14)'; ctx.beginPath(); ctx.ellipse(F.x + 2, F.y + 5, 42, 20, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#b9b2a4'; ctx.beginPath(); ctx.ellipse(F.x, F.y, 42, 20, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#6cc2ec'; ctx.beginPath(); ctx.ellipse(F.x, F.y, 33, 14, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#9d968a'; ctx.beginPath(); ctx.ellipse(F.x, F.y - 4, 9, 5, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillRect(F.x - 3, F.y - 28, 6, 24);
+      ctx.fillStyle = 'rgba(255,255,255,0.85)'; for (let k = 0; k < 8; k++) { const ph = (t * 0.9 + k * 0.125) % 1, a = (k / 8) * Math.PI * 2; ctx.beginPath(); ctx.arc(F.x + Math.cos(a) * ph * 26, F.y - 26 - Math.sin(ph * Math.PI) * 20 + ph * 22, 2.3, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = '#ffd54a'; for (const [dx, dy] of [[-12, 2], [8, -3], [18, 4]]) { ctx.beginPath(); ctx.ellipse(F.x + dx, F.y + dy, 3, 2, 0, 0, Math.PI * 2); ctx.fill(); }   // wishing coins
+      // a kid waiting with a balloon
+      person(238, 238, { shirt: '#ffd166', skin: '#f1c27d', hair: '#d9a066', hairStyle: 2, facing: 1, moving: false, carry: 0 });
+      ctx.strokeStyle = 'rgba(43,29,20,0.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(252), Y(222)); ctx.lineTo(X(258), Y(178) + Math.sin(t * 2) * 3); ctx.stroke(); ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.ellipse(X(258), Y(168) + Math.sin(t * 2) * 3, 9, 11, 0, 0, Math.PI * 2); ctx.fill();
+      if (near(238, 238, 70)) bubble(X(238), Y(180), 'Hi, chef!', 72);
+      // the way out
+      const e = this.exitSpot(); ctx.fillStyle = '#e4572e'; U.roundRect(ctx, e.x - 50, R.y1 - 26, 100, 18, 3); ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = r.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🚪 TO THE STREET', e.x, R.y1 - 17);
     } else if (f === 2) {
-      ctx.fillStyle = '#cfe3f7'; ctx.fillRect(x0, y0, w, wall); ctx.fillStyle = '#9fa8da'; ctx.fillRect(x0, fy, w, h - wall); ctx.fillStyle = 'rgba(255,255,255,0.08)'; for (let yy = fy; yy < R.y1; yy += 16) ctx.fillRect(x0, yy, w, 2);
-      // party banner and balloons on the wall
-      ctx.fillStyle = '#e4572e'; U.roundRect(ctx, x0 + 262, y0 + 8, 170, 20, 6); ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = r.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🎉 PIZZA PARTY! 🎉', x0 + 347, y0 + 18);
-      [['#ffd166', 150], ['#3b7dd8', 168], ['#2f9e44', 30]].forEach(([c, dx], i) => { const by = y0 + 18 + Math.sin(t * 2 + i) * 3; ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(x0 + dx, by, 9, 11, 0, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = 'rgba(43,29,20,0.4)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x0 + dx, by + 11); ctx.lineTo(x0 + dx + 3, by + 30); ctx.stroke(); });
-      // desks with monitors and pizza boxes, coworkers in party hats
+      // an office in party mode: windows, banner, confetti, desks with pizza boxes, dancing coworkers
+      ctx.fillStyle = '#cfe3f7'; ctx.fillRect(x0, y0, w, wall);
+      for (const wx of [40, 110, 490, 560]) { ctx.fillStyle = '#9fd8ff'; ctx.fillRect(X(wx) - 18, Y(14), 36, 34); ctx.fillStyle = '#fff'; ctx.fillRect(X(wx) - 18, Y(14), 36, 3); ctx.fillRect(X(wx) - 1, Y(14), 2, 34); ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.beginPath(); ctx.arc(X(wx) - 6, Y(26), 6, 0, Math.PI * 2); ctx.arc(X(wx) + 2, Y(23), 7, 0, Math.PI * 2); ctx.arc(X(wx) + 9, Y(27), 5, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = '#9fa8da'; ctx.fillRect(x0, fy, w, h - wall); ctx.fillStyle = 'rgba(255,255,255,0.08)'; for (let yy = 0; yy < h - wall; yy += 16) ctx.fillRect(x0, fy + yy, w, 2);
+      ctx.fillStyle = '#e4572e'; U.roundRect(ctx, X(10), Y(44), 160, 20, 6); ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = r.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🎉 PIZZA PARTY! 🎉', X(90), Y(54));
+      [['#ffd166', 420, 0], ['#3b7dd8', 442, 1.3], ['#2f9e44', 464, 2.1], ['#f06292', 486, 0.6], ['#e4572e', 508, 1.8]].forEach(([c, dx, ph]) => { const by = Y(54) + Math.sin(t * 2 + ph) * 3; ctx.strokeStyle = 'rgba(43,29,20,0.4)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(dx), by + 11); ctx.lineTo(X(dx) + 3, by + 32); ctx.stroke(); ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(X(dx), by, 9, 11, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.beginPath(); ctx.ellipse(X(dx) - 3, by - 4, 3, 4, 0, 0, Math.PI * 2); ctx.fill(); });
+      for (let i = 0; i < 26; i++) { const cy = (t * 26 + this.hash(i + 40) * 230) % (h - 10), cxx = this.hash(i) * (w - 20) + 10 + Math.sin(t * 3 + i) * 6; ctx.save(); ctx.translate(X(cxx), Y(cy)); ctx.rotate(t * 3 + i); ctx.fillStyle = ['#e4572e', '#3b7dd8', '#ffd166', '#2f9e44', '#f06292'][i % 5]; ctx.fillRect(-3, -1.5, 6, 3); ctx.restore(); }
+      const desk = (dx) => { ctx.fillStyle = 'rgba(0,0,0,0.14)'; ctx.fillRect(X(dx) + 3, Y(154), 72, 24); ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, X(dx), Y(150), 72, 24, 4); ctx.fill(); ctx.fillStyle = '#2d3a4a'; ctx.fillRect(X(dx) + 6, Y(132), 24, 18); ctx.fillStyle = '#9fd8ff'; ctx.fillRect(X(dx) + 8, Y(134), 20, 14); ctx.fillStyle = '#d9b382'; ctx.fillRect(X(dx) + 38, Y(154), 28, 16); r.drawPizza(X(dx) + 52, Y(162), 9); };
+      desk(18); desk(108); desk(400); desk(490);
+      // the party table in the middle with a big pizza and a cake
+      shadow(302, 216, 40, 10); ctx.fillStyle = '#fff8ee'; ctx.beginPath(); ctx.ellipse(X(300), Y(200), 38, 16, 0, 0, Math.PI * 2); ctx.fill(); r.drawPizza(X(288), Y(198), 13);
+      ctx.fillStyle = '#f8bbd0'; U.roundRect(ctx, X(310), Y(188), 20, 12, 3); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(X(310), Y(188), 20, 3); ctx.fillStyle = '#ffd166'; ctx.fillRect(X(319), Y(180), 2, 8); ctx.fillStyle = Math.floor(t * 8) % 2 ? '#ff7a1a' : '#ffe08a'; ctx.beginPath(); ctx.arc(X(320), Y(178), 2.5, 0, Math.PI * 2); ctx.fill();
       const looks = [['#f28e2b', '#f1c27d', '#2b1d14', 0], ['#59a14f', '#c68642', '#5a3a1a', 2], ['#b07aa1', '#ffdbac', '#d9a066', 1], ['#e15759', '#8d5524', '#1a1a1a', 3]];
-      for (let i = 0; i < 3; i++) {
-        const dx = x0 + 50 + i * 130, dy = fy + 20;
-        ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, dx, dy, 70, 24, 4); ctx.fill(); ctx.fillStyle = '#2d3a4a'; ctx.fillRect(dx + 6, dy - 14, 22, 16); ctx.fillStyle = '#9fd8ff'; ctx.fillRect(dx + 8, dy - 12, 18, 12);
-        ctx.fillStyle = '#d9b382'; ctx.fillRect(dx + 36, dy + 2, 28, 18); r.drawPizza(dx + 50, dy + 11, 10);
-      }
-      const dance = (i) => Math.sin(t * 6 + i) * 3;
-      [[x0 + 70, fy + 70], [x0 + 135, fy + 64], [x0 + 300, fy + 72], [x0 + 390, fy + 60]].forEach(([px, py], i) => {
-        const [shirt, skin, hair, hs] = looks[i], yy = py + dance(i), fac = p.x < px ? -1 : 1;
-        r.drawPerson(px, yy, { shirt, skin, hair, hairStyle: hs, facing: fac, moving: true, bob: t * 8 + i, carry: 0 });
-        ctx.fillStyle = ['#e4572e', '#3b7dd8', '#ffd166', '#2f9e44'][i]; ctx.beginPath(); ctx.moveTo(px - 8, yy - 46); ctx.lineTo(px + 8, yy - 46); ctx.lineTo(px, yy - 66); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(px, yy - 66, 3, 0, Math.PI * 2); ctx.fill();
-        r.drawPizza(px + fac * 16, yy - 18, 6);
-        if (near(px, py, 80)) bubble(px, yy - 80, ['It’s the pizza chef!!', 'Best pizza ever!', 'Can I get a selfie?', 'Hooray, chef!'][i], 118);
+      [[62, 226], [150, 220], [430, 226], [520, 220]].forEach(([px, py], i) => {
+        const [shirt, skin, hair, hs] = looks[i], yy = Y(py) + Math.sin(t * 6 + i) * 3, xx = X(px), fac = p.x < xx ? -1 : 1;
+        r.drawPerson(xx, yy, { shirt, skin, hair, hairStyle: hs, facing: fac, moving: true, bob: t * 8 + i, carry: 0 });
+        ctx.fillStyle = ['#e4572e', '#3b7dd8', '#ffd166', '#2f9e44'][i]; ctx.beginPath(); ctx.moveTo(xx - 8, yy - 46); ctx.lineTo(xx + 8, yy - 46); ctx.lineTo(xx, yy - 66); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(xx, yy - 66, 3, 0, Math.PI * 2); ctx.fill();
+        r.drawPizza(xx + fac * 16, yy - 18, 6);
+        if (near(px, py, 80)) bubble(xx, yy - 84 - (i % 2) * 26, ['It’s the pizza chef!!', 'Best pizza ever!', 'Can I get a selfie?', 'Hooray, chef!'][i], 120);   // staggered so neighbours' bubbles stay clear of each other
       });
     } else if (f === 3) {
-      ctx.fillStyle = '#ffe082'; ctx.fillRect(x0, y0, w, wall); ctx.fillStyle = '#bfe3ff'; ctx.fillRect(x0 + 60, y0 + 6, 200, 32); ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillRect(x0 + 70, y0 + 10, 30, 24);   // mirror
-      ctx.fillStyle = '#607d8b'; ctx.fillRect(x0, fy, w, h - wall); ctx.fillStyle = 'rgba(0,0,0,0.08)'; for (let xx = x0; xx < R.x1; xx += 40) ctx.fillRect(xx, fy, 2, h - wall);
-      label(x0 + 392, y0 + 22, '💪 GO GO GO!');
+      // the gym: mirror wall, punching bag, treadmills with runners, a rack of weights and a water cooler
+      ctx.fillStyle = '#ffe082'; ctx.fillRect(x0, y0, w, wall); ctx.fillStyle = '#bfe3ff'; ctx.fillRect(X(16), Y(10), 180, 48); ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillRect(X(24), Y(14), 30, 40); ctx.fillStyle = '#9aa0a8'; ctx.fillRect(X(16), Y(10), 180, 3); ctx.fillRect(X(16), Y(55), 180, 3);
+      label(X(540), Y(24), '💪 GO GO GO!'); label(X(540), Y(46), 'PIZZA GYM', '#2b1d14', '#ffd166');
+      ctx.fillStyle = '#607d8b'; ctx.fillRect(x0, fy, w, h - wall); ctx.fillStyle = 'rgba(0,0,0,0.08)'; for (let xx = 0; xx < w; xx += 40) ctx.fillRect(X(xx), fy, 2, h - wall); ctx.fillStyle = 'rgba(255,255,255,0.06)'; ctx.fillRect(x0, fy + 110, w, 3);
+      const sw = Math.sin(t * 1.6) * 5; ctx.strokeStyle = '#5c6670'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(X(440), Y(0)); ctx.lineTo(X(440) + sw, Y(22)); ctx.stroke(); ctx.fillStyle = '#c62828'; U.roundRect(ctx, X(440) + sw - 10, Y(22), 20, 42, 6); ctx.fill(); ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(X(440) + sw - 10, Y(44), 20, 4);
       for (let i = 0; i < 3; i++) {
-        const tx = x0 + 60 + i * 110, ty = fy + 14, ph = i * 1.3;
-        ctx.fillStyle = '#2d3a4a'; U.roundRect(ctx, tx, ty + 20, 56, 12, 4); ctx.fill(); ctx.fillStyle = '#9aa0a8'; ctx.fillRect(tx + 50, ty - 10, 4, 36); ctx.fillRect(tx + 2, ty - 10, 4, 36); ctx.fillStyle = '#1e1e1e'; ctx.fillRect(tx + 40, ty - 14, 16, 8);
+        const tx = X([30, 125, 390][i]), ty = Y(170), ph = i * 1.3;
+        ctx.fillStyle = 'rgba(0,0,0,0.14)'; ctx.fillRect(tx + 3, ty + 24, 58, 12);
+        ctx.fillStyle = '#2d3a4a'; U.roundRect(ctx, tx, ty + 20, 58, 12, 4); ctx.fill(); ctx.fillStyle = '#9aa0a8'; ctx.fillRect(tx + 52, ty - 12, 4, 38); ctx.fillRect(tx + 2, ty - 12, 4, 38); ctx.fillStyle = '#1e1e1e'; ctx.fillRect(tx + 42, ty - 16, 16, 8); ctx.fillStyle = '#44d36a'; ctx.fillRect(tx + 45, ty - 14, 3 + (Math.floor(t * 2 + i) % 3) * 3, 3);
         ctx.fillStyle = 'rgba(255,255,255,0.25)'; const belt = (t * 120) % 12; for (let k = -12; k < 56; k += 12) ctx.fillRect(tx + 2 + k + belt, ty + 22, 6, 8);
-        r.drawPerson(tx + 28, ty + 16 + Math.abs(Math.sin(t * 7 + ph)) * -4, { shirt: ['#e15759', '#4e79a7', '#59a14f'][i], skin: ['#f1c27d', '#8d5524', '#e0ac69'][i], hair: '#2b1d14', hairStyle: i, facing: 1, moving: true, bob: t * 14 + ph, carry: 0 });
-        if (Math.floor(t + i) % 4 === 0) { ctx.fillStyle = '#9fd8ff'; ctx.beginPath(); ctx.arc(tx + 42, ty - 20 + ((t * 2) % 1) * 8, 2, 0, Math.PI * 2); ctx.fill(); }
+        r.drawPerson(tx + 29, ty + 16 - Math.abs(Math.sin(t * 7 + ph)) * 4, { shirt: ['#e15759', '#4e79a7', '#59a14f'][i], skin: ['#f1c27d', '#8d5524', '#e0ac69'][i], hair: ['#2b1d14', '#1a1a1a', '#d9a066'][i], hairStyle: i, facing: 1, moving: true, bob: t * 14 + ph, carry: 0 });
+        if (Math.floor(t * 1.5 + i) % 5 === 0) { ctx.fillStyle = '#9fd8ff'; ctx.beginPath(); ctx.arc(tx + 44, ty - 36 + ((t * 2) % 1) * 10, 2.2, 0, Math.PI * 2); ctx.fill(); }
+        if (near([30, 125, 390][i] + 29, 184, 60)) bubble(tx + 29, ty - 58, ['Keep going!', 'Phew!', 'Pizza power!'][i], 92);
       }
-      // dumbbell rack and a water cooler
-      ctx.fillStyle = '#5c6670'; ctx.fillRect(R.x1 - 90, fy + 60, 60, 8); for (let k = 0; k < 3; k++) { ctx.fillStyle = '#1e1e1e'; ctx.fillRect(R.x1 - 86 + k * 20, fy + 50, 6, 10); ctx.fillRect(R.x1 - 74 + k * 20, fy + 50, 6, 10); ctx.fillStyle = '#9aa0a8'; ctx.fillRect(R.x1 - 80 + k * 20, fy + 54, 6, 2); }
-      ctx.fillStyle = '#bfe3ff'; U.roundRect(ctx, x0 + 14, fy + 20, 18, 26, 5); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(x0 + 12, fy + 46, 22, 30);
+      // a yoga mat with somebody stretching, the dumbbell rack, the water cooler
+      ctx.fillStyle = '#8e5bd1'; U.roundRect(ctx, X(470), Y(236), 70, 18, 5); ctx.fill();
+      r.drawPerson(X(505), Y(242) - Math.abs(Math.sin(t * 1.2)) * 8, { shirt: '#f06292', skin: '#e0ac69', hair: '#8c3b2f', hairStyle: 1, facing: -1, moving: false, carry: 0 });
+      if (near(505, 242, 60)) bubble(X(505), Y(184), 'Stretch!', 70);
+      ctx.fillStyle = '#5c6670'; ctx.fillRect(X(30), Y(240), 64, 8); ctx.fillRect(X(34), Y(248), 4, 8); ctx.fillRect(X(86), Y(248), 4, 8); for (let k = 0; k < 3; k++) { ctx.fillStyle = ['#e4572e', '#3b7dd8', '#ffd166'][k]; ctx.fillRect(X(34) + k * 20, Y(230), 6, 10); ctx.fillRect(X(46) + k * 20, Y(230), 6, 10); ctx.fillStyle = '#9aa0a8'; ctx.fillRect(X(40) + k * 20, Y(234), 6, 2); }
+      ctx.fillStyle = '#bfe3ff'; U.roundRect(ctx, X(550), Y(150), 20, 18, 5); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(X(548), Y(168), 24, 18); ctx.fillStyle = '#3b7dd8'; ctx.fillRect(X(554), Y(172), 4, 5);
     } else if (f === 4) {
-      // the back wall is one big tank
-      const tank = ctx.createLinearGradient(0, y0, 0, fy + 40); tank.addColorStop(0, '#1e5a8a'); tank.addColorStop(1, '#4aa3d8'); ctx.fillStyle = tank; ctx.fillRect(x0, y0, w, wall + 40);
-      ctx.fillStyle = '#d9b382'; ctx.fillRect(x0, fy + 30, w, 10);
-      ctx.strokeStyle = '#2f9e44'; ctx.lineWidth = 4; for (let k = 0; k < 7; k++) { const sx = x0 + 30 + k * 65; ctx.beginPath(); ctx.moveTo(sx, fy + 34); ctx.quadraticCurveTo(sx + Math.sin(t * 1.5 + k) * 10, fy + 10, sx + Math.sin(t * 1.2 + k) * 14, y0 + 20 + (k % 3) * 8); ctx.stroke(); }
-      const fish = [['#ff7a1a', 0, 0.7, 14], ['#ffd166', 1.1, 1, 22], ['#f06292', 2.4, 0.5, 40], ['#41b883', 3.6, 0.85, 8], ['#8e5bd1', 4.2, 1.3, 30], ['#3b7dd8', 5.5, 0.6, 50]];
-      fish.forEach(([col, ph, sp, dy]) => { const span = w - 60, u = ((t * sp * 40 + ph * 97) % (span * 2)); const fx = x0 + 30 + (u < span ? u : span * 2 - u), dir = u < span ? 1 : -1, fyy = y0 + 16 + dy + Math.sin(t * 2 + ph) * 4; ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(fx, fyy, 12, 7, 0, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.moveTo(fx - dir * 10, fyy); ctx.lineTo(fx - dir * 20, fyy - 7); ctx.lineTo(fx - dir * 20, fyy + 7); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(fx + dir * 6, fyy - 2, 2.5, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.arc(fx + dir * 7, fyy - 2, 1.2, 0, Math.PI * 2); ctx.fill(); });
-      // a slow turtle along the sand
-      const tu = x0 + 60 + ((t * 12) % (w - 120)); ctx.fillStyle = '#2f9e44'; ctx.beginPath(); ctx.ellipse(tu, fy + 24, 14, 8, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#56b862'; ctx.beginPath(); ctx.arc(tu + 16, fy + 24, 5, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.6)'; for (let k = 0; k < 6; k++) { const bu = (t * 0.4 + k * 0.17) % 1; ctx.beginPath(); ctx.arc(x0 + 80 + k * 70 + Math.sin(bu * 8) * 4, fy + 30 - bu * (wall + 30), 2 + k % 3, 0, Math.PI * 2); ctx.fill(); }
-      ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(x0, y0, w, 6); ctx.fillStyle = '#5c6670'; ctx.fillRect(x0, fy + 38, w, 6);   // glass shine + frame
-      ctx.fillStyle = '#2d3a4a'; ctx.fillRect(x0, fy + 44, w, h - wall - 44); ctx.fillStyle = 'rgba(255,255,255,0.05)'; for (let xx = x0; xx < R.x1; xx += 30) ctx.fillRect(xx, fy + 44, 1, h);
-      label(cx + 80, R.y1 - 17, '🐠 AQUARIUM', '#9fd8ff');
-      ctx.fillStyle = '#8d5a2b'; ctx.fillRect(cx - 40, fy + 76, 80, 10); ctx.fillStyle = '#4a2d12'; ctx.fillRect(cx - 36, fy + 86, 5, 8); ctx.fillRect(cx + 31, fy + 86, 5, 8);
+      // a wall-sized tank: fish, a turtle, an octopus and a treasure chest; a dark carpet with light spots
+      const tank = ctx.createLinearGradient(0, y0, 0, fy); tank.addColorStop(0, '#1e5a8a'); tank.addColorStop(1, '#4aa3d8'); ctx.fillStyle = tank; ctx.fillRect(x0, y0, w, wall);
+      ctx.fillStyle = '#d9b382'; ctx.fillRect(x0, Y(58), w, 12);
+      ctx.strokeStyle = '#2f9e44'; ctx.lineWidth = 4; for (let k = 0; k < 8; k++) { const sx = X(26 + k * 66); ctx.beginPath(); ctx.moveTo(sx, Y(62)); ctx.quadraticCurveTo(sx + Math.sin(t * 1.5 + k) * 10, Y(36), sx + Math.sin(t * 1.2 + k) * 12, Y(14 + (k % 3) * 8)); ctx.stroke(); }
+      ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, X(112), Y(46), 26, 16, 3); ctx.fill(); ctx.fillStyle = '#a86b36'; ctx.fillRect(X(112), Y(46), 26, 5); ctx.fillStyle = '#ffd166'; ctx.fillRect(X(118), Y(50), 14, 4); ctx.beginPath(); ctx.arc(X(125), Y(45), 4, 0, Math.PI * 2); ctx.fill();   // treasure chest
+      ctx.fillStyle = '#ff8fab'; for (let k = 0; k < 5; k++) { const a = (k / 5) * Math.PI * 2; ctx.beginPath(); ctx.moveTo(X(60), Y(60)); ctx.lineTo(X(60) + Math.cos(a) * 7, Y(60) + Math.sin(a) * 7); ctx.lineTo(X(60) + Math.cos(a + 0.6) * 3, Y(60) + Math.sin(a + 0.6) * 3); ctx.closePath(); ctx.fill(); }   // starfish
+      const fish = [['#ff7a1a', 0, 0.7, 8], ['#ffd166', 1.1, 1, 18], ['#f06292', 2.4, 0.5, 34], ['#41b883', 3.6, 0.85, 4], ['#8e5bd1', 4.2, 1.3, 26], ['#3b7dd8', 5.5, 0.6, 42], ['#ffffff', 2.9, 0.45, 14]];
+      fish.forEach(([col, ph, sp, dy]) => { const span = w - 60, u = ((t * sp * 40 + ph * 97) % (span * 2)); const fx = X(30) + (u < span ? u : span * 2 - u), dir = u < span ? 1 : -1, fyy = Y(12 + dy) + Math.sin(t * 2 + ph) * 3; ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(fx, fyy, 11, 6, 0, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.moveTo(fx - dir * 9, fyy); ctx.lineTo(fx - dir * 18, fyy - 6); ctx.lineTo(fx - dir * 18, fyy + 6); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(fx + dir * 5, fyy - 2, 2.3, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.arc(fx + dir * 6, fyy - 2, 1.1, 0, Math.PI * 2); ctx.fill(); });
+      const tu = X(70 + ((t * 12) % (w - 140))); ctx.fillStyle = '#2f9e44'; ctx.beginPath(); ctx.ellipse(tu, Y(52), 13, 7, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#56b862'; ctx.beginPath(); ctx.arc(tu + 15, Y(52), 4.5, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#1f6e3e'; for (const [dx, dy] of [[-5, -2], [3, -3], [0, 3]]) ctx.fillRect(tu + dx, Y(52) + dy, 3, 3);
+      const ox = X(452), oy = Y(30) + Math.sin(t * 1.3) * 4; ctx.strokeStyle = '#b07aa1'; ctx.lineWidth = 3; for (let k = 0; k < 6; k++) { const a = Math.PI * 0.2 + k * 0.32; ctx.beginPath(); ctx.moveTo(ox, oy + 6); ctx.quadraticCurveTo(ox + Math.cos(a) * 16 + Math.sin(t * 3 + k) * 4, oy + 18, ox + Math.cos(a) * 24, oy + 26 + Math.sin(t * 2.5 + k) * 3); ctx.stroke(); }
+      ctx.fillStyle = '#b07aa1'; ctx.beginPath(); ctx.ellipse(ox, oy, 15, 13, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ox - 5, oy - 1, 4, 0, Math.PI * 2); ctx.arc(ox + 5, oy - 1, 4, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.arc(ox - 4, oy - 1, 1.8, 0, Math.PI * 2); ctx.arc(ox + 6, oy - 1, 1.8, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(ox, oy + 3, 4, 0.2, Math.PI - 0.2); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.6)'; for (let k = 0; k < 7; k++) { const bu = (t * 0.4 + k * 0.14) % 1; ctx.beginPath(); ctx.arc(X(50 + k * 68) + Math.sin(bu * 8) * 4, Y(60) - bu * 54, 1.5 + k % 3, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(x0, y0, w, 5); ctx.fillStyle = '#5c6670'; ctx.fillRect(x0, fy - 2, w, 6);
+      ctx.fillStyle = '#243447'; ctx.fillRect(x0, fy + 4, w, h - wall - 4); for (let k = 0; k < 9; k++) { const gl = ctx.createRadialGradient(X(40 + k * 56), Y(150), 2, X(40 + k * 56), Y(150), 40); gl.addColorStop(0, 'rgba(108,194,236,0.22)'); gl.addColorStop(1, 'rgba(108,194,236,0)'); ctx.fillStyle = gl; ctx.fillRect(X(k * 56), fy, 80, h - wall); }
+      label(X(90), Y(252), '🐠 AQUARIUM', '#9fd8ff'); label(X(96), Y(12), 'please don’t tap the glass', '#2b1d14', '#fff');
+      shadow(302, 200, 42, 8); ctx.fillStyle = '#8d5a2b'; ctx.fillRect(X(262), Y(184), 76, 10); ctx.fillStyle = '#4a2d12'; ctx.fillRect(X(266), Y(194), 5, 8); ctx.fillRect(X(329), Y(194), 5, 8);
+      person(80, 214, { shirt: '#ffd166', skin: '#f1c27d', hair: '#d9a066', hairStyle: 2, facing: 1, moving: false, carry: 0 }); if (near(80, 214, 80)) bubble(X(80), Y(158), 'A turtle! 🐢', 86);
+      ctx.fillStyle = '#3b7dd8'; U.roundRect(ctx, X(60), Y(192), 36, 18, 3); ctx.fill(); ctx.fillStyle = '#ffd166'; ctx.fillRect(X(64), Y(196), 8, 6); ctx.fillStyle = '#e4572e'; ctx.fillRect(X(76), Y(198), 10, 6);   // toy chest
+      person(520, 220, { shirt: '#4e79a7', skin: '#8d5524', hair: '#1a1a1a', hairStyle: 0, facing: -1, moving: false, carry: 0, hat: 'cap', capColor: '#2f9e44' }); if (near(520, 220, 80)) bubble(X(520), Y(164), 'Shh, the fish are sleepy', 150);
+      // a glowing jellyfish drifts about the tank
+      const jx = X(330) + Math.sin(t * 0.7) * 40, jy = Y(30) + Math.sin(t * 1.1) * 8; ctx.fillStyle = 'rgba(255,143,171,0.85)'; ctx.beginPath(); ctx.arc(jx, jy, 10, Math.PI, 0); ctx.fill(); ctx.strokeStyle = 'rgba(255,143,171,0.8)'; ctx.lineWidth = 2; for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(jx + k * 6, jy); ctx.quadraticCurveTo(jx + k * 6 + Math.sin(t * 4 + k) * 4, jy + 10, jx + k * 6 + Math.sin(t * 3 + k) * 6, jy + 20); ctx.stroke(); } ctx.fillStyle = '#2b1d14'; ctx.fillRect(jx - 4, jy - 4, 2, 2); ctx.fillRect(jx + 2, jy - 4, 2, 2);
     } else if (f === 5) {
-      ctx.fillStyle = '#b8f2c8'; ctx.fillRect(x0, y0, w, wall); ctx.fillStyle = '#f3efe3'; ctx.fillRect(x0, fy, w, h - wall); ctx.fillStyle = 'rgba(0,0,0,0.05)'; for (let xx = x0; xx < R.x1; xx += 32) for (let yy = fy; yy < R.y1; yy += 32) if (((xx - x0) / 32 + (yy - fy) / 32) % 2) ctx.fillRect(xx, yy, 32, 32);
-      label(x0 + 110, y0 + 22, '🦷 DR. MOLAR, DENTIST');
-      ctx.fillStyle = '#fff'; U.roundRect(ctx, x0 + 280, y0 + 6, 70, 34, 4); ctx.fill(); ctx.fillStyle = '#2b1d14'; ctx.font = r.font(8); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('BRUSH', x0 + 330, y0 + 14); ctx.fillText('TWICE!', x0 + 330, y0 + 24); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x0 + 302, y0 + 24, 8, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#9aa0a8'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x0 + 302, y0 + 24, 8, 0, Math.PI * 2); ctx.stroke();
-      // reception window with a nurse
-      ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, R.x1 - 100, fy + 10, 70, 30, 5); ctx.fill(); r.drawPerson(R.x1 - 65, fy + 8, { shirt: '#fff', skin: '#c68642', hair: '#1a1a1a', hairStyle: 2, facing: -1, moving: false, carry: 0 });
-      // a row of blue chairs: a kid with a lollipop, and the shark reading a magazine
-      for (let i = 0; i < 3; i++) { const sx = x0 + 30 + i * 46; ctx.fillStyle = '#3b7dd8'; U.roundRect(ctx, sx, fy + 16, 38, 26, 5); ctx.fill(); ctx.fillStyle = '#2d5a8a'; ctx.fillRect(sx, fy + 34, 38, 8); }
-      r.drawPerson(x0 + 49, fy + 30, { shirt: '#ffd166', skin: '#f1c27d', hair: '#d9a066', hairStyle: 2, facing: 1, moving: false, carry: 0 });
-      ctx.fillStyle = '#fff'; ctx.fillRect(x0 + 65, fy + 4, 2, 14); ctx.fillStyle = '#f06292'; ctx.beginPath(); ctx.arc(x0 + 66, fy + 2, 6, 0, Math.PI * 2); ctx.fill();
-      const sh = { x: x0 + 128, y: fy + 24 + Math.sin(t * 1.5) * 1.5 };
+      // the dentist's waiting room: mint walls, a tooth poster, chairs, the kid, the shark with his magazine, the nurse
+      ctx.fillStyle = '#b8f2c8'; ctx.fillRect(x0, y0, w, wall); ctx.fillStyle = '#9fe0b4'; ctx.fillRect(x0, Y(52), w, wall - 52);
+      ctx.fillStyle = '#f3efe3'; ctx.fillRect(x0, fy, w, h - wall); ctx.fillStyle = 'rgba(0,0,0,0.05)'; for (let xx = 0; xx < w; xx += 32) for (let yy = 0; yy < h - wall; yy += 32) if ((xx / 32 + yy / 32) % 2) ctx.fillRect(X(xx), fy + yy, 32, 32);
+      label(X(100), Y(26), '🦷 DR. MOLAR, DENTIST'); label(X(100), Y(48), 'everyone welcome, even sharks', '#2b1d14', '#fff');
+      const tp = 82; ctx.fillStyle = '#fff'; U.roundRect(ctx, X(392 + tp), Y(8), 110, 50, 4); ctx.fill(); ctx.fillStyle = '#2b1d14'; ctx.font = r.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('BRUSH', X(466 + tp), Y(22)); ctx.fillText('TWICE A DAY!', X(466 + tp), Y(36));
+      ctx.fillStyle = '#fff'; ctx.strokeStyle = '#9aa0a8'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(X(406 + tp), Y(22)); ctx.quadraticCurveTo(X(406 + tp), Y(12), X(416 + tp), Y(13)); ctx.quadraticCurveTo(X(421 + tp), Y(16), X(426 + tp), Y(13)); ctx.quadraticCurveTo(X(436 + tp), Y(12), X(436 + tp), Y(22)); ctx.quadraticCurveTo(X(436 + tp), Y(38), X(430 + tp), Y(46)); ctx.lineTo(X(425 + tp), Y(36)); ctx.lineTo(X(417 + tp), Y(46)); ctx.quadraticCurveTo(X(406 + tp), Y(38), X(406 + tp), Y(22)); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#2b1d14'; ctx.fillRect(X(415 + tp), Y(24), 2, 2); ctx.fillRect(X(425 + tp), Y(24), 2, 2); ctx.strokeStyle = '#2b1d14'; ctx.beginPath(); ctx.arc(X(421 + tp), Y(28), 3, 0.2, Math.PI - 0.2); ctx.stroke();
+      // the chairs, the kid with a lollipop, the shark and his magazine
+      for (let i = 0; i < 3; i++) { const sx = X(28 + i * 46); ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(sx + 3, Y(156), 40, 30); ctx.fillStyle = '#3b7dd8'; U.roundRect(ctx, sx, Y(150), 40, 30, 5); ctx.fill(); ctx.fillStyle = '#2d5a8a'; ctx.fillRect(sx, Y(170), 40, 10); }
+      person(48, 172, { shirt: '#ffd166', skin: '#f1c27d', hair: '#d9a066', hairStyle: 2, facing: 1, moving: false, carry: 0 });
+      ctx.fillStyle = '#fff'; ctx.fillRect(X(64), Y(140), 2, 16); ctx.fillStyle = '#f06292'; ctx.beginPath(); ctx.arc(X(65), Y(138), 6, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.beginPath(); ctx.arc(X(63), Y(136), 2, 0, Math.PI * 2); ctx.fill();
+      const sh = { x: X(132), y: Y(164) + Math.sin(t * 1.5) * 1.5 };
       ctx.fillStyle = '#8f96a3'; ctx.beginPath(); ctx.ellipse(sh.x, sh.y - 10, 30, 18, -0.2, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(sh.x - 6, sh.y - 28); ctx.lineTo(sh.x + 4, sh.y - 46); ctx.lineTo(sh.x + 12, sh.y - 26); ctx.closePath(); ctx.fill();   // dorsal fin
-      ctx.beginPath(); ctx.moveTo(sh.x - 28, sh.y - 14); ctx.lineTo(sh.x - 44, sh.y - 26); ctx.lineTo(sh.x - 42, sh.y - 2); ctx.closePath(); ctx.fill();     // tail
-      ctx.fillStyle = '#e8edf2'; ctx.beginPath(); ctx.ellipse(sh.x + 6, sh.y - 4, 20, 9, -0.2, 0, Math.PI * 2); ctx.fill();   // belly
+      ctx.beginPath(); ctx.moveTo(sh.x - 6, sh.y - 28); ctx.lineTo(sh.x + 4, sh.y - 46); ctx.lineTo(sh.x + 12, sh.y - 26); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(sh.x - 28, sh.y - 14); ctx.lineTo(sh.x - 44, sh.y - 26); ctx.lineTo(sh.x - 42, sh.y - 2); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#e8edf2'; ctx.beginPath(); ctx.ellipse(sh.x + 6, sh.y - 4, 20, 9, -0.2, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(sh.x + 14, sh.y - 16, 5, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.arc(sh.x + 15, sh.y - 16, 2.2, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(sh.x + 14, sh.y - 6, 10, 0.1, Math.PI - 0.3); ctx.stroke();   // big smile
+      ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(sh.x + 14, sh.y - 6, 10, 0.1, Math.PI - 0.3); ctx.stroke();
       ctx.fillStyle = '#fff'; for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.moveTo(sh.x + 5 + k * 4, sh.y - 3); ctx.lineTo(sh.x + 7 + k * 4, sh.y + 2); ctx.lineTo(sh.x + 9 + k * 4, sh.y - 3); ctx.closePath(); ctx.fill(); }
-      ctx.fillStyle = '#fff'; U.roundRect(ctx, sh.x + 18, sh.y - 2, 26, 18, 2); ctx.fill(); ctx.strokeStyle = 'rgba(43,29,20,0.4)'; ctx.lineWidth = 1; U.roundRect(ctx, sh.x + 18, sh.y - 2, 26, 18, 2); ctx.stroke(); ctx.fillStyle = '#e4572e'; ctx.font = r.font(6); ctx.fillText('TEETH', sh.x + 31, sh.y + 4); ctx.fillText('WEEKLY', sh.x + 31, sh.y + 11);
-      ctx.fillStyle = '#8f96a3'; ctx.beginPath(); ctx.ellipse(sh.x + 16, sh.y + 4, 8, 4, 0.6, 0, Math.PI * 2); ctx.fill();   // fin holding the magazine
-      if (near(sh.x, sh.y, 90)) bubble(sh.x + 10, y0 + 22, 'Just a check-up! 😁', 126);
-      else if (near(x0 + 49, fy + 30, 60)) bubble(x0 + 60, y0 + 22, 'No cavities!', 86);
+      ctx.fillStyle = '#fff'; U.roundRect(ctx, sh.x + 18, sh.y - 2, 28, 20, 2); ctx.fill(); ctx.strokeStyle = 'rgba(43,29,20,0.4)'; ctx.lineWidth = 1; U.roundRect(ctx, sh.x + 18, sh.y - 2, 28, 20, 2); ctx.stroke(); ctx.fillStyle = '#e4572e'; ctx.font = r.font(6); ctx.textAlign = 'center'; ctx.fillText('TEETH', sh.x + 32, sh.y + 5); ctx.fillText('WEEKLY', sh.x + 32, sh.y + 12);
+      ctx.fillStyle = '#8f96a3'; ctx.beginPath(); ctx.ellipse(sh.x + 16, sh.y + 6, 8, 4, 0.6, 0, Math.PI * 2); ctx.fill();
+      if (near(132, 164, 90)) bubble(sh.x + 4, sh.y - 66, 'Just a check-up! 😁', 128);
+      else if (near(48, 172, 60)) bubble(X(48), Y(114), 'No cavities!', 86);
+      // reception window with the nurse, a toy box and a plant
+      person(508, 163, { shirt: '#fff', skin: '#c68642', hair: '#1a1a1a', hairStyle: 2, facing: -1, moving: false, carry: 0 });
+      ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(X(463), Y(169), 96, 32); ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, X(460), Y(165), 96, 32, 5); ctx.fill(); ctx.fillStyle = '#a86b36'; ctx.fillRect(X(460), Y(165), 96, 7);
+      ctx.fillStyle = '#fff'; ctx.font = r.font(7); ctx.textAlign = 'center'; ctx.fillText('CHECK-IN', X(496), Y(186));
+      ctx.fillStyle = '#9fd8ff'; U.roundRect(ctx, X(536), Y(150), 14, 18, 4); ctx.fill(); ctx.fillStyle = '#f06292'; for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.arc(X(540) + (k % 2) * 6, Y(156) + Math.floor(k / 2) * 7, 2.5, 0, Math.PI * 2); ctx.fill(); }   // lollipop jar
+      if (near(508, 180, 90)) bubble(X(508), Y(106), 'Next, please!', 90);
+      ctx.fillStyle = '#ffd166'; U.roundRect(ctx, X(380), Y(232), 30, 16, 3); ctx.fill(); ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.arc(X(388), Y(232), 5, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#3b7dd8'; ctx.fillRect(X(396), Y(228), 9, 8);   // toy box
+      plant(578, 246);
     } else {
-      // rooftop: sky and the skyline, a railing, planters, pigeons and a telescope
-      const sky = ctx.createLinearGradient(0, y0, 0, fy + 20); sky.addColorStop(0, '#79c6f2'); sky.addColorStop(1, '#d9f0ff'); ctx.fillStyle = sky; ctx.fillRect(x0, y0, w, wall + 20);
-      ctx.fillStyle = '#fff7c2'; ctx.beginPath(); ctx.arc(x0 + 380, y0 + 16, 10, 0, Math.PI * 2); ctx.fill();
-      for (let k = 0; k < 14; k++) { const bh = 14 + this.hash(k) * 36, bx = x0 + k * 32; ctx.fillStyle = k % 2 ? '#9fb3c8' : '#b0c4d8'; ctx.fillRect(bx, fy + 14 - bh, 26, bh); ctx.fillStyle = 'rgba(255,255,255,0.5)'; for (let yy = fy + 18 - bh; yy < fy + 8; yy += 8) ctx.fillRect(bx + 4, yy, 4, 4), ctx.fillRect(bx + 14, yy, 4, 4); }
-      ctx.fillStyle = '#b9b2a4'; ctx.fillRect(x0, fy + 14, w, h - wall - 14); ctx.strokeStyle = 'rgba(0,0,0,0.08)'; ctx.lineWidth = 1; for (let xx = x0; xx < R.x1; xx += 40) { ctx.beginPath(); ctx.moveTo(xx + 0.5, fy + 14); ctx.lineTo(xx + 0.5, R.y1); ctx.stroke(); }
-      ctx.fillStyle = '#5c6670'; ctx.fillRect(x0, fy + 10, w, 4); for (let xx = x0 + 10; xx < R.x1; xx += 22) ctx.fillRect(xx, fy - 10, 3, 24);   // railing
-      for (let i = 0; i < 3; i++) { const px = x0 + 40 + i * 140, py = fy + 16; ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, px, py, 60, 20, 4); ctx.fill(); ctx.fillStyle = '#3f9a4a'; for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.arc(px + 10 + k * 13, py - 2, 7, 0, Math.PI * 2); ctx.fill(); } const cols = ['#ff8fab', '#ffd166', '#ff6b6b', '#9ad0ff']; for (let k = 0; k < 4; k++) { ctx.fillStyle = cols[(k + i) % 4]; ctx.beginPath(); ctx.arc(px + 10 + k * 13, py - 8 + Math.sin(t * 2 + k) * 1.5, 3.5, 0, Math.PI * 2); ctx.fill(); } }
-      for (const b of st.roofPigeons) { const bx = x0 + b.x, by = y0 + b.y - b.lift, fc = b.facing; ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(bx, y0 + b.y + 2, 6, 3, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#8f96a3'; ctx.beginPath(); ctx.ellipse(bx, by - 4, 7, 4.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#6b7480'; ctx.beginPath(); ctx.arc(bx + fc * 6, by - 7 + (b.state === 'walk' && Math.floor(t * 3) % 2 ? 2 : 0), 3.2, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#ff8c42'; ctx.fillRect(bx + fc * 8, by - 8, fc * 3, 2); if (b.lift > 0) { const wv = Math.sin(b.flap) * 7; ctx.fillStyle = '#b8c0cc'; ctx.beginPath(); ctx.moveTo(bx, by - 5); ctx.lineTo(bx - 9, by - 9 - wv); ctx.lineTo(bx - 3, by - 2); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(bx, by - 5); ctx.lineTo(bx + 9, by - 9 - wv); ctx.lineTo(bx + 3, by - 2); ctx.closePath(); ctx.fill(); } }
+      // the rooftop garden: skyline and sky behind a railing, planters, a tree in a tub, a sun lounger, pigeons, the telescope
+      const sky = ctx.createLinearGradient(0, y0, 0, fy); sky.addColorStop(0, '#79c6f2'); sky.addColorStop(1, '#d9f0ff'); ctx.fillStyle = sky; ctx.fillRect(x0, y0, w, wall);
+      ctx.fillStyle = '#fff7c2'; ctx.beginPath(); ctx.arc(X(500), Y(18), 11, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.9)'; for (const [cxx, cy] of [[60, 14], [400, 10]]) { const mx = X(cxx) + ((t * 6) % 60); ctx.beginPath(); ctx.arc(mx, Y(cy), 7, 0, Math.PI * 2); ctx.arc(mx + 9, Y(cy) - 4, 9, 0, Math.PI * 2); ctx.arc(mx + 20, Y(cy), 6, 0, Math.PI * 2); ctx.fill(); }
+      for (let k = 0; k < 19; k++) { const bh = 14 + this.hash(k) * 40, bx = X(k * 33); ctx.fillStyle = k % 2 ? '#9fb3c8' : '#b0c4d8'; ctx.fillRect(bx, Y(62) - bh, 27, bh); ctx.fillStyle = 'rgba(255,255,255,0.5)'; for (let yy = Y(66) - bh; yy < Y(58); yy += 8) { ctx.fillRect(bx + 4, yy, 4, 4); ctx.fillRect(bx + 15, yy, 4, 4); } }
+      const bxx = X(((t * 30) % (w + 60)) - 30), byy = Y(22) + Math.sin(t * 2) * 3; ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(bxx - 6, byy); ctx.quadraticCurveTo(bxx - 3, byy - 4, bxx, byy); ctx.quadraticCurveTo(bxx + 3, byy - 4, bxx + 6, byy); ctx.stroke();   // a bird
+      ctx.fillStyle = '#b9b2a4'; ctx.fillRect(x0, fy, w, h - wall); ctx.strokeStyle = 'rgba(0,0,0,0.08)'; ctx.lineWidth = 1; for (let xx = 0; xx < w; xx += 40) { ctx.beginPath(); ctx.moveTo(X(xx) + 0.5, fy); ctx.lineTo(X(xx) + 0.5, R.y1); ctx.stroke(); }
+      ctx.fillStyle = '#5c6670'; ctx.fillRect(x0, Y(62), w, 4); ctx.fillRect(x0, fy - 2, w, 4); for (let xx = 10; xx < w; xx += 22) ctx.fillRect(X(xx), Y(44), 3, 26);   // railing
+      const planter = (px, py, i) => { ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(X(px) + 3, Y(py) + 4, 72, 26); ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, X(px), Y(py), 72, 26, 4); ctx.fill(); ctx.fillStyle = '#3f9a4a'; for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.arc(X(px) + 10 + k * 13, Y(py) - 2, 7, 0, Math.PI * 2); ctx.fill(); } const cols = ['#ff8fab', '#ffd166', '#ff6b6b', '#9ad0ff', '#fff']; for (let k = 0; k < 5; k++) { ctx.fillStyle = cols[(k + i) % 5]; ctx.beginPath(); ctx.arc(X(px) + 10 + k * 13, Y(py) - 9 + Math.sin(t * 2 + k) * 1.5, 3.5, 0, Math.PI * 2); ctx.fill(); } };
+      planter(28, 124, 0); planter(500, 124, 2);
+      ctx.fillStyle = '#c62828'; U.roundRect(ctx, X(73), Y(184), 34, 22, 4); ctx.fill(); ctx.fillStyle = '#6b4a2b'; ctx.fillRect(X(88), Y(150), 6, 36); ctx.fillStyle = '#3f9a4a'; ctx.beginPath(); ctx.arc(X(91) + Math.sin(t * 1.2) * 2, Y(138), 22, 0, Math.PI * 2); ctx.arc(X(77) + Math.sin(t * 1.2) * 2, Y(150), 14, 0, Math.PI * 2); ctx.arc(X(107) + Math.sin(t * 1.2) * 2, Y(150), 14, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#ff6b6b'; for (const [dx, dy] of [[-8, -6], [6, 2], [12, -10]]) { ctx.beginPath(); ctx.arc(X(91) + dx, Y(140) + dy, 3, 0, Math.PI * 2); ctx.fill(); }   // a little apple tree
+      ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(X(363), Y(202), 76, 20); for (let k = 0; k < 6; k++) { ctx.fillStyle = k % 2 ? '#fff' : '#3b7dd8'; ctx.fillRect(X(360) + k * 13, Y(196), 13, 22); } ctx.fillStyle = '#5c6670'; ctx.fillRect(X(360), Y(218), 76, 3);
+      person(386, 216, { shirt: '#e4572e', skin: '#e0ac69', hair: '#5a3a1a', hairStyle: 3, facing: 1, moving: false, carry: 0 }); ctx.fillStyle = '#ffd166'; ctx.fillRect(X(396), Y(194), 14, 10); ctx.fillStyle = '#2b1d14'; ctx.fillRect(X(398), Y(197), 10, 1); ctx.fillRect(X(398), Y(200), 10, 1);   // reading a book
+      if (near(386, 216, 70)) bubble(X(386), Y(158), 'Lovely day up here!', 128);
+      // a picnic blanket with a pizza box
+      ctx.fillStyle = '#ffd166'; U.roundRect(ctx, X(200), Y(226), 60, 30, 4); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.5)'; for (let k = 0; k < 4; k++) ctx.fillRect(X(200), Y(230) + k * 8, 60, 2); r.drawPizza(X(230), Y(240), 10);
+      for (const b of st.roofPigeons) { const bx = X(b.x), by = Y(b.y) - b.lift, fc = b.facing; ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(bx, Y(b.y) + 2, 6, 3, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#8f96a3'; ctx.beginPath(); ctx.ellipse(bx, by - 4, 7, 4.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#6b7480'; ctx.beginPath(); ctx.arc(bx + fc * 6, by - 7 + (b.state === 'walk' && Math.floor(t * 3) % 2 ? 2 : 0), 3.2, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#ff8c42'; ctx.fillRect(bx + fc * 8, by - 8, fc * 3, 2); if (b.lift > 0) { const wv = Math.sin(b.flap) * 7; ctx.fillStyle = '#b8c0cc'; ctx.beginPath(); ctx.moveTo(bx, by - 5); ctx.lineTo(bx - 9, by - 9 - wv); ctx.lineTo(bx - 3, by - 2); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(bx, by - 5); ctx.lineTo(bx + 9, by - 9 - wv); ctx.lineTo(bx + 3, by - 2); ctx.closePath(); ctx.fill(); } }
       const tl = this.telescope();
-      ctx.fillStyle = '#2d3a4a'; ctx.beginPath(); ctx.moveTo(tl.x, tl.y - 20); ctx.lineTo(tl.x - 12, tl.y + 8); ctx.moveTo(tl.x, tl.y - 20); ctx.lineTo(tl.x + 12, tl.y + 8); ctx.moveTo(tl.x, tl.y - 20); ctx.lineTo(tl.x, tl.y + 8); ctx.strokeStyle = '#2d3a4a'; ctx.lineWidth = 3; ctx.stroke();
-      ctx.save(); ctx.translate(tl.x, tl.y - 24); ctx.rotate(-0.5); ctx.fillStyle = '#e4572e'; U.roundRect(ctx, -10, -6, 34, 12, 5); ctx.fill(); ctx.fillStyle = '#ffd166'; U.roundRect(ctx, 18, -8, 8, 16, 3); ctx.fill(); ctx.restore();
-      label(tl.x, tl.y + 20, '🔭 LOOK!');
-      if (near(tl.x, tl.y, 50)) bubble(tl.x - 30, tl.y - 58, 'I can see the pizza shop! 🍕', 170);
+      ctx.fillStyle = 'rgba(0,0,0,0.14)'; ctx.beginPath(); ctx.ellipse(tl.x + 2, tl.y + 10, 16, 6, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#2d3a4a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(tl.x, tl.y - 22); ctx.lineTo(tl.x - 13, tl.y + 8); ctx.moveTo(tl.x, tl.y - 22); ctx.lineTo(tl.x + 13, tl.y + 8); ctx.moveTo(tl.x, tl.y - 22); ctx.lineTo(tl.x, tl.y + 8); ctx.stroke();
+      ctx.save(); ctx.translate(tl.x, tl.y - 26); ctx.rotate(-0.5); ctx.fillStyle = '#e4572e'; U.roundRect(ctx, -12, -7, 38, 14, 6); ctx.fill(); ctx.fillStyle = '#ffd166'; U.roundRect(ctx, 20, -9, 9, 18, 3); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(-8, -5, 24, 3); ctx.restore();
+      label(tl.x - 4, tl.y + 24, '🔭 LOOK!');
     }
+  },
+
+  // ---------- screen-space: the floor panel beside the elevator, and the telescope view ----------
+  screen(r, g) {
+    const st = this.st; if (!st || g.area !== 'city' || !this.floor) return;
+    const ctx = r.ctx, W = r.canvas.width / r.dpr, H = r.canvas.height / r.dpr;
+    if (this.viewing) { this.drawTelescope(r, g, W, H); return; }
+    const T = CFG.CITY.TOWER, R = T.ROOM, L = st.lift, p = g.player, f = this.floor;
+    if (!(L || st.pickerT > 0 || p.y < R.y0 + 125)) return;
+    const shown = L ? L.shown : f, sel = st.padSel, k = sel ? st.padT / 0.45 : 0;
+    ctx.textBaseline = 'middle';
+    if (W >= 640) {
+      // a tall panel on the right: top floor at the top
+      const px = W - 204, py = 64, rowH = 30;
+      ctx.fillStyle = 'rgba(43,29,20,0.88)'; U.roundRect(ctx, px, py, 188, 34 + rowH * T.floors + 8, 12); ctx.fill();
+      ctx.fillStyle = '#ffe08a'; ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.fillText('🛗 Pick a floor', px + 94, py + 18);
+      for (let i = T.floors; i >= 1; i--) {
+        const ry = py + 34 + (T.floors - i) * rowH, here = i === shown, picking = i === sel;
+        ctx.fillStyle = here ? '#ffd166' : picking ? '#56b862' : 'rgba(255,255,255,0.12)'; U.roundRect(ctx, px + 8, ry, 172, rowH - 4, 8); ctx.fill();
+        if (picking) { ctx.fillStyle = '#2f9e44'; U.roundRect(ctx, px + 8, ry, 172 * U.clamp(k, 0, 1), rowH - 4, 8); ctx.fill(); }
+        ctx.fillStyle = here ? '#2b1d14' : '#fff'; ctx.font = r.font(12); ctx.textAlign = 'left'; ctx.fillText(`${T.icons[i]}  ${i}  ${T.names[i]}`, px + 18, ry + (rowH - 4) / 2);
+        if (here && !L) { ctx.font = r.font(9); ctx.textAlign = 'right'; ctx.fillText('you are here', px + 172, ry + (rowH - 4) / 2); }
+      }
+    } else {
+      // a strip of chips above the action button on phones
+      const cw = 50, gap = 6, total = T.floors * cw + (T.floors - 1) * gap, sx = W / 2 - total / 2, sy = H - 142;
+      ctx.fillStyle = 'rgba(43,29,20,0.88)'; U.roundRect(ctx, sx - 10, sy - 26, total + 20, 86, 12); ctx.fill();
+      ctx.fillStyle = '#ffe08a'; ctx.font = r.font(11); ctx.textAlign = 'center'; ctx.fillText('🛗 Pick a floor', W / 2, sy - 12);
+      for (let i = 1; i <= T.floors; i++) {
+        const x = sx + (i - 1) * (cw + gap), here = i === shown, picking = i === sel;
+        ctx.fillStyle = here ? '#ffd166' : picking ? '#56b862' : 'rgba(255,255,255,0.12)'; U.roundRect(ctx, x, sy, cw, 50, 8); ctx.fill();
+        if (picking) { ctx.fillStyle = '#2f9e44'; U.roundRect(ctx, x, sy + 50 - 50 * U.clamp(k, 0, 1), cw, 50 * U.clamp(k, 0, 1), 8); ctx.fill(); }
+        ctx.fillStyle = here ? '#2b1d14' : '#fff'; ctx.font = r.font(14); ctx.textAlign = 'center'; ctx.fillText(T.icons[i], x + cw / 2, sy + 16); ctx.font = r.font(13); ctx.fillText(String(i), x + cw / 2, sy + 36);
+      }
+    }
+  },
+
+  // Through the telescope: the city rooftops, then far away the whole pizza town, the islands and the mountains.
+  drawTelescope(r, g, W, H) {
+    const ctx = r.ctx, t = g.time, v = this.viewing, cx = W / 2, cy = H / 2, Rv = Math.min(W, H) * 0.46, fade = Math.min(1, v.t / 0.5);
+    const sway = Math.sin(t * 0.5) * 7, bob = Math.cos(t * 0.37) * 3, hz = cy + Rv * 0.05;   // hz: the horizon
+    ctx.fillStyle = '#0a0806'; ctx.fillRect(0, 0, W, H);
+    ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, Rv, 0, Math.PI * 2); ctx.clip();
+    const sky = ctx.createLinearGradient(0, cy - Rv, 0, hz); sky.addColorStop(0, '#5fb6ee'); sky.addColorStop(1, '#dff3ff'); ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#fff7c2'; ctx.beginPath(); ctx.arc(cx + Rv * 0.55 + sway * 0.2, cy - Rv * 0.55 + bob * 0.2, Rv * 0.09, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.9)'; for (let i = 0; i < 4; i++) { const mx = cx - Rv + ((t * 8 + i * 230) % (Rv * 2.4)) + sway * 0.3, my = cy - Rv * (0.75 - (i % 2) * 0.18); ctx.beginPath(); ctx.arc(mx, my, 12, 0, Math.PI * 2); ctx.arc(mx + 14, my - 7, 15, 0, Math.PI * 2); ctx.arc(mx + 30, my, 11, 0, Math.PI * 2); ctx.fill(); }
+    ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1.5; for (let i = 0; i < 3; i++) { const bx = cx - Rv + ((t * 22 + i * 170) % (Rv * 2.2)), by = cy - Rv * (0.45 + i * 0.08) + Math.sin(t * 3 + i) * 4, fl = Math.sin(t * 9 + i) * 3; ctx.beginPath(); ctx.moveTo(bx - 7, by); ctx.quadraticCurveTo(bx - 3, by - 4 - fl, bx, by); ctx.quadraticCurveTo(bx + 3, by - 4 - fl, bx + 7, by); ctx.stroke(); }
+    // mountains with snow, then green hills, then the sea off to the right with the islands' lighthouse
+    const far = sway * 0.25, mid = sway * 0.5, nearS = sway;
+    ctx.fillStyle = '#7f8fb3'; ctx.beginPath(); ctx.moveTo(cx - Rv * 1.2, hz); for (let i = 0; i <= 10; i++) { const px = cx - Rv * 1.2 + i * Rv * 0.24 + far, peak = hz - Rv * (0.18 + 0.2 * Math.abs(Math.sin(i * 2.3))); ctx.lineTo(px, hz - 4); ctx.lineTo(px + Rv * 0.12, peak); } ctx.lineTo(cx + Rv * 1.4, hz); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#fff'; for (let i = 0; i <= 10; i++) { const px = cx - Rv * 1.2 + i * Rv * 0.24 + Rv * 0.12 + far, peak = hz - Rv * (0.18 + 0.2 * Math.abs(Math.sin(i * 2.3))); ctx.beginPath(); ctx.moveTo(px, peak); ctx.lineTo(px + 12, peak + 14); ctx.lineTo(px + 3, peak + 11); ctx.lineTo(px - 3, peak + 15); ctx.lineTo(px - 12, peak + 14); ctx.closePath(); ctx.fill(); }
+    ctx.fillStyle = '#5fa84f'; ctx.fillRect(0, hz, W, H); ctx.fillStyle = '#79b85e'; ctx.fillRect(0, hz + Rv * 0.12, W, Rv * 0.1); ctx.fillStyle = '#8bc34a'; ctx.beginPath(); ctx.ellipse(cx - Rv * 0.5 + nearS * 0.6, hz + Rv * 0.34, Rv * 0.6, Rv * 0.08, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#6cb35a'; ctx.beginPath(); ctx.ellipse(cx - Rv * 0.4 + mid, hz + 6, Rv * 0.9, Rv * 0.12, 0, Math.PI, 0); ctx.fill(); ctx.beginPath(); ctx.ellipse(cx + Rv * 0.3 + mid, hz + 8, Rv * 0.7, Rv * 0.09, 0, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = '#4aa3d8'; ctx.fillRect(cx + Rv * 0.45 + mid, hz - 2, Rv, Rv * 0.3); ctx.fillStyle = 'rgba(255,255,255,0.35)'; for (let i = 0; i < 5; i++) ctx.fillRect(cx + Rv * 0.5 + mid + ((t * 10 + i * 37) % (Rv * 0.5)), hz + 4 + i * Rv * 0.05, 14, 2); ctx.fillStyle = '#79b85e'; ctx.beginPath(); ctx.ellipse(cx + Rv * 0.78 + mid, hz + 4, Rv * 0.12, Rv * 0.04, 0, 0, Math.PI * 2); ctx.fill();
+    { const lx = cx + Rv * 0.78 + mid, ly = hz + 2; ctx.fillStyle = '#fff'; ctx.fillRect(lx - 4, ly - 26, 8, 26); ctx.fillStyle = '#e4572e'; ctx.fillRect(lx - 4, ly - 20, 8, 5); ctx.fillRect(lx - 4, ly - 10, 8, 5); ctx.fillStyle = Math.floor(t * 2) % 2 ? '#ffe08a' : '#fff6b0'; ctx.fillRect(lx - 5, ly - 31, 10, 6); ctx.fillStyle = `rgba(255,224,138,${0.25 + 0.2 * Math.sin(t * 4)})`; ctx.beginPath(); ctx.moveTo(lx, ly - 28); ctx.lineTo(lx - 40, ly - 40); ctx.lineTo(lx - 40, ly - 16); ctx.closePath(); ctx.fill(); }   // the lighthouse
+    // the pizza town on its hill: the pizzeria with its sign, the farm, the station, the crane
+    const ty = hz + 2, S = Rv / 240;
+    const sc = (fn) => { ctx.save(); ctx.translate(mid, 0); ctx.scale(S, S); fn(); ctx.restore(); };
+    sc(() => {
+      const ox = cx / S, oy = ty / S;
+      ctx.fillStyle = '#6b4a2b'; for (const dx of [-150, -120, 60, 95]) { ctx.fillRect(ox + dx - 2, oy - 14, 4, 14); ctx.fillStyle = '#3f9a4a'; ctx.beginPath(); ctx.arc(ox + dx, oy - 18, 9, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#6b4a2b'; }
+      ctx.fillStyle = '#b23a48'; ctx.fillRect(ox - 112, oy - 24, 30, 24); ctx.fillStyle = '#8a2a36'; ctx.beginPath(); ctx.moveTo(ox - 115, oy - 24); ctx.lineTo(ox - 97, oy - 36); ctx.lineTo(ox - 79, oy - 24); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#9aa0a8'; ctx.fillRect(ox - 78, oy - 40, 10, 40); ctx.beginPath(); ctx.arc(ox - 73, oy - 40, 5, Math.PI, 0); ctx.fill();   // barn + silo
+      ctx.fillStyle = '#c98a4b'; ctx.fillRect(ox - 56, oy - 18, 28, 18); ctx.fillStyle = '#8a5527'; ctx.fillRect(ox - 58, oy - 22, 32, 5); ctx.fillStyle = '#2d3a4a'; ctx.fillRect(ox - 62, oy - 6, 60, 3); ctx.fillStyle = '#c62828'; ctx.fillRect(ox - 48 + ((t * 20) % 70), oy - 12, 14, 6); ctx.fillStyle = '#2d8a5a'; ctx.fillRect(ox - 64 + ((t * 20) % 70), oy - 12, 14, 6);   // the station and a passing train
+      ctx.fillStyle = '#f2c94c'; ctx.fillRect(ox - 20, oy - 30, 44, 30); ctx.fillStyle = '#c62828'; ctx.fillRect(ox - 22, oy - 36, 48, 6); ctx.fillStyle = '#9fe0ff'; ctx.fillRect(ox - 14, oy - 22, 10, 8); ctx.fillRect(ox + 6, oy - 22, 10, 8); ctx.fillStyle = '#5b3a1a'; ctx.fillRect(ox - 3, oy - 12, 8, 12);
+      ctx.fillStyle = '#fff'; ctx.fillRect(ox - 16, oy - 48, 36, 12); ctx.fillStyle = '#e4572e'; ctx.font = r.font(8); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('PIZZA', ox + 2, oy - 42); r.drawPizza(ox - 10 + 32, oy - 42, 5);   // the pizzeria and its sign
+      ctx.fillStyle = '#f2b705'; ctx.fillRect(ox + 110, oy - 60, 4, 60); ctx.save(); ctx.translate(ox + 112, oy - 58); ctx.rotate(Math.sin(t * 0.25) * 0.3 - 0.2); ctx.fillRect(-10, -2, 50, 4); ctx.restore(); ctx.fillStyle = Math.floor(t * 2) % 2 ? '#ff3b3b' : '#ffb3b3'; ctx.beginPath(); ctx.arc(ox + 112, oy - 62, 2.5, 0, Math.PI * 2); ctx.fill();   // the crane
+    });
+    // the city's own rooftops in the foreground
+    for (let i = 0; i < 9; i++) { const bw = Rv * 0.26, bx = cx - Rv * 1.1 + i * bw * 0.95 + nearS, bh = Rv * (0.28 + 0.22 * this.hash(i + 7)); ctx.fillStyle = i % 2 ? '#2d3a4a' : '#3a4a5c'; ctx.fillRect(bx, cy + Rv * 0.9 - bh, bw, bh + Rv); ctx.fillStyle = '#ffe08a'; for (let yy = cy + Rv * 0.9 - bh + 10; yy < cy + Rv; yy += 14) for (let xx = bx + 8; xx < bx + bw - 8; xx += 16) if (this.hash(xx * 0.37 + yy) < 0.5) ctx.fillRect(xx, yy, 6, 7); }
+    ctx.fillStyle = '#8d5a2b'; ctx.beginPath(); ctx.arc(cx - Rv * 0.55 + nearS, cy + Rv * 0.5, 12, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#5b3a1a'; ctx.fillRect(cx - Rv * 0.55 + nearS - 2, cy + Rv * 0.5, 4, 30);   // a water tower
+    ctx.restore();
+    // the eyepiece: black vignette, soft rim, crosshair, tick marks
+    ctx.fillStyle = '#0a0806'; ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.arc(cx, cy, Rv, 0, Math.PI * 2, true); ctx.fill();
+    const rim = ctx.createRadialGradient(cx, cy, Rv * 0.82, cx, cy, Rv); rim.addColorStop(0, 'rgba(0,0,0,0)'); rim.addColorStop(1, 'rgba(0,0,0,0.6)'); ctx.fillStyle = rim; ctx.beginPath(); ctx.arc(cx, cy, Rv, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(cx - Rv, cy); ctx.lineTo(cx - 18, cy); ctx.moveTo(cx + 18, cy); ctx.lineTo(cx + Rv, cy); ctx.moveTo(cx, cy - Rv); ctx.lineTo(cx, cy - 18); ctx.moveTo(cx, cy + 18); ctx.lineTo(cx, cy + Rv); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, 18, 0, Math.PI * 2); ctx.stroke(); for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * (Rv - 10), cy + Math.sin(a) * (Rv - 10)); ctx.lineTo(cx + Math.cos(a) * Rv, cy + Math.sin(a) * Rv); ctx.stroke(); }
+    ctx.strokeStyle = '#5c6670'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(cx, cy, Rv + 3, 0, Math.PI * 2); ctx.stroke();
+    // labels
+    const bw = Math.min(W - 24, 320);
+    ctx.fillStyle = 'rgba(43,29,20,0.85)'; U.roundRect(ctx, cx - bw / 2, H - 150, bw, 40, 12); ctx.fill();
+    ctx.fillStyle = '#ffe08a'; ctx.font = r.font(bw < 300 ? 14 : 17); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('There’s my pizza shop! 🍕', cx, H - 130);
+    const px = cx + mid - Rv * 0.0, py = hz - Rv * 0.26; ctx.strokeStyle = '#ffe08a'; ctx.lineWidth = 2; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.arc(px, py + Rv * 0.06, Rv * 0.12, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = r.font(11); ctx.fillText('press the button when you are done looking', cx, H - 100);
+    if (fade < 1) { ctx.fillStyle = `rgba(10,8,6,${1 - fade})`; ctx.fillRect(0, 0, W, H); }
   },
 
   // the city bus seen from above (via Render.drawVehicle so the core's shadow/wheel/light helpers apply)

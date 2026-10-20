@@ -628,6 +628,7 @@ const CityExt = {
     g.floats.push({ x: g.player.x, y: g.player.y - 60, text: 'Welcome to the Pizza Tower!', color: '#ffe08a', t: 0, dur: 1.6, big: true });
     Haptics.tap();
   },
+  home(g) { this.floor = null; this.viewing = null; this.st.lift = null; this.st.panel = null; this.st.boarding = null; },
   leaveTower(g) {
     const D = CFG.CITY.TOWER.door;
     this.floor = null; this.viewing = null; this.st.lift = null; this.st.panel = null;

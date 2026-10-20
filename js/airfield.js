@@ -100,6 +100,7 @@ const AirfieldExt = {
   },
 
   // ======================= game hooks =======================
+  home(g) { const rt = this.rt; if (rt) { rt.ride = null; rt.runup = null; rt.roll = null; } },
   build(g) {
     const A = CFG.AIRFIELD, C = CFG.CLOUD;
     this.rt = {

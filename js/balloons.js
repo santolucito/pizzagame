@@ -55,6 +55,7 @@ const BalloonsExt = {
     Sfx.ding(); Haptics.tap();
   },
   closePicker(g) { this.picker = null; },
+  home(g) { this.picker = null; },
   flipPage(dir) {
     const P = this.picker, n = CFG.BALLOONS.KINDS.length;
     P.page = (P.page + dir + n) % n; P.dir = dir; P.flip = 1;

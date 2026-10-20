@@ -50,6 +50,7 @@ const UpstairsExt = {
 
   // ---------- game hooks ----------
   defaults: { upstairs: { seen: false } },
+  home(g) { if (this.st) { this.st.nap = null; this.st.fade = 0; this.st.roofA = 1; } },
   build(g) {
     if (!g.s.upstairs) g.s.upstairs = { seen: false };
     const R = CFG.UPSTAIRS.ROOF;

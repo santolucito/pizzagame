@@ -31,6 +31,7 @@ const UI = {
     window.addEventListener('resize', () => { if (MiniGame.open) MiniGame.resize(); });
     $('btn-zoom-in').addEventListener('click', () => Render.setZoom(Render.zoom * 1.25));
     $('btn-zoom-out').addEventListener('click', () => Render.setZoom(Render.zoom / 1.25));
+    $('btn-home').addEventListener('click', () => { Game.goHome(); this.close(); });   // stuck somewhere? straight back to the shop
     $('btn-reset').addEventListener('click', () => {
       if (confirm('Reset all progress and start over?')) { Game.reset(); this.close(); this.toast('Progress reset'); }
     });

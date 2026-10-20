@@ -633,6 +633,7 @@ const SecretExt = {
     if (this.st.cat.hold) this.st.cat.hold = { x: p.x, y: p.y };
   },
   // ---------- the telescope: a frozen look at the night sky ----------
+  home(g) { this.st.view.on = false; this.st.cat.on = false; this.st.fade = 0; },
   startViewing(g) { const v = this.st.view, H = CFG.SECRET.HOME, p = g.player; v.on = true; v.t = 0; v.shoot = null; v.shootT = 2.5; v.wish = 0; v.label = 0; v.labelT = 0; p.x = H.eye.x; p.y = H.eye.y; p.moving = false; p.facing = 1; this.st.fade = 0.45; Sfx.ding(); Haptics.tap(); },
   stopViewing(g) { this.st.view.on = false; this.st.fade = 0.45; Sfx.drop(); },
   bgKey(g) { return g.s.cabin ? 'cabin:' + CFG.SECRET.HOME.items.map((it) => this.owned(g, it.key) ? 1 : 0).join('') : ''; },

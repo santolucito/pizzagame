@@ -136,6 +136,18 @@ const Game = {
     } catch (e) { /* storage may be unavailable */ }
   },
 
+  // Emergency exit from anywhere: back on the pizzeria floor on foot, every ride, vehicle, overlay and
+  // scripted scene dropped. Nothing bought or earned is lost.
+  goHome() {
+    if (this.driving) { this.driving = false; this.vehicle = null; }
+    this.onTrain = false; this.ride = null; this.fishing = null; this.travel = null; this.inPaintBay = false;
+    for (const e of this.ext) if (e.home) e.home(this);
+    this.area = 'town';
+    const st = CFG.PLAYER_START; this.player.x = st.x; this.player.y = st.y; this.player.moving = false; this.player.hasMoved = false;
+    this.cameraSnap = true; this.save();
+    this.toast('🏠 Back at the pizza shop!', true);
+  },
+
   reset() {
     try { localStorage.removeItem(CFG.SAVE_KEY); } catch (e) { /* ignore */ }
     this.s = this.defaultState();

@@ -133,7 +133,7 @@ body.painting #btn-car, body.painting #btn-make, body.painting #toasts, body.pai
 .btn.max { background: #a98f66; box-shadow: 0 3px 0 #7d6a4a; }
 .btn.primary { background: var(--accent); box-shadow: 0 3px 0 var(--accent-dark); }
 .btn.danger { background: #b23a48; box-shadow: 0 3px 0 #7d2531; }
-.help-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.help-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .version { color: #8a7a6a; font-size: 13px; font-weight: 700; }
 .help-body { padding: 14px 18px; overflow-y: auto; font-size: 14px; line-height: 1.45; }
 .help-body ol { padding-left: 20px; }

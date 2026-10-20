@@ -21,7 +21,8 @@ const Game = {
       decor: {},
       iceCream: { owned: false, flavors: 0, cash: 0 },
       farm: { wheat: 0, tomato: 0, cheese: 0, mushroom: 0, basil: 0 },
-      paint: { car: '#e4572e', bike: '#e4572e', tractor: '#43a047' },
+      paint: { car: '#ffffff', bike: '#ffffff', tractor: '#43a047' },
+      vehicles: { car: false, bike: false },   // bought at the showroom
       padPaid: {},
       upg: { speed: 0, capacity: 0, oven: 0 },
       staff: { cashier: { count: 0, level: 0 }, helper: { count: 0, level: 0 }, cleaner: { count: 0, level: 0 } },
@@ -58,8 +59,10 @@ const Game = {
     this.dog = new Dog();
     this.houses = CFG.HOUSES.map((h, i) => Object.assign({ i, order: null, happy: 0 }, h));
     this.icCustomers = [];
-    this.car = { kind: 'car', x: CFG.DELIVERY_CAR.x, y: CFG.DELIVERY_CAR.y, angle: -Math.PI / 2, vx: 0, vy: 0 };
-    this.bike = { kind: 'bike', x: CFG.DELIVERY_BIKE.x, y: CFG.DELIVERY_BIKE.y, angle: -Math.PI / 2, vx: 0, vy: 0 };
+    // owned vehicles wait at their usual spots; unsold ones sit in the showroom
+    const SR = CFG.GARAGE.showroom;
+    this.car = s.vehicles.car ? { kind: 'car', x: CFG.DELIVERY_CAR.x, y: CFG.DELIVERY_CAR.y, angle: -Math.PI / 2, vx: 0, vy: 0 } : { kind: 'car', x: SR.car.x, y: SR.car.y, angle: -Math.PI / 2, vx: 0, vy: 0 };
+    this.bike = s.vehicles.bike ? { kind: 'bike', x: CFG.DELIVERY_BIKE.x, y: CFG.DELIVERY_BIKE.y, angle: -Math.PI / 2, vx: 0, vy: 0 } : { kind: 'bike', x: SR.bike.x, y: SR.bike.y, angle: -Math.PI / 2, vx: 0, vy: 0 };
     this.tractor = { kind: 'tractor', x: CFG.FARM.tractor.x, y: CFG.FARM.tractor.y, angle: -0.3, vx: 0, vy: 0 };
     this.fishing = null; this.onTrain = false;
     this.vehicle = null; this.driving = false; this.orderT = U.rand(20, 35); this.icSpawnT = 4;
@@ -112,6 +115,7 @@ const Game = {
         iceCream: Object.assign(d.iceCream, data.iceCream || {}),
         farm: Object.assign(d.farm, data.farm || {}),
         paint: Object.assign(d.paint, data.paint || {}),
+        vehicles: Object.assign(d.vehicles, data.vehicles || {}),
         unlocked: data.unlocked || {},
         padPaid: data.padPaid || {},
         pos: data.pos || null,
@@ -236,6 +240,9 @@ const Game = {
     const IC = CFG.ICE_CREAM;
     if (!this.s.iceCream.owned) out.push({ key: 'icecream', kind: 'icecream', label: 'Buy Ice Cream Shop', ico: '🍦', pos: IC.buyPad, price: IC.price, maxed: false, sub: 'earns money for you' });
     else { const c = this.flavorsCost(); out.push({ key: 'flavors', kind: 'flavors', label: 'More Flavors', ico: '🍨', pos: IC.flavorsPad, price: c || 0, maxed: c === null, sub: `${this.s.iceCream.flavors}/${IC.flavorsMax}` }); }
+    const SR = CFG.GARAGE.showroom;
+    if (!this.s.vehicles.car) out.push({ key: 'buyCar', kind: 'vehicle', vkind: 'car', label: 'Delivery Car', ico: '🚗', pos: SR.car.pad, price: SR.car.price, maxed: false, sub: 'deliveries pay double' });
+    if (!this.s.vehicles.bike) out.push({ key: 'buyBike', kind: 'vehicle', vkind: 'bike', label: 'Scooter', ico: '🛵', pos: SR.bike.pad, price: SR.bike.price, maxed: false, sub: 'zippy!' });
     for (const e of this.ext) if (e.pads) for (const p of e.pads(this)) out.push(Object.assign({ kind: 'ext', ext: e, maxed: false, sub: '' }, p));
     for (const it of CFG.DECOR_ITEMS) {
       if (this.s.decor[it.key]) continue;
@@ -253,6 +260,7 @@ const Game = {
     else if (pad.kind === 'decor') { this.s.decor[pad.item] = true; this.toast(`${pad.label} bought!`); }
     else if (pad.kind === 'icecream') { this.s.iceCream.owned = true; Sfx.unlock(); Haptics.success(); this.toast('🍦 You own the ice cream shop!', true); }
     else if (pad.kind === 'flavors') { this.s.iceCream.flavors++; this.toast(`More flavors! ${this.s.iceCream.flavors}/${CFG.ICE_CREAM.flavorsMax}`); }
+    else if (pad.kind === 'vehicle') { this.s.vehicles[pad.vkind] = true; this.s.paint[pad.vkind] = '#ffffff'; Sfx.unlock(); Haptics.success(); this.toast(`${pad.ico} Your new ${pad.label.toLowerCase()}! Drive it into the bay to pick a colour`, true, 'town'); }
     else if (pad.kind === 'ext') pad.ext.onPad(this, pad);
     else this.applyStaffPad(pad.role, pad.mode);
   },
@@ -620,7 +628,7 @@ const Game = {
   },
 
   // ---------- delivery vehicles (car and scooter) ----------
-  vehicles() { const v = [this.car, this.bike, this.tractor, this.excavator, this.dumptruck, this.bulldozer]; for (const e of this.ext) if (e.vehicles) v.push(...e.vehicles(this)); return v; },
+  vehicles() { const v = [this.tractor, this.excavator, this.dumptruck, this.bulldozer]; if (this.s.vehicles.car) v.push(this.car); if (this.s.vehicles.bike) v.push(this.bike); for (const e of this.ext) if (e.vehicles) v.push(...e.vehicles(this)); return v; },
   isSiteVehicle(v) { return v === this.excavator || v === this.dumptruck || v === this.bulldozer; },
   findNearVehicle() {
     if (this.driving) return null;
@@ -950,6 +958,7 @@ const Game = {
       else if (this.nearFarm() && this.cow.ready) h = { text: 'Say hi to the cow for cheese 🧀', target: this.cow };
       else if (s.iceCream.owned && s.iceCream.cash >= 30 && U.dist(p.x, p.y, IC.cash.x, IC.cash.y) < 500) h = { text: 'Collect the ice cream money', target: IC.cash };
       else if (coin && U.dist(p.x, p.y, coin.x, coin.y) < 420) h = { text: 'Grab the shiny coin!', target: coin };
+      else if (order && !s.vehicles.car && !s.vehicles.bike) h = { text: 'Deliver on foot, or buy a car at the showroom!', target: CFG.GARAGE.showroom.car.pad };
       else if (order) h = { text: 'Grab pizzas, then deliver by car!', target: CFG.DOOR_OUT };
       else h = { text: 'Walk back to the pizza shop', target: CFG.DOOR_OUT };
     }

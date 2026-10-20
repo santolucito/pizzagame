@@ -668,9 +668,10 @@ const Render = {
     ctx.fillStyle = '#f2c94c'; ctx.fillRect(GA.bay.x - 30, GA.bay.y - 26, 60, 4); ctx.fillRect(GA.bay.x - 30, GA.bay.y + 22, 60, 4); ctx.fillRect(GA.bay.x - 30, GA.bay.y - 26, 4, 52); ctx.fillRect(GA.bay.x + 26, GA.bay.y - 26, 4, 52); // bay markings
     ctx.fillStyle = '#9aa0a8'; ctx.fillRect(GA.x0, GA.y0, gd.x - gd.half - GA.x0, 8); ctx.fillRect(gd.x + gd.half, GA.y0, GA.x1 - (gd.x + gd.half), 8); ctx.fillRect(GA.x0, GA.y0, 8, gh); ctx.fillRect(GA.x1 - 8, GA.y0, 8, gh); ctx.fillRect(GA.x0, GA.y1 - 8, gw, 8);
     ctx.fillStyle = '#c62828'; ctx.fillRect(GA.x0 + 8, GA.y1 - 20, gw - 16, 12);              // back wall tool rack
-    for (let i = 0; i < 8; i++) { ctx.fillStyle = CFG.PAINT_COLORS[i]; ctx.beginPath(); ctx.arc(GA.x0 + 24 + i * 18, GA.y1 - 14, 5, 0, Math.PI * 2); ctx.fill(); } // paint cans
-    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, gd.x - 60, GA.y0 - 20, 120, 18, 4); ctx.fill();
-    ctx.fillStyle = '#ffe08a'; ctx.font = this.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🎨 PAINT SHOP', gd.x, GA.y0 - 11);
+    CFG.PAINT_COLORS.filter((c) => c !== 'rainbow').forEach((c, i) => { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(GA.x0 + 24 + i * 18, GA.y1 - 14, 5, 0, Math.PI * 2); ctx.fill(); }); // paint cans
+    ctx.fillStyle = 'rgba(159,224,255,0.35)'; ctx.fillRect(GA.x0 + 8, GA.y0 + 8, gd.x - gd.half - GA.x0 - 8, 6); ctx.fillRect(gd.x + gd.half, GA.y0 + 8, GA.x1 - (gd.x + gd.half) - 8, 6);   // showroom glass
+    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, gd.x - 78, GA.y0 - 20, 156, 18, 4); ctx.fill();
+    ctx.fillStyle = '#ffe08a'; ctx.font = this.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🚗 SHOWROOM · 🎨 PAINT', gd.x, GA.y0 - 11);
     ctx.fillStyle = '#d2cbbb'; ctx.fillRect(gd.x - gd.half, 1000, gd.half * 2, 20);          // driveway from the road
     // ---- fire station
     const F = CFG.FIRE_STATION, fw = F.x1 - F.x0, fh = F.y1 - F.y0;
@@ -1397,14 +1398,15 @@ const Render = {
   },
 
   drawDeliveryCar(g) {
-    const ctx = this.ctx, c = g.car;
+    const ctx = this.ctx, c = g.car, owned = g.s.vehicles.car;
     ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.angle);
-    this.drawVehicle('car', g, g.s.paint.car);
+    if (!owned) ctx.globalAlpha = 0.6;   // on the showroom floor, not yours yet
+    this.drawVehicle('car', g, owned ? g.s.paint.car : '#c9ccd2');
     // roof sign
     ctx.fillStyle = '#fff8ee'; U.roundRect(ctx, -16, -8, 32, 16, 4); ctx.fill();
     this.drawPizza(0, 0, 6);
     ctx.restore();
-    this.drawRidingExtras(g, c, 30);
+    if (owned) this.drawRidingExtras(g, c, 30);
   },
 
   // pizzas stacked on the vehicle while driving, and the "hop in" bubble when standing next to it
@@ -1432,12 +1434,13 @@ const Render = {
   },
 
   drawDeliveryBike(g) {
-    const ctx = this.ctx, b = g.bike, riding = g.driving && g.vehicle === b;
+    const ctx = this.ctx, b = g.bike, riding = g.driving && g.vehicle === b, owned = g.s.vehicles.bike;
     ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.angle);
+    if (!owned) ctx.globalAlpha = 0.6;
     // scooter, nose +x
     ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(2, 4, 28, 12, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#1e1e1e'; ctx.beginPath(); ctx.ellipse(-20, 0, 8, 5, 0, 0, Math.PI * 2); ctx.ellipse(22, 0, 8, 5, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = g.s.paint.bike; U.roundRect(ctx, -14, -8, 36, 16, 7); ctx.fill();     // body
+    ctx.fillStyle = owned ? this.paintColor(g.s.paint.bike, g) : '#c9ccd2'; U.roundRect(ctx, -14, -8, 36, 16, 7); ctx.fill();     // body
     ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, -10, -6, 16, 12, 5); ctx.fill();     // seat
     ctx.fillStyle = '#c9ccd2'; ctx.fillRect(16, -12, 3, 24);                           // handlebar
     ctx.fillStyle = '#fff6b0'; ctx.beginPath(); ctx.arc(24, 0, 3, 0, Math.PI * 2); ctx.fill(); // headlight
@@ -1452,7 +1455,7 @@ const Render = {
       ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(14, -9, 2.5, 0, Math.PI * 2); ctx.arc(14, 9, 2.5, 0, Math.PI * 2); ctx.fill(); // hands on the bars
     }
     ctx.restore();
-    this.drawRidingExtras(g, b, 22);
+    if (owned) this.drawRidingExtras(g, b, 22);
   },
 
   drawDog(d, g) {
@@ -1710,8 +1713,11 @@ const Render = {
   },
 
   // Top-down vehicles drawn at the origin, nose pointing +x.
+  // 'rainbow' paint cycles through the hues
+  paintColor(color, g) { return color === 'rainbow' ? `hsl(${Math.floor((g.time * 70) % 360)}, 85%, 56%)` : color; },
   drawVehicle(kind, g, color, v) {
     const ctx = this.ctx, t = g.time;
+    color = this.paintColor(color, g);
     const wheels = (xs, w = 14, h = 9, half = 22) => { ctx.fillStyle = '#1e1e1e'; for (const wx of xs) { U.roundRect(ctx, wx - w / 2, -half - 4, w, h, 3); ctx.fill(); U.roundRect(ctx, wx - w / 2, half - 5, w, h, 3); ctx.fill(); } };
     const lights = (len, half) => { ctx.fillStyle = '#fff6b0'; U.roundRect(ctx, len / 2 - 4, -half + 5, 5, 9, 2); ctx.fill(); U.roundRect(ctx, len / 2 - 4, half - 14, 5, 9, 2); ctx.fill(); ctx.fillStyle = '#ff5252'; U.roundRect(ctx, -len / 2 - 1, -half + 5, 5, 9, 2); ctx.fill(); U.roundRect(ctx, -len / 2 - 1, half - 14, 5, 9, 2); ctx.fill(); };
     const flash = Math.floor(t * 5) % 2 === 0;

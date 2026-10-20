@@ -24,7 +24,7 @@ const UI = {
     this.els.btnMake.addEventListener('click', () => Game.doAction());
     Game.onMakePizza = () => this.startMinigame();
     const sw = $('paint-swatches');
-    for (const c of CFG.PAINT_COLORS) { const b = document.createElement('button'); b.className = 'swatch'; b.style.background = c; b.addEventListener('click', () => Game.paintVehicle(c)); sw.appendChild(b); }
+    for (const c of CFG.PAINT_COLORS) { const b = document.createElement('button'); b.className = 'swatch'; b.style.background = c === 'rainbow' ? 'linear-gradient(135deg, #ff4d4d, #ffb000, #ffe600, #3bd16f, #3b7dd8, #8e5bd1)' : c; b.title = c === 'rainbow' ? 'Rainbow' : ''; b.addEventListener('click', () => Game.paintVehicle(c)); sw.appendChild(b); }
     this.els.paint = $('paint-bar');
     MiniGame.init($('pizza-canvas'), $('pizza-primary'));
     $('pizza-quit').addEventListener('click', () => { MiniGame.stop(); this.close(); });

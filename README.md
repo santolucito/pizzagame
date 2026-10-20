@@ -71,7 +71,7 @@ No build step, no dependencies: plain HTML5 Canvas + vanilla JavaScript.
 11. A **train** arrives at the station north of the farm every few minutes with a crowd of passengers who
     walk to the shop (extra people wait in a line outside the door). The **playground** across the south
     road has a slide, swings, a seesaw and a spring horse you can ride.
-12. The **garage paint shop** across the south road: drive the car, scooter or tractor in and pick a colour.
+12. The **car showroom** across the south road sells the delivery car and the scooter (they start white). Drive any vehicle into its bay to pick a colour, rainbow included, whenever you like.
     The farm **tractor** can be driven around the farm. Go **fishing** at the pond, and hop on the **train**
     at the platform for a ride.
 13. The **ice cream shop** is for sale. Once bought it runs itself with a scooper and its own customers;

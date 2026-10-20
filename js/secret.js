@@ -29,29 +29,30 @@ CFG.SECRET.HOME = {
   fire: { x: 4947, y: 1575 },                         // the firebox on the top wall; the hearth sticks out onto the floor
   topWindow: { x: 5060 }, sideWindow: { y: 1740 },
   bed: { x0: 5168, y0: 1580, x1: 5228, y1: 1684 },
-  table: { x: 5080, y: 1780 }, chairs: [{ x: 5040, y: 1780 }, { x: 5120, y: 1780 }],
+  table: { x: 5100, y: 1780 }, chairs: [{ x: 5060, y: 1780 }, { x: 5140, y: 1780 }],
   counter: { x0: 4822, y0: 1808, x1: 4904, y1: 1840 },
   door: { x: 4995, w: 42 }, exit: { x: 4995, y: 1818 },  // stand on the mat inside to go out; you arrive there when you come in
   porchDoor: { x: -1176, y: 636 },                      // stand here on the porch outside to go in (clear of the bear's rug)
-  padReach: 100,                                        // the circle shows for the nearest unowned item within this distance
-  // decorations to buy: `spot` is where the item goes (drawn grayed out until owned), `pad` where you stand to buy it,
-  // `block` an obstacle rect once owned
+  catalog: { x: 5046, y: 1826, reach: 44 },             // the mail-order catalog on its little stand by the door
+  eye: { x: 5172, y: 1742 },                            // where you stand to look through the telescope
+  // decorations, bought from the catalog: `spot` is where the item goes, `block` an obstacle rect once owned,
+  // `view` how the catalog page shows it (scale, and the item's visual centre relative to its spot)
   items: [
-    { key: 'rug', label: 'Big Rug', ico: '🟥', price: 40, spot: { x: 4995, y: 1700 }, pad: { x: 4995, y: 1700 } },
-    { key: 'teddy', label: 'Teddy Bear', ico: '🧸', price: 45, spot: { x: 5198, y: 1614 }, pad: { x: 5140, y: 1640 } },
-    { key: 'plant', label: 'Potted Plant', ico: '🪴', price: 50, spot: { x: 5212, y: 1822 }, pad: { x: 5178, y: 1808 }, block: [5198, 1806, 30, 30] },
-    { key: 'jar', label: 'Bear Cookie Jar', ico: '🍪', price: 55, spot: { x: 4862, y: 1818 }, pad: { x: 4862, y: 1782 } },
-    { key: 'curtains', label: 'Curtains', ico: '🪟', price: 60, spot: { x: 5060, y: 1548 }, pad: { x: 5064, y: 1608 } },
-    { key: 'fish', label: 'Fish Bowl', ico: '🐟', price: 65, spot: { x: 5080, y: 1776 }, pad: { x: 5080, y: 1736 } },
-    { key: 'painting', label: 'Pizza Painting', ico: '🖼️', price: 70, spot: { x: 4812, y: 1548 }, pad: { x: 4812, y: 1606 } },
-    { key: 'dogbed', label: 'Dog Bed', ico: '🐶', price: 75, spot: { x: 4950, y: 1636 }, pad: { x: 4950, y: 1636 } },
-    { key: 'lamp', label: 'Cosy Lamp', ico: '💡', price: 80, spot: { x: 4788, y: 1690 }, pad: { x: 4815, y: 1700 }, block: [4776, 1684, 24, 16] },
-    { key: 'armchair', label: 'Comfy Armchair', ico: '🛋️', price: 90, spot: { x: 4888, y: 1636 }, pad: { x: 4888, y: 1690 }, block: [4868, 1616, 40, 40] },
-    { key: 'clock', label: 'Cuckoo Clock', ico: '🕰️', price: 110, spot: { x: 5010, y: 1546 }, pad: { x: 5008, y: 1606 } },
-    { key: 'books', label: 'Bookshelf', ico: '📚', price: 120, spot: { x: 5125, y: 1580 }, pad: { x: 5125, y: 1626 }, block: [5088, 1562, 74, 36] },
-    { key: 'record', label: 'Record Player', ico: '🎵', price: 150, spot: { x: 4945, y: 1806 }, pad: { x: 4945, y: 1772 }, block: [4925, 1792, 40, 26] },
-    { key: 'oven', label: 'Pizza Oven', ico: '🍕', price: 200, spot: { x: 4790, y: 1812 }, pad: { x: 4790, y: 1770 }, block: [4765, 1786, 52, 54] },
-    { key: 'telescope', label: 'Telescope', ico: '🔭', price: 250, spot: { x: 5208, y: 1742 }, pad: { x: 5170, y: 1742 }, block: [5196, 1730, 30, 24] },
+    { key: 'rug', label: 'Big Rug', ico: '🟥', price: 40, spot: { x: 4995, y: 1700 }, view: { s: 1.8, dy: 0 } },
+    { key: 'teddy', label: 'Teddy Bear', ico: '🧸', price: 45, spot: { x: 5198, y: 1614 }, view: { s: 3.4, dy: 0 } },
+    { key: 'plant', label: 'Potted Plant', ico: '🪴', price: 50, spot: { x: 5212, y: 1822 }, view: { s: 3, dy: -12 }, block: [5198, 1806, 30, 30] },
+    { key: 'jar', label: 'Bear Cookie Jar', ico: '🍪', price: 55, spot: { x: 4862, y: 1818 }, view: { s: 3.4, dy: -7 } },
+    { key: 'curtains', label: 'Curtains', ico: '🪟', price: 60, spot: { x: 5060, y: 1548 }, view: { s: 2.4, dy: 0 } },
+    { key: 'fish', label: 'Fish Bowl', ico: '🐟', price: 65, spot: { x: 5100, y: 1776 }, view: { s: 3.6, dy: 0 } },
+    { key: 'painting', label: 'Pizza Painting', ico: '🖼️', price: 70, spot: { x: 4812, y: 1548 }, view: { s: 3.2, dy: 0 } },
+    { key: 'dogbed', label: 'Dog Bed', ico: '🐶', price: 75, spot: { x: 4950, y: 1636 }, view: { s: 3, dy: 0 } },
+    { key: 'lamp', label: 'Cosy Lamp', ico: '💡', price: 80, spot: { x: 4788, y: 1690 }, view: { s: 2.8, dy: -16 }, block: [4776, 1684, 24, 16] },
+    { key: 'armchair', label: 'Comfy Armchair', ico: '🛋️', price: 90, spot: { x: 4888, y: 1636 }, view: { s: 2.8, dy: 0 }, block: [4868, 1616, 40, 40] },
+    { key: 'clock', label: 'Cuckoo Clock', ico: '🕰️', price: 110, spot: { x: 5010, y: 1546 }, view: { s: 3.2, dy: -2 }, block: null },
+    { key: 'books', label: 'Bookshelf', ico: '📚', price: 120, spot: { x: 5125, y: 1580 }, view: { s: 2.4, dy: 0 }, block: [5088, 1562, 74, 36] },
+    { key: 'record', label: 'Record Player', ico: '🎵', price: 150, spot: { x: 4945, y: 1806 }, view: { s: 3.2, dy: 0 }, block: [4925, 1792, 40, 26] },
+    { key: 'oven', label: 'Pizza Oven', ico: '🍕', price: 200, spot: { x: 4790, y: 1812 }, view: { s: 2.4, dy: 0 }, block: [4765, 1786, 52, 54] },
+    { key: 'telescope', label: 'Telescope', ico: '🔭', price: 250, spot: { x: 5212, y: 1742 }, view: { s: 3.2, dy: -2 }, block: [5198, 1730, 34, 24] },
   ],
 };
 
@@ -136,6 +137,16 @@ const SecretExt = {
     // the beehive hangs from the tree nearest the clearing's south-east edge
     const near = this.trees.slice().sort((a, b) => U.dist(a.x, a.y, S.hive.x, S.hive.y) - U.dist(b.x, b.y, S.hive.x, S.hive.y))[0];
     if (near) { S.hive.tree = near; S.hive.x = near.x + 16 * near.s; S.hive.y = near.y - 4 * near.s; }
+    // the telescope's sky, computed once: stars in a unit square (u, v), a denser band for the Milky Way
+    const cols = ['#ffffff', '#fff4d6', '#cfe6ff', '#ffd9c2', '#ffe9a8', '#ffffff'];
+    this.stars = [];
+    for (let i = 0; i < 300; i++) { const big = rnd() < 0.08; this.stars.push({ u: rnd(), v: rnd(), r: big ? 1.8 + rnd() * 1.2 : 0.5 + rnd() * 1.1, col: cols[Math.floor(rnd() * cols.length)], tw: 1 + rnd() * 2.5, ph: rnd() * 6.3, d: big ? 1 : 0.3 + rnd() * 0.5, big }); }
+    const ca = Math.cos(-0.6), sa = Math.sin(-0.6);
+    for (let i = 0; i < 220; i++) { const along = rnd() - 0.5, off = (rnd() + rnd() + rnd() - 1.5) * 0.09; this.stars.push({ u: 0.5 + along * ca - off * sa, v: 0.5 + along * sa + off * ca, r: 0.4 + rnd() * 0.7, col: cols[Math.floor(rnd() * 3)], tw: 1.5 + rnd() * 2, ph: rnd() * 6.3, d: 0.3, big: false }); }
+    this.constellations = [
+      { name: 'The Big Dipper', pts: [[0.13, 0.26], [0.18, 0.23], [0.23, 0.24], [0.28, 0.28], [0.35, 0.26], [0.36, 0.34], [0.29, 0.36]], edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 3]] },
+      { name: 'The Little Pizza', pts: [[0.58, 0.66], [0.72, 0.63], [0.66, 0.80], [0.64, 0.68], [0.67, 0.73]], edges: [[0, 1], [1, 2], [2, 0]] },
+    ];
   },
 
   // ---------- game hooks ----------
@@ -147,6 +158,8 @@ const SecretExt = {
       visited: false, still: 0, peek: 0, cool: 0,
       squirrel: { stump: 0, x: S.stumps[0].x, y: S.stumps[0].y, hop: null, facing: 1, flick: 0 },
       fade: 0, notes: [], noteT: 0, cuckoo: -1,
+      view: { on: false, t: 0, shoot: null, shootT: 4, wish: 0, label: 0, labelT: 0 },      // looking through the telescope
+      cat: { on: false, page: 0, flip: null, ready: true, hold: null, bought: 0, nope: 0 },  // the decoration catalog
     };
   },
   obstacles(g, forCar) {
@@ -551,7 +564,13 @@ const SecretExt = {
     const p = g.player, H = CFG.SECRET.HOME;
     if (g.driving || g.onTrain || g.ride || g.travel) return null;
     if (g.area === 'town' && U.dist(p.x, p.y, H.porchDoor.x, H.porchDoor.y) < 30) return { label: '🚪 Go inside', run: (gg) => this.enterHome(gg) };
-    if (g.area === 'cabin' && U.dist(p.x, p.y, H.exit.x, H.exit.y) < 30) return { label: '🚪 Go outside', run: (gg) => this.leaveHome(gg) };
+    if (g.area !== 'cabin') return null;
+    const st = this.st;
+    if (st.view.on) return { label: '🚶 Done looking', run: (gg) => this.stopViewing(gg) };
+    if (st.cat.on) return this.catalogAction(g);
+    if (U.dist(p.x, p.y, H.exit.x, H.exit.y) < 30) return { label: '🚪 Go outside', run: (gg) => this.leaveHome(gg) };
+    if (U.dist(p.x, p.y, H.catalog.x, H.catalog.y) < H.catalog.reach) return { label: '📖 Open the catalog', run: (gg) => this.openCatalog(gg) };
+    if (this.owned(g, 'telescope') && U.dist(p.x, p.y, H.eye.x, H.eye.y) < 40) return { label: '🔭 Look at the stars', run: (gg) => this.startViewing(gg) };
     return null;
   },
   enterHome(g) {
@@ -577,30 +596,97 @@ const SecretExt = {
     for (const it of H.items) if (it.block && this.owned(g, it.key)) o.push({ x: it.block[0], y: it.block[1], w: it.block[2], h: it.block[3] });
     return o;
   },
-  // Only the nearest unowned decoration shows its circle, so the little room never fills up with dashed rings.
-  pads(g) {
-    if (g.area !== 'cabin') return [];
-    const p = g.player, H = CFG.SECRET.HOME;
-    let best = null, bd = H.padReach;
-    for (const it of H.items) { if (this.owned(g, it.key)) continue; const d = U.dist(p.x, p.y, it.pad.x, it.pad.y); if (d < bd) { bd = d; best = it; } }
-    return best ? [{ key: 'cabin_' + best.key, item: best.key, label: best.label, ico: best.ico, pos: best.pad, price: best.price }] : [];
+  // ---------- the catalog: one item per page, pages turn with left/right, the big button buys ----------
+  openCatalog(g) { const c = this.st.cat, p = g.player; c.on = true; c.page = 0; c.flip = null; c.ready = false; c.bought = 0; c.nope = 0; c.hold = { x: p.x, y: p.y }; p.moving = false; Sfx.pickup(); Haptics.tap(); },
+  closeCatalog(g) { this.st.cat.on = false; this.st.cat.hold = null; Sfx.drop(); },
+  catalogPages() { return CFG.SECRET.HOME.items.length + 1; },
+  turnPage(g, dir) {
+    const c = this.st.cat, n = this.catalogPages(), to = c.page + dir;
+    if (to < 0 || to >= n || c.flip) return;
+    c.flip = { from: c.page, to, t: 0, dur: 0.32 }; c.page = to; c.bought = 0; c.nope = 0; Sfx.pickup();
   },
-  onPad(g, pad) {
-    g.s.cabin.owned[pad.item] = true;
-    Sfx.unlock(); Haptics.success();
-    g.floats.push({ x: pad.pos.x, y: pad.pos.y - 40, text: `${pad.ico} ${pad.label}!`, color: '#ffe08a', t: 0, dur: 1.6, big: true });
+  catalogAction(g) {
+    const c = this.st.cat, H = CFG.SECRET.HOME;
+    if (c.page === 0) return { label: '📕 Close the catalog', run: (gg) => this.closeCatalog(gg) };
+    const it = H.items[c.page - 1];
+    if (this.owned(g, it.key)) return { label: '✅ You have this one!', run: (gg) => this.turnPage(gg, c.page < this.catalogPages() - 1 ? 1 : -1) };
+    if (g.s.cash >= it.price) return { label: `🛒 Buy for ${U.money(it.price)}`, run: (gg) => this.buyItem(gg, it) };
+    return { label: `💰 Need ${U.money(it.price - g.s.cash)} more`, run: (gg) => { c.nope = 1.4; Sfx.error(); } };
   },
+  buyItem(g, it) {
+    const c = this.st.cat;
+    if (this.owned(g, it.key) || g.s.cash < it.price) return;
+    g.s.cash -= it.price; g.s.cabin.owned[it.key] = true;
+    Sfx.buy(); Haptics.success(); c.bought = 1.8; c.nope = 0;
+    this.nudgeOut(g, it);
+    g.fx.push({ kind: 'sparkle', x0: it.spot.x, y0: it.spot.y, x1: it.spot.x, y1: it.spot.y, t: 0, dur: 0.8 });
+    g.floats.push({ x: g.player.x, y: g.player.y - 50, text: `${it.ico} It's in your cabin!`, color: '#ffe08a', t: 0, dur: 1.6, big: true });
+  },
+  // A newly solid item must never appear under the chef: step to the nearest free spot beside it.
+  nudgeOut(g, it) {
+    const p = g.player, b = it.block, r = 12;
+    if (!b || !(p.x + r > b[0] && p.x - r < b[0] + b[2] && p.y + r > b[1] && p.y - r < b[1] + b[3])) return;
+    const blocks = this.homeBlocks(g), cands = [[b[0] - r - 2, p.y], [b[0] + b[2] + r + 2, p.y], [p.x, b[1] - r - 2], [p.x, b[1] + b[3] + r + 2]];
+    let best = null, bd = 1e9;
+    for (const [x, y] of cands) { if (!this.homeFree(g, x, y, blocks)) continue; const d = U.dist(p.x, p.y, x, y); if (d < bd) { bd = d; best = [x, y]; } }
+    if (best) { p.x = best[0]; p.y = best[1]; } else this.rescueHome(g);
+    if (this.st.cat.hold) this.st.cat.hold = { x: p.x, y: p.y };
+  },
+  // ---------- the telescope: a frozen look at the night sky ----------
+  startViewing(g) { const v = this.st.view, H = CFG.SECRET.HOME, p = g.player; v.on = true; v.t = 0; v.shoot = null; v.shootT = 2.5; v.wish = 0; v.label = 0; v.labelT = 0; p.x = H.eye.x; p.y = H.eye.y; p.moving = false; p.facing = 1; this.st.fade = 0.45; Sfx.ding(); Haptics.tap(); },
+  stopViewing(g) { this.st.view.on = false; this.st.fade = 0.45; Sfx.drop(); },
   bgKey(g) { return g.s.cabin ? 'cabin:' + CFG.SECRET.HOME.items.map((it) => this.owned(g, it.key) ? 1 : 0).join('') : ''; },
   homeHint(g) {
-    const H = CFG.SECRET.HOME, s = g.s;
+    const p = g.player, H = CFG.SECRET.HOME, st = this.st, s = g.s;
+    if (st.view.on || st.cat.on) return null;                       // the overlays explain themselves
+    if (this.owned(g, 'telescope') && U.dist(p.x, p.y, H.eye.x, H.eye.y) < 40) return { text: 'Look through the telescope! 🔭', target: null };
+    if (U.dist(p.x, p.y, H.catalog.x, H.catalog.y) < H.catalog.reach) return { text: 'Open the catalog to decorate 📖', target: null };
     const left = H.items.filter((it) => !this.owned(g, it.key));
     if (!left.length) return { text: 'Walk to the door to go outside', target: H.exit };
-    const cheapest = left.slice().sort((a, b) => a.price - b.price)[0];
-    if (s.cash + (s.padPaid['cabin_' + cheapest.key] || 0) >= cheapest.price) return { text: 'Buy a decoration for your home!', target: cheapest.pad };
-    return { text: 'Cosy! Stand on a circle to decorate', target: null };
+    if (left.some((it) => s.cash >= it.price)) return { text: 'Open the catalog to decorate 📖', target: H.catalog };
+    return { text: 'Cosy! Your very own cabin 🏡', target: null };
+  },
+  // Is this point somewhere the chef can stand: inside the room and not inside a wall or a solid piece of furniture?
+  homeFree(g, x, y, blocks) {
+    const R = CFG.SECRET.HOME.room, r = 12;
+    if (x < R.x0 + r || x > R.x1 - r || y < R.y0 + r || y > R.y1 - r) return false;
+    for (const o of blocks || this.homeBlocks(g)) if (x > o.x && x < o.x + o.w && y > o.y && y < o.y + o.h) return false;
+    return true;
+  },
+  // Rescue: a save (or a push) that left the chef outside the walls or inside furniture goes back onto the door mat.
+  rescueHome(g) {
+    const p = g.player, H = CFG.SECRET.HOME;
+    if (this.homeFree(g, p.x, p.y)) return false;
+    p.x = H.exit.x; p.y = H.exit.y - 8; p.moving = false;
+    if (this.st.cat.hold) this.st.cat.hold = { x: p.x, y: p.y };
+    g.floats.push({ x: p.x, y: p.y - 50, text: 'Oops! Back inside', color: '#ffe08a', t: 0, dur: 1.4, big: true });
+    return true;
   },
   updateHome(g, dt) {
     const st = this.st, p = g.player, H = CFG.SECRET.HOME, t = g.time;
+    if (!st.view.on) this.rescueHome(g);
+    // looking through the telescope: stay at the eyepiece, time the shooting stars and the label
+    if (st.view.on) {
+      const v = st.view; p.x = H.eye.x; p.y = H.eye.y; p.moving = false; p.facing = 1;
+      v.t += dt; v.wish = Math.max(0, v.wish - dt); v.labelT += dt;
+      if (v.labelT > 9) { v.labelT = 0; v.label = (v.label + 1) % 5; }
+      if (v.shoot) { v.shoot.t += dt; if (v.shoot.t > v.shoot.dur) v.shoot = null; }
+      else { v.shootT -= dt; if (v.shootT <= 0) { v.shootT = U.rand(4, 9); const fromLeft = Math.random() < 0.5; v.shoot = { u: fromLeft ? U.rand(0.05, 0.4) : U.rand(0.6, 0.95), v: U.rand(0.08, 0.4), du: (fromLeft ? 1 : -1) * U.rand(0.35, 0.5), dv: U.rand(0.18, 0.3), t: 0, dur: U.rand(0.9, 1.3) }; v.wish = 3.2; } }
+    }
+    // reading the catalog: stay put, left/right turn the pages, down closes it
+    if (st.cat.on) {
+      const c = st.cat; p.x = c.hold.x; p.y = c.hold.y; p.moving = false;
+      c.bought = Math.max(0, c.bought - dt); c.nope = Math.max(0, c.nope - dt);
+      if (c.flip) { c.flip.t += dt; if (c.flip.t >= c.flip.dur) c.flip = null; }
+      const a = Input.axis();
+      if (Math.abs(a.x) < 0.3 && Math.abs(a.y) < 0.3) c.ready = true;
+      else if (c.ready) {
+        c.ready = false;
+        if (a.y > 0.5 && Math.abs(a.x) < 0.5) this.closeCatalog(g);
+        else if (a.x > 0.5) this.turnPage(g, 1);
+        else if (a.x < -0.5) this.turnPage(g, -1);
+      }
+    }
     // the cuckoo pops out once a minute
     if (this.owned(g, 'clock')) {
       const minute = Math.floor(t / 60);
@@ -614,8 +700,11 @@ const SecretExt = {
     else st.noteT = 0;
   },
   screen(r, g) {
-    if (!this.st || this.st.fade <= 0) return;
+    if (!this.st) return;
     const ctx = r.ctx, W = r.canvas.width / r.dpr, H = r.canvas.height / r.dpr;
+    if (g.area === 'cabin' && this.st.view.on) this.drawSkyView(r, g, W, H);
+    else if (g.area === 'cabin' && this.st.cat.on) this.drawCatalog(r, g, W, H);
+    if (this.st.fade <= 0) return;
     ctx.fillStyle = `rgba(20,12,6,${(this.st.fade / 0.45).toFixed(3)})`; ctx.fillRect(0, 0, W, H);
   },
 
@@ -715,9 +804,16 @@ const SecretExt = {
     ctx.fillStyle = '#fff'; U.roundRect(ctx, D.x - 50, R.y1 + 13, 14, 10, 3); ctx.fill(); U.roundRect(ctx, D.x - 52, R.y1 + 10, 18, 6, 3); ctx.fill();   // the spare hat
     ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, D.x + 30, R.y1 + 5, 92, 18, 4); ctx.fill(); ctx.fillStyle = '#b5773a'; U.roundRect(ctx, D.x + 33, R.y1 + 8, 86, 12, 3); ctx.fill();
     ctx.fillStyle = '#2b1d14'; ctx.font = r.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🏡 Home sweet home', D.x + 76, R.y1 + 14);
-    // decorations: grayed-out ghosts until bought
-    const ghost = (key, fn) => { if (this.owned(g, key)) { fn(); return; } ctx.save(); ctx.globalAlpha = 0.3; ctx.filter = 'grayscale(1)'; fn(); ctx.restore(); };
-    for (const it of H.items) ghost(it.key, () => this.drawHomeItem(r, g, it));
+    // the mail-order catalog on a little stand by the door
+    const C = H.catalog;
+    ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(C.x - 10, C.y - 8, 26, 22);
+    ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, C.x - 13, C.y - 11, 26, 22, 3); ctx.fill(); ctx.fillStyle = '#a5693a'; U.roundRect(ctx, C.x - 10, C.y - 8, 20, 16, 2); ctx.fill();
+    ctx.save(); ctx.translate(C.x, C.y); ctx.rotate(-0.25);
+    ctx.fillStyle = '#b23a48'; U.roundRect(ctx, -9, -11, 18, 22, 2); ctx.fill(); ctx.fillStyle = '#fff8ee'; ctx.fillRect(-7, -9, 14, 18);
+    ctx.fillStyle = '#e4572e'; ctx.fillRect(-7, -9, 14, 5); ctx.fillStyle = '#3f9a4a'; U.roundRect(ctx, -4, -2, 8, 7, 2); ctx.fill(); ctx.fillStyle = '#b23a48'; ctx.beginPath(); ctx.moveTo(-5, -1); ctx.lineTo(0, -5); ctx.lineTo(5, -1); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    // decorations you own (the rest wait in the catalog)
+    for (const it of H.items) if (this.owned(g, it.key)) this.drawHomeItem(r, g, it);
   },
   drawHomeItem(r, g, it) {
     const ctx = r.ctx, x = it.spot.x, y = it.spot.y, R = CFG.SECRET.HOME.room;
@@ -729,7 +825,7 @@ const SecretExt = {
         ctx.fillStyle = '#c17f3a'; ctx.beginPath(); ctx.arc(x - 7, y - 10, 3.5, 0, Math.PI * 2); ctx.arc(x + 7, y - 10, 3.5, 0, Math.PI * 2); ctx.fill();
         ctx.beginPath(); ctx.ellipse(x, y + 6, 10, 9, 0, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(x, y - 6, 9, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = '#f1d3a8'; ctx.beginPath(); ctx.ellipse(x, y - 3, 4.5, 3.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.ellipse(x, y + 7, 6, 5, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.arc(x - 3.5, y - 8, 1.3, 0, Math.PI * 2); ctx.arc(x + 3.5, y - 8, 1.3, 0, Math.PI * 2); ctx.arc(x, y - 4, 1.4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.arc(x - 4, y - 9, 1.1, 0, Math.PI * 2); ctx.arc(x + 4, y - 9, 1.1, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(x, y - 4.5, 1.2, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.moveTo(x, y + 1); ctx.lineTo(x - 5, y - 2); ctx.lineTo(x - 5, y + 4); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(x, y + 1); ctx.lineTo(x + 5, y - 2); ctx.lineTo(x + 5, y + 4); ctx.closePath(); ctx.fill();
         break;
       case 'plant':
@@ -813,8 +909,13 @@ const SecretExt = {
         ctx.fillStyle = '#6b4a2b'; ctx.fillRect(x - 24, y + 14, 12, 12); ctx.fillStyle = '#d7b98a'; ctx.beginPath(); ctx.arc(x - 18, y + 20, 3, 0, Math.PI * 2); ctx.fill();
         break;
       case 'telescope':
-        ctx.fillStyle = '#5b3a1a'; ctx.lineWidth = 3; ctx.strokeStyle = '#5b3a1a'; ctx.beginPath(); ctx.moveTo(x, y + 2); ctx.lineTo(x - 9, y + 14); ctx.moveTo(x, y + 2); ctx.lineTo(x + 9, y + 14); ctx.moveTo(x, y + 2); ctx.lineTo(x, y + 15); ctx.stroke();
-        ctx.save(); ctx.translate(x, y); ctx.rotate(-0.5); ctx.fillStyle = '#2d3a4a'; U.roundRect(ctx, -6, -22, 12, 26, 4); ctx.fill(); ctx.fillStyle = '#ffd166'; U.roundRect(ctx, -7, -24, 14, 5, 2); ctx.fill(); ctx.fillStyle = '#9ad0ff'; ctx.fillRect(-4, -21, 8, 2); ctx.restore();
+        ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(x + 2, y + 14, 12, 4, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.lineWidth = 3; ctx.strokeStyle = '#5b3a1a'; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 10, y + 13); ctx.moveTo(x, y); ctx.lineTo(x + 10, y + 13); ctx.moveTo(x, y); ctx.lineTo(x + 1, y + 15); ctx.stroke();   // tripod
+        ctx.save(); ctx.translate(x, y); ctx.rotate(-0.22);                                                                     // the tube points right, through the window
+        ctx.fillStyle = '#1f2a38'; U.roundRect(ctx, -16, -4, 10, 8, 3); ctx.fill();                                              // eyepiece, toward the room
+        ctx.fillStyle = '#2d3a4a'; U.roundRect(ctx, -8, -6, 32, 12, 4); ctx.fill(); ctx.fillStyle = '#4a5a6a'; ctx.fillRect(-6, -4, 28, 2);
+        ctx.fillStyle = '#ffd166'; U.roundRect(ctx, 20, -7, 6, 14, 2); ctx.fill(); ctx.fillStyle = '#9ad0ff'; ctx.fillRect(25, -5, 2, 10);   // brass ring and the lens
+        ctx.restore();
         break;
     }
   },
@@ -869,15 +970,158 @@ const SecretExt = {
       ctx.globalAlpha = 1;
     }
     if (this.owned(g, 'dogbed')) this.drawSleepingDog(r, g, spot('dogbed').x, spot('dogbed').y);
-    // little price tags over the decorations still for sale (the dashed circle is the core's, for the nearest one)
-    ctx.font = r.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    for (const it of H.items) {
-      if (this.owned(g, it.key)) continue;
-      const afford = g.s.cash + (g.s.padPaid['cabin_' + it.key] || 0) >= it.price, tag = `${it.ico} ${U.money(it.price)}`;
-      const w = ctx.measureText(tag).width + 10, tx = it.spot.x, ty = it.spot.y + (it.key === 'rug' ? 0 : it.spot.y < R.y0 ? 28 : -30);   // wall items: tag below, on the floor side
-      ctx.fillStyle = afford ? 'rgba(31,110,46,0.85)' : 'rgba(43,29,20,0.7)'; U.roundRect(ctx, tx - w / 2, ty - 8, w, 15, 7); ctx.fill();
-      ctx.fillStyle = '#fff'; ctx.fillText(tag, tx, ty);
+  },
+  // ---------- looking through the telescope (screen space) ----------
+  drawSkyView(r, g, W, H) {
+    const ctx = r.ctx, v = this.st.view, t = v.t;
+    const D = Math.max(200, Math.min(W * 0.92, H - 128)), R = D / 2, cx = W / 2, cy = 56 + (H - 128) / 2;
+    ctx.fillStyle = '#04060c'; ctx.fillRect(0, 0, W, H);
+    ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.clip();
+    const sky = ctx.createLinearGradient(0, cy - R, 0, cy + R); sky.addColorStop(0, '#070b1e'); sky.addColorStop(0.65, '#101a3f'); sky.addColorStop(1, '#1d2c5c');
+    ctx.fillStyle = sky; ctx.fillRect(cx - R, cy - R, D, D);
+    const swx = Math.sin(t * 0.23) * R * 0.035, swy = Math.cos(t * 0.17) * R * 0.025;   // slow parallax sway
+    const px = (u, d) => cx + (u - 0.5) * D * 1.35 + swx * d, py = (vv, d) => cy + (vv - 0.5) * D * 1.35 + swy * d;
+    // the Milky Way: a soft rotated band
+    ctx.save(); ctx.translate(cx + swx * 0.3, cy + swy * 0.3); ctx.rotate(-0.6);
+    const band = ctx.createLinearGradient(0, -R * 0.4, 0, R * 0.4); band.addColorStop(0, 'rgba(190,205,255,0)'); band.addColorStop(0.5, 'rgba(200,210,255,0.16)'); band.addColorStop(1, 'rgba(190,205,255,0)');
+    ctx.fillStyle = band; ctx.fillRect(-R * 1.6, -R * 0.4, R * 3.2, R * 0.8);
+    ctx.restore();
+    // stars, twinkling
+    for (const s of this.stars) {
+      const a = 0.5 + 0.5 * Math.sin(t * s.tw + s.ph), x = px(s.u, s.d), y = py(s.v, s.d);
+      ctx.globalAlpha = 0.35 + 0.65 * a; ctx.fillStyle = s.col; ctx.beginPath(); ctx.arc(x, y, s.r, 0, Math.PI * 2); ctx.fill();
+      if (s.big && a > 0.7) { ctx.globalAlpha = (a - 0.7) * 1.5; ctx.fillRect(x - s.r * 3, y - 0.5, s.r * 6, 1); ctx.fillRect(x - 0.5, y - s.r * 3, 1, s.r * 6); }
     }
+    ctx.globalAlpha = 1;
+    // a ringed planet
+    const plx = px(0.2, 0.8), ply = py(0.62, 0.8), pr = R * 0.045;
+    ctx.save(); ctx.translate(plx, ply); ctx.rotate(-0.4);
+    ctx.strokeStyle = 'rgba(255,225,170,0.55)'; ctx.lineWidth = pr * 0.35; ctx.beginPath(); ctx.ellipse(0, 0, pr * 2.1, pr * 0.55, 0, 0.15, Math.PI - 0.15); ctx.stroke();
+    ctx.fillStyle = '#e9c48a'; ctx.beginPath(); ctx.arc(0, 0, pr, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#d4a86a'; ctx.fillRect(-pr, -pr * 0.3, pr * 2, pr * 0.22); ctx.fillRect(-pr * 0.9, pr * 0.25, pr * 1.8, pr * 0.18);
+    ctx.strokeStyle = 'rgba(255,235,190,0.9)'; ctx.beginPath(); ctx.ellipse(0, 0, pr * 2.1, pr * 0.55, 0, Math.PI + 0.15, Math.PI * 2 - 0.15); ctx.stroke();
+    ctx.restore();
+    // the moon: big, friendly, with craters and a soft glow
+    const mx = px(0.72, 1), my = py(0.27, 1), mr = R * 0.19;
+    const mg = ctx.createRadialGradient(mx, my, mr * 0.8, mx, my, mr * 2.2); mg.addColorStop(0, 'rgba(255,245,200,0.35)'); mg.addColorStop(1, 'rgba(255,245,200,0)');
+    ctx.fillStyle = mg; ctx.beginPath(); ctx.arc(mx, my, mr * 2.2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#f6efd0'; ctx.beginPath(); ctx.arc(mx, my, mr, 0, Math.PI * 2); ctx.fill();
+    for (const [dx, dy, rr] of [[-0.45, -0.3, 0.16], [0.3, -0.45, 0.11], [0.4, 0.3, 0.2], [-0.2, 0.45, 0.12], [-0.05, 0.05, 0.08], [0.6, -0.1, 0.07]]) {
+      ctx.fillStyle = '#e2d8b0'; ctx.beginPath(); ctx.arc(mx + dx * mr, my + dy * mr, rr * mr, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#d2c79c'; ctx.beginPath(); ctx.arc(mx + dx * mr + rr * mr * 0.2, my + dy * mr + rr * mr * 0.25, rr * mr * 0.7, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.strokeStyle = '#b9ad84'; ctx.lineWidth = Math.max(1.5, mr * 0.05); ctx.lineCap = 'round';                               // a sleepy little smile
+    ctx.beginPath(); ctx.arc(mx - mr * 0.28, my - mr * 0.12, mr * 0.07, 0.1 * Math.PI, 0.9 * Math.PI); ctx.stroke();
+    ctx.beginPath(); ctx.arc(mx + mr * 0.02, my - mr * 0.12, mr * 0.07, 0.1 * Math.PI, 0.9 * Math.PI); ctx.stroke();
+    ctx.beginPath(); ctx.arc(mx - mr * 0.13, my + mr * 0.1, mr * 0.16, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+    // constellations light up one after the other
+    ctx.lineWidth = 1.2; ctx.font = r.font(Math.max(11, R * 0.05)); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    this.constellations.forEach((c, k) => {
+      const lit = 0.5 + 0.5 * Math.sin(t * 0.35 + k * Math.PI);
+      ctx.strokeStyle = `rgba(160,200,255,${(0.65 * lit).toFixed(3)})`;
+      ctx.beginPath(); for (const [a, b] of c.edges) { ctx.moveTo(px(c.pts[a][0], 0.6), py(c.pts[a][1], 0.6)); ctx.lineTo(px(c.pts[b][0], 0.6), py(c.pts[b][1], 0.6)); } ctx.stroke();
+      for (const [u, vv] of c.pts) { const x = px(u, 0.6), y = py(vv, 0.6); ctx.fillStyle = `rgba(200,225,255,${(0.25 * lit).toFixed(3)})`; ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, 2 + lit, 0, Math.PI * 2); ctx.fill(); }
+      if (lit > 0.6) { ctx.globalAlpha = (lit - 0.6) / 0.4; ctx.fillStyle = '#cfe6ff'; ctx.fillText(c.name, px(c.pts[0][0] + 0.11, 0.6), py(c.pts[0][1] - 0.08, 0.6)); ctx.globalAlpha = 1; }
+    });
+    // a slow comet, a blinking satellite, and now and then a shooting star
+    const cu = ((t * 0.011) % 1.4) - 0.2, cvv = 0.18 + cu * 0.22, cxx = px(cu, 0.7), cyy = py(cvv, 0.7);
+    const tail = ctx.createLinearGradient(cxx, cyy, cxx - R * 0.22, cyy - R * 0.1); tail.addColorStop(0, 'rgba(180,220,255,0.7)'); tail.addColorStop(1, 'rgba(180,220,255,0)');
+    ctx.strokeStyle = tail; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(cxx, cyy); ctx.lineTo(cxx - R * 0.22, cyy - R * 0.1); ctx.stroke();
+    ctx.fillStyle = '#e8f4ff'; ctx.beginPath(); ctx.arc(cxx, cyy, 2.5, 0, Math.PI * 2); ctx.fill();
+    const su = ((t % 26) / 26) * 1.3 - 0.15, sx = px(su, 0.5), sy = py(0.52 - su * 0.15, 0.5);
+    ctx.fillStyle = '#9ad0ff'; ctx.fillRect(sx - 9, sy - 1.5, 6, 3); ctx.fillRect(sx + 3, sy - 1.5, 6, 3); ctx.fillStyle = '#c9ccd2'; ctx.fillRect(sx - 2, sy - 2, 4, 4);
+    if (t % 1 < 0.5) { ctx.fillStyle = '#ff5a5a'; ctx.beginPath(); ctx.arc(sx, sy - 3.5, 1.5, 0, Math.PI * 2); ctx.fill(); }
+    if (v.shoot) {
+      const sh = v.shoot, k = sh.t / sh.dur, hx = px(sh.u + sh.du * k, 0), hy = py(sh.v + sh.dv * k, 0), len = R * 0.3 * Math.sin(k * Math.PI);
+      const ang = Math.atan2(sh.dv, sh.du), tx = hx - Math.cos(ang) * len, ty = hy - Math.sin(ang) * len;
+      const tg = ctx.createLinearGradient(hx, hy, tx, ty); tg.addColorStop(0, 'rgba(255,255,255,0.95)'); tg.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.strokeStyle = tg; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(tx, ty); ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(hx, hy, 3, 0, Math.PI * 2); ctx.fill();
+    }
+    // pine tops along the bottom edge, with an owl
+    ctx.fillStyle = '#050d09';
+    for (let i = 0; i < 14; i++) { const x = cx - R + (i + 0.5) * (D / 14) + swx * 1.3, h = R * (0.22 + ((i * 7) % 5) * 0.03), base = cy + R + 2; ctx.beginPath(); ctx.moveTo(x - D / 20, base); ctx.lineTo(x, base - h); ctx.lineTo(x + D / 20, base); ctx.closePath(); ctx.fill(); }
+    const ox = cx - R * 0.25 + swx * 1.3, oy = cy + R * 0.77;
+    ctx.fillStyle = '#050d09'; ctx.beginPath(); ctx.ellipse(ox, oy, R * 0.035, R * 0.045, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(ox - R * 0.03, oy - R * 0.03); ctx.lineTo(ox - R * 0.035, oy - R * 0.065); ctx.lineTo(ox - R * 0.01, oy - R * 0.04); ctx.moveTo(ox + R * 0.03, oy - R * 0.03); ctx.lineTo(ox + R * 0.035, oy - R * 0.065); ctx.lineTo(ox + R * 0.01, oy - R * 0.04); ctx.fill();
+    if (t % 6 > 0.25) { ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(ox - R * 0.013, oy - R * 0.02, R * 0.008, 0, Math.PI * 2); ctx.arc(ox + R * 0.013, oy - R * 0.02, R * 0.008, 0, Math.PI * 2); ctx.fill(); }
+    // vignette inside the eyepiece
+    const vg = ctx.createRadialGradient(cx, cy, R * 0.55, cx, cy, R); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.6)');
+    ctx.fillStyle = vg; ctx.fillRect(cx - R, cy - R, D, D);
+    ctx.restore();
+    // the telescope's rim
+    ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = Math.max(6, R * 0.05); ctx.beginPath(); ctx.arc(cx, cy, R + ctx.lineWidth / 2 - 1, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = '#b8862c'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, cy, R + 1, 0, Math.PI * 2); ctx.stroke();
+    // a little label
+    const labels = ['So many stars! ✨', 'Hello, Moon! 🌙', 'Can you find the Big Dipper?', 'The planet has a ring! 🪐', 'Shh… the owl is watching 🦉'];
+    const text = v.wish > 0 ? 'A shooting star! Make a wish 🌠' : labels[v.label % labels.length];
+    ctx.font = r.font(W < 480 ? 13 : 15); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const lw = ctx.measureText(text).width + 24, ly = cy + R - 30;
+    ctx.fillStyle = 'rgba(43,29,20,0.85)'; U.roundRect(ctx, cx - lw / 2, ly - 13, lw, 26, 13); ctx.fill();
+    ctx.fillStyle = '#ffe08a'; ctx.fillText(text, cx, ly);
+  },
+
+  // ---------- the decoration catalog (screen space) ----------
+  drawCatalog(r, g, W, H) {
+    const ctx = r.ctx, c = this.st.cat, items = CFG.SECRET.HOME.items, n = this.catalogPages();
+    ctx.fillStyle = 'rgba(10,8,6,0.72)'; ctx.fillRect(0, 0, W, H);
+    const cw = Math.min(360, W - 32), ch = Math.min(440, H - 150), cx = W / 2, cy = 56 + (H - 128) / 2;
+    // page flip: the card squashes to a spine and back, the content switches half way
+    let sq = 1, page = c.page;
+    if (c.flip) { const k = c.flip.t / c.flip.dur; sq = Math.abs(Math.cos(k * Math.PI)); if (k < 0.5) page = c.flip.from; }
+    ctx.save(); ctx.translate(cx, cy); ctx.scale(Math.max(0.04, sq), 1); ctx.translate(-cx, -cy);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)'; U.roundRect(ctx, cx - cw / 2 + 6, cy - ch / 2 + 8, cw, ch, 16); ctx.fill();
+    if (page === 0) {
+      // the cover
+      ctx.fillStyle = '#b23a48'; U.roundRect(ctx, cx - cw / 2, cy - ch / 2, cw, ch, 16); ctx.fill();
+      ctx.fillStyle = '#8f2f3a'; U.roundRect(ctx, cx - cw / 2, cy - ch / 2, 22, ch, 16); ctx.fill();
+      ctx.fillStyle = '#fff8ee'; U.roundRect(ctx, cx - cw / 2 + 36, cy - ch / 2 + 22, cw - 56, ch - 44, 10); ctx.fill();
+      ctx.fillStyle = '#2b1d14'; ctx.font = r.font(Math.min(30, cw * 0.08)); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('🏡 Cabin Catalog', cx + 8, cy - ch / 2 + 62);
+      // a little cabin picture
+      const hx = cx + 8, hy = cy + 10, hs = Math.min(1.2, ch / 380);
+      ctx.save(); ctx.translate(hx, hy); ctx.scale(hs, hs);
+      ctx.fillStyle = '#7cc45f'; ctx.beginPath(); ctx.ellipse(0, 46, 110, 22, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#a5693a'; ctx.fillRect(-60, -10, 120, 56); ctx.fillStyle = 'rgba(0,0,0,0.12)'; for (let y = -4; y < 46; y += 12) ctx.fillRect(-60, y, 120, 2);
+      ctx.fillStyle = '#5b3a1a'; ctx.beginPath(); ctx.moveTo(-72, -8); ctx.lineTo(0, -62); ctx.lineTo(72, -8); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#8c8f94'; ctx.fillRect(28, -52, 14, 30);
+      ctx.fillStyle = '#7a4a22'; U.roundRect(ctx, -14, 10, 28, 36, 4); ctx.fill(); ctx.fillStyle = '#ffd97a'; ctx.fillRect(24, 4, 22, 18); ctx.fillStyle = '#f5f0dc'; ctx.fillRect(34, 4, 2, 18); ctx.fillRect(24, 12, 22, 2);
+      ctx.fillStyle = '#e84c6a'; ctx.font = r.font(12); ctx.fillText('♥', 0, 24);
+      for (let k = 0; k < 3; k++) { ctx.globalAlpha = 0.5 - k * 0.12; ctx.fillStyle = '#f3efe3'; ctx.beginPath(); ctx.arc(35 + k * 7 + Math.sin(g.time * 1.5 + k) * 3, -62 - k * 14, 6 + k * 2, 0, Math.PI * 2); ctx.fill(); }
+      ctx.globalAlpha = 1; ctx.restore();
+      ctx.fillStyle = '#2b1d14'; ctx.font = r.font(15); ctx.fillText(`${items.length} lovely things inside`, cx + 8, cy + ch / 2 - 72);
+      ctx.fillStyle = '#8a7a6a'; ctx.font = r.font(14); ctx.fillText('Walk ◀ ▶ to turn pages', cx + 8, cy + ch / 2 - 46);
+    } else {
+      const it = items[page - 1], own = this.owned(g, it.key), afford = g.s.cash >= it.price;
+      ctx.fillStyle = '#fff8ee'; U.roundRect(ctx, cx - cw / 2, cy - ch / 2, cw, ch, 16); ctx.fill();
+      ctx.fillStyle = '#e8dcc4'; U.roundRect(ctx, cx - cw / 2, cy - ch / 2, 14, ch, 16); ctx.fill();
+      ctx.fillStyle = '#2b1d14'; ctx.font = r.font(Math.min(26, cw * 0.072)); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(`${it.ico} ${it.label}`, cx + 6, cy - ch / 2 + 40);
+      // the picture, on a plain board
+      const bw = cw - 60, bh = ch - 170, bx = cx + 6, by = cy - 12;
+      ctx.fillStyle = '#fdf3dc'; U.roundRect(ctx, bx - bw / 2, by - bh / 2, bw, bh, 12); ctx.fill();
+      ctx.strokeStyle = '#e8dcc4'; ctx.lineWidth = 2; U.roundRect(ctx, bx - bw / 2, by - bh / 2, bw, bh, 12); ctx.stroke();
+      ctx.save(); ctx.beginPath(); U.roundRect(ctx, bx - bw / 2, by - bh / 2, bw, bh, 12); ctx.clip();
+      const k = it.view.s * Math.min(1, bh / 260);
+      ctx.translate(bx, by + Math.sin(g.time * 1.4) * 2); ctx.scale(k, k); ctx.translate(-it.spot.x, -it.spot.y - it.view.dy);
+      this.drawHomeItem(r, g, it);
+      ctx.restore();
+      // price / status
+      const tag = own ? '✅ In your cabin' : U.money(it.price);
+      ctx.font = r.font(22); const tw = ctx.measureText(tag).width + 28;
+      ctx.fillStyle = own ? '#2f9e44' : afford ? '#1f6e2e' : '#b8401c'; U.roundRect(ctx, cx + 6 - tw / 2, cy + ch / 2 - 74, tw, 34, 17); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.fillText(tag, cx + 6, cy + ch / 2 - 57);
+      if (c.bought > 0) { ctx.globalAlpha = Math.min(1, c.bought); ctx.fillStyle = '#ffe08a'; ctx.font = r.font(18); ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(43,29,20,0.85)'; const yy = by - bh / 2 + 22 - (1.8 - c.bought) * 10; ctx.strokeText("✨ It's in your cabin! ✨", bx, yy); ctx.fillText("✨ It's in your cabin! ✨", bx, yy); ctx.globalAlpha = 1; }
+      if (c.nope > 0) { ctx.globalAlpha = Math.min(1, c.nope); ctx.fillStyle = '#b8401c'; ctx.font = r.font(13); ctx.fillText('Earn more at the pizzeria 🍕', cx + 6, cy + ch / 2 - 32); ctx.globalAlpha = 1; }
+    }
+    // page counter and the arrows
+    ctx.fillStyle = '#8a7a6a'; ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(`${page + 1} / ${n}`, cx + 6, cy + ch / 2 - 16);
+    ctx.font = r.font(22); ctx.fillStyle = page > 0 ? '#2b1d14' : 'rgba(43,29,20,0.25)'; ctx.fillText('◀', cx - cw / 2 + 34, cy + ch / 2 - 18);
+    ctx.fillStyle = page < n - 1 ? '#2b1d14' : 'rgba(43,29,20,0.25)'; ctx.fillText('▶', cx + cw / 2 - 22, cy + ch / 2 - 18);
+    ctx.restore();
+    ctx.fillStyle = '#fff'; ctx.font = r.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('▼ walk down to close', cx, cy + ch / 2 + 16);
   },
   // The park dog curls up in its bed while you are home (it is the same dog in spirit; the real one waits in the park).
   drawSleepingDog(r, g, x, y) {

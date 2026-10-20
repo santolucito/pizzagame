@@ -113,7 +113,8 @@ const CFG = {
   STATION: {
     trackY: -140, platform: { x0: -900, y0: -118, x1: -560, y1: -72 },
     house: { x0: -890, y0: -118, x1: -790, y1: -72 },
-    stopX: -700,                            // where the locomotive's front stops
+    stopX: -400,                            // where the locomotive's front stops: past the platform, so the coaches line up with it
+    boardDx: -330,                          // the first coach's door, relative to the locomotive's front: where you board and alight
     first: [50, 80], every: [180, 300],     // seconds until the first / next train
     dwell: 16, passengers: [5, 8],         // seconds the train waits at the platform
     warn: 20, hold: 12,                     // heads-up before it appears; extra wait while you are hurrying onto the platform
@@ -127,7 +128,7 @@ const CFG = {
   // background and train. The train ride between the two plays as a little mountain journey.
   SITE: {
     WORLD: { x0: 2600, y0: -170, x1: 4000, y1: 900 },
-    STATION: { trackY: -140, platform: { x0: 2820, y0: -118, x1: 3160, y1: -72 }, house: { x0: 2830, y0: -118, x1: 2930, y1: -72 }, stopX: 3020, name: 'CONSTRUCTION TOWN' },
+    STATION: { trackY: -140, platform: { x0: 2820, y0: -118, x1: 3160, y1: -72 }, house: { x0: 2830, y0: -118, x1: 2930, y1: -72 }, stopX: 3320, boardDx: -330, name: 'CONSTRUCTION TOWN' },
     ROAD: { x0: 2600, y0: 40, x1: 4000, y1: 120 },            // gravel road along the top
     BUILDING: { x0: 2720, y0: 330, x1: 3020, y1: 560, door: { x: 2870, half: 40 } },  // the half-built house
     CRANE: { x: 3560, y: 330 },

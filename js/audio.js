@@ -36,7 +36,21 @@ const Sfx = {
   error() { if (this.throttle('error', 500)) this.tone(200, 0.2, 'sawtooth', 0.04, -80); },
   angry() { if (this.throttle('angry', 2000)) this.tone(260, 0.22, 'sawtooth', 0.025, -100); },
   clean() { if (this.throttle('clean', 200)) this.tone(900, 0.15, 'sine', 0.05, 400); },
-  whistle() { if (this.throttle('whistle', 5000)) { this.tone(660, 0.3, 'square', 0.022); setTimeout(() => this.tone(880, 0.4, 'square', 0.022), 300); } },
+  // steam whistle: two rich notes (a square and a sine an octave up) with a little slide
+  whistle() {
+    if (!this.throttle('whistle', 4000)) return;
+    this.tone(587, 0.45, 'square', 0.045, 60); this.tone(1174, 0.45, 'sine', 0.03, 120);
+    setTimeout(() => { this.tone(784, 0.7, 'square', 0.045, -40); this.tone(1568, 0.7, 'sine', 0.03, -80); }, 420);
+  },
+  // chugga chugga: a short puff of filtered noise, called on the train's rhythm while it rolls
+  chuff(strength = 1) {
+    if (!this.ctx || this.muted || !this.throttle('chuff', 120)) return;
+    if (!this.noise) { const n = this.ctx.sampleRate * 0.12, buf = this.ctx.createBuffer(1, n, this.ctx.sampleRate), d = buf.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1; this.noise = buf; }
+    const t = this.ctx.currentTime, src = this.ctx.createBufferSource(), f = this.ctx.createBiquadFilter(), g = this.ctx.createGain();
+    src.buffer = this.noise; f.type = 'bandpass'; f.frequency.value = 700; f.Q.value = 0.8;
+    g.gain.setValueAtTime(0.09 * strength, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.11);
+    src.connect(f); f.connect(g); g.connect(this.ctx.destination); src.start(t); src.stop(t + 0.12);
+  },
   ding() { if (this.throttle('ding', 2000)) this.tone(1760, 0.4, 'sine', 0.04); },
 };
 

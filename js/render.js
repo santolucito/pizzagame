@@ -875,14 +875,14 @@ const Render = {
     ctx.fillStyle = '#8c8c86'; ctx.fillRect(R.x0, R.y0, R.x1 - R.x0, R.y1 - R.y0);
     ctx.fillStyle = 'rgba(255,255,255,0.08)'; for (let i = 0; i < 400; i++) ctx.fillRect(R.x0 + ((i * 97) % (R.x1 - R.x0)), R.y0 + ((i * 53) % (R.y1 - R.y0)), 3, 2);
     this.bgPlatform(S.STATION, W, '🏗️ ' + S.STATION.name);
-    ctx.fillStyle = '#d2cbbb'; ctx.fillRect(S.STATION.stopX - 12, S.STATION.platform.y1, 24, R.y0 - S.STATION.platform.y1); // path to the road
+    ctx.fillStyle = '#d2cbbb'; ctx.fillRect(S.STATION.stopX + S.STATION.boardDx - 12, S.STATION.platform.y1, 24, R.y0 - S.STATION.platform.y1); // path to the road
     // orange safety fencing around the lot, with a wide gap by the station path
     const fence = (x0, y0, x1, y1) => {
       ctx.fillStyle = '#ff7a1a'; const vert = Math.abs(y1 - y0) > Math.abs(x1 - x0);
       if (vert) { for (let y = y0; y < y1; y += 24) ctx.fillRect(x0 - 2, y, 5, 16); ctx.fillRect(x0 - 1, y0, 3, y1 - y0); }
       else { for (let x = x0; x < x1; x += 24) ctx.fillRect(x, y0 - 2, 16, 5); ctx.fillRect(x0, y0 - 1, x1 - x0, 3); }
     };
-    fence(W.x0 + 30, R.y1 + 20, S.STATION.stopX - 60, R.y1 + 20); fence(S.STATION.stopX + 60, R.y1 + 20, W.x1 - 30, R.y1 + 20);
+    { const px = S.STATION.stopX + S.STATION.boardDx; fence(W.x0 + 30, R.y1 + 20, px - 60, R.y1 + 20); fence(px + 60, R.y1 + 20, W.x1 - 30, R.y1 + 20); }
     // the half-built house: concrete slab, brick walls part way up, scaffolding, a doorway
     const B = S.BUILDING;
     ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(B.x0 + 6, B.y0 + 8, B.x1 - B.x0, B.y1 - B.y0);

@@ -15,7 +15,7 @@ class Customer {
     this.x = CFG.SPAWN_OUT.x; this.y = CFG.SPAWN_OUT.y;
     this.route = [CFG.DOOR_OUT, CFG.ENTRANCE]; this.after = 'toQueue';
     if (fromTrain) {
-      const S = CFG.STATION; this.x = S.stopX + U.rand(-120, 20); this.y = S.platform.y1 - 10;
+      const S = CFG.STATION; this.x = S.stopX + S.boardDx + U.rand(-120, 80); this.y = S.platform.y1 - 10;
       this.route = S.route.map((p) => ({ x: p.x + U.rand(-8, 8), y: p.y + U.rand(-6, 6) })).concat([CFG.DOOR_OUT, CFG.ENTRANCE]);
       this.fromTrain = true;
     }
@@ -200,6 +200,12 @@ class Train {
   summon() { this.state = 'arriving'; this.x = this.bounds.x0 - 420; this.speed = 320; this.warned = true; this.smoke = []; }
   update(dt, g) {
     const S = this.st, W = this.bounds, home = !this.remote && g.area === 'town';
+    // chugga chugga while it rolls, when it is near enough to see (or you are aboard)
+    if (this.state === 'arriving' || this.state === 'leaving') {
+      this.chug = (this.chug || 0) - dt;
+      const near = g.onTrain || (g.area === (this.remote ? 'site' : 'town') && Math.abs(this.x - g.player.x) < 900);
+      if (near && this.chug <= 0) { Sfx.chuff(g.onTrain ? 1 : 0.7); this.chug = this.speed > 220 ? 0.2 : 0.32; }
+    }
     for (const p of this.smoke) { p.t += dt; p.y -= 18 * dt; p.x += 8 * dt; } this.smoke = this.smoke.filter((p) => p.t < 1.6);
     if (this.state === 'away') {
       if (this.remote || !g.isUnlocked('station')) return;   // no trains until the old station is repaired
@@ -212,7 +218,7 @@ class Train {
       this.x += this.speed * dt;
       if (Math.random() < dt * 6) this.smoke.push({ x: this.x - 14, y: this.y - 28, t: 0 });
       if (dist <= 2) {
-        this.x = S.stopX; this.state = 'stopped'; this.dropT = 1.2; Sfx.whistle();
+        this.x = S.stopX; this.state = 'stopped'; this.dropT = 1.2; if (g.onTrain || g.area === (this.remote ? 'site' : 'town')) Sfx.whistle();
         if (this.remote) { this.unload = Infinity; this.hold = 0; this.toDrop = 0; this.departIn = Infinity; }   // waits until somebody boards
         else { this.unload = S.dwell; this.hold = S.hold; this.toDrop = U.randInt(S.passengers[0], S.passengers[1]); }
       }
@@ -223,7 +229,7 @@ class Train {
         return;
       }
       // the conductor waits a little longer while somebody is hurrying up the platform path
-      const p = g.player, hurrying = !g.onTrain && !g.driving && g.area === 'town' && p.y < 120 && Math.abs(p.x - S.stopX) < 420;
+      const p = g.player, hurrying = !g.onTrain && !g.driving && g.area === 'town' && p.y < 120 && Math.abs(p.x - (S.stopX + S.boardDx)) < 420;
       this.hurrying = hurrying;
       if (this.unload <= 0 && hurrying && this.hold > 0) this.hold -= dt; else this.unload -= dt;
       this.dropT -= dt;

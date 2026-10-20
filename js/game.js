@@ -572,14 +572,15 @@ const Game = {
   // ---------- riding the train ----------
   // climbing aboard: the train pulls out right away (a second to settle in)
   boardTrain() { const t = this.currentTrain(); this.onTrain = true; this.player.moving = false; if (t.remote) t.departIn = 1; else { t.unload = Math.min(t.unload, 1); t.hold = 0; t.toDrop = 0; } Haptics.tap(); },
-  leaveTrain() { const st = this.station(); this.onTrain = false; this.player.x = st.stopX; this.player.y = st.platform.y1 - 12; this.player.hasMoved = true; },
-  updateOnTrain(dt) { const t = this.currentTrain(); this.player.x = t.x - 240; this.player.y = t.y; this.player.moving = false; this.player.hasMoved = true; },
+  leaveTrain() { const st = this.station(); this.onTrain = false; this.player.x = st.stopX + st.boardDx; this.player.y = st.platform.y1 - 12; this.player.hasMoved = true; },
+  updateOnTrain(dt) { const t = this.currentTrain(); this.player.x = t.x + this.station().boardDx + 60; this.player.y = t.y; this.player.moving = false; this.player.hasMoved = true; },
 
   // ---------- the ride between towns, and Construction Town itself ----------
   // via: 'train' (the core's mountain ride) or an extension's own ride ('bus', 'ferry', ...) which draws and lands itself
   startTravel(to, via = 'train', dur = CFG.TRAVEL.dur) { this.travel = { t: 0, dur, to, via, from: this.area }; if (via === 'train') Sfx.whistle(); },
   updateTravel(dt) {
     const tr = this.travel; tr.t += dt;
+    if (tr.via === 'train') { tr.chug = (tr.chug || 0) - dt; if (tr.chug <= 0) { Sfx.chuff(); tr.chug = tr.t < 1.2 || tr.t > tr.dur - 1.2 ? 0.34 : 0.21; } }
     if (tr.t < tr.dur) return;
     this.travel = null; this.area = tr.to; this.cameraSnap = true;
     if (tr.via === 'train') {
@@ -714,7 +715,7 @@ const Game = {
     this.nearVehicle = this.findNearVehicle(); this.carNear = !!this.nearVehicle;
     this.nearPrep = !this.driving && !this.onTrain && U.dist(p.x, p.y, CFG.PREP_TABLE.x, CFG.PREP_TABLE.y + 10) < 64;
     this.nearPond = !this.driving && !this.onTrain && U.dist(p.x, p.y, CFG.FISHING.spot.x, CFG.FISHING.spot.y) < 54;
-    { const t = this.currentTrain(), st = this.station(); this.nearTrain = !this.driving && !this.onTrain && t.state === 'stopped' && p.y < 0 && Math.abs(p.x - st.stopX) < 180; }
+    { const t = this.currentTrain(), st = this.station(); this.nearTrain = !this.driving && !this.onTrain && t.state === 'stopped' && p.y < 0 && Math.abs(p.x - (st.stopX + st.boardDx)) < 200; }
   },
   hitRect(px, py, r, o) { return px + r > o.x && px - r < o.x + o.w && py + r > o.y && py - r < o.y + o.h; },
 
@@ -929,7 +930,7 @@ const Game = {
     let h = null;
     const order = this.houses.find((hh) => hh.order);
     if (order && p.carry > 0) h = { text: `Deliver to ${order.name}!`, target: order.door };
-    else if (this.train.state === 'stopped' && !this.onTrain && !this.nearTrain && !this.driving) h = { text: `🚂 Train leaves in ${Math.ceil(this.train.leavesIn)}s!`, target: { x: CFG.STATION.stopX, y: CFG.STATION.platform.y1 } };
+    else if (this.train.state === 'stopped' && !this.onTrain && !this.nearTrain && !this.driving) h = { text: `🚂 Train leaves in ${Math.ceil(this.train.leavesIn)}s!`, target: { x: CFG.STATION.stopX + CFG.STATION.boardDx, y: CFG.STATION.platform.y1 } };
     else if (this.driving) {
       const IC = CFG.ICE_CREAM;
       if (order && this.isUnlocked('driveThru') && s.piles.dt > 0) h = { text: 'Swing by the drive-thru window to load pizzas', target: CFG.DT_WINDOW };

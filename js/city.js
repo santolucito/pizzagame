@@ -69,7 +69,7 @@ CFG.CITY = {
   BENCHES: [[5530, 300], [5710, 300], [5620, 420], [4700, 1030], [5900, 1030], [5240, 30]],
   HYDRANTS: [[4910, 470], [5450, 890], [5790, 30]],
   // the bus in the pizza town: timetable, where it stops, where you land when you come home
-  BUS: { first: [40, 70], every: [90, 150], dwell: 15, speed: 320, len: 150 },
+  BUS: { first: [40, 70], every: [90, 150], dwell: 15, speed: 320, len: 150, warn: 20, callAfter: 10 },
   TOWN_STOP: { x: 500, y: 36 },           // north lane, the bus faces west
   TOWN_ARRIVE: { x: 500, y: -30 },
   RIDE: 7,
@@ -206,14 +206,21 @@ const CityExt = {
     const st = this.st, b = st.bus, B = CFG.CITY.BUS, S = CFG.CITY.TOWN_STOP, home = g.area === 'town' && !g.onTrain;
     b.honk = Math.max(0, b.honk - dt);
     if (b.state === 'away') {
+      // waiting at the stop calls the bus: stand there ten seconds and it comes
+      if (g.area === 'town' && this.nearTownStop(g) && !g.player.moving) {
+        b.wait = (b.wait || 0) + dt;
+        if (b.wait >= B.callAfter && b.timer > 1) { b.timer = 1; b.warned = true; g.floats.push({ x: g.player.x, y: g.player.y - 70, text: 'Here comes the bus! 🚌', color: '#ffe08a', t: 0, dur: 1.6, big: true }); }
+      } else b.wait = 0;
       b.timer -= dt;
-      if (b.timer <= 0) { b.state = 'arriving'; b.x = CFG.WORLD.x1 + 200; b.y = S.y; b.speed = B.speed; }
+      // a heads-up like the train's, so there is time to walk to the stop
+      if (!b.warned && b.timer <= B.warn && home) { b.warned = true; g.toast(`🚌 Bus in ${B.warn} seconds! Head to the bus stop!`, true, 'town'); Sfx.ding(); }
+      if (b.timer <= 0) { b.state = 'arriving'; b.x = CFG.WORLD.x1 + 200; b.y = S.y; b.speed = B.speed; b.warned = false; }
     } else if (b.state === 'arriving') {
       const d = b.x - S.x;
       b.speed = U.clamp(d * 1.6, 40, B.speed); b.x -= b.speed * dt;
       if (d <= 2) {
         b.x = S.x; b.state = 'stopped'; b.dwell = B.dwell; b.honk = 1.2;
-        if (home) { g.toast('🚌 The bus is here!', true); Sfx.ding(); }
+        if (home) { g.toast('🚌 The bus is here! It leaves in 15 seconds', true, 'town'); Sfx.ding(); }
       }
     } else if (b.state === 'stopped') {
       if (!(st.boarding && st.boarding.to === 'city')) b.dwell -= dt;   // the driver waits for someone climbing on

@@ -82,6 +82,8 @@ CFG.CITY = {
     wall: 70, floors: 6,
     names: ['', 'Lobby', 'Pizza Party Office', 'Gym', 'Aquarium', 'Dentist', 'Rooftop Garden'],
     icons: ['', '🛎️', '🍕', '🏋️', '🐠', '🦷', '🌳'],
+    wallColors: ['', '#e8d9c8', '#cfe3f7', '#ffe082', '#1e5a8a', '#b8f2c8', '#79c6f2'],
+    ride: { close: 0.6, move: 1.8, open: 0.6, out: 0.5 },   // seconds: the ride is about three seconds whatever the distance
   },
   coins: [{ x: 5560, y: 390 }, { x: 4760, y: 132 }, { x: 6040, y: 992 }, { x: 5200, y: 572 }, { x: 4700, y: 1050 }, { x: 5620, y: 1050 }],
 };
@@ -97,12 +99,13 @@ const CityExt = {
 
   // ---------- small helpers ----------
   hash(i) { const v = Math.sin(i * 12.9898 + 78.233) * 43758.5453; return v - Math.floor(v); },
+  // how lit a window is (0..1): decided once per building/window, plus one window somewhere fading on and off every 2.5 s
+  winLit(bi, wi, t) { const base = this.hash(bi * 101 + wi * 7 + 3) < 0.42 ? 1 : 0, slot = Math.floor(t / 2.5), pick = Math.floor(this.hash(slot * 17 + 1) * 97); if (((bi * 13 + wi) % 97) !== pick) return base; const k = (t / 2.5) % 1, fade = k < 0.3 ? k / 0.3 : k > 0.7 ? (1 - k) / 0.3 : 1; return base ? 1 - fade : fade; },
   shade(hex, f) { const n = parseInt(hex.slice(1), 16); const c = (s) => Math.max(0, Math.min(255, Math.round(((n >> s) & 255) * f))); return `rgb(${c(16)},${c(8)},${c(0)})`; },
   nearTownStop(g) { const p = g.player, S = CFG.CITY.TOWN_STOP; return !g.driving && !g.onTrain && !g.ride && !g.fishing && p.x > S.x - 160 && p.x < S.x + 80 && p.y > -100 && p.y < 16; },   // the sign, the bus door and the shelter with its bench
   nearCityStop(g) { const p = g.player, S = CFG.CITY.STOP; return !g.driving && !g.onTrain && !this.floor && U.dist(p.x, p.y, S.x, S.y) < 95; },
   nearTowerDoor(g) { const p = g.player, D = CFG.CITY.TOWER.door; return !g.driving && !g.onTrain && !this.floor && U.dist(p.x, p.y, D.x, D.y) < 36; },
   liftSpot() { const R = CFG.CITY.TOWER.ROOM; return { x: (R.x0 + R.x1) / 2, y: R.y0 + 64 }; },
-  padPos(i) { const R = CFG.CITY.TOWER.ROOM; return { x: R.x0 + 90 + (i - 1) * 84, y: R.y0 + 96 }; },   // the six floor buttons in front of the car
   exitSpot() { const R = CFG.CITY.TOWER.ROOM; return { x: (R.x0 + R.x1) / 2, y: R.y1 - 24 }; },
   telescope() { const R = CFG.CITY.TOWER.ROOM; return { x: R.x1 - 60, y: R.y1 - 56 }; },
   busDoor(bus) { return { x: bus.x - 44, y: bus.y - 28 }; },   // westbound: the front door is on the sidewalk side near the nose
@@ -129,7 +132,7 @@ const CityExt = {
       cityBus: { x: C.STOP.x, y: C.STOP.y, angle: Math.PI, state: 'stopped' },
       taxi: { kind: 'taxi', x: C.TAXI.x, y: C.TAXI.y, angle: 0, vx: 0, vy: 0 },
       taxis, peds, pigeons, boarding: null, taxiDriven: false, scattered: 0, notes: [],
-      lift: null, floorT: 0, seenTower: false, seenView: false, padSel: null, padT: 0, pickerT: 0, roofPigeons: [{ x: 60, y: 240 }, { x: 250, y: 150 }, { x: 470, y: 250 }].map((q) => ({ x: q.x, y: q.y, lift: 0, state: 'walk', facing: 1, flap: 0, t: 0 })),
+      lift: null, panel: null, floorT: 0, seenTower: false, seenView: false, roofPigeons: [{ x: 60, y: 240 }, { x: 250, y: 150 }, { x: 470, y: 250 }].map((q) => ({ x: q.x, y: q.y, lift: 0, state: 'walk', facing: 1, flap: 0, t: 0 })),
     };
     this.floor = null; this.viewing = null;
     // a save made inside the Pizza Tower reloads onto the room's spot: put the chef back in the lobby
@@ -547,7 +550,7 @@ const CityExt = {
       ctx.fillStyle = '#2b2b2b'; ctx.fillRect(x + 7, y - 44, 9, 9); ctx.fillStyle = walk; ctx.fillRect(x + 9, y - 42, 5, 5);
     }
     // chasing bulbs around the pizza billboard
-    const bb = C.BUILDINGS.find((b) => b.billboard); if (bb) { const cx = (bb.x0 + bb.x1) / 2, y = bb.y0 + 2, on = Math.floor(t * 6) % 3; let i = 0; for (let x = cx - 60; x <= cx + 60; x += 12, i++) { ctx.fillStyle = (i % 3) === on ? '#ffe08a' : 'rgba(255,224,138,0.35)'; ctx.beginPath(); ctx.arc(x, y - 54, 2.5, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(x, y + 6, 2.5, 0, Math.PI * 2); ctx.fill(); } }
+    const bb = C.BUILDINGS.find((b) => b.billboard); if (bb) { const cx = (bb.x0 + bb.x1) / 2, y = bb.y0 + 2, on = Math.floor(t * 2) % 3; let i = 0; for (let x = cx - 60; x <= cx + 60; x += 12, i++) { ctx.fillStyle = (i % 3) === on ? '#ffe08a' : 'rgba(255,224,138,0.35)'; ctx.beginPath(); ctx.arc(x, y - 54, 2.5, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(x, y + 6, 2.5, 0, Math.PI * 2); ctx.fill(); } }
     // steam from the hot dog cart
     const H = C.HOTDOG; for (let i = 0; i < 3; i++) { const age = ((t * 0.8 + i * 0.33) % 1); ctx.fillStyle = `rgba(255,255,255,${0.5 * (1 - age)})`; ctx.beginPath(); ctx.arc(H.x - 6 + i * 6 + Math.sin(age * 6 + i) * 3, H.y - 14 - age * 26, 3 + age * 4, 0, Math.PI * 2); ctx.fill(); }
     // the cat on its windowsill, tail swishing
@@ -617,66 +620,76 @@ const CityExt = {
     ctx.globalAlpha = 1;
   },
 
-  // ---------- the Pizza Tower: lobby door, elevator with a floor picker, six floors, the rooftop telescope ----------
+  // ---------- the Pizza Tower: lobby door, an elevator with a real button panel, six floors, the rooftop telescope ----------
   enterTower(g) {
     const st = this.st, S = this.exitSpot();
-    this.floor = 1; this.viewing = null; st.lift = null; st.floorT = 0; st.seenTower = true; st.padSel = null; st.padT = 0; st.pickerT = 0;
+    this.floor = 1; this.viewing = null; st.lift = null; st.panel = null; st.floorT = 0; st.seenTower = true;
     g.player.x = S.x; g.player.y = S.y - 14; g.player.moving = false; g.player.facing = 1; g.player.hasMoved = true; g.cameraSnap = true;
     g.floats.push({ x: g.player.x, y: g.player.y - 60, text: 'Welcome to the Pizza Tower!', color: '#ffe08a', t: 0, dur: 1.6, big: true });
     Haptics.tap();
   },
   leaveTower(g) {
     const D = CFG.CITY.TOWER.door;
-    this.floor = null; this.viewing = null; this.st.lift = null;
+    this.floor = null; this.viewing = null; this.st.lift = null; this.st.panel = null;
     g.player.x = D.x; g.player.y = D.y + 6; g.player.moving = false; g.cameraSnap = true;
   },
   inCar(p) { const R = CFG.CITY.TOWER.ROOM, cx = (R.x0 + R.x1) / 2; return Math.abs(p.x - cx) < 80 && p.y < R.y0 + 78; },
-  onPad(p, i) { const q = this.padPos(i), dx = (p.x - q.x) / 36, dy = (p.y - q.y) / 19; return dx * dx + dy * dy < 1; },
+  stepOut(g, dx = 0) { const sp = this.liftSpot(); this.st.panel = null; g.player.x = sp.x + dx; g.player.y = sp.y + 42; g.player.moving = false; },
   towerAction(g) {
     const st = this.st, p = g.player, T = CFG.CITY.TOWER, ex = this.exitSpot(), tl = this.telescope();
     if (this.viewing) return { label: '🚶 Done looking', run: () => { this.viewing = null; } };
     if (st.lift) return null;
+    if (st.panel) return st.panel.sel === this.floor ? { label: '🚶 Step out', run: (gg) => this.stepOut(gg) } : { label: `🛗 Go to floor ${st.panel.sel}`, run: (gg) => this.ride(gg, st.panel.sel) };
     if (this.floor === 1 && U.dist(p.x, p.y, ex.x, ex.y) < 36) return { label: '🚪 Out to the street', run: (gg) => this.leaveTower(gg) };
-    if (this.floor === T.floors && U.dist(p.x, p.y, tl.x, tl.y) < 52) return { label: '🔭 Look through the telescope', run: (gg) => { this.viewing = { t: 0, x: gg.player.x, y: gg.player.y }; st.seenView = true; gg.player.moving = false; Haptics.tap(); } };
-    if (this.inCar(p)) return { label: '🛗 Pick a floor', run: (gg) => { st.pickerT = 4; gg.floats.push({ x: gg.player.x, y: gg.player.y - 64, text: 'Step on a floor button!', color: '#ffe08a', t: 0, dur: 1.4, big: true }); } };
+    if (this.floor === T.floors && U.dist(p.x, p.y, tl.x, tl.y) < 52) return { label: '🔭 Look through the telescope', run: (gg) => { this.viewing = { t: 0, x: gg.player.x, y: gg.player.y, f: 0.14, vel: 0, bump: 0, bumpDir: 0 }; st.seenView = true; gg.player.moving = false; Haptics.tap(); } };
     return null;
   },
   ride(g, to) {
     if (to === this.floor) return;
     this.st.lift = { phase: 'closing', t: 0, from: this.floor, to, shown: this.floor };
-    this.st.padSel = null; this.st.padT = 0; this.st.pickerT = 0;
-    g.player.moving = false; Haptics.tap();
+    this.st.panel = null; g.player.moving = false; Haptics.tap();
   },
   updateTower(g, dt) {
-    const st = this.st, L = st.lift, p = g.player, T = CFG.CITY.TOWER, R = T.ROOM;
-    st.floorT += dt; st.pickerT = Math.max(0, st.pickerT - dt);
-    if (this.viewing) { const v = this.viewing; v.t += dt; p.x = v.x; p.y = v.y; p.moving = false; return; }   // eyes on the telescope
+    const st = this.st, L = st.lift, p = g.player, T = CFG.CITY.TOWER, R = T.ROOM, sp = this.liftSpot(), a = Input.axis();
+    st.floorT += dt;
+    if (this.viewing) {
+      // eyes on the telescope: the chef stays put, the stick pans the view with easing, a soft bump at each end
+      const v = this.viewing; v.t += dt; p.x = v.x; p.y = v.y; p.moving = false;
+      v.vel = U.lerp(v.vel, a.x * 0.3, 1 - Math.pow(0.03, dt)); v.f += v.vel * dt;
+      if (v.f < 0) { v.f = 0; if (v.vel < -0.08 && v.bump <= 0) { v.bump = 0.45; v.bumpDir = -1; } v.vel = 0; }
+      if (v.f > 1) { v.f = 1; if (v.vel > 0.08 && v.bump <= 0) { v.bump = 0.45; v.bumpDir = 1; } v.vel = 0; }
+      v.bump = Math.max(0, v.bump - dt);
+      return;
+    }
     if (L) {
-      const sp = this.liftSpot();
-      // slide into the car, then the doors close, the counter ticks, ding, the doors open on the new floor
-      p.x = U.lerp(p.x, sp.x, Math.min(1, dt * 10)); p.y = U.lerp(p.y, sp.y, Math.min(1, dt * 10)); p.moving = false;
-      L.t += dt;
-      if (L.phase === 'closing' && L.t >= 0.7) { L.phase = 'moving'; L.t = 0; }
+      // the ride: doors close, the car hums between floors (counter ticks floor by floor), ding, doors open, the chef steps out
+      p.x = sp.x; p.y = sp.y; p.moving = false; L.t += dt;
+      const n = Math.abs(L.to - L.from), dir = L.to > L.from ? 1 : -1;
+      if (L.phase === 'closing' && L.t >= T.ride.close) { L.phase = 'moving'; L.t = 0; }
       else if (L.phase === 'moving') {
-        const dir = L.to > L.from ? 1 : -1, n = Math.abs(L.to - L.from);
-        L.shown = L.from + dir * Math.min(n, Math.floor(L.t / 0.45));
-        if (L.t >= n * 0.45 + 0.3) { this.floor = L.to; L.shown = L.to; L.phase = 'opening'; L.t = 0; st.floorT = 0; Sfx.ding(); }
-      } else if (L.phase === 'opening' && L.t >= 0.7) {
-        st.lift = null; p.x = sp.x; p.y = sp.y;
-        g.floats.push({ x: p.x, y: p.y - 64, text: `${T.icons[this.floor]} ${T.names[this.floor]}!`, color: '#ffe08a', t: 0, dur: 1.5, big: true });
+        L.shown = L.from + dir * Math.min(n, Math.floor(L.t / (T.ride.move / n)));
+        if (L.t >= T.ride.move) { this.floor = L.to; L.shown = L.to; L.phase = 'opening'; L.t = 0; st.floorT = 0; Sfx.ding(); }
+      } else if (L.phase === 'opening' && L.t >= T.ride.open) { L.phase = 'out'; L.t = 0; }
+      else if (L.phase === 'out') {
+        p.y = sp.y + Math.min(1, L.t / T.ride.out) * 42; p.moving = L.t < T.ride.out; p.bob += dt * 14; p.facing = 1;
+        if (L.t >= T.ride.out) { st.lift = null; p.moving = false; g.floats.push({ x: p.x, y: p.y - 64, text: `${T.icons[this.floor]} ${T.names[this.floor]}!`, color: '#ffe08a', t: 0, dur: 1.5, big: true }); }
       }
       return;
     }
-    // the floor picker: stand on one of the numbered buttons for a moment
-    let on = null;
-    for (let i = 1; i <= T.floors; i++) if (this.onPad(p, i)) on = i;
-    if (on && on !== this.floor) { if (st.padSel !== on) st.padT = 0; st.padSel = on; st.padT += dt; if (st.padT >= 0.45) this.ride(g, on); }
-    else { st.padSel = null; st.padT = 0; }
+    // walking into the car opens the button panel; the stick moves the highlight, left/right steps back out
+    if (st.panel) {
+      p.x = sp.x; p.y = sp.y; p.moving = false;
+      const P = st.panel;
+      if (Math.abs(a.y) < 0.35) P.armed = true;
+      else if (P.armed) { P.sel = U.clamp(P.sel + (a.y < 0 ? 1 : -1), 1, T.floors); P.armed = false; P.flash = 0.25; }
+      P.flash = Math.max(0, (P.flash || 0) - dt);
+      if (Math.abs(a.x) > 0.6) this.stepOut(g, a.x < 0 ? -70 : 70);
+    } else if (this.inCar(p)) { st.panel = { sel: this.floor, armed: Math.abs(a.y) < 0.35, flash: 0 }; Haptics.tap(); }
     // rooftop pigeons scatter like the ones on the square
     if (this.floor === T.floors) for (const b of st.roofPigeons) {
       b.t -= dt; b.flap += dt * 24;
       const wx = R.x0 + b.x, wy = R.y0 + b.y, d = U.dist(wx, wy, p.x, p.y);
-      if (b.state !== 'fly' && d < 60) { b.state = 'fly'; b.t = 1.2; const a = Math.atan2(wy - p.y, wx - p.x); b.tx = U.clamp(b.x + Math.cos(a) * 160, 24, R.x1 - R.x0 - 24); b.ty = U.clamp(b.y + Math.sin(a) * 60, 100, 220); }
+      if (b.state !== 'fly' && d < 60) { b.state = 'fly'; b.t = 1.2; const an = Math.atan2(wy - p.y, wx - p.x); b.tx = U.clamp(b.x + Math.cos(an) * 160, 24, R.x1 - R.x0 - 24); b.ty = U.clamp(b.y + Math.sin(an) * 60, 100, 220); }
       if (b.state === 'fly') { b.lift = Math.min(36, b.lift + dt * 90); if (U.moveToward(b, b.tx, b.ty, 220, dt) || b.t <= 0) b.state = 'land'; }
       else if (b.state === 'land') { b.lift = Math.max(0, b.lift - dt * 100); if (b.lift === 0) { b.state = 'walk'; b.t = U.rand(1, 3); } }
       else if (b.t <= 0) { b.tx = U.clamp(b.x + U.rand(-40, 40), 24, R.x1 - R.x0 - 24); b.ty = U.clamp(b.y + U.rand(-20, 20), 100, 220); b.t = U.rand(1.5, 4); }
@@ -700,19 +713,19 @@ const CityExt = {
   },
   towerHint(g) {
     const st = this.st, p = g.player, T = CFG.CITY.TOWER, f = this.floor, L = st.lift, tl = this.telescope();
-    if (this.viewing) return null;   // the eyepiece view carries its own banner
-    if (L) return { text: L.phase === 'moving' ? (L.to > L.from ? '🛗 Going up!' : '🛗 Going down!') : L.phase === 'opening' ? '🛗 Ding! Doors opening' : '🛗 Doors closing…', target: null };
-    if (st.padSel) return { text: `🛗 Going to ${T.names[st.padSel]}…`, target: null };
-    const next = f < T.floors ? f + 1 : 1, pick = { text: `Step on a floor button to ride! ${T.icons[next]}`, target: this.padPos(next) };
+    if (this.viewing) return { text: '◀ ▶ to look around', target: null };
+    if (L) return { text: L.phase === 'moving' ? (L.to > L.from ? '🛗 Going up!' : '🛗 Going down!') : L.phase === 'opening' || L.phase === 'out' ? '🛗 Ding! Doors opening' : '🛗 Doors closing…', target: null };
+    if (st.panel) return { text: st.panel.sel === f ? '▲ ▼ to choose a floor, ◀ ▶ to step out' : `Press the button to ride to ${T.names[st.panel.sel]} ${T.icons[st.panel.sel]}`, target: null };
+    const car = this.liftSpot(), go = { text: 'Walk into the elevator to choose a floor 🛗', target: { x: car.x, y: car.y + 20 } };
     const early = st.floorT < 5;
-    if (f === 1) return st.seenView ? { text: 'Walk out the door to the street', target: this.exitSpot() } : pick;
-    if (f === 2) return early ? { text: 'Everybody loves the pizza chef! 🍕', target: null } : pick;
-    if (f === 3) return early ? { text: 'Run, run, run! 🏃', target: null } : pick;
-    if (f === 4) return early ? { text: 'Look at all the fish! 🐠', target: null } : pick;
-    if (f === 5) return early ? { text: 'The shark is waiting for the dentist 🦈', target: null } : pick;
+    if (f === 1) return st.seenView ? { text: 'Walk out the door to the street', target: this.exitSpot() } : go;
+    if (f === 2) return early ? { text: 'Everybody loves the pizza chef! 🍕', target: null } : go;
+    if (f === 3) return early ? { text: 'Run, run, run! 🏃', target: null } : go;
+    if (f === 4) return early ? { text: 'Look at all the fish! 🐠', target: null } : go;
+    if (f === 5) return early ? { text: 'The shark is waiting for the dentist 🦈', target: null } : go;
     if (U.dist(p.x, p.y, tl.x, tl.y) < 52) return { text: 'Press the button to look through the telescope!', target: null };
     if (!st.seenView) return { text: 'Look through the telescope! 🔭', target: tl };
-    return pick;
+    return go;
   },
 
   // the room the chef is in, drawn over the whole view
@@ -722,30 +735,22 @@ const CityExt = {
     ctx.save(); ctx.beginPath(); ctx.rect(R.x0, R.y0, w, h); ctx.clip();
     this.paintFloor(r, g, f);
     // the elevator car set into the back wall: lit interior, the chef, two sliding doors, frame and counter
-    const open = !L ? 1 : L.phase === 'closing' ? 1 - L.t / 0.7 : L.phase === 'opening' ? Math.min(1, L.t / 0.7) : 0;
+    const open = !L || L.phase === 'out' ? 1 : 0;
     const ex = cx, ey = R.y0;
     ctx.fillStyle = '#5c6670'; ctx.fillRect(ex - 88, ey, 176, T.wall + 4);
     ctx.fillStyle = '#6b5a4a'; ctx.fillRect(ex - 80, ey + 14, 160, T.wall - 14);
     ctx.fillStyle = '#d9b382'; ctx.fillRect(ex - 80, ey + 14, 160, 26); ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(ex - 76, ey + 18, 152, 6);   // wood panel + strip light
     ctx.fillStyle = '#8d7b63'; ctx.fillRect(ex - 80, ey + 40, 160, T.wall - 40);
     ctx.fillStyle = 'rgba(255,255,255,0.08)'; for (let k = -80; k < 80; k += 20) ctx.fillRect(ex + k, ey + 40, 1, T.wall - 40);
-    // floor buttons
-    for (let i = 1; i <= T.floors; i++) {
-      const q = this.padPos(i), here = i === f, sel = st.padSel === i, k = sel ? st.padT / 0.45 : 0;
-      ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.beginPath(); ctx.ellipse(q.x + 2, q.y + 4, 36, 19, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = here ? '#9aa0a8' : sel ? '#ffd166' : '#fff8ee'; ctx.beginPath(); ctx.ellipse(q.x, q.y, 36, 19, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = here ? '#5c6670' : '#e4572e'; ctx.lineWidth = 2.5; ctx.stroke();
-      if (sel) { ctx.strokeStyle = '#2f9e44'; ctx.lineWidth = 4; ctx.beginPath(); ctx.ellipse(q.x, q.y, 36, 19, 0, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k); ctx.stroke(); }
-      ctx.fillStyle = here ? '#fff' : '#2b1d14'; ctx.font = r.font(15); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(i), q.x - 11, q.y + 1);
-      ctx.font = r.font(12); ctx.fillText(T.icons[i], q.x + 11, q.y + 1);
-    }
-    if (!L || open >= 0.2) r.drawPlayer(g);
+    ctx.fillStyle = '#2b1d14'; ctx.fillRect(ex + 60, ey + 18, 12, 30); for (let i = 0; i < 6; i++) { ctx.fillStyle = i + 1 === f ? '#ffd166' : '#9aa0a8'; ctx.beginPath(); ctx.arc(ex + 66, ey + 22 + i * 4.6, 1.6, 0, Math.PI * 2); ctx.fill(); }   // the little button panel on the car wall
+    ctx.fillStyle = 'rgba(255,255,255,0.35)'; U.roundRect(ctx, ex - 70, ey + 38, 120, 3, 1.5); ctx.fill();   // handrail
+    if (st.panel) { ctx.fillStyle = 'rgba(255,224,138,0.18)'; ctx.fillRect(ex - 80, ey + 14, 160, T.wall - 14); }
+    r.drawPlayer(g);
     for (const b of this.bubbles) r.drawBubble(b.x, b.y, () => { ctx.font = r.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText(b.text, 0, 0); }, b.w);
     ctx.fillStyle = '#9aa0a8'; ctx.fillRect(ex - 80, ey + 12, 80 * (1 - open), T.wall - 12); ctx.fillRect(ex + 80 - 80 * (1 - open), ey + 12, 80 * (1 - open), T.wall - 12);
-    if (open < 1) { ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(ex - 80 + 80 * (1 - open) - 2, ey + 12, 2, T.wall - 12); ctx.fillRect(ex + 80 - 80 * (1 - open), ey + 12, 2, T.wall - 12); ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(ex - 78, ey + 16, 80 * (1 - open) - 4, 3); ctx.fillRect(ex + 80 - 80 * (1 - open) + 2, ey + 16, 80 * (1 - open) - 4, 3); }
     ctx.fillStyle = '#5c6670'; ctx.fillRect(ex - 88, ey, 176, 14); ctx.fillRect(ex - 88, ey, 8, T.wall + 4); ctx.fillRect(ex + 80, ey, 8, T.wall + 4);
     ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, ex - 30, ey + 1, 60, 12, 3); ctx.fill();
-    ctx.fillStyle = '#ff7a1a'; ctx.font = r.font(10); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(`${L && L.phase === 'moving' ? (L.to > L.from ? '▲ ' : '▼ ') : ''}${L ? L.shown : f}`, ex, ey + 7);
+    ctx.fillStyle = '#ff7a1a'; ctx.font = r.font(10); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(f), ex, ey + 7);
     // floor name plate in the corner
     ctx.font = r.font(10); const name = `Floor ${f} · ${T.names[f]}`, nw = ctx.measureText(name).width + 18;
     ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, R.x1 - 10 - nw, R.y1 - 26, nw, 18, 4); ctx.fill(); ctx.fillStyle = '#ffe08a'; ctx.textAlign = 'center'; ctx.fillText(name, R.x1 - 10 - nw / 2, R.y1 - 17);
@@ -916,87 +921,178 @@ const CityExt = {
     }
   },
 
-  // ---------- screen-space: the floor panel beside the elevator, and the telescope view ----------
+  // ---------- screen-space: the elevator button panel, the ride cut-scene, and the telescope view ----------
   screen(r, g) {
     const st = this.st; if (!st || g.area !== 'city' || !this.floor) return;
     const ctx = r.ctx, W = r.canvas.width / r.dpr, H = r.canvas.height / r.dpr;
     if (this.viewing) { this.drawTelescope(r, g, W, H); return; }
-    const T = CFG.CITY.TOWER, R = T.ROOM, L = st.lift, p = g.player, f = this.floor;
-    if (!(L || st.pickerT > 0 || p.y < R.y0 + 125)) return;
-    const shown = L ? L.shown : f, sel = st.padSel, k = sel ? st.padT / 0.45 : 0;
-    ctx.textBaseline = 'middle';
-    if (W >= 640) {
-      // a tall panel on the right: top floor at the top
-      const px = W - 204, py = 64, rowH = 30;
-      ctx.fillStyle = 'rgba(43,29,20,0.88)'; U.roundRect(ctx, px, py, 188, 34 + rowH * T.floors + 8, 12); ctx.fill();
-      ctx.fillStyle = '#ffe08a'; ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.fillText('🛗 Pick a floor', px + 94, py + 18);
-      for (let i = T.floors; i >= 1; i--) {
-        const ry = py + 34 + (T.floors - i) * rowH, here = i === shown, picking = i === sel;
-        ctx.fillStyle = here ? '#ffd166' : picking ? '#56b862' : 'rgba(255,255,255,0.12)'; U.roundRect(ctx, px + 8, ry, 172, rowH - 4, 8); ctx.fill();
-        if (picking) { ctx.fillStyle = '#2f9e44'; U.roundRect(ctx, px + 8, ry, 172 * U.clamp(k, 0, 1), rowH - 4, 8); ctx.fill(); }
-        ctx.fillStyle = here ? '#2b1d14' : '#fff'; ctx.font = r.font(12); ctx.textAlign = 'left'; ctx.fillText(`${T.icons[i]}  ${i}  ${T.names[i]}`, px + 18, ry + (rowH - 4) / 2);
-        if (here && !L) { ctx.font = r.font(9); ctx.textAlign = 'right'; ctx.fillText('you are here', px + 172, ry + (rowH - 4) / 2); }
-      }
-    } else {
-      // a strip of chips above the action button on phones
-      const cw = 50, gap = 6, total = T.floors * cw + (T.floors - 1) * gap, sx = W / 2 - total / 2, sy = H - 142;
-      ctx.fillStyle = 'rgba(43,29,20,0.88)'; U.roundRect(ctx, sx - 10, sy - 26, total + 20, 86, 12); ctx.fill();
-      ctx.fillStyle = '#ffe08a'; ctx.font = r.font(11); ctx.textAlign = 'center'; ctx.fillText('🛗 Pick a floor', W / 2, sy - 12);
-      for (let i = 1; i <= T.floors; i++) {
-        const x = sx + (i - 1) * (cw + gap), here = i === shown, picking = i === sel;
-        ctx.fillStyle = here ? '#ffd166' : picking ? '#56b862' : 'rgba(255,255,255,0.12)'; U.roundRect(ctx, x, sy, cw, 50, 8); ctx.fill();
-        if (picking) { ctx.fillStyle = '#2f9e44'; U.roundRect(ctx, x, sy + 50 - 50 * U.clamp(k, 0, 1), cw, 50 * U.clamp(k, 0, 1), 8); ctx.fill(); }
-        ctx.fillStyle = here ? '#2b1d14' : '#fff'; ctx.font = r.font(14); ctx.textAlign = 'center'; ctx.fillText(T.icons[i], x + cw / 2, sy + 16); ctx.font = r.font(13); ctx.fillText(String(i), x + cw / 2, sy + 36);
-      }
-    }
+    const L = st.lift;
+    if (L && L.phase !== 'out') { this.drawLiftScene(r, g, W, H); return; }
+    if (st.panel) this.drawPanel(r, g, W, H);
   },
 
-  // Through the telescope: the city rooftops, then far away the whole pizza town, the islands and the mountains.
+  // a real elevator panel: round buttons 6 down to 1, the current floor lit, the highlight moved with the stick
+  drawPanel(r, g, W, H) {
+    const ctx = r.ctx, T = CFG.CITY.TOWER, P = this.st.panel, f = this.floor, wide = W >= 640, t = g.time;
+    const pw = wide ? 236 : 150, rowH = wide ? 42 : 40, ph = 54 + rowH * T.floors + 40, px = W - pw - 12, py = Math.max(64, Math.min(H / 2 - ph / 2, H - ph - 90));
+    ctx.fillStyle = 'rgba(0,0,0,0.25)'; U.roundRect(ctx, px + 4, py + 6, pw, ph, 14); ctx.fill();
+    const steel = ctx.createLinearGradient(px, 0, px + pw, 0); steel.addColorStop(0, '#8a9099'); steel.addColorStop(0.5, '#c9ccd2'); steel.addColorStop(1, '#8a9099');
+    ctx.fillStyle = steel; U.roundRect(ctx, px, py, pw, ph, 14); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 2; U.roundRect(ctx, px + 6, py + 6, pw - 12, ph - 12, 10); ctx.stroke();
+    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, px + 14, py + 12, pw - 28, 30, 6); ctx.fill();
+    ctx.fillStyle = '#ff7a1a'; ctx.font = r.font(wide ? 13 : 11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(`🛗 FLOOR ${f}`, px + pw / 2, py + 27);
+    for (let i = T.floors; i >= 1; i--) {
+      const cy = py + 54 + (T.floors - i) * rowH + rowH / 2, bx = px + 32, here = i === f, sel = i === P.sel, glow = sel && P.flash > 0;
+      ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(bx + 1, cy + 2, 16, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = sel ? (glow ? '#fff3b0' : '#ffd166') : here ? '#ffb347' : '#e6e8eb'; ctx.beginPath(); ctx.arc(bx, cy, 16, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = sel ? '#e4572e' : 'rgba(0,0,0,0.35)'; ctx.lineWidth = sel ? 3 : 1.5; ctx.stroke();
+      if (here) { ctx.strokeStyle = `rgba(255,122,26,${0.5 + 0.4 * Math.sin(t * 5)})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(bx, cy, 20, 0, Math.PI * 2); ctx.stroke(); }
+      ctx.fillStyle = '#2b1d14'; ctx.font = r.font(15); ctx.textAlign = 'center'; ctx.fillText(String(i), bx, cy + 1);
+      ctx.font = r.font(wide ? 12 : 13); ctx.textAlign = 'left'; ctx.fillStyle = sel ? '#2b1d14' : '#3a3f45';
+      ctx.fillText(wide ? `${T.icons[i]}  ${T.names[i]}` : T.icons[i], bx + 26, cy + 1);
+      if (sel) { ctx.fillStyle = '#e4572e'; ctx.font = r.font(12); ctx.textAlign = 'right'; ctx.fillText('◀', px + pw - 14, cy + 1); }
+      if (here && !sel && wide) { ctx.fillStyle = '#6f665c'; ctx.font = r.font(8); ctx.textAlign = 'right'; ctx.fillText('here', px + pw - 14, cy + 1); }
+    }
+    ctx.fillStyle = '#2b1d14'; ctx.font = r.font(wide ? 10 : 9); ctx.textAlign = 'center'; ctx.fillText(wide ? '▲ ▼ choose  ·  ◀ ▶ step out' : '▲▼ choose · ◀▶ out', px + pw / 2, py + ph - 20);
+  },
+
+  // the ride, seen from inside the car: doors close, the counter ticks, the car hums and shakes, ding, doors open on the new floor
+  drawLiftScene(r, g, W, H) {
+    const ctx = r.ctx, T = CFG.CITY.TOWER, L = this.st.lift, t = g.time, Rd = T.ride, p = g.player;
+    const cw = Math.min(W - 40, 560), ch = Math.min(H - 150, 380), cx = W / 2, cy = H / 2 + 10, x0 = cx - cw / 2, y0 = cy - ch / 2;
+    const open = L.phase === 'closing' ? 1 - L.t / Rd.close : L.phase === 'opening' ? Math.min(1, L.t / Rd.open) : 0;
+    const moving = L.phase === 'moving', shake = moving ? Math.sin(t * 43) * 1.6 + Math.sin(t * 29) * 0.8 : 0, dir = L.to > L.from ? 1 : -1;
+    ctx.fillStyle = '#0a0806'; ctx.fillRect(0, 0, W, H);
+    ctx.save(); ctx.translate(shake, moving ? Math.cos(t * 37) * 1.2 : 0);
+    // side walls, ceiling and floor in a little perspective; the far side is the door wall
+    const inset = cw * 0.16, iy = ch * 0.16, ix0 = x0 + inset, ix1 = x0 + cw - inset, iy0 = y0 + iy, iy1 = y0 + ch - iy * 0.8;
+    const wallGrad = (a, b, c) => { const gr = ctx.createLinearGradient(a, 0, b, 0); gr.addColorStop(0, c[0]); gr.addColorStop(1, c[1]); return gr; };
+    ctx.fillStyle = wallGrad(x0, ix0, ['#6e7681', '#aeb4bb']); ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(ix0, iy0); ctx.lineTo(ix0, iy1); ctx.lineTo(x0, y0 + ch); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = wallGrad(ix1, x0 + cw, ['#aeb4bb', '#6e7681']); ctx.beginPath(); ctx.moveTo(x0 + cw, y0); ctx.lineTo(ix1, iy0); ctx.lineTo(ix1, iy1); ctx.lineTo(x0 + cw, y0 + ch); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#d7dbe0'; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + cw, y0); ctx.lineTo(ix1, iy0); ctx.lineTo(ix0, iy0); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#3a3f45'; ctx.beginPath(); ctx.moveTo(x0, y0 + ch); ctx.lineTo(x0 + cw, y0 + ch); ctx.lineTo(ix1, iy1); ctx.lineTo(ix0, iy1); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.06)'; for (let k = 0; k < 14; k++) { ctx.beginPath(); ctx.moveTo(x0 + 6, y0 + 10 + k * (ch - 20) / 14); ctx.lineTo(ix0, iy0 + 6 + k * (iy1 - iy0 - 12) / 14); ctx.lineTo(ix0, iy0 + 8 + k * (iy1 - iy0 - 12) / 14); ctx.lineTo(x0 + 6, y0 + 13 + k * (ch - 20) / 14); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(x0 + cw - 6, y0 + 10 + k * (ch - 20) / 14); ctx.lineTo(ix1, iy0 + 6 + k * (iy1 - iy0 - 12) / 14); ctx.lineTo(ix1, iy0 + 8 + k * (iy1 - iy0 - 12) / 14); ctx.lineTo(x0 + cw - 6, y0 + 13 + k * (ch - 20) / 14); ctx.closePath(); ctx.fill(); }   // brushed metal
+    ctx.fillStyle = '#fff8e6'; U.roundRect(ctx, cx - cw * 0.18, y0 + 8, cw * 0.36, 8, 4); ctx.fill();   // ceiling light
+    // the door wall: the doors slide apart onto the floor we are leaving / arriving at
+    const dw = ix1 - ix0, dh = iy1 - iy0, col = T.wallColors[L.phase === 'closing' ? L.from : L.to];
+    ctx.fillStyle = col; ctx.fillRect(ix0, iy0, dw, dh); ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(ix0, iy1 - dh * 0.3, dw, dh * 0.3);
+    ctx.fillStyle = `rgba(255,255,255,${0.35 * open})`; ctx.fillRect(ix0, iy0, dw, dh);
+    const half = dw / 2 * (1 - open);
+    const door = (x, wdt) => { const gr = ctx.createLinearGradient(x, 0, x + wdt, 0); gr.addColorStop(0, '#b4bac1'); gr.addColorStop(0.5, '#d8dce1'); gr.addColorStop(1, '#b4bac1'); ctx.fillStyle = gr; ctx.fillRect(x, iy0, wdt, dh); ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(x, iy0, wdt, 4); ctx.fillRect(x, iy1 - 4, wdt, 4); };
+    if (half > 0) { door(ix0, half); door(ix1 - half, half); ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(ix0 + half - 2, iy0, 2, dh); ctx.fillRect(ix1 - half, iy0, 2, dh); }
+    ctx.strokeStyle = '#5c6670'; ctx.lineWidth = 6; ctx.strokeRect(ix0, iy0, dw, dh);
+    // the indicator above the doors
+    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, cx - 50, iy0 - 30, 100, 24, 6); ctx.fill();
+    ctx.fillStyle = '#ff7a1a'; ctx.font = r.font(16); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const blink = moving && Math.floor(t * 4) % 2 === 0;
+    ctx.fillText(`${moving ? (dir > 0 ? '▲' : '▼') : ''} ${L.shown}`, cx, iy0 - 18); if (blink) { ctx.fillStyle = 'rgba(255,122,26,0.35)'; ctx.fillText(dir > 0 ? '▲' : '▼', cx - 22, iy0 - 18); }
+    // handrails on both side walls and the button panel on the right
+    ctx.strokeStyle = '#e6e8eb'; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x0 + 10, y0 + ch * 0.56); ctx.lineTo(ix0 - 2, iy0 + dh * 0.56); ctx.moveTo(x0 + cw - 10, y0 + ch * 0.56); ctx.lineTo(ix1 + 2, iy0 + dh * 0.56); ctx.stroke(); ctx.lineCap = 'butt';
+    const bpx = x0 + cw - inset * 0.55, bpy = y0 + ch * 0.26;
+    ctx.fillStyle = '#5c6670'; U.roundRect(ctx, bpx - 14, bpy - 10, 28, 24 * 6 / 1.6 + 20, 6); ctx.fill();
+    for (let i = T.floors; i >= 1; i--) { const by = bpy + (T.floors - i) * 15; const lit = i === L.to; ctx.fillStyle = lit ? '#ffd166' : i === L.from ? '#ffb347' : '#e6e8eb'; ctx.beginPath(); ctx.arc(bpx, by, 6, 0, Math.PI * 2); ctx.fill(); if (lit) { ctx.fillStyle = `rgba(255,209,102,${0.3 + 0.3 * Math.sin(t * 6)})`; ctx.beginPath(); ctx.arc(bpx, by, 10, 0, Math.PI * 2); ctx.fill(); } ctx.fillStyle = '#2b1d14'; ctx.font = r.font(7); ctx.textAlign = 'center'; ctx.fillText(String(i), bpx, by + 1); }
+    // the chef standing in the car (bigger than life), bobbing a little with the ride
+    const sc = Math.min(2.4, ch / 170), bob = moving ? Math.sin(t * 12) * 1.5 : 0;
+    ctx.save(); ctx.translate(cx, iy1 + dh * 0.02 + bob); ctx.scale(sc, sc);
+    r.drawPerson(0, 0, { shirt: '#fff', apron: '#e4572e', skin: '#f1c27d', hat: 'chef', facing: 1, moving: false, bob: 0, carry: p.carry, pants: '#2d3a4a' });
+    ctx.restore();
+    ctx.restore();
+    // what is happening
+    const msg = L.phase === 'closing' ? '🛗 Doors closing…' : moving ? `🛗 Going ${dir > 0 ? 'up' : 'down'} to ${T.names[L.to]} ${T.icons[L.to]}` : `🛗 Ding! ${T.names[L.to]} ${T.icons[L.to]}`;
+    const bw = Math.min(W - 24, 360);
+    ctx.fillStyle = 'rgba(43,29,20,0.85)'; U.roundRect(ctx, cx - bw / 2, H - 110, bw, 40, 12); ctx.fill();
+    ctx.fillStyle = '#ffe08a'; ctx.font = r.font(bw < 300 ? 13 : 16); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(msg, cx, H - 90);
+  },
+
+  // Through the telescope: a wide panorama laid out by the real geography. Left end looks north-west (the snowy
+  // mountains and, far away, the pizza town), then west (Construction Town, nearest), south-west (the sea and
+  // the Islands) and, at the right end, south over the open sea. The stick pans; near layers move more than far ones.
   drawTelescope(r, g, W, H) {
-    const ctx = r.ctx, t = g.time, v = this.viewing, cx = W / 2, cy = H / 2, Rv = Math.min(W, H) * 0.46, fade = Math.min(1, v.t / 0.5);
-    const sway = Math.sin(t * 0.5) * 7, bob = Math.cos(t * 0.37) * 3, hz = cy + Rv * 0.05;   // hz: the horizon
+    const E = this, ctx = r.ctx, t = g.time, v = this.viewing, cx = W / 2, cy = H / 2, Rv = Math.min(W, H) * 0.46, D = Rv * 2, fade = Math.min(1, v.t / 0.5);
+    const f = v.f, hz = cy + Rv * 0.05, S = Rv / 240;
+    const bump = v.bump > 0 ? Math.sin(v.bump * 24) * 5 * v.bump * v.bumpDir : 0, bob = Math.cos(t * 0.37) * 2;
+    // sx: where something that sits centred at pan fraction fc, on a layer with parallax k, lands on screen
+    const sx = (fc, k) => cx + (fc - f) * 2 * D * k + bump * k;
     ctx.fillStyle = '#0a0806'; ctx.fillRect(0, 0, W, H);
     ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, Rv, 0, Math.PI * 2); ctx.clip();
+    ctx.translate(0, bob);
     const sky = ctx.createLinearGradient(0, cy - Rv, 0, hz); sky.addColorStop(0, '#5fb6ee'); sky.addColorStop(1, '#dff3ff'); ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = '#fff7c2'; ctx.beginPath(); ctx.arc(cx + Rv * 0.55 + sway * 0.2, cy - Rv * 0.55 + bob * 0.2, Rv * 0.09, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.9)'; for (let i = 0; i < 4; i++) { const mx = cx - Rv + ((t * 8 + i * 230) % (Rv * 2.4)) + sway * 0.3, my = cy - Rv * (0.75 - (i % 2) * 0.18); ctx.beginPath(); ctx.arc(mx, my, 12, 0, Math.PI * 2); ctx.arc(mx + 14, my - 7, 15, 0, Math.PI * 2); ctx.arc(mx + 30, my, 11, 0, Math.PI * 2); ctx.fill(); }
-    ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1.5; for (let i = 0; i < 3; i++) { const bx = cx - Rv + ((t * 22 + i * 170) % (Rv * 2.2)), by = cy - Rv * (0.45 + i * 0.08) + Math.sin(t * 3 + i) * 4, fl = Math.sin(t * 9 + i) * 3; ctx.beginPath(); ctx.moveTo(bx - 7, by); ctx.quadraticCurveTo(bx - 3, by - 4 - fl, bx, by); ctx.quadraticCurveTo(bx + 3, by - 4 - fl, bx + 7, by); ctx.stroke(); }
-    // mountains with snow, then green hills, then the sea off to the right with the islands' lighthouse
-    const far = sway * 0.25, mid = sway * 0.5, nearS = sway;
-    ctx.fillStyle = '#7f8fb3'; ctx.beginPath(); ctx.moveTo(cx - Rv * 1.2, hz); for (let i = 0; i <= 10; i++) { const px = cx - Rv * 1.2 + i * Rv * 0.24 + far, peak = hz - Rv * (0.18 + 0.2 * Math.abs(Math.sin(i * 2.3))); ctx.lineTo(px, hz - 4); ctx.lineTo(px + Rv * 0.12, peak); } ctx.lineTo(cx + Rv * 1.4, hz); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#fff'; for (let i = 0; i <= 10; i++) { const px = cx - Rv * 1.2 + i * Rv * 0.24 + Rv * 0.12 + far, peak = hz - Rv * (0.18 + 0.2 * Math.abs(Math.sin(i * 2.3))); ctx.beginPath(); ctx.moveTo(px, peak); ctx.lineTo(px + 12, peak + 14); ctx.lineTo(px + 3, peak + 11); ctx.lineTo(px - 3, peak + 15); ctx.lineTo(px - 12, peak + 14); ctx.closePath(); ctx.fill(); }
-    ctx.fillStyle = '#5fa84f'; ctx.fillRect(0, hz, W, H); ctx.fillStyle = '#79b85e'; ctx.fillRect(0, hz + Rv * 0.12, W, Rv * 0.1); ctx.fillStyle = '#8bc34a'; ctx.beginPath(); ctx.ellipse(cx - Rv * 0.5 + nearS * 0.6, hz + Rv * 0.34, Rv * 0.6, Rv * 0.08, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#6cb35a'; ctx.beginPath(); ctx.ellipse(cx - Rv * 0.4 + mid, hz + 6, Rv * 0.9, Rv * 0.12, 0, Math.PI, 0); ctx.fill(); ctx.beginPath(); ctx.ellipse(cx + Rv * 0.3 + mid, hz + 8, Rv * 0.7, Rv * 0.09, 0, Math.PI, 0); ctx.fill();
-    ctx.fillStyle = '#4aa3d8'; ctx.fillRect(cx + Rv * 0.45 + mid, hz - 2, Rv, Rv * 0.3); ctx.fillStyle = 'rgba(255,255,255,0.35)'; for (let i = 0; i < 5; i++) ctx.fillRect(cx + Rv * 0.5 + mid + ((t * 10 + i * 37) % (Rv * 0.5)), hz + 4 + i * Rv * 0.05, 14, 2); ctx.fillStyle = '#79b85e'; ctx.beginPath(); ctx.ellipse(cx + Rv * 0.78 + mid, hz + 4, Rv * 0.12, Rv * 0.04, 0, 0, Math.PI * 2); ctx.fill();
-    { const lx = cx + Rv * 0.78 + mid, ly = hz + 2; ctx.fillStyle = '#fff'; ctx.fillRect(lx - 4, ly - 26, 8, 26); ctx.fillStyle = '#e4572e'; ctx.fillRect(lx - 4, ly - 20, 8, 5); ctx.fillRect(lx - 4, ly - 10, 8, 5); ctx.fillStyle = Math.floor(t * 2) % 2 ? '#ffe08a' : '#fff6b0'; ctx.fillRect(lx - 5, ly - 31, 10, 6); ctx.fillStyle = `rgba(255,224,138,${0.25 + 0.2 * Math.sin(t * 4)})`; ctx.beginPath(); ctx.moveTo(lx, ly - 28); ctx.lineTo(lx - 40, ly - 40); ctx.lineTo(lx - 40, ly - 16); ctx.closePath(); ctx.fill(); }   // the lighthouse
-    // the pizza town on its hill: the pizzeria with its sign, the farm, the station, the crane
-    const ty = hz + 2, S = Rv / 240;
-    const sc = (fn) => { ctx.save(); ctx.translate(mid, 0); ctx.scale(S, S); fn(); ctx.restore(); };
-    sc(() => {
-      const ox = cx / S, oy = ty / S;
-      ctx.fillStyle = '#6b4a2b'; for (const dx of [-150, -120, 60, 95]) { ctx.fillRect(ox + dx - 2, oy - 14, 4, 14); ctx.fillStyle = '#3f9a4a'; ctx.beginPath(); ctx.arc(ox + dx, oy - 18, 9, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#6b4a2b'; }
-      ctx.fillStyle = '#b23a48'; ctx.fillRect(ox - 112, oy - 24, 30, 24); ctx.fillStyle = '#8a2a36'; ctx.beginPath(); ctx.moveTo(ox - 115, oy - 24); ctx.lineTo(ox - 97, oy - 36); ctx.lineTo(ox - 79, oy - 24); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#9aa0a8'; ctx.fillRect(ox - 78, oy - 40, 10, 40); ctx.beginPath(); ctx.arc(ox - 73, oy - 40, 5, Math.PI, 0); ctx.fill();   // barn + silo
-      ctx.fillStyle = '#c98a4b'; ctx.fillRect(ox - 56, oy - 18, 28, 18); ctx.fillStyle = '#8a5527'; ctx.fillRect(ox - 58, oy - 22, 32, 5); ctx.fillStyle = '#2d3a4a'; ctx.fillRect(ox - 62, oy - 6, 60, 3); ctx.fillStyle = '#c62828'; ctx.fillRect(ox - 48 + ((t * 20) % 70), oy - 12, 14, 6); ctx.fillStyle = '#2d8a5a'; ctx.fillRect(ox - 64 + ((t * 20) % 70), oy - 12, 14, 6);   // the station and a passing train
-      ctx.fillStyle = '#f2c94c'; ctx.fillRect(ox - 20, oy - 30, 44, 30); ctx.fillStyle = '#c62828'; ctx.fillRect(ox - 22, oy - 36, 48, 6); ctx.fillStyle = '#9fe0ff'; ctx.fillRect(ox - 14, oy - 22, 10, 8); ctx.fillRect(ox + 6, oy - 22, 10, 8); ctx.fillStyle = '#5b3a1a'; ctx.fillRect(ox - 3, oy - 12, 8, 12);
-      ctx.fillStyle = '#fff'; ctx.fillRect(ox - 16, oy - 48, 36, 12); ctx.fillStyle = '#e4572e'; ctx.font = r.font(8); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('PIZZA', ox + 2, oy - 42); r.drawPizza(ox - 10 + 32, oy - 42, 5);   // the pizzeria and its sign
-      ctx.fillStyle = '#f2b705'; ctx.fillRect(ox + 110, oy - 60, 4, 60); ctx.save(); ctx.translate(ox + 112, oy - 58); ctx.rotate(Math.sin(t * 0.25) * 0.3 - 0.2); ctx.fillRect(-10, -2, 50, 4); ctx.restore(); ctx.fillStyle = Math.floor(t * 2) % 2 ? '#ff3b3b' : '#ffb3b3'; ctx.beginPath(); ctx.arc(ox + 112, oy - 62, 2.5, 0, Math.PI * 2); ctx.fill();   // the crane
-    });
-    // the city's own rooftops in the foreground
-    for (let i = 0; i < 9; i++) { const bw = Rv * 0.26, bx = cx - Rv * 1.1 + i * bw * 0.95 + nearS, bh = Rv * (0.28 + 0.22 * this.hash(i + 7)); ctx.fillStyle = i % 2 ? '#2d3a4a' : '#3a4a5c'; ctx.fillRect(bx, cy + Rv * 0.9 - bh, bw, bh + Rv); ctx.fillStyle = '#ffe08a'; for (let yy = cy + Rv * 0.9 - bh + 10; yy < cy + Rv; yy += 14) for (let xx = bx + 8; xx < bx + bw - 8; xx += 16) if (this.hash(xx * 0.37 + yy) < 0.5) ctx.fillRect(xx, yy, 6, 7); }
-    ctx.fillStyle = '#8d5a2b'; ctx.beginPath(); ctx.arc(cx - Rv * 0.55 + nearS, cy + Rv * 0.5, 12, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#5b3a1a'; ctx.fillRect(cx - Rv * 0.55 + nearS - 2, cy + Rv * 0.5, 4, 30);   // a water tower
+    // sky layer: the sun to the south, clouds, birds
+    ctx.fillStyle = '#fff7c2'; ctx.beginPath(); ctx.arc(sx(0.92, 0.3), cy - Rv * 0.5, Rv * 0.1, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.9)'; for (let i = 0; i < 9; i++) { const mx = sx(-0.3 + i * 0.2, 0.3) + ((t * 6 + i * 50) % 80), my = cy - Rv * (0.78 - (i % 3) * 0.14); ctx.beginPath(); ctx.arc(mx, my, 12, 0, Math.PI * 2); ctx.arc(mx + 14, my - 7, 15, 0, Math.PI * 2); ctx.arc(mx + 30, my, 11, 0, Math.PI * 2); ctx.fill(); }
+    ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1.5; for (let i = 0; i < 6; i++) { const bx = sx(0.55 + i * 0.12, 0.45) + ((t * 22 + i * 90) % 160) - 80, by = cy - Rv * (0.4 + (i % 3) * 0.08) + Math.sin(t * 3 + i) * 4, fl = Math.sin(t * 9 + i) * 3; ctx.beginPath(); ctx.moveTo(bx - 7, by); ctx.quadraticCurveTo(bx - 3, by - 4 - fl, bx, by); ctx.quadraticCurveTo(bx + 3, by - 4 - fl, bx + 7, by); ctx.stroke(); }
+    // far layer (k 0.7): the snowy mountains along the north, fading out towards the west
+    const K1 = 0.7;
+    ctx.fillStyle = '#7f8fb3'; ctx.beginPath(); ctx.moveTo(sx(-0.6, K1), hz); for (let i = 0; i <= 14; i++) { const fc = -0.6 + i * 0.065, hgt = Rv * (0.14 + 0.22 * Math.abs(Math.sin(i * 2.3))) * U.clamp((0.45 - fc) / 0.25, 0, 1); ctx.lineTo(sx(fc, K1), hz - 4); ctx.lineTo(sx(fc + 0.032, K1), hz - hgt); } ctx.lineTo(sx(0.6, K1), hz); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#fff'; for (let i = 0; i <= 14; i++) { const fc = -0.6 + i * 0.065, hgt = Rv * (0.14 + 0.22 * Math.abs(Math.sin(i * 2.3))) * U.clamp((0.45 - fc) / 0.25, 0, 1); if (hgt < Rv * 0.1) continue; const px = sx(fc + 0.032, K1), peak = hz - hgt; ctx.beginPath(); ctx.moveTo(px, peak); ctx.lineTo(px + 12, peak + 14); ctx.lineTo(px + 3, peak + 11); ctx.lineTo(px - 3, peak + 15); ctx.lineTo(px - 12, peak + 14); ctx.closePath(); ctx.fill(); }
+    // the land: green to the west, the sea from the south-west round to the south
+    ctx.fillStyle = '#5fa84f'; ctx.fillRect(0, hz, W, H);
+    ctx.fillStyle = '#6cb35a'; for (let i = 0; i < 6; i++) { ctx.beginPath(); ctx.ellipse(sx(-0.4 + i * 0.2, K1), hz + 4, Rv * 0.5, Rv * 0.1, 0, Math.PI, 0); ctx.fill(); }
+    const seaX = sx(0.52, 0.85);
+    ctx.fillStyle = '#4aa3d8'; ctx.fillRect(seaX, hz - 2, W + D * 3, H); ctx.fillStyle = '#2f86bd'; ctx.fillRect(seaX, hz - 2, W + D * 3, 3);
+    ctx.fillStyle = 'rgba(255,255,255,0.35)'; for (let i = 0; i < 24; i++) { const wx = sx(0.5 + (i % 8) * 0.09, 0.85) + ((t * 10 + i * 37) % 60), wy = hz + 6 + Math.floor(i / 8) * Rv * 0.1 + (i % 3) * 6; if (wx > seaX) ctx.fillRect(wx, wy, 14, 2); }
+    ctx.fillStyle = '#e8d49a'; ctx.beginPath(); ctx.moveTo(seaX - 14, hz - 2); ctx.lineTo(seaX + 2, hz - 2); for (let yy = hz; yy < H; yy += 20) ctx.lineTo(seaX + 2 + Math.sin(yy * 0.08 + t * 0.5) * 4, yy); ctx.lineTo(seaX - 14, H); ctx.closePath(); ctx.fill();   // a sandy shore where the land meets the sea
+    // the pizza town, far away to the north-west on its hill: small and hazy
+    { const ox = sx(0.14, K1), oy = hz - Rv * 0.05, s2 = S * 0.72; ctx.save(); ctx.globalAlpha = 0.82; ctx.translate(ox, oy); ctx.scale(s2, s2);
+      ctx.fillStyle = '#8bc34a'; ctx.beginPath(); ctx.ellipse(0, 6, 190, 22, 0, Math.PI, 0); ctx.fill();
+      ctx.fillStyle = '#6b4a2b'; for (const dx of [-170, -140, 70, 100, 150]) { ctx.fillRect(dx - 2, -14, 4, 14); ctx.fillStyle = '#3f9a4a'; ctx.beginPath(); ctx.arc(dx, -18, 9, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#6b4a2b'; }
+      ctx.fillStyle = '#b23a48'; ctx.fillRect(-122, -24, 30, 24); ctx.fillStyle = '#8a2a36'; ctx.beginPath(); ctx.moveTo(-125, -24); ctx.lineTo(-107, -36); ctx.lineTo(-89, -24); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#9aa0a8'; ctx.fillRect(-88, -40, 10, 40); ctx.beginPath(); ctx.arc(-83, -40, 5, Math.PI, 0); ctx.fill();   // barn + silo
+      ctx.fillStyle = '#c98a4b'; ctx.fillRect(-62, -18, 28, 18); ctx.fillStyle = '#8a5527'; ctx.fillRect(-64, -22, 32, 5); ctx.fillStyle = '#2d3a4a'; ctx.fillRect(-70, -6, 70, 3); ctx.fillStyle = '#c62828'; ctx.fillRect(-54 + ((t * 20) % 70), -12, 14, 6); ctx.fillStyle = '#2d8a5a'; ctx.fillRect(-70 + ((t * 20) % 70), -12, 14, 6);   // the station and a passing train
+      ctx.fillStyle = '#f2c94c'; ctx.fillRect(-18, -30, 44, 30); ctx.fillStyle = '#c62828'; ctx.fillRect(-20, -36, 48, 6); ctx.fillStyle = '#9fe0ff'; ctx.fillRect(-12, -22, 10, 8); ctx.fillRect(8, -22, 10, 8); ctx.fillStyle = '#5b3a1a'; ctx.fillRect(-1, -12, 8, 12);
+      ctx.fillStyle = '#fff'; ctx.fillRect(-14, -48, 36, 12); ctx.fillStyle = '#e4572e'; ctx.font = r.font(8); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('PIZZA', 4, -42); r.drawPizza(24, -42, 5);   // the pizzeria and its sign
+      ctx.fillStyle = '#f8bbd0'; ctx.fillRect(34, -24, 28, 24); ctx.fillStyle = '#c45c7a'; ctx.fillRect(32, -28, 32, 5); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(48, -34, 5, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#d9b382'; ctx.beginPath(); ctx.moveTo(44, -31); ctx.lineTo(52, -31); ctx.lineTo(48, -22); ctx.closePath(); ctx.fill();   // the ice cream shop with its cone
+      ctx.restore(); }
+    // the secret woods with the little cabin, at the town's far west end
+    { const ox = sx(0.23, K1), oy = hz - Rv * 0.03, s2 = S * 0.7; ctx.save(); ctx.globalAlpha = 0.78; ctx.translate(ox, oy); ctx.scale(s2, s2);
+      ctx.fillStyle = '#2f7a3e'; for (let i = 0; i < 9; i++) { const dx = -70 + i * 17, hgt = 26 + (i % 3) * 8; ctx.beginPath(); ctx.moveTo(dx, 0); ctx.lineTo(dx + 8, -hgt); ctx.lineTo(dx + 16, 0); ctx.closePath(); ctx.fill(); }
+      ctx.fillStyle = '#8d5a2b'; ctx.fillRect(-10, -16, 24, 16); ctx.fillStyle = '#5b3a1a'; ctx.beginPath(); ctx.moveTo(-13, -16); ctx.lineTo(2, -26); ctx.lineTo(17, -16); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#ffe08a'; ctx.fillRect(-4, -11, 5, 5); ctx.fillStyle = '#5c6670'; ctx.fillRect(7, -24, 4, 7);
+      for (let i = 0; i < 3; i++) { const age = ((t * 0.5 + i * 0.33) % 1); ctx.fillStyle = `rgba(230,230,230,${0.6 * (1 - age)})`; ctx.beginPath(); ctx.arc(9 + age * 10 + Math.sin(age * 6) * 3, -26 - age * 22, 2 + age * 5, 0, Math.PI * 2); ctx.fill(); }   // chimney smoke
+      ctx.restore(); }
+    // mid layer (k 0.85): Construction Town due west, the nearest neighbour
+    const K2 = 0.85;
+    { const ox = sx(0.4, K2), oy = hz + Rv * 0.06; ctx.save(); ctx.translate(ox, oy); ctx.scale(S, S);
+      ctx.fillStyle = '#c9a46a'; ctx.beginPath(); ctx.ellipse(0, 4, 150, 22, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ff7a1a'; for (let k = -140; k < 150; k += 24) ctx.fillRect(k, -2, 14, 4);
+      for (const [mx, mr] of [[-100, 16], [60, 14], [120, 12]]) { ctx.fillStyle = '#7a4f2a'; ctx.beginPath(); ctx.ellipse(mx, -2, mr, mr * 0.55, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#95643a'; ctx.beginPath(); ctx.ellipse(mx - 2, -6, mr * 0.6, mr * 0.3, 0, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = '#b9b5ad'; ctx.fillRect(-60, -34, 70, 34); ctx.fillStyle = '#b5543a'; ctx.fillRect(-60, -34, 70, 6); ctx.fillRect(-60, -34, 6, 34); ctx.fillRect(4, -34, 6, 34); ctx.fillStyle = '#9a9a9a'; for (let k = -56; k < 10; k += 16) ctx.fillRect(k, -48, 2, 16); ctx.fillRect(-56, -48, 64, 2); ctx.fillStyle = '#c99a5f'; ctx.fillRect(-54, -44, 60, 4);   // the half-built house with scaffolding
+      ctx.fillStyle = '#f2b705'; ctx.fillRect(28, -96, 5, 96); ctx.save(); ctx.translate(30, -94); ctx.rotate(Math.sin(t * 0.25) * 0.35 - 0.15); ctx.fillRect(-16, -2, 70, 4); ctx.fillStyle = '#2b1d14'; for (let k = -12; k < 50; k += 10) ctx.fillRect(k, -1, 2, 2); ctx.restore(); ctx.fillStyle = Math.floor(t * 2) % 2 ? '#ff3b3b' : '#ffb3b3'; ctx.beginPath(); ctx.arc(30, -98, 3, 0, Math.PI * 2); ctx.fill();   // the crane
+      const ex = -118 + Math.sin(t * 0.4) * 12, arm = Math.sin(t * 2) * 4; ctx.fillStyle = '#2b2b2b'; ctx.fillRect(ex - 14, -6, 28, 6); ctx.fillStyle = '#f2b705'; ctx.beginPath(); ctx.arc(ex, -12, 9, 0, Math.PI * 2); ctx.fill(); ctx.fillRect(ex + 4, -14 + arm, 18, 4); ctx.fillStyle = '#5c5c5c'; ctx.fillRect(ex + 20, -18 + arm, 6, 8);   // the excavator
+      ctx.restore(); }
+    // the Islands to the south-west: palms, the lighthouse with its beam, the ferry, a jet ski, a dolphin
+    { const ox = sx(0.68, K2), oy = hz + Rv * 0.05; ctx.save(); ctx.translate(ox, oy); ctx.scale(S, S);
+      for (const [ix, iw] of [[-90, 50], [40, 60]]) { ctx.fillStyle = '#e8d49a'; ctx.beginPath(); ctx.ellipse(ix, 0, iw, 12, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#79b85e'; ctx.beginPath(); ctx.ellipse(ix, -3, iw * 0.7, 8, 0, 0, Math.PI * 2); ctx.fill(); for (const dx of [-14, 12]) { ctx.strokeStyle = '#8d5a2b'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(ix + dx, -4); ctx.quadraticCurveTo(ix + dx + 4, -18, ix + dx + 2, -30); ctx.stroke(); ctx.strokeStyle = '#2f9e44'; ctx.lineWidth = 2.5; for (let k = 0; k < 5; k++) { const an = -Math.PI / 2 + (k - 2) * 0.55 + Math.sin(t * 2 + k) * 0.05; ctx.beginPath(); ctx.moveTo(ix + dx + 2, -30); ctx.lineTo(ix + dx + 2 + Math.cos(an) * 14, -30 + Math.sin(an) * 14 + 6); ctx.stroke(); } } }
+      const lx = 72, ly = -4; ctx.fillStyle = '#fff'; ctx.fillRect(lx - 5, ly - 34, 10, 34); ctx.fillStyle = '#e4572e'; ctx.fillRect(lx - 5, ly - 26, 10, 6); ctx.fillRect(lx - 5, ly - 14, 10, 6); ctx.fillStyle = '#2b1d14'; ctx.fillRect(lx - 6, ly - 40, 12, 7); ctx.fillStyle = `rgba(255,224,138,${0.7 + 0.3 * Math.sin(t * 2.5)})`; ctx.fillRect(lx - 4, ly - 39, 8, 5);
+      const ba = t * 0.6; ctx.fillStyle = `rgba(255,224,138,${0.3 + 0.15 * Math.sin(t * 4)})`; ctx.beginPath(); ctx.moveTo(lx, ly - 37); ctx.lineTo(lx + Math.cos(ba) * 70, ly - 37 + Math.sin(ba) * 18 - 10); ctx.lineTo(lx + Math.cos(ba) * 70, ly - 37 + Math.sin(ba) * 18 + 10); ctx.closePath(); ctx.fill();   // the lighthouse and its sweeping beam
+      const fu = (t * 0.12) % 2, fx = -200 + (fu < 1 ? fu : 2 - fu) * 150, fdir = fu < 1 ? 1 : -1; ctx.fillStyle = '#2d5a8a'; ctx.beginPath(); ctx.moveTo(fx - 22, 10); ctx.lineTo(fx + 22, 10); ctx.lineTo(fx + 16, 20); ctx.lineTo(fx - 16, 20); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(fx - 14, 0, 28, 10); ctx.fillStyle = '#e4572e'; ctx.fillRect(fx + fdir * 6 - 3, -8, 6, 8); for (let i = 0; i < 3; i++) { const age = ((t * 0.7 + i * 0.33) % 1); ctx.fillStyle = `rgba(235,235,235,${0.5 * (1 - age)})`; ctx.beginPath(); ctx.arc(fx + fdir * 6 - fdir * age * 14, -10 - age * 16, 2 + age * 4, 0, Math.PI * 2); ctx.fill(); }   // the ferry crossing
+      const jx = -20 + Math.sin(t * 1.3) * 90, jdir = Math.cos(t * 1.3) > 0 ? 1 : -1, jy = 30 + Math.sin(t * 5) * 1.5; ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.beginPath(); ctx.moveTo(jx - jdir * 8, jy + 2); ctx.lineTo(jx - jdir * 40, jy - 2); ctx.lineTo(jx - jdir * 40, jy + 6); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.ellipse(jx, jy, 9, 4, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.arc(jx - jdir * 2, jy - 6, 3.5, 0, Math.PI * 2); ctx.fill();   // the jet ski zipping about
+      const dph = (t * 0.5) % 1; if (dph < 0.5) { const k = dph / 0.5, dx = 120 + k * 50, dy = 26 - Math.sin(k * Math.PI) * 24; ctx.save(); ctx.translate(dx, dy); ctx.rotate((0.5 - k) * 1.2); ctx.fillStyle = '#6b7f99'; ctx.beginPath(); ctx.ellipse(0, 0, 12, 4.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(-18, -5); ctx.lineTo(-18, 5); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(-2, -3); ctx.lineTo(2, -9); ctx.lineTo(5, -3); ctx.closePath(); ctx.fill(); ctx.restore(); }   // a dolphin leaping
+      ctx.restore(); }
+    // the open sea to the south: a sailing boat and gulls on the water
+    { const bx = sx(0.93, K2) + Math.sin(t * 0.3) * 10, by = hz + Rv * 0.16; ctx.fillStyle = '#8d5a2b'; ctx.beginPath(); ctx.moveTo(bx - 16 * S, by); ctx.lineTo(bx + 16 * S, by); ctx.lineTo(bx + 11 * S, by + 7 * S); ctx.lineTo(bx - 11 * S, by + 7 * S); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(bx, by - 2); ctx.lineTo(bx, by - 30 * S); ctx.lineTo(bx + 14 * S, by - 4); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.moveTo(bx - 2, by - 6); ctx.lineTo(bx - 2, by - 24 * S); ctx.lineTo(bx - 11 * S, by - 6); ctx.closePath(); ctx.fill(); }
+    // the city's own rooftops in the foreground (they slide past fastest)
+    const K3 = 1.25;
+    for (let i = 0; i < 24; i++) { const bw = Rv * 0.26, bx = sx(-0.45 + i * 0.09, K3), bh = Rv * (0.28 + 0.22 * E.hash(i + 7)); ctx.fillStyle = i % 2 ? '#2d3a4a' : '#3a4a5c'; ctx.fillRect(bx, cy + Rv * 0.9 - bh, bw, bh + Rv); let row = 0; for (let yy = cy + Rv * 0.9 - bh + 10; yy < cy + Rv; yy += 14, row++) { let col = 0; for (let xx = bx + 8; xx < bx + bw - 8; xx += 16, col++) { const lit = E.winLit(i, row * 8 + col, t); if (lit > 0) { ctx.fillStyle = `rgba(255,224,138,${lit})`; ctx.fillRect(xx, yy, 6, 7); } } } }
+    for (const fc of [0.05, 0.62, 1.1]) { const wx = sx(fc, K3); ctx.fillStyle = '#8d5a2b'; ctx.beginPath(); ctx.arc(wx, cy + Rv * 0.5, 12, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#5b3a1a'; ctx.fillRect(wx - 2, cy + Rv * 0.5, 4, 30); }   // water towers
     ctx.restore();
     // the eyepiece: black vignette, soft rim, crosshair, tick marks
     ctx.fillStyle = '#0a0806'; ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.arc(cx, cy, Rv, 0, Math.PI * 2, true); ctx.fill();
     const rim = ctx.createRadialGradient(cx, cy, Rv * 0.82, cx, cy, Rv); rim.addColorStop(0, 'rgba(0,0,0,0)'); rim.addColorStop(1, 'rgba(0,0,0,0.6)'); ctx.fillStyle = rim; ctx.beginPath(); ctx.arc(cx, cy, Rv, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(cx - Rv, cy); ctx.lineTo(cx - 18, cy); ctx.moveTo(cx + 18, cy); ctx.lineTo(cx + Rv, cy); ctx.moveTo(cx, cy - Rv); ctx.lineTo(cx, cy - 18); ctx.moveTo(cx, cy + 18); ctx.lineTo(cx, cy + Rv); ctx.stroke();
-    ctx.beginPath(); ctx.arc(cx, cy, 18, 0, Math.PI * 2); ctx.stroke(); for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * (Rv - 10), cy + Math.sin(a) * (Rv - 10)); ctx.lineTo(cx + Math.cos(a) * Rv, cy + Math.sin(a) * Rv); ctx.stroke(); }
+    ctx.beginPath(); ctx.arc(cx, cy, 18, 0, Math.PI * 2); ctx.stroke(); for (let i = 0; i < 12; i++) { const an = (i / 12) * Math.PI * 2; ctx.beginPath(); ctx.moveTo(cx + Math.cos(an) * (Rv - 10), cy + Math.sin(an) * (Rv - 10)); ctx.lineTo(cx + Math.cos(an) * Rv, cy + Math.sin(an) * Rv); ctx.stroke(); }
     ctx.strokeStyle = '#5c6670'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(cx, cy, Rv + 3, 0, Math.PI * 2); ctx.stroke();
-    // labels
+    // what is in the middle of the view, and the compass strip
+    const spots = [[0, 'Snowy mountains ⛰️'], [0.14, 'There’s my pizza shop! 🍕'], [0.4, 'Construction Town! 🏗️'], [0.68, 'The Islands! 🏝️'], [0.93, 'The sea 🌊']];
+    let best = null; for (const [fc, text] of spots) { const d = Math.abs(fc - f); if (d < 0.09 && (!best || d < best.d)) best = { d, text }; }
     const bw = Math.min(W - 24, 320);
-    ctx.fillStyle = 'rgba(43,29,20,0.85)'; U.roundRect(ctx, cx - bw / 2, H - 150, bw, 40, 12); ctx.fill();
-    ctx.fillStyle = '#ffe08a'; ctx.font = r.font(bw < 300 ? 14 : 17); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('There’s my pizza shop! 🍕', cx, H - 130);
-    const px = cx + mid - Rv * 0.0, py = hz - Rv * 0.26; ctx.strokeStyle = '#ffe08a'; ctx.lineWidth = 2; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.arc(px, py + Rv * 0.06, Rv * 0.12, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = r.font(11); ctx.fillText('press the button when you are done looking', cx, H - 100);
+    if (best) { ctx.fillStyle = 'rgba(43,29,20,0.85)'; U.roundRect(ctx, cx - bw / 2, H - 152, bw, 40, 12); ctx.fill(); ctx.fillStyle = '#ffe08a'; ctx.font = r.font(bw < 300 ? 14 : 17); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(best.text, cx, H - 132); }
+    const sw = Math.min(W - 40, 260), sy = H - 102;
+    ctx.save(); ctx.fillStyle = 'rgba(43,29,20,0.85)'; U.roundRect(ctx, cx - sw / 2, sy - 13, sw, 26, 13); ctx.fill();
+    ctx.beginPath(); ctx.rect(cx - sw / 2 + 24, sy - 13, sw - 48, 26); ctx.clip();
+    ctx.font = r.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (const [fc, lab] of [[-0.08, 'N'], [0.14, 'NW'], [0.4, 'W'], [0.68, 'SW'], [0.93, 'S'], [1.18, 'SE']]) { const x = cx + (fc - f) * sw * 0.9; ctx.fillStyle = Math.abs(fc - f) < 0.08 ? '#ffe08a' : 'rgba(255,255,255,0.55)'; ctx.fillText(lab, x, sy + 1); }
+    ctx.restore();
+    ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.moveTo(cx - 5, sy - 13); ctx.lineTo(cx + 5, sy - 13); ctx.lineTo(cx, sy - 7); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = f > 0.02 ? '#ffe08a' : 'rgba(255,255,255,0.3)'; ctx.font = r.font(12); ctx.textAlign = 'center'; ctx.fillText('◀', cx - sw / 2 + 12, sy + 1); ctx.fillStyle = f < 0.98 ? '#ffe08a' : 'rgba(255,255,255,0.3)'; ctx.fillText('▶', cx + sw / 2 - 12, sy + 1);
     if (fade < 1) { ctx.fillStyle = `rgba(10,8,6,${1 - fade})`; ctx.fillRect(0, 0, W, H); }
   },
 
@@ -1074,7 +1170,7 @@ const CityExt = {
         } else {
           const col = ['#e8a0bf', '#7fc8f8', '#f6c453', '#b39ddb', '#ef8a62', '#a5d6a7'][i % 6], th = 110 + hh * 130;
           ctx.fillStyle = col; ctx.fillRect(x + 6, gy - th, 150, th); ctx.fillStyle = E.shade(col, 0.65); ctx.fillRect(x + 6, gy - th, 150, 14);
-          for (let yy = gy - th + 24; yy < gy - 30; yy += 26) for (let xx = x + 18; xx < x + 150; xx += 28) { ctx.fillStyle = E.hash(xx + yy) < 0.3 ? '#fff3b0' : '#9fd8ff'; ctx.fillRect(xx, yy, 16, 16); }
+          let wi = 0; for (let yy = gy - th + 24; yy < gy - 30; yy += 26) for (let xx = x + 18; xx < x + 150; xx += 28) { const lit = E.winLit(i, wi++, g.time); ctx.fillStyle = '#9fd8ff'; ctx.fillRect(xx, yy, 16, 16); if (lit > 0) { ctx.fillStyle = `rgba(255,243,176,${lit})`; ctx.fillRect(xx, yy, 16, 16); } }
           for (let a = 0; a < 6; a++) { ctx.fillStyle = a % 2 ? '#fff8ee' : '#e4572e'; ctx.fillRect(x + 36 + a * 15, gy - 30, 15, 8); }
           if (i % 4 === 1) { ctx.fillStyle = '#5b3a1a'; ctx.fillRect(x + 120, gy - th - 26, 24, 26); ctx.beginPath(); ctx.moveTo(x + 118, gy - th - 26); ctx.lineTo(x + 132, gy - th - 40); ctx.lineTo(x + 146, gy - th - 26); ctx.fill(); }
         }

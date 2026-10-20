@@ -98,7 +98,7 @@ const CityExt = {
   // ---------- small helpers ----------
   hash(i) { const v = Math.sin(i * 12.9898 + 78.233) * 43758.5453; return v - Math.floor(v); },
   shade(hex, f) { const n = parseInt(hex.slice(1), 16); const c = (s) => Math.max(0, Math.min(255, Math.round(((n >> s) & 255) * f))); return `rgb(${c(16)},${c(8)},${c(0)})`; },
-  nearTownStop(g) { const p = g.player, S = CFG.CITY.TOWN_STOP; return !g.driving && !g.onTrain && !g.ride && !g.fishing && p.x > S.x - 80 && p.x < S.x + 80 && p.y > -100 && p.y < 16; },
+  nearTownStop(g) { const p = g.player, S = CFG.CITY.TOWN_STOP; return !g.driving && !g.onTrain && !g.ride && !g.fishing && p.x > S.x - 160 && p.x < S.x + 80 && p.y > -100 && p.y < 16; },   // the sign, the bus door and the shelter with its bench
   nearCityStop(g) { const p = g.player, S = CFG.CITY.STOP; return !g.driving && !g.onTrain && !this.floor && U.dist(p.x, p.y, S.x, S.y) < 95; },
   nearTowerDoor(g) { const p = g.player, D = CFG.CITY.TOWER.door; return !g.driving && !g.onTrain && !this.floor && U.dist(p.x, p.y, D.x, D.y) < 36; },
   liftSpot() { const R = CFG.CITY.TOWER.ROOM; return { x: (R.x0 + R.x1) / 2, y: R.y0 + 64 }; },
@@ -1039,6 +1039,10 @@ const CityExt = {
       const zone = (px, s) => { let f = U.clamp((px - W / 2) / (total * s), 0, 1); if (home) f = 1 - f; return f < 0.34 ? 0 : f < 0.62 ? 1 : 2; };
       const layer = (s, step, draw) => { const off = dist * s; const i0 = Math.floor((off - 300) / step), i1 = Math.ceil((off + W + 300) / step); for (let i = Math.max(0, i0); i <= i1; i++) draw(i * step - off, i * step, i, zone(i * step, s)); };
       const groundY = H * 0.72;
+      // to the City the bus drives right to left (as it does in town); home it drives left to right: mirror the scene
+      const mirror = !home;
+      const txt = (str, x, y) => { if (!mirror) { ctx.fillText(str, x, y); return; } ctx.save(); ctx.translate(x, y); ctx.scale(-1, 1); ctx.fillText(str, 0, 0); ctx.restore(); };
+      ctx.save(); if (mirror) { ctx.translate(W, 0); ctx.scale(-1, 1); }
       // sky, sun, clouds
       const sky = ctx.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#79c6f2'); sky.addColorStop(0.6, '#d9f0ff'); sky.addColorStop(1, '#eaf7ff');
       ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
@@ -1080,7 +1084,7 @@ const CityExt = {
       ctx.fillStyle = '#474a50'; ctx.fillRect(0, ry, W, 70); ctx.fillStyle = '#cfc8b8'; ctx.fillRect(0, ry + 70, W, H - ry - 70); ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(0, ry + 70, W, 3);
       layer(1, 44, (x, px, i, z) => { ctx.fillStyle = '#f2c94c'; ctx.fillRect(x, ry + 33, 24, 4); if (z === 2 && i % 9 === 0) { ctx.fillStyle = '#2d3a4a'; ctx.fillRect(x, ry - 60, 4, 60); ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.arc(x + 2, ry - 62, 6, 0, Math.PI * 2); ctx.fill(); } else if (z === 0 && i % 5 === 0) { ctx.fillStyle = '#8d5a2b'; ctx.fillRect(x, ry - 22, 5, 22); ctx.fillRect(x - 20, ry - 16, 46, 3); } });
       // a road sign goes by as the city comes into view
-      layer(1, total + W, (x, px, i) => { if (i !== 0) return; const sx = x + total * 0.6; ctx.fillStyle = '#5c6670'; ctx.fillRect(sx, ry - 70, 5, 70); ctx.fillStyle = '#2f9e44'; U.roundRect(ctx, sx - 50, ry - 96, 110, 30, 5); ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = r.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(home ? 'PIZZA TOWN  ➜' : 'THE CITY  ➜', sx + 5, ry - 81); });
+      layer(1, total + W, (x, px, i) => { if (i !== 0) return; const sx = x + total * 0.6; ctx.fillStyle = '#5c6670'; ctx.fillRect(sx, ry - 70, 5, 70); ctx.fillStyle = '#2f9e44'; U.roundRect(ctx, sx - 50, ry - 96, 110, 30, 5); ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = r.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; txt(home ? 'PIZZA TOWN  ➜' : 'THE CITY  ➜', sx + 5, ry - 81); });
       // the bus, side on, rolling along with its wheels turning and the chef waving from a window
       const sc = Math.min(1.1, W / 720), bx = W / 2, by = ry + 40 + Math.sin(g.time * 9) * 1.2;
       ctx.save(); ctx.translate(bx, by); ctx.scale(sc, sc);
@@ -1091,7 +1095,7 @@ const CityExt = {
       ctx.fillStyle = '#bfe3ff'; for (let i = 0; i < 6; i++) { U.roundRect(ctx, -124 + i * 34, -88, 26, 30, 4); ctx.fill(); }
       U.roundRect(ctx, 86, -88, 24, 68, 4); ctx.fill(); ctx.fillStyle = 'rgba(43,29,20,0.3)'; ctx.fillRect(97, -86, 2, 64);   // door
       ctx.fillStyle = '#bfe3ff'; U.roundRect(ctx, 114, -92, 24, 40, 6); ctx.fill();                                      // windshield
-      ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, -46, -124, 92, 20, 5); ctx.fill(); ctx.fillStyle = '#ffe08a'; ctx.font = r.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(home ? '🍕 PIZZA TOWN' : '🏙️ THE CITY', 0, -114);
+      ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, -46, -124, 92, 20, 5); ctx.fill(); ctx.fillStyle = '#ffe08a'; ctx.font = r.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; txt(home ? '🍕 PIZZA TOWN' : '🏙️ THE CITY', 0, -114);
       // passengers: a few round heads, and the chef waving in the third window
       const heads = [['#2b1d14', 0], ['#d9a066', 1], ['#8c3b2f', 4], ['#1a1a1a', 5]];
       for (const [hair, w] of heads) { const hx = -111 + w * 34; ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(hx, -68, 8, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = hair; ctx.beginPath(); ctx.arc(hx, -70, 8.5, Math.PI, 0); ctx.fill(); }
@@ -1104,6 +1108,7 @@ const CityExt = {
       wheel(-92); wheel(92);
       ctx.restore();
       for (let i = 0; i < 4; i++) { const age = ((g.time * 1.4 + i * 0.5) % 2) / 2; ctx.fillStyle = `rgba(200,200,200,${0.45 * (1 - age)})`; ctx.beginPath(); ctx.arc(bx - 146 * sc - age * 90, by - 16 * sc - age * 30, (4 + age * 12) * sc, 0, Math.PI * 2); ctx.fill(); }
+      ctx.restore();
       // destination banner and progress bar
       const msg = home ? '🚌 Next stop: home! 🍕' : '🚌 Next stop: the City! 🏙️';
       ctx.fillStyle = 'rgba(43,29,20,0.85)'; const bw = Math.min(W - 24, 360); U.roundRect(ctx, W / 2 - bw / 2, 60, bw, 44, 12); ctx.fill();

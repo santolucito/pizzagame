@@ -3,7 +3,7 @@
 // (0..960, 98..646); the world extends beyond it so the player can wander outside.
 const CFG = {
   W: 960, H: 640,                                   // reference viewport used for zoom rules
-  WORLD: { x0: -1320, y0: -170, x1: 1520, y1: 1330 }, // walkable world bounds (the whole tiny town, farm included)
+  WORLD: { x0: -1320, y0: -170, x1: 2060, y1: 1330 },   // walkable world bounds (the whole tiny town, farm included; the east strip past x 1540 is the airfield)
   BUILDING: { x0: 0, y0: 98, x1: 966, y1: 646 },    // outer wall rectangle
   DOOR: { y0: 572, y1: 638 },                        // gap in the right wall
   SAVE_KEY: 'pizza-rush-save-v1',
@@ -39,7 +39,7 @@ const CFG = {
   // Roads: the top street (drive-thru) plus a loop around the block. Buildings sit across the loop.
   ROAD: { y1: 18, y2: 98 },
   ROADS: [
-    { x0: -1020, y0: 18, x1: 1520, y1: 98 },     // Main Street (top)
+    { x0: -1020, y0: 18, x1: 2060, y1: 98 },     // Main Street (top), on past the airfield
     { x0: 1240, y0: 18, x1: 1320, y1: 1000 },    // East Road
     { x0: -1020, y0: 920, x1: 1320, y1: 1000 },  // South Road
     { x0: -480, y0: 18, x1: -400, y1: 1000 },    // West Road

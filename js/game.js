@@ -408,7 +408,9 @@ const Game = {
       if (a.x) p.facing = a.x < 0 ? -1 : 1;
       p.bob += dt * 14;
       const r = 12, w = this.bounds();
-      const obstacles = this.obstacles();
+      // an obstacle you are already inside (one that just appeared under you, say a bought decoration) never
+      // shoves you: it is ignored until you have stepped out of it, so you can never be flung through a wall
+      const obstacles = this.obstacles().filter((o) => !this.hitRect(p.x, p.y, r, o));
       p.x = U.clamp(p.x + a.x * sp * dt, w.x0 + 16, w.x1 - 16);
       for (const o of obstacles) if (this.hitRect(p.x, p.y, r, o)) p.x = a.x > 0 ? o.x - r : o.x + o.w + r;
       p.y = U.clamp(p.y + a.y * sp * dt, w.y0 + 16, w.y1 - 16);

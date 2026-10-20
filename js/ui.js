@@ -5,6 +5,7 @@ const UI = {
   els: {},
 
   init() {
+    const ver = document.getElementById('version'); if (ver) ver.textContent = 'Version ' + CFG.VERSION;
     const $ = (id) => document.getElementById(id);
     this.els = {
       cash: $('hud-cash'), city: $('hud-city'), hint: $('hint'), toasts: $('toasts'),

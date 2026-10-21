@@ -19,7 +19,8 @@ CFG.IC_DRIVE = {
   board: { x: 1228, y: 146 },                      // menu board north of the window
   sign: { x: 1202, y: 184 },                       // "DRIVE-THRU" sign over the wall, clear of the cars
   laneX: 1264,                                     // centre of East Road's west lane (road is 1240..1320)
-  spawnY: 1100,                                    // cars appear on the grass below the South Road junction
+  approachY: 980,                                  // cars come along South Road's south lane from the west edge of town
+  spawnY: 940,                                     // where the approach ends: just north of the junction, in East Road's west lane
   entryGap: 90,                                    // no new car while the last one is still this close to the entrance
   stopLine: 166,                                   // white bar just ahead of the first car's nose
   laneEnd: 560,                                    // dashed guide line runs from the road top down to here
@@ -45,9 +46,11 @@ class IcDriveCar {
   constructor(kind) {
     const D = CFG.IC_DRIVE;
     this.kind = kind; this.color = U.pick(COLORS.cars); this.flavor = U.pick(D.flavors);
-    this.x = D.laneX; this.y = D.spawnY; this.angle = -Math.PI / 2;   // nose pointing north
-    this.state = 'arriving'; this.t = 0; this.paid = false; this.coneT = 0; this.waitT = 0; this.honked = false;
-    this.speed = D.speed; this.path = null;
+    // start off the west edge on South Road, drive east, swing north into East Road, then join the queue
+    this.x = CFG.WORLD.x0 - 130; this.y = D.approachY; this.angle = 0;
+    this.path = [{ x: D.laneX - 70, y: D.approachY }, { x: D.laneX - 16, y: D.approachY - 14 }, { x: D.laneX, y: D.spawnY }];
+    this.state = 'approach'; this.t = 0; this.paid = false; this.coneT = 0; this.waitT = 0; this.honked = false;
+    this.speed = D.speed;
   }
   get inLine() { return this.state === 'arriving' || this.state === 'waiting'; }
   get half() { return (IC_DRIVE_LEN[this.kind] || 92) / 2; }
@@ -110,8 +113,8 @@ const IceCreamDriveThruExt = {
     if (this.spawnT <= 0) {
       const far = g.area !== 'town' || U.dist(g.player.x, g.player.y, W.x, W.y) > 1400;
       this.spawnT = U.rand(D.spawnEvery[0], D.spawnEvery[1]) * (far ? 2 : 1);
-      const line = this.cars.filter((c) => c.inLine);
-      const clear = !this.cars.some((c) => c.y > D.spawnY - D.entryGap);   // nobody still sitting on the entrance
+      const line = this.cars.filter((c) => c.inLine || c.state === 'approach');
+      const clear = !this.cars.some((c) => c.state === 'approach' && c.x < CFG.WORLD.x0 + D.entryGap);   // nobody still on the entrance
       if (line.length < D.queueMax && clear) this.cars.push(new IcDriveCar(Math.random() < D.funChance ? U.pick(D.funKinds) : 'car'));
     }
     // the cone sliding across to the car
@@ -152,10 +155,10 @@ const IceCreamDriveThruExt = {
             }
           }
         }
-      } else if (c.state === 'leaving') {
+      } else if (c.state === 'leaving' || c.state === 'approach') {
         const wp = c.path[0];
         c.steer(wp.x, wp.y, dt);
-        if (U.moveToward(c, wp.x, wp.y, c.speed, dt)) { c.path.shift(); if (!c.path.length) c.state = 'gone'; }
+        if (U.moveToward(c, wp.x, wp.y, c.state === 'approach' ? c.speed * 1.4 : c.speed, dt)) { c.path.shift(); if (!c.path.length) c.state = c.state === 'approach' ? 'arriving' : 'gone'; }
       }
     }
     this.cars = this.cars.filter((c) => c.state !== 'gone');

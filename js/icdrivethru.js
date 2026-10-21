@@ -24,7 +24,7 @@ CFG.IC_DRIVE = {
   entryGap: 90,                                    // no new car while the last one is still this close to the entrance
   stopLine: 166,                                   // white bar just ahead of the first car's nose
   laneEnd: 560,                                    // dashed guide line runs from the road top down to here
-  exitY: 58,                                       // Main Street's centre line, where the cars turn east
+  exitY: 78,                                       // the middle of Main Street's eastbound (south) lane, where the cars turn east
   queueMax: 3,
   gap: 14,                                         // bumper-to-bumper gap between queued cars
   spawnEvery: [12, 25],                            // seconds between cars (first one sooner after buying)
@@ -41,6 +41,9 @@ CFG.IC_DRIVE = {
 // Vehicle lengths along their nose axis (from Render.drawVehicle), used to space the queue so nothing overlaps.
 const IC_DRIVE_LEN = { car: 92, taxi: 92, police: 92, mixer: 108, schoolbus: 112, firetruck: 124 };
 
+// points along a quarter circle (centre cx,cy radius R) from angle a0 to a1, so the cars take rounded corners
+function IC_DRIVE_ARC(cx, cy, R, a0, a1, n = 7) { const pts = []; for (let i = 1; i <= n; i++) { const a = a0 + (a1 - a0) * (i / n); pts.push({ x: cx + Math.cos(a) * R, y: cy + Math.sin(a) * R }); } return pts; }
+function arrived0(c, ty) { return Math.abs(c.y - ty) < 24 && Math.abs(c.x - CFG.IC_DRIVE.laneX) < 4; }
 // One NPC car in the ice cream drive-thru line. States: arriving -> waiting (at the window) -> leaving -> gone.
 class IcDriveCar {
   constructor(kind) {
@@ -48,7 +51,8 @@ class IcDriveCar {
     this.kind = kind; this.color = U.pick(COLORS.cars); this.flavor = U.pick(D.flavors);
     // start off the west edge on South Road, drive east, swing north into East Road, then join the queue
     this.x = CFG.WORLD.x0 - 130; this.y = D.approachY; this.angle = 0;
-    this.path = [{ x: D.laneX - 70, y: D.approachY }, { x: D.laneX - 16, y: D.approachY - 14 }, { x: D.laneX, y: D.spawnY }];
+    // along South Road, then a proper rounded left turn (a quarter circle) up into East Road's west lane
+    this.path = [{ x: D.laneX - 64, y: D.approachY }].concat(IC_DRIVE_ARC(D.laneX - 64, D.approachY - 64, 64, Math.PI / 2, 0), [{ x: D.laneX, y: D.approachY - 64 - 20 }]);
     this.state = 'approach'; this.t = 0; this.paid = false; this.coneT = 0; this.waitT = 0; this.honked = false;
     this.speed = D.speed;
   }
@@ -58,7 +62,7 @@ class IcDriveCar {
   steer(tx, ty, dt) {
     const ang = Math.atan2(ty - this.y, tx - this.x);
     let d = ang - this.angle; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2;
-    this.angle += d * Math.min(1, dt * 6);
+    this.angle += d * Math.min(1, dt * 11);   // quick enough to follow the rounded corners without sliding sideways
   }
 }
 
@@ -125,6 +129,7 @@ const IceCreamDriveThruExt = {
       if (c.inLine) {
         const myIdx = idx++;
         const ty = this.queueY(myIdx);
+        if (!arrived0(c, ty)) c.steer(D.laneX, ty, dt); else { let d = -Math.PI / 2 - c.angle; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; c.angle += d * Math.min(1, dt * 6); }   // keep turning until it faces up the lane
         const arrived = U.moveToward(c, D.laneX, ty, c.speed, dt);
         if (myIdx === 0 && arrived) {
           if (c.state !== 'waiting') { c.state = 'waiting'; c.t = 0; }
@@ -142,7 +147,7 @@ const IceCreamDriveThruExt = {
           if (c.t >= D.serve) {
             c.state = 'leaving'; c.coneT = D.coneHold; c.speed = D.speed * 1.2;
             // up to the junction, a rounded right turn, then east along Main Street and out of town
-            c.path = [{ x: D.laneX, y: D.exitY + 30 }, { x: D.laneX + 14, y: D.exitY + 6 }, { x: D.laneX + 44, y: D.exitY }, { x: CFG.WORLD.x1 + 130, y: D.exitY }];
+            c.path = [{ x: D.laneX, y: D.exitY + 44 + 10 }].concat(IC_DRIVE_ARC(D.laneX + 44, D.exitY + 44, 44, Math.PI, Math.PI * 1.5), [{ x: CFG.WORLD.x1 + 130, y: D.exitY }]);
           }
         } else {
           c.state = 'arriving';

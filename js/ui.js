@@ -10,7 +10,7 @@ const UI = {
     this.els = {
       cash: $('hud-cash'), city: $('hud-city'), hint: $('hint'), toasts: $('toasts'),
       help: $('modal-help'), msg: $('modal-msg'),
-      btnSound: $('btn-sound'), msgTitle: $('msg-title'), msgBody: $('msg-body'), btnCar: $('btn-car'), btnMake: $('btn-make'), pizza: $('modal-pizza'),
+      catCtl: $('catalog-ctl'), catPrev: $('cat-prev'), catNext: $('cat-next'), catClose: $('cat-close'), btnSound: $('btn-sound'), msgTitle: $('msg-title'), msgBody: $('msg-body'), btnCar: $('btn-car'), btnMake: $('btn-make'), pizza: $('modal-pizza'),
     };
     $('btn-help').addEventListener('click', () => this.toggle('help'));
     this.els.btnSound.addEventListener('click', () => this.toggleSound());
@@ -21,6 +21,9 @@ const UI = {
       fsBtn.remove();
     }
     this.els.btnCar.addEventListener('click', () => this.toggleCar());
+    this.els.catPrev.addEventListener('click', () => { if (this.catalog) this.catalog.prev(); });
+    this.els.catNext.addEventListener('click', () => { if (this.catalog) this.catalog.next(); });
+    this.els.catClose.addEventListener('click', () => { if (this.catalog) this.catalog.close(); });
     this.els.btnMake.addEventListener('click', () => Game.doAction());
     Game.onMakePizza = () => this.startMinigame();
     const sw = $('paint-swatches');
@@ -40,6 +43,11 @@ const UI = {
     document.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', () => this.close()));
     document.querySelectorAll('.modal').forEach((m) => m.addEventListener('click', (e) => { if (e.target === m) this.close(); }));
     window.addEventListener('keydown', (e) => {
+      if (this.catalog && !this.open) {   // a catalog is open: arrows turn the pages, Escape closes it
+        if (e.code === 'ArrowLeft' || e.code === 'KeyA') { e.preventDefault(); this.catalog.prev(); return; }
+        if (e.code === 'ArrowRight' || e.code === 'KeyD') { e.preventDefault(); this.catalog.next(); return; }
+        if (e.code === 'Escape') { this.catalog.close(); return; }
+      }
       if (e.code === 'Escape') this.close();
       else if (e.code === 'KeyM') this.toggleSound();
       else if (e.code === 'KeyE') this.toggleCar();
@@ -81,6 +89,19 @@ const UI = {
     setTimeout(() => el.remove(), 4200);
   },
   toggleCar() { if (Game.driving) Game.exitCar(); else Game.enterCar(); },
+  // ---- catalog controls (used by the cabin and bedroom catalogs): handlers { prev, next, close }, then placeCatalog each frame
+  catalog: null,
+  openCatalog(handlers) { this.catalog = handlers; this.els.catCtl.classList.remove('hidden'); },
+  closeCatalog() { this.catalog = null; this.els.catCtl.classList.add('hidden'); },
+  // box is the catalog card in CSS px: { x, y, w, h }; the X sits on its top-right corner, the arrows on its sides
+  placeCatalog(box, canPrev, canNext) {
+    if (!this.catalog) return;
+    const put = (el, x, y) => { el.style.left = x + 'px'; el.style.top = y + 'px'; };
+    put(this.els.catClose, box.x + box.w - 10, box.y + 10);
+    put(this.els.catPrev, box.x + 8, box.y + box.h / 2);
+    put(this.els.catNext, box.x + box.w - 8, box.y + box.h / 2);
+    this.els.catPrev.disabled = !canPrev; this.els.catNext.disabled = !canNext;
+  },
   startMinigame() {
     if (!Game.nearPrep || this.open) return;
     this.show('pizza');

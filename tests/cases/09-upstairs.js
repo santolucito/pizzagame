@@ -16,14 +16,21 @@ module.exports = async (t) => {
   const keyBefore = await t.ev(() => UpstairsExt.bgKey(Game));
   await t.ev(() => T.act());
   t.expect(await t.ev(() => UpstairsExt.st.cat.on && UpstairsExt.st.cat.page === 0), 'catalog opens on the cover');
-  t.expectEq(await t.ev(() => T.label()), '📕 Close the catalog', 'cover action closes');
+  t.expectEq(await t.ev(() => T.label()), '📖 Open it up!', 'cover action turns to the first page');
+  // the controls are DOM buttons on the card: the X on its top-right corner, the arrows on its sides, under the HUD
+  await t.wait(150);
+  const ctl = await t.ev(() => { const r = (id) => document.getElementById(id).getBoundingClientRect(); const c = r('cat-close'), p = r('cat-prev'), n = r('cat-next'), W = innerWidth; return { shown: !document.getElementById('catalog-ctl').classList.contains('hidden'), closeRight: c.left > W / 2, closeTop: c.top > 40 && c.top < innerHeight / 2, prevLeft: p.left < W / 2, nextRight: n.left > W / 2, prevOff: document.getElementById('cat-prev').disabled, nextOn: !document.getElementById('cat-next').disabled }; });
+  t.expect(ctl.shown && ctl.closeRight && ctl.closeTop && ctl.prevLeft && ctl.nextRight && ctl.prevOff && ctl.nextOn, `catalog buttons sit on the card (${JSON.stringify(ctl)})`);
   t.expectEq(await t.ev(() => T.hint()), null, 'no hint while reading');
   await t.shot('catalog-cover');
   // frozen while reading
   const held = await t.ev(() => { const x = Game.player.x; T.steer(0, -1); T.step(40); T.unsteer(); T.step(2); return Math.abs(Game.player.x - x) < 0.01; });
   t.expect(held, 'the chef stays put while the catalog is open');
-  // flip to the second item (two pages right), the flip animation finishing between presses
-  await t.ev(() => { T.steer(1, 0); T.step(5); T.unsteer(); T.step(25); T.steer(1, 0); T.step(5); T.unsteer(); T.step(25); });
+  // walking does not turn pages any more
+  await t.ev(() => { T.steer(1, 0); T.step(10); T.unsteer(); T.step(25); T.steer(0, 1); T.step(10); T.unsteer(); T.step(2); });
+  t.expect(await t.ev(() => UpstairsExt.st.cat.on && UpstairsExt.st.cat.page === 0), 'the joystick neither turns pages nor closes the catalog');
+  // flip to the second item with the ▶ button (two taps), the flip animation finishing between taps
+  await t.ev(() => { document.getElementById('cat-next').click(); T.step(25); document.getElementById('cat-next').click(); T.step(25); });
   const page = await t.ev(() => UpstairsExt.st.cat.page);
   t.expectEq(page, 2, 'two pages to the right');
   const item = C.items[page - 1];
@@ -35,11 +42,13 @@ module.exports = async (t) => {
   t.expectEq(await t.ev(() => T.label()), '✅ You have this one!', 'owned label after buying');
   t.expect(await t.ev(() => UpstairsExt.bgKey(Game)) !== keyBefore, 'bgKey changes once something is owned');
   // too poor on the next page
-  await t.ev(() => { T.steer(1, 0); T.step(5); T.unsteer(); T.step(25); Game.s.cash = 10; });
+  await t.ev(() => { document.getElementById('cat-next').click(); T.step(25); Game.s.cash = 10; });
   t.expect((await t.ev(() => T.label())).startsWith('💰 Need'), 'need-more label when poor');
-  // DOWN closes
-  await t.ev(() => { T.steer(0, 1); T.step(5); T.unsteer(); T.step(2); });
-  t.expect(await t.ev(() => !UpstairsExt.st.cat.on), 'walking down closes the catalog');
+  // ◀ goes back, the X closes
+  await t.ev(() => { document.getElementById('cat-prev').click(); T.step(25); });
+  t.expectEq(await t.ev(() => UpstairsExt.st.cat.page), 2, 'the ◀ button turns back a page');
+  await t.ev(() => { document.getElementById('cat-close').click(); T.step(2); });
+  t.expect(await t.ev(() => !UpstairsExt.st.cat.on && document.getElementById('catalog-ctl').classList.contains('hidden')), 'the X closes the catalog and hides the buttons');
   await t.ev(() => { Game.s.cash = 5000; T.step(20); });
   await t.shot('room-bought');
 

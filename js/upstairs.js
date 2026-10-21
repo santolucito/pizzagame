@@ -70,7 +70,7 @@ const UpstairsExt = {
 
   // ---------- game hooks ----------
   defaults: { upstairs: { seen: false, owned: {}, drawing: null } },
-  home(g) { if (this.st) { this.st.nap = null; this.st.slide = null; this.st.fade = 0; this.st.roofA = 1; this.st.cat.on = false; this.st.cat.hold = null; } if (this.st && this.st.draw.on) this.closePad(g); },
+  home(g) { if (this.st) { this.st.nap = null; this.st.slide = null; this.st.fade = 0; this.st.roofA = 1; this.closeCatalog(g); } if (this.st && this.st.draw.on) this.closePad(g); },
   build(g) {
     if (!g.s.upstairs) g.s.upstairs = { seen: false, owned: {}, drawing: null };
     if (!g.s.upstairs.owned) g.s.upstairs.owned = {};
@@ -214,19 +214,11 @@ const UpstairsExt = {
   updateRoom(g, dt) {
     const st = this.st, p = g.player, C = CFG.UPSTAIRS, N = C.nap, n = st.nap;
     this.updateToys(g, dt);
-    // reading the catalog: stay put, left/right turn the pages, down closes it
+    // reading the catalog: stay put (the ◀ ▶ buttons turn the pages and the ✕ closes it)
     if (st.cat.on) {
       const c = st.cat; p.x = c.hold.x; p.y = c.hold.y; p.moving = false;
       c.bought = Math.max(0, c.bought - dt); c.nope = Math.max(0, c.nope - dt);
       if (c.flip) { c.flip.t += dt; if (c.flip.t >= c.flip.dur) c.flip = null; }
-      const a = Input.axis();
-      if (Math.abs(a.x) < 0.3 && Math.abs(a.y) < 0.3) c.ready = true;
-      else if (c.ready) {
-        c.ready = false;
-        if (a.y > 0.5 && Math.abs(a.x) < 0.5) this.closeCatalog(g);
-        else if (a.x > 0.5) this.turnPage(g, 1);
-        else if (a.x < -0.5) this.turnPage(g, -1);
-      }
       return;
     }
     // drawing at the desk: the chef stays on the chair's side while the pad is open
@@ -863,9 +855,9 @@ const UpstairsExt = {
     if (this.owned(g, 'horse')) { const h = byKey('horse'), amp = U.dist(p.x, p.y, h.x, h.y) < 70 ? 0.18 : 0.04; st.rock = Math.sin(g.time * 3) * amp; }
   },
 
-  // ======================= the catalog: one item per page, pages turn with left/right, the big button buys =======================
-  openCatalog(g) { const c = this.st.cat, p = g.player; c.on = true; c.page = 0; c.flip = null; c.ready = false; c.bought = 0; c.nope = 0; c.hold = { x: p.x, y: p.y }; p.moving = false; Sfx.pickup(); Haptics.tap(); },
-  closeCatalog(g) { this.st.cat.on = false; this.st.cat.hold = null; Sfx.drop(); },
+  // ======================= the catalog: one item per page, the ◀ ▶ buttons turn pages, the ✕ closes, the big button buys =======================
+  openCatalog(g) { const c = this.st.cat, p = g.player; c.on = true; c.page = 0; c.flip = null; c.bought = 0; c.nope = 0; c.hold = { x: p.x, y: p.y }; p.moving = false; Sfx.pickup(); Haptics.tap(); UI.openCatalog({ prev: () => this.turnPage(g, -1), next: () => this.turnPage(g, 1), close: () => this.closeCatalog(g) }); },
+  closeCatalog(g) { if (!this.st.cat.on) return; this.st.cat.on = false; this.st.cat.hold = null; UI.closeCatalog(); Sfx.drop(); },
   catalogPages() { return CFG.UPSTAIRS.items.length + 1; },
   turnPage(g, dir) {
     const c = this.st.cat, n = this.catalogPages(), to = c.page + dir;
@@ -874,7 +866,7 @@ const UpstairsExt = {
   },
   catalogAction(g) {
     const c = this.st.cat, items = CFG.UPSTAIRS.items;
-    if (c.page === 0) return { label: '📕 Close the catalog', run: (gg) => this.closeCatalog(gg) };
+    if (c.page === 0) return { label: '📖 Open it up!', run: (gg) => this.turnPage(gg, 1) };
     const it = items[c.page - 1];
     if (this.owned(g, it.key)) return { label: '✅ You have this one!', run: (gg) => this.turnPage(gg, c.page < this.catalogPages() - 1 ? 1 : -1) };
     if (g.s.cash >= it.price) return { label: `🛒 Buy for ${U.money(it.price)}`, run: (gg) => this.buyItem(gg, it) };
@@ -925,7 +917,7 @@ const UpstairsExt = {
       ctx.save(); ctx.translate(0, 20); ctx.scale(0.55, 0.55); ctx.translate(-(CFG.UPSTAIRS.bed.x0 + CFG.UPSTAIRS.bed.x1) / 2, -(CFG.UPSTAIRS.bed.y0 + CFG.UPSTAIRS.bed.y1) / 2); this.paintBed(ctx, this.owned(g, 'racecar')); ctx.restore();
       ctx.restore();
       ctx.fillStyle = '#2b1d14'; ctx.font = r.font(15); ctx.fillText(`${items.length} fun things for your room`, cx + 8, cy + ch / 2 - 72);
-      ctx.fillStyle = '#8a7a6a'; ctx.font = r.font(14); ctx.fillText('Walk ◀ ▶ to turn pages', cx + 8, cy + ch / 2 - 46);
+      ctx.fillStyle = '#8a7a6a'; ctx.font = r.font(14); ctx.fillText('Tap ◀ ▶ to turn the pages', cx + 8, cy + ch / 2 - 46);
     } else {
       const it = items[page - 1], own = this.owned(g, it.key), afford = g.s.cash >= it.price;
       ctx.fillStyle = '#fff8ee'; U.roundRect(ctx, cx - cw / 2, cy - ch / 2, cw, ch, 16); ctx.fill();
@@ -952,11 +944,8 @@ const UpstairsExt = {
     // page counter and the arrows
     ctx.fillStyle = '#8a7a6a'; ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(`${page + 1} / ${n}`, cx + 6, cy + ch / 2 - 16);
-    ctx.font = r.font(22); ctx.fillStyle = page > 0 ? '#2b1d14' : 'rgba(43,29,20,0.25)'; ctx.fillText('◀', cx - cw / 2 + 34, cy + ch / 2 - 18);
-    ctx.fillStyle = page < n - 1 ? '#2b1d14' : 'rgba(43,29,20,0.25)'; ctx.fillText('▶', cx + cw / 2 - 22, cy + ch / 2 - 18);
     ctx.restore();
-    ctx.fillStyle = '#fff'; ctx.font = r.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('▼ walk down to close', cx, cy + ch / 2 + 16);
+    UI.placeCatalog({ x: cx - cw / 2, y: cy - ch / 2, w: cw, h: ch }, page > 0, page < n - 1);   // the ✕ and ◀ ▶ buttons sit on the card
   },
 
   // ======================= the owner's drawing: hung on the wall upstairs and in the shop =======================

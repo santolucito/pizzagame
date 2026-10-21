@@ -108,4 +108,18 @@ module.exports = async (t) => {
   t.expect(heli.clearing.out && heli.clearing.near && !heli.clearing.inObs, 'landing in the forest clearing sets you down on a free spot next to the helicopter');
   t.expect(heli.street.out && heli.street.near && !heli.street.inObs, 'landing in the street sets you down next to the helicopter');
   t.expect(heli.home, 'Take me home brings the helicopter back to its pad');
+
+  // the cabin catalog uses the same X / ◀ ▶ buttons
+  const cab = await t.ev(() => {
+    const H = CFG.SECRET.HOME; Game.s.cabin = Game.s.cabin || { owned: {} }; T.tp(H.catalog.x + 24, H.catalog.y - 14, 'cabin'); T.step(2);
+    const open = T.label(); T.act(); T.step(1);
+    const cover = SecretExt.st.cat.on && SecretExt.st.cat.page === 0 && !document.getElementById('catalog-ctl').classList.contains('hidden');
+    T.steer(1, 0); T.step(10); T.unsteer(); T.step(2); const stillCover = SecretExt.st.cat.page === 0 && SecretExt.st.cat.on;
+    document.getElementById('cat-next').click(); T.step(25); const p1 = SecretExt.st.cat.page;
+    document.getElementById('cat-close').click(); T.step(2);
+    return { open, cover, stillCover, p1, closed: !SecretExt.st.cat.on && document.getElementById('catalog-ctl').classList.contains('hidden') };
+  });
+  t.expect(cab.open === '📖 Open the catalog' && cab.cover, `cabin catalog opens on the cover (${cab.open})`);
+  t.expect(cab.stillCover && cab.p1 === 1 && cab.closed, `cabin catalog: joystick ignored, ▶ turns, X closes (${JSON.stringify(cab)})`);
+  await t.ev(() => Game.goHome());
 };

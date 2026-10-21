@@ -596,9 +596,9 @@ const SecretExt = {
     for (const it of H.items) if (it.block && this.owned(g, it.key)) o.push({ x: it.block[0], y: it.block[1], w: it.block[2], h: it.block[3] });
     return o;
   },
-  // ---------- the catalog: one item per page, pages turn with left/right, the big button buys ----------
-  openCatalog(g) { const c = this.st.cat, p = g.player; c.on = true; c.page = 0; c.flip = null; c.ready = false; c.bought = 0; c.nope = 0; c.hold = { x: p.x, y: p.y }; p.moving = false; Sfx.pickup(); Haptics.tap(); },
-  closeCatalog(g) { this.st.cat.on = false; this.st.cat.hold = null; Sfx.drop(); },
+  // ---------- the catalog: one item per page, the ◀ ▶ buttons turn pages, the ✕ closes, the big button buys ----------
+  openCatalog(g) { const c = this.st.cat, p = g.player; c.on = true; c.page = 0; c.flip = null; c.bought = 0; c.nope = 0; c.hold = { x: p.x, y: p.y }; p.moving = false; Sfx.pickup(); Haptics.tap(); UI.openCatalog({ prev: () => this.turnPage(g, -1), next: () => this.turnPage(g, 1), close: () => this.closeCatalog(g) }); },
+  closeCatalog(g) { if (!this.st.cat.on) return; this.st.cat.on = false; this.st.cat.hold = null; UI.closeCatalog(); Sfx.drop(); },
   catalogPages() { return CFG.SECRET.HOME.items.length + 1; },
   turnPage(g, dir) {
     const c = this.st.cat, n = this.catalogPages(), to = c.page + dir;
@@ -607,7 +607,7 @@ const SecretExt = {
   },
   catalogAction(g) {
     const c = this.st.cat, H = CFG.SECRET.HOME;
-    if (c.page === 0) return { label: '📕 Close the catalog', run: (gg) => this.closeCatalog(gg) };
+    if (c.page === 0) return { label: '📖 Open it up!', run: (gg) => this.turnPage(gg, 1) };
     const it = H.items[c.page - 1];
     if (this.owned(g, it.key)) return { label: '✅ You have this one!', run: (gg) => this.turnPage(gg, c.page < this.catalogPages() - 1 ? 1 : -1) };
     if (g.s.cash >= it.price) return { label: `🛒 Buy for ${U.money(it.price)}`, run: (gg) => this.buyItem(gg, it) };
@@ -633,7 +633,7 @@ const SecretExt = {
     if (this.st.cat.hold) this.st.cat.hold = { x: p.x, y: p.y };
   },
   // ---------- the telescope: a frozen look at the night sky ----------
-  home(g) { this.st.view.on = false; this.st.cat.on = false; this.st.fade = 0; },
+  home(g) { this.st.view.on = false; this.closeCatalog(g); this.st.fade = 0; },
   startViewing(g) { const v = this.st.view, H = CFG.SECRET.HOME, p = g.player; v.on = true; v.t = 0; v.shoot = null; v.shootT = 2.5; v.wish = 0; v.label = 0; v.labelT = 0; p.x = H.eye.x; p.y = H.eye.y; p.moving = false; p.facing = 1; this.st.fade = 0.45; Sfx.ding(); Haptics.tap(); },
   stopViewing(g) { this.st.view.on = false; this.st.fade = 0.45; Sfx.drop(); },
   bgKey(g) { return g.s.cabin ? 'cabin:' + CFG.SECRET.HOME.items.map((it) => this.owned(g, it.key) ? 1 : 0).join('') : ''; },
@@ -674,19 +674,11 @@ const SecretExt = {
       if (v.shoot) { v.shoot.t += dt; if (v.shoot.t > v.shoot.dur) v.shoot = null; }
       else { v.shootT -= dt; if (v.shootT <= 0) { v.shootT = U.rand(4, 9); const fromLeft = Math.random() < 0.5; v.shoot = { u: fromLeft ? U.rand(0.05, 0.4) : U.rand(0.6, 0.95), v: U.rand(0.08, 0.4), du: (fromLeft ? 1 : -1) * U.rand(0.35, 0.5), dv: U.rand(0.18, 0.3), t: 0, dur: U.rand(0.9, 1.3) }; v.wish = 3.2; } }
     }
-    // reading the catalog: stay put, left/right turn the pages, down closes it
+    // reading the catalog: stay put (the ◀ ▶ buttons turn the pages and the ✕ closes it)
     if (st.cat.on) {
       const c = st.cat; p.x = c.hold.x; p.y = c.hold.y; p.moving = false;
       c.bought = Math.max(0, c.bought - dt); c.nope = Math.max(0, c.nope - dt);
       if (c.flip) { c.flip.t += dt; if (c.flip.t >= c.flip.dur) c.flip = null; }
-      const a = Input.axis();
-      if (Math.abs(a.x) < 0.3 && Math.abs(a.y) < 0.3) c.ready = true;
-      else if (c.ready) {
-        c.ready = false;
-        if (a.y > 0.5 && Math.abs(a.x) < 0.5) this.closeCatalog(g);
-        else if (a.x > 0.5) this.turnPage(g, 1);
-        else if (a.x < -0.5) this.turnPage(g, -1);
-      }
     }
     // the cuckoo pops out once a minute
     if (this.owned(g, 'clock')) {
@@ -1091,7 +1083,7 @@ const SecretExt = {
       for (let k = 0; k < 3; k++) { ctx.globalAlpha = 0.5 - k * 0.12; ctx.fillStyle = '#f3efe3'; ctx.beginPath(); ctx.arc(35 + k * 7 + Math.sin(g.time * 1.5 + k) * 3, -62 - k * 14, 6 + k * 2, 0, Math.PI * 2); ctx.fill(); }
       ctx.globalAlpha = 1; ctx.restore();
       ctx.fillStyle = '#2b1d14'; ctx.font = r.font(15); ctx.fillText(`${items.length} lovely things inside`, cx + 8, cy + ch / 2 - 72);
-      ctx.fillStyle = '#8a7a6a'; ctx.font = r.font(14); ctx.fillText('Walk ◀ ▶ to turn pages', cx + 8, cy + ch / 2 - 46);
+      ctx.fillStyle = '#8a7a6a'; ctx.font = r.font(14); ctx.fillText('Tap ◀ ▶ to turn the pages', cx + 8, cy + ch / 2 - 46);
     } else {
       const it = items[page - 1], own = this.owned(g, it.key), afford = g.s.cash >= it.price;
       ctx.fillStyle = '#fff8ee'; U.roundRect(ctx, cx - cw / 2, cy - ch / 2, cw, ch, 16); ctx.fill();
@@ -1118,11 +1110,8 @@ const SecretExt = {
     // page counter and the arrows
     ctx.fillStyle = '#8a7a6a'; ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(`${page + 1} / ${n}`, cx + 6, cy + ch / 2 - 16);
-    ctx.font = r.font(22); ctx.fillStyle = page > 0 ? '#2b1d14' : 'rgba(43,29,20,0.25)'; ctx.fillText('◀', cx - cw / 2 + 34, cy + ch / 2 - 18);
-    ctx.fillStyle = page < n - 1 ? '#2b1d14' : 'rgba(43,29,20,0.25)'; ctx.fillText('▶', cx + cw / 2 - 22, cy + ch / 2 - 18);
     ctx.restore();
-    ctx.fillStyle = '#fff'; ctx.font = r.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('▼ walk down to close', cx, cy + ch / 2 + 16);
+    UI.placeCatalog({ x: cx - cw / 2, y: cy - ch / 2, w: cw, h: ch }, page > 0, page < n - 1);   // the ✕ and ◀ ▶ buttons sit on the card
   },
   // The park dog curls up in its bed while you are home (it is the same dog in spirit; the real one waits in the park).
   drawSleepingDog(r, g, x, y) {

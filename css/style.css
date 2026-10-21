@@ -92,6 +92,14 @@ body.painting #btn-car, body.painting #btn-make, body.painting #toasts, body.pai
 #zoom-ctl { position: absolute; right: calc(10px + env(safe-area-inset-right)); bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 5; display: flex; flex-direction: column; gap: 6px; }
 #zoom-ctl .hud-btn { width: 40px; font-size: 20px; line-height: 1; }
 
+/* Catalog controls: an X on the card's top-right corner and page buttons on its sides (placed by UI.placeCatalog) */
+#catalog-ctl { position: absolute; inset: 0; z-index: 6; pointer-events: none; }
+#catalog-ctl.hidden { display: none; }
+#catalog-ctl .hud-btn { position: absolute; pointer-events: auto; width: 48px; height: 48px; min-height: 48px; padding: 0; border-radius: 50%; font-size: 22px; line-height: 1; transform: translate(-50%, -50%); }
+#catalog-ctl .hud-btn:active { transform: translate(-50%, -50%) translateY(2px); }
+#catalog-ctl .hud-btn[disabled] { opacity: 0.35; pointer-events: none; }
+#cat-close { background: #e4572e; color: #fff; box-shadow: 0 3px 0 #a33a1c; }
+
 /* Toasts */
 /* announcements stack under the hint at the top, well away from the action buttons at the bottom */
 #toasts { position: absolute; right: calc(10px + env(safe-area-inset-right)); top: calc(96px + env(safe-area-inset-top)); max-width: min(74vw, 420px); z-index: 4; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; pointer-events: none; }

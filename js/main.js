@@ -39,5 +39,10 @@
 
   const saveNow = () => Game.save();
   window.addEventListener('beforeunload', saveNow);
-  document.addEventListener('visibilitychange', () => { if (document.hidden) saveNow(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) saveNow(); else Render.invalidateBackgrounds(); });
+  // coming back to the tab (or the page being restored) repaints the maps, in case the browser dropped them meanwhile
+  window.addEventListener('pageshow', () => Render.invalidateBackgrounds());
+  window.addEventListener('focus', () => Render.invalidateBackgrounds());
+  const cv = document.getElementById('game');
+  if (cv) { cv.addEventListener('contextrestored', () => Render.invalidateBackgrounds()); cv.addEventListener('contextlost', (e) => { e.preventDefault(); }); }
 })();

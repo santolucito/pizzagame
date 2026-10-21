@@ -89,7 +89,7 @@ const Render = {
     ctx.fillStyle = '#2b1d14'; ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     if (g.travel) { this.drawTravel(g); return; }
     ctx.setTransform(this.dpr * this.scale, 0, 0, this.dpr * this.scale, -this.camX * this.dpr * this.scale, -this.camY * this.dpr * this.scale);
-    this.ensureBackground(g);
+    this.checkBackground(g, 1 / 60); this.ensureBackground(g);
     const W = g.bounds();
     this.drawSkyline(g, W);
     ctx.drawImage(this.bgs[g.area].canvas, W.x0, W.y0, W.x1 - W.x0, W.y1 - W.y0);
@@ -112,6 +112,19 @@ const Render = {
   },
 
   // ======================= static background =======================
+  // Browsers may throw away a big offscreen canvas while the tab is hidden (the map then draws as a blank brown
+  // rectangle under the people and cars). Forget every cached map so the next frame paints it again.
+  invalidateBackgrounds() { if (this.bgs) for (const k in this.bgs) this.bgs[k].key = null; },
+  bgCheckT: 0,
+  // every few seconds, make sure the current map's cache still holds pixels (a discarded canvas reads back blank)
+  checkBackground(g, dt) {
+    this.bgCheckT -= dt; if (this.bgCheckT > 0) return; this.bgCheckT = 3;
+    const c = this.bgs && this.bgs[g.area]; if (!c || !c.key || c.canvas.width < 2) return;
+    try {
+      const px = c.canvas.getContext('2d').getImageData(Math.floor(c.canvas.width / 2), Math.floor(c.canvas.height / 2), 1, 1).data;
+      if (px[3] === 0) c.key = null;
+    } catch (e) { /* ignore */ }
+  },
   // One cached background per map (the town, Construction Town), rebuilt when its key changes.
   ensureBackground(g) {
     const W = g.bounds(), area = (W.x1 - W.x0) * (W.y1 - W.y0);

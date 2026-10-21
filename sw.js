@@ -3,7 +3,7 @@
 // Network-first so a new deploy is picked up on the next load; cache is the fallback.
 const CACHE = 'pizza-rush-v72';
 const SHELL = ['./', 'index.html', 'css/style.css', 'js/config.js', 'js/utils.js', 'js/audio.js', 'js/input.js',
-  'js/entities.js', 'js/minigame.js', 'js/game.js', 'js/render.js', 'js/ui.js', 'js/city.js', 'js/islands.js', 'js/atmosphere.js', 'js/secret.js', 'js/balloons.js', 'js/icdrivethru.js', 'js/upstairs.js', 'js/airfield.js', 'js/subway.js', 'js/sportscar.js', 'js/main.js', 'manifest.webmanifest',
+  'js/entities.js', 'js/minigame.js', 'js/game.js', 'js/render.js', 'js/ui.js', 'js/city.js', 'js/islands.js', 'js/atmosphere.js', 'js/secret.js', 'js/balloons.js', 'js/icdrivethru.js', 'js/upstairs.js', 'js/airfield.js', 'js/subway.js', 'js/sportscar.js', 'js/city-barber.js', 'js/main.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {

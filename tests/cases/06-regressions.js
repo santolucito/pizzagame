@@ -55,6 +55,8 @@ module.exports = async (t) => {
   });
   for (const h of homeFrom) t.expect(h.area === 'town' && h.at && !h.driving && !h.onTrain && !h.travel && h.floor === null, `take me home works from ${h.label}: ${JSON.stringify(h)}`);
   t.expect(await t.ev(() => !!document.getElementById('btn-home')), 'the help panel has a Take me home button');
+  const cash = await t.ev(() => { const before = Game.s.cash; document.getElementById('btn-cash').click(); return Game.s.cash - before; });
+  t.expectEq(cash, 10000, 'the debug money button adds $10,000');
 
   // alert sounds collapse to one per burst
   const tones = await t.ev(() => { const oc = Sfx.ctx; Sfx.ctx = Sfx.ctx || {}; let n = 0; const orig = Sfx.tone; Sfx.tone = () => n++; Sfx.lastAt = {}; for (let i = 0; i < 10; i++) { Sfx.unlock(); Sfx.ding(); Sfx.chime(); Sfx.pickup(); Sfx.drop(); } Sfx.tone = orig; Sfx.ctx = oc; return n; });

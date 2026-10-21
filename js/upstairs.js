@@ -88,6 +88,7 @@ const UpstairsExt = {
   owned(g, key) { return !!(g.s.upstairs && g.s.upstairs.owned && g.s.upstairs.owned[key]); },
   // Inside the pizzeria, or in the door gap: the roof is off.
   insideShop(g) {
+    if (typeof RooftopsExt !== 'undefined' && RooftopsExt.aboveRoofs(g)) return false;   // on the roof, or flying over it: the roof stays on
     const p = g.player, B = CFG.BUILDING, D = CFG.DOOR;
     return g.insideBuilding(p.x, p.y) || (p.x > B.x1 - 30 && p.x < B.x1 + 30 && p.y > D.y0 - 8 && p.y < D.y1 + 8);
   },

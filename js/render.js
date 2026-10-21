@@ -58,12 +58,14 @@ const Render = {
   updateCamera(g, snap) {
     const W = g.bounds();
     if (g.cameraSnap) { snap = true; g.cameraSnap = false; }
-    const tx = U.clamp(g.player.x - this.viewW / 2, W.x0, W.x1 - this.viewW);
+    // A map smaller than the view (a shop interior, say) sits centred on the screen instead of pinned to a corner.
+    const mw = W.x1 - W.x0, mh = W.y1 - W.y0;
+    const tx = mw < this.viewW ? W.x0 - (this.viewW - mw) / 2 : U.clamp(g.player.x - this.viewW / 2, W.x0, W.x1 - this.viewW);
     // Let the world scroll a little below the HUD so the top edge is never hidden under it.
     const hudPad = this.HUD_PAD_PX / this.scale;
     // Riding the train, lift the camera so the train sits well down the screen with mountains above the tracks.
     const minY = g.onTrain ? Math.min(W.y0 - hudPad, g.player.y - this.viewH * 0.4) : W.y0 - hudPad;
-    const ty = U.clamp(g.player.y - this.viewH / 2, minY, W.y1 - this.viewH);
+    const ty = mh + hudPad < this.viewH ? W.y0 - (this.viewH - mh) / 2 : U.clamp(g.player.y - this.viewH / 2, minY, W.y1 - this.viewH);
     if (snap) { this.camX = tx; this.camY = ty; return; }
     this.camX = U.lerp(this.camX, tx, 0.12);
     this.camY = U.lerp(this.camY, ty, 0.12);
@@ -137,7 +139,7 @@ const Render = {
 
   // Sky and mountains above the top edge of the map: seen when the camera lifts for a train ride.
   drawSkyline(g, W) {
-    if (this.camY >= W.y0) return;
+    if (this.camY >= W.y0 || W.y1 - W.y0 < 700) return;   // only the big outdoor maps have the mountains and sky above them
     const ctx = this.ctx, x0 = this.camX - 10, x1 = this.camX + this.viewW + 10, top = this.camY - 10, base = W.y0 + 1;
     const sky = ctx.createLinearGradient(0, top, 0, base); sky.addColorStop(0, '#79c6f2'); sky.addColorStop(1, '#d9f0ff');
     ctx.fillStyle = sky; ctx.fillRect(x0, top, x1 - x0, base - top);

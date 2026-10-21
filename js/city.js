@@ -56,7 +56,7 @@ CFG.CITY = {
     { x: 5080, y: 640, s: 0.85 },
   ],
   STOP: { x: 5200, y: 60 },           // the bus home waits here, north lane of Bus Street
-  SHELTER: { x: 5100, y: 2 },         // on the wide north sidewalk, west of where the bus door stops
+  SHELTER: { x: 5030, y: 2 },         // on the wide north sidewalk, west of where the bus door stops (clear of the bakery's doorstep)
   ARRIVE: { x: 5200, y: 28 },         // where you step off
   TAXI: { x: 5500, y: 470 },          // parked by the square
   TAXI_LOOP: [{ x: 4980, y: 102 }, { x: 5820, y: 102 }, { x: 5820, y: 922 }, { x: 4980, y: 922 }],
@@ -91,6 +91,10 @@ CFG.CITY = {
 CFG.AREAS.city = { WORLD: CFG.CITY.WORLD };
 CFG.VEHICLES.taxi = { speed: 380, radius: 22, label: '🚕 Drive', exit: '🚶 Get out' };
 CFG.COINS.push(...CFG.CITY.coins);
+
+// what the rooftop telescope shows at each pan fraction, and its compass strip (left end north-west, right end south)
+const CITY_SCOPE_SPOTS = [[0, 'Snowy mountains ⛰️'], [0.14, 'There’s my pizza shop! 🍕'], [0.4, 'Construction Town! 🏗️'], [0.68, 'The Islands! 🏝️'], [0.93, 'The sea 🌊']];
+const CITY_SCOPE_COMPASS = [[-0.08, 'N'], [0.14, 'NW'], [0.4, 'W'], [0.68, 'SW'], [0.93, 'S'], [1.18, 'SE']];
 
 const CityExt = {
   name: 'city',
@@ -769,7 +773,7 @@ const CityExt = {
     if (st.lift) return null;
     if (st.panel) return st.panel.sel === this.floor ? { label: '🚶 Step out', run: (gg) => this.stepOut(gg) } : { label: `🛗 Go to floor ${st.panel.sel}`, run: (gg) => this.ride(gg, st.panel.sel) };
     if (this.floor === 1 && U.dist(p.x, p.y, ex.x, ex.y) < 36) return { label: '🚪 Out to the street', run: (gg) => this.leaveTower(gg) };
-    if (this.floor === T.floors && U.dist(p.x, p.y, tl.x, tl.y) < 52) return { label: '🔭 Look through the telescope', run: (gg) => { this.viewing = { t: 0, x: gg.player.x, y: gg.player.y, f: 0.14, vel: 0, bump: 0, bumpDir: 0 }; st.seenView = true; gg.player.moving = false; Haptics.tap(); } };
+    if (this.floor === T.floors && U.dist(p.x, p.y, tl.x, tl.y) < 52) return { label: '🔭 Look through the telescope', run: (gg) => { this.viewing = this.scopeStart(gg.player.x, gg.player.y, 0.14); st.seenView = true; gg.player.moving = false; Haptics.tap(); } };
     return null;
   },
   ride(g, to) {
@@ -780,15 +784,7 @@ const CityExt = {
   updateTower(g, dt) {
     const st = this.st, L = st.lift, p = g.player, T = CFG.CITY.TOWER, R = T.ROOM, sp = this.liftSpot(), a = Input.axis();
     st.floorT += dt;
-    if (this.viewing) {
-      // eyes on the telescope: the chef stays put, the stick pans the view with easing, a soft bump at each end
-      const v = this.viewing; v.t += dt; p.x = v.x; p.y = v.y; p.moving = false;
-      v.vel = U.lerp(v.vel, a.x * 0.3, 1 - Math.pow(0.03, dt)); v.f += v.vel * dt;
-      if (v.f < 0) { v.f = 0; if (v.vel < -0.08 && v.bump <= 0) { v.bump = 0.45; v.bumpDir = -1; } v.vel = 0; }
-      if (v.f > 1) { v.f = 1; if (v.vel > 0.08 && v.bump <= 0) { v.bump = 0.45; v.bumpDir = 1; } v.vel = 0; }
-      v.bump = Math.max(0, v.bump - dt);
-      return;
-    }
+    if (this.viewing) { this.scopeUpdate(g, this.viewing, dt, a); return; }   // eyes on the telescope
     if (L) {
       // the ride: doors close, the car hums between floors (counter ticks floor by floor), ding, doors open, the chef steps out
       p.x = sp.x; p.y = sp.y; p.moving = false; L.t += dt;
@@ -1136,14 +1132,8 @@ const CityExt = {
   // mountains and, far away, the pizza town), then west (Construction Town, nearest), south-west (the sea and
   // the Islands) and, at the right end, south over the open sea. The stick pans; near layers move more than far ones.
   drawTelescope(r, g, W, H) {
-    const E = this, ctx = r.ctx, t = g.time, v = this.viewing, cx = W / 2, cy = H / 2, Rv = Math.min(W, H) * 0.46, D = Rv * 2, fade = Math.min(1, v.t / 0.5);
-    const f = v.f, hz = cy + Rv * 0.05, S = Rv / 240;
-    const bump = v.bump > 0 ? Math.sin(v.bump * 24) * 5 * v.bump * v.bumpDir : 0, bob = Math.cos(t * 0.37) * 2;
-    // sx: where something that sits centred at pan fraction fc, on a layer with parallax k, lands on screen
-    const sx = (fc, k) => cx + (fc - f) * 2 * D * k + bump * k;
-    ctx.fillStyle = '#0a0806'; ctx.fillRect(0, 0, W, H);
-    ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, Rv, 0, Math.PI * 2); ctx.clip();
-    ctx.translate(0, bob);
+    const E = this, ctx = r.ctx, t = g.time, v = this.viewing, G = this.scopeBegin(r, g, v, W, H);
+    const { cx, cy, Rv, D, S, hz, f, sx } = G;
     const sky = ctx.createLinearGradient(0, cy - Rv, 0, hz); sky.addColorStop(0, '#5fb6ee'); sky.addColorStop(1, '#dff3ff'); ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
     // sky layer: the sun to the south, clouds, birds
     ctx.fillStyle = '#fff7c2'; ctx.beginPath(); ctx.arc(sx(0.92, 0.3), cy - Rv * 0.5, Rv * 0.1, 0, Math.PI * 2); ctx.fill();
@@ -1201,15 +1191,45 @@ const CityExt = {
     const K3 = 1.25;
     for (let i = 0; i < 24; i++) { const bw = Rv * 0.26, bx = sx(-0.45 + i * 0.09, K3), bh = Rv * (0.28 + 0.22 * E.hash(i + 7)); ctx.fillStyle = i % 2 ? '#2d3a4a' : '#3a4a5c'; ctx.fillRect(bx, cy + Rv * 0.9 - bh, bw, bh + Rv); let row = 0; for (let yy = cy + Rv * 0.9 - bh + 10; yy < cy + Rv; yy += 14, row++) { let col = 0; for (let xx = bx + 8; xx < bx + bw - 8; xx += 16, col++) { const lit = E.winLit(i, row * 8 + col, t); if (lit > 0) { ctx.fillStyle = `rgba(255,224,138,${lit})`; ctx.fillRect(xx, yy, 6, 7); } } } }
     for (const fc of [0.05, 0.62, 1.1]) { const wx = sx(fc, K3); ctx.fillStyle = '#8d5a2b'; ctx.beginPath(); ctx.arc(wx, cy + Rv * 0.5, 12, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#5b3a1a'; ctx.fillRect(wx - 2, cy + Rv * 0.5, 4, 30); }   // water towers
+    this.scopeEnd(r, g, v, W, H, G, CITY_SCOPE_SPOTS, CITY_SCOPE_COMPASS);
+  },
+
+  // ---------- the telescope mechanism, shared with the other telescopes in the game (the bedroom's, js/bedroomscope.js) ----------
+  // A viewing state: the chef is held at (x, y) with eyes on the eyepiece while the stick pans the view;
+  // `f` is the pan fraction (0 = left end, 1 = right end).
+  scopeStart(x, y, f0) { return { t: 0, x, y, f: f0, vel: 0, bump: 0, bumpDir: 0 }; },
+  // one fixed step: the chef stays put, the stick pans the view with easing, a soft bump at each end
+  scopeUpdate(g, v, dt, a = Input.axis()) {
+    const p = g.player; v.t += dt; p.x = v.x; p.y = v.y; p.moving = false;
+    v.vel = U.lerp(v.vel, a.x * 0.3, 1 - Math.pow(0.03, dt)); v.f += v.vel * dt;
+    if (v.f < 0) { v.f = 0; if (v.vel < -0.08 && v.bump <= 0) { v.bump = 0.45; v.bumpDir = -1; } v.vel = 0; }
+    if (v.f > 1) { v.f = 1; if (v.vel > 0.08 && v.bump <= 0) { v.bump = 0.45; v.bumpDir = 1; } v.vel = 0; }
+    v.bump = Math.max(0, v.bump - dt);
+  },
+  // Opens the eyepiece: blacks the screen, clips to the round view (with a slow breathing bob) and returns the
+  // geometry the scene is drawn with: cx/cy the centre, Rv the radius, D the diameter, S a scale for art drawn at
+  // ~240 px per radius, hz the horizon, f the pan fraction and sx(fc, k): where something centred at pan fraction fc,
+  // on a layer with parallax k (far layers < 1, near layers > 1), lands on screen. Pair with `scopeEnd`.
+  scopeBegin(r, g, v, W, H) {
+    const ctx = r.ctx, t = g.time, cx = W / 2, cy = H / 2, Rv = Math.min(W, H) * 0.46, D = Rv * 2;
+    const f = v.f, hz = cy + Rv * 0.05, S = Rv / 240;
+    const bump = v.bump > 0 ? Math.sin(v.bump * 24) * 5 * v.bump * v.bumpDir : 0, bob = Math.cos(t * 0.37) * 2;
+    const sx = (fc, k) => cx + (fc - f) * 2 * D * k + bump * k;
+    ctx.fillStyle = '#0a0806'; ctx.fillRect(0, 0, W, H);
+    ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, Rv, 0, Math.PI * 2); ctx.clip();
+    ctx.translate(0, bob);
+    return { cx, cy, Rv, D, S, hz, f, sx, bump, bob };
+  },
+  // Closes the eyepiece: the black vignette, soft rim, crosshair and tick marks, then the label of what is in the
+  // middle of the view (`spots`: [[fc, text], ...]), the compass strip (`compass`: [[fc, 'N'], ...]) and the fade-in.
+  scopeEnd(r, g, v, W, H, G, spots, compass) {
+    const ctx = r.ctx, { cx, cy, Rv, f } = G, fade = Math.min(1, v.t / 0.5);
     ctx.restore();
-    // the eyepiece: black vignette, soft rim, crosshair, tick marks
     ctx.fillStyle = '#0a0806'; ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.arc(cx, cy, Rv, 0, Math.PI * 2, true); ctx.fill();
     const rim = ctx.createRadialGradient(cx, cy, Rv * 0.82, cx, cy, Rv); rim.addColorStop(0, 'rgba(0,0,0,0)'); rim.addColorStop(1, 'rgba(0,0,0,0.6)'); ctx.fillStyle = rim; ctx.beginPath(); ctx.arc(cx, cy, Rv, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(cx - Rv, cy); ctx.lineTo(cx - 18, cy); ctx.moveTo(cx + 18, cy); ctx.lineTo(cx + Rv, cy); ctx.moveTo(cx, cy - Rv); ctx.lineTo(cx, cy - 18); ctx.moveTo(cx, cy + 18); ctx.lineTo(cx, cy + Rv); ctx.stroke();
     ctx.beginPath(); ctx.arc(cx, cy, 18, 0, Math.PI * 2); ctx.stroke(); for (let i = 0; i < 12; i++) { const an = (i / 12) * Math.PI * 2; ctx.beginPath(); ctx.moveTo(cx + Math.cos(an) * (Rv - 10), cy + Math.sin(an) * (Rv - 10)); ctx.lineTo(cx + Math.cos(an) * Rv, cy + Math.sin(an) * Rv); ctx.stroke(); }
     ctx.strokeStyle = '#5c6670'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(cx, cy, Rv + 3, 0, Math.PI * 2); ctx.stroke();
-    // what is in the middle of the view, and the compass strip
-    const spots = [[0, 'Snowy mountains ⛰️'], [0.14, 'There’s my pizza shop! 🍕'], [0.4, 'Construction Town! 🏗️'], [0.68, 'The Islands! 🏝️'], [0.93, 'The sea 🌊']];
     let best = null; for (const [fc, text] of spots) { const d = Math.abs(fc - f); if (d < 0.09 && (!best || d < best.d)) best = { d, text }; }
     const bw = Math.min(W - 24, 320);
     if (best) { ctx.fillStyle = 'rgba(43,29,20,0.85)'; U.roundRect(ctx, cx - bw / 2, H - 152, bw, 40, 12); ctx.fill(); ctx.fillStyle = '#ffe08a'; ctx.font = r.font(bw < 300 ? 14 : 17); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(best.text, cx, H - 132); }
@@ -1217,7 +1237,7 @@ const CityExt = {
     ctx.save(); ctx.fillStyle = 'rgba(43,29,20,0.85)'; U.roundRect(ctx, cx - sw / 2, sy - 13, sw, 26, 13); ctx.fill();
     ctx.beginPath(); ctx.rect(cx - sw / 2 + 24, sy - 13, sw - 48, 26); ctx.clip();
     ctx.font = r.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    for (const [fc, lab] of [[-0.08, 'N'], [0.14, 'NW'], [0.4, 'W'], [0.68, 'SW'], [0.93, 'S'], [1.18, 'SE']]) { const x = cx + (fc - f) * sw * 0.9; ctx.fillStyle = Math.abs(fc - f) < 0.08 ? '#ffe08a' : 'rgba(255,255,255,0.55)'; ctx.fillText(lab, x, sy + 1); }
+    for (const [fc, lab] of compass) { const x = cx + (fc - f) * sw * 0.9; ctx.fillStyle = Math.abs(fc - f) < 0.08 ? '#ffe08a' : 'rgba(255,255,255,0.55)'; ctx.fillText(lab, x, sy + 1); }
     ctx.restore();
     ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.moveTo(cx - 5, sy - 13); ctx.lineTo(cx + 5, sy - 13); ctx.lineTo(cx, sy - 7); ctx.closePath(); ctx.fill();
     ctx.fillStyle = f > 0.02 ? '#ffe08a' : 'rgba(255,255,255,0.3)'; ctx.font = r.font(12); ctx.textAlign = 'center'; ctx.fillText('◀', cx - sw / 2 + 12, sy + 1); ctx.fillStyle = f < 0.98 ? '#ffe08a' : 'rgba(255,255,255,0.3)'; ctx.fillText('▶', cx + sw / 2 - 12, sy + 1);

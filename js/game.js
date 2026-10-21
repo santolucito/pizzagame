@@ -953,7 +953,17 @@ const Game = {
   computeHint() {
     const s = this.s, p = this.player;
     if (this.area === 'site' || this.travel) { this.hint = this.siteHint(); return; }
-    for (const e of this.ext) if (e.hint) { const h = e.hint(this); if (h !== undefined) { this.hint = h; return; } }
+    // Extensions answer in order. When the first answer points at something close by (a shop door, say) and other
+    // extensions point at other close things, the nearest one wins, so two neighbouring doors never fight.
+    const NEAR = 120;
+    let first, best = null, bd = Infinity;
+    for (const e of this.ext) if (e.hint) {
+      const h = e.hint(this); if (h === undefined) continue;
+      const d = h && h.target ? U.dist(p.x, p.y, h.target.x, h.target.y) : Infinity;
+      if (first === undefined) { first = h; if (d > NEAR) break; }
+      if (d < bd) { bd = d; best = h; }
+    }
+    if (first !== undefined) { this.hint = first && first.target && bd <= NEAR ? best : first; return; }
     const hasCashier = this.staff.some((st) => st.role === 'cashier');
     const paying = this.customers.some((c) => c.state === 'paying' || c.state === 'toPay');
     const hasHelper = this.staff.some((st) => st.role === 'helper');

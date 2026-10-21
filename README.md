@@ -86,7 +86,10 @@ No build step, no dependencies: plain HTML5 Canvas + vanilla JavaScript.
 22. **The subway**: down the stairs in the City to an underground station, then a ride to the Columbia campus, with the lion, the giant-slice stand, and Barnard with its bear across Broadway.
 23. **The sports car lot** in the City sells a super-fast car for $900; it starts white, takes paint in the garage bay, and a second one is delivered to the pizzeria's parking lot.
 24. **Helicopter and Sky Café**: the helicopter on the airfield's helipad is driven with the joystick like a car but flies over everything in town; Cloud Harbor has a Sky Café you can walk into (cocoa, pie, a seat by the window).
-25. **Taxis**: in the City, stand on a sidewalk beside a street and hail a taxi; it pulls up, you hop in and ride around the blocks (on the house), and the button lets you out at the next curb.
+25. **Interiors**: the barn (goat, pig, hens and eggs, hayloft), and in the City the toy shop, barber, bakery, arcade, pet shop, hotel, candy shop, bookshop and cat café can all be entered, and on the campus Low Library and Barnard Hall, each with its own things to do.
+26. **Rooftops**: the ice cream shop has a roof too; land the helicopter on the pizzeria or ice cream roof and walk around up there.
+27. **Bedroom telescope**: the bedroom's telescope gives a pannable view over the whole town, like the Pizza Tower's.
+28. **Taxis**: in the City, stand on a sidewalk beside a street and hail a taxi; it pulls up, you hop in and ride around the blocks (on the house), and the button lets you out at the next curb.
     walk in to collect the money, and buy More Flavors inside to make it busier.
 
 Impatient customers and cars leave if they wait too long. Progress saves automatically to

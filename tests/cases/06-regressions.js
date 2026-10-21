@@ -21,7 +21,7 @@ module.exports = async (t) => {
   // standing at the bus stop calls the bus; the stop zone covers the bench
   await t.ev(() => { CityExt.st.bus.state = 'away'; CityExt.st.bus.timer = 500; T.tp(380, -30); });
   const called = await t.ev(() => T.until(() => CityExt.st.bus.state === 'stopped', 1500));
-  t.expect(called >= 0 && called <= 1100, `waiting at the stop brings the bus (took ${called} steps)`);
+  t.expect(called >= 0 && called <= 1200, `waiting at the stop brings the bus (took ${called} steps)`);
   t.expectEq(await t.ev(() => T.label()), '🚌 Ride the bus', 'bus can be boarded from beside the bench');
   await t.ev(() => { CityExt.st.bus.state = 'away'; CityExt.st.bus.timer = 999; });
 

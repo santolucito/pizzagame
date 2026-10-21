@@ -80,7 +80,7 @@ No build step, no dependencies: plain HTML5 Canvas + vanilla JavaScript.
 16. **The Islands by ferry**: the ferry behind River House crosses to small islands where you set up an island pizza stand and deliver by jet ski. Pizzas you carry wait in a crate on the dock.
 17. **Secret path**: somewhere behind the barn a trail leads into the woods to a cabin and a sleeping bear.
 18. **Dusk and weather**: a soft dusk every few minutes, rain in town now and then, snow at Construction Town.
-19. **Upstairs**: stairs in the office lead to the owner's bedroom; a nap in the bed starts a fresh morning. From outside you see the pizzeria's roof.
+19. **Upstairs**: stairs in the office lead to the owner's bedroom; a nap in the bed starts a fresh morning. From outside you see the pizzeria's roof. A catalog on the bedside table sells room upgrades (lava lamp, hamster wheel, drum kit, bed slide, race-car bed…), and the desk has a drawing pad: hang your drawing on the wall and a copy hangs in the dining room too.
 20. **Ice cream drive-thru**: a window on East Road where cars buy cones on their own, once you own the ice cream shop.
 21. **The airfield and Cloud Harbor**: taxi the plane onto the runway past the fire station and fly to floating cloud islands with a hot-air balloon, a glider ramp, bouncy clouds and a sky café.
 22. **The subway**: down the stairs in the City to an underground station, then a ride to the Columbia campus, with the lion, the giant-slice stand, and Barnard with its bear across Broadway.

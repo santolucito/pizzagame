@@ -41,6 +41,26 @@ CFG.UPSTAIRS = {
   opening: { x0: 6866, y0: 1766, x1: 6936, y1: 1838 },    // the stair hole in the floor, railed on two sides
   top: { x: 6836, y: 1806 }, topReach: 34,                // the top of the stairs: arrive here, go down from here
   nap: { hop: 0.45, sleep: 3.0, wake: 0.5 },              // seconds
+  catalog: { x: 6622, y: 1602, reach: 36 },               // the catalog lies on the bedside table; stand just below it
+  chairReach: 36,                                         // stand by the desk chair to draw
+  art: { room: { x: 6600, y: 1546, w: 44, h: 33 }, shop: { x: 922, y: 132, w: 48, h: 36 }, size: [160, 120] },   // where the drawing hangs
+  slide: { entry: { x: 6600, y: 1712 }, top: { x: 6566, y: 1702 }, bottom: { x: 6566, y: 1804 }, reach: 14, dur: 1.1 },
+  // bedroom upgrades, bought from the catalog: `spot` is where the item goes, `block` an obstacle rect once owned,
+  // `view` how the catalog page shows it (scale, and the item's visual centre relative to its spot)
+  items: [
+    { key: 'poster', label: 'Pizza Chef Poster', ico: '🖼️', price: 50, spot: { x: 6728, y: 1547 }, view: { s: 3.4, dy: 0 } },
+    { key: 'lava', label: 'Lava Lamp', ico: '🔮', price: 60, spot: { x: 6752, y: 1590 }, view: { s: 3.6, dy: -10 } },
+    { key: 'beanbag', label: 'Bean Bag', ico: '🛋️', price: 70, spot: { x: 6790, y: 1680 }, view: { s: 3.2, dy: 0 }, block: [6766, 1664, 48, 32] },
+    { key: 'stars', label: 'Star Projector', ico: '🌟', price: 80, spot: { x: 6706, y: 1590 }, view: { s: 3.4, dy: -6 } },
+    { key: 'chest', label: 'Toy Chest', ico: '🧸', price: 90, spot: { x: 6630, y: 1820 }, view: { s: 2.8, dy: -4 }, block: [6600, 1804, 60, 34] },
+    { key: 'hamster', label: 'Hamster Wheel', ico: '🐹', price: 100, spot: { x: 6806, y: 1802 }, view: { s: 3.4, dy: -4 }, block: [6786, 1784, 40, 34] },
+    { key: 'horse', label: 'Rocking Horse', ico: '🐴', price: 110, spot: { x: 6690, y: 1806 }, view: { s: 3.4, dy: -8 }, block: [6672, 1790, 36, 30] },
+    { key: 'fish', label: 'Fish Tank', ico: '🐟', price: 120, spot: { x: 6916, y: 1592 }, view: { s: 3.4, dy: 0 }, block: [6896, 1574, 40, 36] },
+    { key: 'drums', label: 'Drum Kit', ico: '🥁', price: 150, spot: { x: 6745, y: 1802 }, view: { s: 2.8, dy: -6 }, block: [6716, 1782, 58, 40] },
+    { key: 'slide', label: 'Bed Slide', ico: '🛝', price: 200, spot: { x: 6566, y: 1752 }, view: { s: 2.2, dy: 0 }, block: [6552, 1716, 28, 72] },
+    { key: 'telescope', label: 'Telescope', ico: '🔭', price: 250, spot: { x: 6872, y: 1594 }, view: { s: 3.2, dy: -8 }, block: [6858, 1580, 28, 24] },
+    { key: 'racecar', label: 'Race-Car Bed', ico: '🏎️', price: 300, spot: { x: 6538, y: 1641 }, view: { s: 1.5, dy: 0 } },
+  ],
 };
 CFG.AREAS.upstairs = { WORLD: CFG.UPSTAIRS.WORLD };
 
@@ -49,17 +69,23 @@ const UpstairsExt = {
   st: null, roofBg: null,
 
   // ---------- game hooks ----------
-  defaults: { upstairs: { seen: false } },
-  home(g) { if (this.st) { this.st.nap = null; this.st.fade = 0; this.st.roofA = 1; } },
+  defaults: { upstairs: { seen: false, owned: {}, drawing: null } },
+  home(g) { if (this.st) { this.st.nap = null; this.st.slide = null; this.st.fade = 0; this.st.roofA = 1; this.st.cat.on = false; this.st.cat.hold = null; } if (this.st && this.st.draw.on) this.closePad(g); },
   build(g) {
-    if (!g.s.upstairs) g.s.upstairs = { seen: false };
+    if (!g.s.upstairs) g.s.upstairs = { seen: false, owned: {}, drawing: null };
+    if (!g.s.upstairs.owned) g.s.upstairs.owned = {};
     const R = CFG.UPSTAIRS.ROOF;
+    this.img = null;
     this.st = {
-      roofA: this.insideShop(g) ? 0 : 1, fade: 0, nap: null,
+      roofA: this.insideShop(g) ? 0 : 1, fade: 0, nap: null, slide: null, slideArmed: true,
       smoke: [], smokeT: 1, puffing: 0, rest: 3,
       pigeons: R.pigeons.map((p, i) => ({ x: p.x, y: p.y, tx: p.x, ty: p.y, wait: 1 + i, facing: 1, step: 0 })),
+      cat: { on: false, page: 0, flip: null, ready: true, hold: null, bought: 0, nope: 0 },   // the decoration catalog
+      draw: { on: false, hold: null },                                                       // the drawing pad
+      notes: [], noteT: 0, wheel: 0, wheelV: 0, rock: 0,
     };
   },
+  owned(g, key) { return !!(g.s.upstairs && g.s.upstairs.owned && g.s.upstairs.owned[key]); },
   // Inside the pizzeria, or in the door gap: the roof is off.
   insideShop(g) {
     const p = g.player, B = CFG.BUILDING, D = CFG.DOOR;
@@ -78,6 +104,8 @@ const UpstairsExt = {
     o.push(rect(C.bed), rect(C.table), rect(C.wardrobe), rect(C.desk), rect(C.shelf), rect(C.opening));
     o.push({ x: C.chair.x - 10, y: C.chair.y - 10, w: 20, h: 20 });
     o.push({ x: C.plant.x - 13, y: C.plant.y - 12, w: 26, h: 20 });
+    const g = Game;
+    for (const it of C.items) if (it.block && this.owned(g, it.key)) o.push({ x: it.block[0], y: it.block[1], w: it.block[2], h: it.block[3] });
     return o;
   },
   update(g, dt) {
@@ -119,15 +147,22 @@ const UpstairsExt = {
       return null;
     }
     if (g.area !== 'upstairs') return null;
-    if (this.st.nap) return null;                                         // fast asleep
+    const st = this.st;
+    if (st.nap || st.slide || st.draw.on) return null;                   // fast asleep, whooshing, or busy drawing
+    if (st.cat.on) return this.catalogAction(g);
     if (U.dist(p.x, p.y, C.top.x, C.top.y) < C.topReach) return { label: '🪜 Go downstairs', run: (gg) => this.goDown(gg) };
+    if (U.dist(p.x, p.y, C.catalog.x, C.catalog.y) < C.catalog.reach) return { label: '📖 Open the catalog', run: (gg) => this.openCatalog(gg) };
+    if (U.dist(p.x, p.y, C.chair.x, C.chair.y) < C.chairReach) return { label: '✏️ Sit and draw', run: (gg) => this.openPad(gg) };
     if (U.dist(p.x, p.y, C.sleepSpot.x, C.sleepSpot.y) < C.sleepReach) return { label: '😴 Sleep', run: (gg) => this.startNap(gg) };
     return null;
   },
   hint(g) {
     const p = g.player, C = CFG.UPSTAIRS;
     if (g.area === 'upstairs') {
-      if (this.st.nap) return null;
+      const st = this.st;
+      if (st.nap || st.slide || st.draw.on || st.cat.on) return null;      // the scenes and overlays explain themselves
+      if (U.dist(p.x, p.y, C.catalog.x, C.catalog.y) < C.catalog.reach) return { text: 'Open the catalog to decorate 📖', target: null };
+      if (U.dist(p.x, p.y, C.chair.x, C.chair.y) < C.chairReach) return { text: 'Sit at the desk and draw ✏️', target: null };
       if (U.dist(p.x, p.y, C.sleepSpot.x, C.sleepSpot.y) < C.sleepReach) return { text: 'Hop into bed for a nap 😴', target: null };
       return null;
     }
@@ -139,7 +174,7 @@ const UpstairsExt = {
   goUp(g) {
     const C = CFG.UPSTAIRS, p = g.player;
     g.area = 'upstairs'; p.x = C.top.x; p.y = C.top.y; p.moving = false; p.facing = -1; p.hasMoved = true; g.cameraSnap = true;
-    this.st.fade = C.ROOF.fade; this.st.nap = null; Sfx.ding(); Haptics.tap();
+    this.st.fade = C.ROOF.fade; this.st.nap = null; this.st.slide = null; this.st.slideArmed = false; Sfx.ding(); Haptics.tap();
     if (!g.s.upstairs.seen) { g.s.upstairs.seen = true; g.toast('🛏️ Your very own room!', true); }
   },
   goDown(g) {
@@ -161,6 +196,7 @@ const UpstairsExt = {
     const B = C.bed;
     if (p.x > B.x0 && p.x < B.x1 && p.y > B.y0 && p.y < B.y1) { p.x = C.sleepSpot.x; p.y = C.sleepSpot.y; p.moving = false; return true; }   // a save made mid-nap: just get up
     p.x = C.top.x; p.y = C.top.y; p.moving = false;
+    if (this.st.cat.hold) this.st.cat.hold = { x: p.x, y: p.y };
     g.floats.push({ x: p.x, y: p.y - 50, text: 'Oops! Back inside', color: '#ffe08a', t: 0, dur: 1.4, big: true });
     return true;
   },
@@ -177,7 +213,42 @@ const UpstairsExt = {
   },
   updateRoom(g, dt) {
     const st = this.st, p = g.player, C = CFG.UPSTAIRS, N = C.nap, n = st.nap;
-    if (!n) { this.rescue(g); return; }
+    this.updateToys(g, dt);
+    // reading the catalog: stay put, left/right turn the pages, down closes it
+    if (st.cat.on) {
+      const c = st.cat; p.x = c.hold.x; p.y = c.hold.y; p.moving = false;
+      c.bought = Math.max(0, c.bought - dt); c.nope = Math.max(0, c.nope - dt);
+      if (c.flip) { c.flip.t += dt; if (c.flip.t >= c.flip.dur) c.flip = null; }
+      const a = Input.axis();
+      if (Math.abs(a.x) < 0.3 && Math.abs(a.y) < 0.3) c.ready = true;
+      else if (c.ready) {
+        c.ready = false;
+        if (a.y > 0.5 && Math.abs(a.x) < 0.5) this.closeCatalog(g);
+        else if (a.x > 0.5) this.turnPage(g, 1);
+        else if (a.x < -0.5) this.turnPage(g, -1);
+      }
+      return;
+    }
+    // drawing at the desk: the chef stays on the chair's side while the pad is open
+    if (st.draw.on) { p.x = st.draw.hold.x; p.y = st.draw.hold.y; p.moving = false; return; }
+    // the bed slide: step onto the little platform at the foot of the bed and whoosh down
+    if (st.slide) {
+      const S = C.slide, r = st.slide; r.t += dt; p.moving = false; p.facing = -1;
+      const k = Math.min(1, r.t / S.dur);
+      if (k < 0.25) { const q = k / 0.25; p.x = U.lerp(S.entry.x, S.top.x, q); p.y = U.lerp(S.entry.y, S.top.y, q) - Math.sin(q * Math.PI) * 18; }
+      else { const q = (k - 0.25) / 0.75; p.x = S.top.x + Math.sin(q * Math.PI * 3) * 2; p.y = U.lerp(S.top.y, S.bottom.y, q * q); }
+      if (k >= 1) { st.slide = null; p.x = S.bottom.x; p.y = S.bottom.y; Sfx.drop(); }
+      return;
+    }
+    if (!n) {
+      this.rescue(g);
+      if (this.owned(g, 'slide')) {
+        const S = C.slide, near = U.dist(p.x, p.y, S.entry.x, S.entry.y) < S.reach;
+        if (near && st.slideArmed) { st.slide = { t: 0 }; st.slideArmed = false; Sfx.whistle(); Haptics.tap(); g.floats.push({ x: S.top.x, y: S.top.y - 40, text: 'Wheee!', color: '#ffe08a', t: 0, dur: 1.2, big: true }); }
+        else if (!near && U.dist(p.x, p.y, S.entry.x, S.entry.y) > S.reach + 12) st.slideArmed = true;
+      }
+      return;
+    }
     // asleep: the chef is frozen; the phases carry them into bed, through the night and back out
     n.t += dt; p.moving = false; p.facing = 1;
     const arc = (a, b, k) => { p.x = U.lerp(a.x, b.x, k); p.y = U.lerp(a.y, b.y, k) - Math.sin(k * Math.PI) * 26; };
@@ -382,6 +453,9 @@ const UpstairsExt = {
     ctx.fillStyle = 'rgba(0,0,0,0.2)'; U.roundRect(ctx, sg.x - 28, sg.y - 7, 60, 16, 4); ctx.fill();
     ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, sg.x - 30, sg.y - 9, 60, 16, 4); ctx.fill();
     ctx.fillStyle = '#ffe08a'; ctx.font = r.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🛏️ UPSTAIRS', sg.x, sg.y - 1);
+    // the owner's drawing hangs in the dining room too, on the back wall past the neon sign
+    const A = CFG.UPSTAIRS.art.shop;
+    if (this.img && this.img.ok) this.paintArt(ctx, A.x, A.y, A.w, A.h);
   },
 
   // ---------- the bedroom (static) ----------
@@ -467,17 +541,8 @@ const UpstairsExt = {
     ctx.fillStyle = '#fff'; ctx.strokeStyle = 'rgba(43,29,20,0.45)'; ctx.lineWidth = 1.5;
     U.roundRect(ctx, hk.x - 9, hk.y - 2, 18, 10, 3); ctx.fill(); ctx.stroke();
     ctx.beginPath(); ctx.arc(hk.x - 5, hk.y - 5, 6, 0, Math.PI * 2); ctx.arc(hk.x + 5, hk.y - 5, 6, 0, Math.PI * 2); ctx.fill();
-    // the big bed: headboard and posts, mattress, two pillows and the pizza-print duvet
-    const B = C.bed;
-    ctx.fillStyle = 'rgba(0,0,0,0.18)'; U.roundRect(ctx, B.x0 + 4, B.y0 + 6, B.x1 - B.x0, B.y1 - B.y0, 6); ctx.fill();
-    ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, B.x0 - 4, B.y0 - 10, B.x1 - B.x0 + 8, 22, 5); ctx.fill();
-    ctx.fillStyle = '#a5693a'; U.roundRect(ctx, B.x0 - 1, B.y0 - 7, B.x1 - B.x0 + 2, 14, 4); ctx.fill();
-    for (const x of [B.x0 - 2, B.x1 + 2]) { ctx.fillStyle = '#5b3a1a'; ctx.beginPath(); ctx.arc(x, B.y0 - 8, 5, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(x, B.y1 - 4, 5, 0, Math.PI * 2); ctx.fill(); }
-    ctx.fillStyle = '#5b3a1a'; U.roundRect(ctx, B.x0 - 3, B.y0 + 4, B.x1 - B.x0 + 6, B.y1 - B.y0 - 4, 6); ctx.fill();
-    ctx.fillStyle = '#fff8ee'; U.roundRect(ctx, B.x0, B.y0 + 6, B.x1 - B.x0, B.y1 - B.y0 - 8, 5); ctx.fill();
-    for (const x of [B.x0 + 28, B.x1 - 28]) { ctx.fillStyle = 'rgba(0,0,0,0.1)'; U.roundRect(ctx, x - 22, B.y0 + 14, 46, 24, 8); ctx.fill(); ctx.fillStyle = '#fff'; U.roundRect(ctx, x - 23, B.y0 + 11, 46, 24, 8); ctx.fill(); ctx.strokeStyle = 'rgba(43,29,20,0.25)'; ctx.lineWidth = 1.5; U.roundRect(ctx, x - 23, B.y0 + 11, 46, 24, 8); ctx.stroke(); }
-    this.duvet(ctx, B.x0 + 3, B.y0 + 48, B.x1 - 3, B.y1 - 6, 8);
-    ctx.fillStyle = '#fff8ee'; U.roundRect(ctx, B.x0 + 3, B.y0 + 48, B.x1 - B.x0 - 6, 12, 4); ctx.fill();   // folded sheet
+    // the big bed (or the race-car bed once bought)
+    this.paintBed(ctx, this.owned(g, 'racecar'));
     // bedside table with a lamp and the alarm clock
     const T = C.table, tx = (T.x0 + T.x1) / 2;
     ctx.fillStyle = 'rgba(0,0,0,0.18)'; U.roundRect(ctx, T.x0 + 3, T.y0 + 4, T.x1 - T.x0, T.y1 - T.y0, 4); ctx.fill();
@@ -489,6 +554,9 @@ const UpstairsExt = {
     ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(tx + 9, T.y0 + 20, 4.5, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(tx + 9, T.y0 + 20); ctx.lineTo(tx + 9, T.y0 + 17); ctx.moveTo(tx + 9, T.y0 + 20); ctx.lineTo(tx + 11.5, T.y0 + 21); ctx.stroke();
     ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.arc(tx + 5, T.y0 + 14.5, 1.8, 0, Math.PI * 2); ctx.arc(tx + 13, T.y0 + 14.5, 1.8, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#b23a48'; U.roundRect(ctx, tx - 16, T.y0 + 22, 20, 10, 2); ctx.fill();                  // the catalog, lying on the table
+    ctx.fillStyle = '#fff8ee'; ctx.fillRect(tx - 14, T.y0 + 24, 16, 1.5); ctx.fillRect(tx - 14, T.y0 + 27, 12, 1.5);
+    ctx.fillStyle = '#ffe08a'; ctx.font = r.font(6); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('📖', tx - 6, T.y0 + 27);
     // wardrobe with two doors
     const Wd = C.wardrobe;
     ctx.fillStyle = 'rgba(0,0,0,0.18)'; U.roundRect(ctx, Wd.x0 + 4, Wd.y0 + 5, Wd.x1 - Wd.x0, Wd.y1 - Wd.y0, 4); ctx.fill();
@@ -537,6 +605,11 @@ const UpstairsExt = {
     ctx.fillStyle = '#d7b98a'; ctx.fillRect(O.x0 - 16, O.y0 - 16, O.x1 - O.x0 + 16, 4); ctx.fillRect(O.x0 - 16, O.y0 - 16, 4, O.y1 - O.y0 + 16);
     ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, O.x0 - 36, O.y0 - 36, 64, 16, 4); ctx.fill();
     ctx.fillStyle = '#ffe08a'; ctx.font = r.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🍕 DOWNSTAIRS', O.x0 - 4, O.y0 - 28);
+    // bought decorations (their still parts; the moving bits are drawn each frame in `dynamic`)
+    for (const it of C.items) if (it.key !== 'racecar' && this.owned(g, it.key)) this.drawItem(r, g, it, 'static');   // the car bed was painted with the bed
+    // the owner's drawing, framed on the wall beside the photo
+    const A = C.art.room;
+    if (this.img && this.img.ok) this.paintArt(ctx, A.x, A.y, A.w, A.h);
   },
 
   // ---------- the chef tucked in (drawn with the people so the duvet covers the sprite) ----------
@@ -574,6 +647,7 @@ const UpstairsExt = {
     const ctx = r.ctx, W = r.canvas.width / r.dpr, H = r.canvas.height / r.dpr;
     const a = this.napAlpha();
     if (a > 0 && g.area === 'upstairs') this.drawNight(r, g, W, H, a);
+    if (g.area === 'upstairs' && this.st.cat.on) this.drawCatalog(r, g, W, H);
     if (this.st.fade > 0) { ctx.fillStyle = `rgba(20,12,6,${(this.st.fade / CFG.UPSTAIRS.ROOF.fade).toFixed(3)})`; ctx.fillRect(0, 0, W, H); }
   },
   drawNight(r, g, W, H, a) {
@@ -606,6 +680,405 @@ const UpstairsExt = {
     ctx.fillStyle = '#fff8ee'; ctx.font = r.font(Math.min(30, W / 14)); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText('😴 Sweet dreams…', W / 2, H * 0.85);
     ctx.restore();
+  },
+
+  // ======================= the bed =======================
+  paintBed(ctx, racecar) {
+    const B = CFG.UPSTAIRS.bed;
+    ctx.fillStyle = 'rgba(0,0,0,0.18)'; U.roundRect(ctx, B.x0 + 4, B.y0 + 6, B.x1 - B.x0, B.y1 - B.y0, 6); ctx.fill();
+    if (racecar) {
+      // a red racing car: rounded body, four fat wheels, a spoiler at the head end and a number on the bonnet
+      ctx.fillStyle = '#2b1d14'; for (const [x, y] of [[B.x0 - 2, B.y0 + 28], [B.x1 + 2, B.y0 + 28], [B.x0 - 2, B.y1 - 30], [B.x1 + 2, B.y1 - 30]]) { U.roundRect(ctx, x - 9, y - 16, 18, 32, 6); ctx.fill(); }
+      ctx.fillStyle = '#8d9299'; for (const [x, y] of [[B.x0 - 2, B.y0 + 28], [B.x1 + 2, B.y0 + 28], [B.x0 - 2, B.y1 - 30], [B.x1 + 2, B.y1 - 30]]) ctx.fillRect(x - 3, y - 8, 6, 16);
+      ctx.fillStyle = '#c62828'; U.roundRect(ctx, B.x0 - 4, B.y0 - 10, B.x1 - B.x0 + 8, B.y1 - B.y0 + 10, 22); ctx.fill();
+      ctx.fillStyle = '#e53935'; U.roundRect(ctx, B.x0 + 2, B.y0 - 4, B.x1 - B.x0 - 4, B.y1 - B.y0 + 2, 18); ctx.fill();
+      ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, B.x0 - 10, B.y0 - 16, B.x1 - B.x0 + 20, 10, 4); ctx.fill();          // spoiler
+      ctx.fillStyle = '#fff8ee'; ctx.fillRect(B.x0 + 16, B.y0 - 4, 10, B.y1 - B.y0 + 2); ctx.fillRect(B.x1 - 26, B.y0 - 4, 10, B.y1 - B.y0 + 2);   // racing stripes
+      ctx.fillStyle = '#ffe08a'; for (const x of [B.x0 + 22, B.x1 - 22]) { ctx.beginPath(); ctx.arc(x, B.y1 - 6, 5, 0, Math.PI * 2); ctx.fill(); }   // headlights at the foot
+      ctx.fillStyle = '#fff'; U.roundRect(ctx, B.x0 + 10, B.y0 + 8, B.x1 - B.x0 - 20, B.y1 - B.y0 - 16, 10); ctx.fill();   // the mattress inside
+      for (const x of [B.x0 + 32, B.x1 - 32]) { ctx.fillStyle = '#9fd8f2'; U.roundRect(ctx, x - 18, B.y0 + 14, 38, 20, 7); ctx.fill(); }
+      this.duvet(ctx, B.x0 + 12, B.y0 + 46, B.x1 - 12, B.y1 - 12, 8);
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc((B.x0 + B.x1) / 2, B.y1 - 26, 11, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#2b1d14'; ctx.font = `900 14px "Trebuchet MS", "Segoe UI", system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('1', (B.x0 + B.x1) / 2, B.y1 - 25);
+      return;
+    }
+    // headboard and posts, mattress, two pillows and the pizza-print duvet
+    ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, B.x0 - 4, B.y0 - 10, B.x1 - B.x0 + 8, 22, 5); ctx.fill();
+    ctx.fillStyle = '#a5693a'; U.roundRect(ctx, B.x0 - 1, B.y0 - 7, B.x1 - B.x0 + 2, 14, 4); ctx.fill();
+    for (const x of [B.x0 - 2, B.x1 + 2]) { ctx.fillStyle = '#5b3a1a'; ctx.beginPath(); ctx.arc(x, B.y0 - 8, 5, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(x, B.y1 - 4, 5, 0, Math.PI * 2); ctx.fill(); }
+    ctx.fillStyle = '#5b3a1a'; U.roundRect(ctx, B.x0 - 3, B.y0 + 4, B.x1 - B.x0 + 6, B.y1 - B.y0 - 4, 6); ctx.fill();
+    ctx.fillStyle = '#fff8ee'; U.roundRect(ctx, B.x0, B.y0 + 6, B.x1 - B.x0, B.y1 - B.y0 - 8, 5); ctx.fill();
+    for (const x of [B.x0 + 28, B.x1 - 28]) { ctx.fillStyle = 'rgba(0,0,0,0.1)'; U.roundRect(ctx, x - 22, B.y0 + 14, 46, 24, 8); ctx.fill(); ctx.fillStyle = '#fff'; U.roundRect(ctx, x - 23, B.y0 + 11, 46, 24, 8); ctx.fill(); ctx.strokeStyle = 'rgba(43,29,20,0.25)'; ctx.lineWidth = 1.5; U.roundRect(ctx, x - 23, B.y0 + 11, 46, 24, 8); ctx.stroke(); }
+    this.duvet(ctx, B.x0 + 3, B.y0 + 48, B.x1 - 3, B.y1 - 6, 8);
+    ctx.fillStyle = '#fff8ee'; U.roundRect(ctx, B.x0 + 3, B.y0 + 48, B.x1 - B.x0 - 6, 12, 4); ctx.fill();   // folded sheet
+  },
+
+  // ======================= the decorations =======================
+  // `mode`: 'static' paints the still parts (cached background), 'dynamic' the moving parts (each frame), 'all' both (the catalog page).
+  drawItem(r, g, it, mode) {
+    const ctx = r.ctx, x = it.spot.x, y = it.spot.y, t = g.time, st = this.st || {}, p = g.player;
+    const S = mode !== 'dynamic', D = mode !== 'static';
+    const near = g.area === 'upstairs' && U.dist(p.x, p.y, x, y) < 70;
+    switch (it.key) {
+      case 'poster':
+        if (S) {
+          ctx.fillStyle = '#5b3a1a'; U.roundRect(ctx, x - 26, y - 14, 52, 28, 3); ctx.fill();
+          ctx.fillStyle = '#ffe08a'; ctx.fillRect(x - 23, y - 11, 46, 22);
+          ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(x - 12, y, 5, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#fff'; U.roundRect(ctx, x - 16, y - 8, 8, 4, 1.5); ctx.fill(); ctx.beginPath(); ctx.arc(x - 14, y - 9, 2.5, 0, Math.PI * 2); ctx.arc(x - 10, y - 9, 2.5, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#e4572e'; ctx.fillRect(x - 15, y + 5, 6, 5);
+          r.drawPizza(x + 2, y, 5);
+          ctx.fillStyle = '#b8401c'; ctx.font = r.font(6); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('PIZZA', x + 14, y - 4); ctx.fillText('CHEF!', x + 14, y + 4);
+        }
+        break;
+      case 'lava':
+        if (S) { ctx.fillStyle = '#8d9299'; U.roundRect(ctx, x - 8, y + 6, 16, 6, 2); ctx.fill(); ctx.fillStyle = '#e8d2b4'; U.roundRect(ctx, x - 6, y - 24, 12, 32, 5); ctx.fill(); ctx.fillStyle = '#8d9299'; U.roundRect(ctx, x - 5, y - 28, 10, 5, 2); ctx.fill(); }
+        if (D) {
+          ctx.save(); ctx.beginPath(); U.roundRect(ctx, x - 5, y - 23, 10, 30, 4); ctx.clip();
+          ctx.fillStyle = '#ff9f1c'; ctx.fillRect(x - 5, y - 23, 10, 30);
+          ctx.fillStyle = '#e4572e';
+          for (let k = 0; k < 3; k++) { const ph = (t * 0.25 + k * 0.33) % 1; ctx.beginPath(); ctx.ellipse(x + Math.sin(t + k * 2) * 2, y + 4 - ph * 26, 3 + Math.sin(t * 2 + k) * 0.8, 4, 0, 0, Math.PI * 2); ctx.fill(); }
+          ctx.restore();
+          ctx.fillStyle = `rgba(255,159,28,${(0.12 + 0.06 * Math.sin(t * 2)).toFixed(3)})`; ctx.beginPath(); ctx.arc(x, y - 8, 22, 0, Math.PI * 2); ctx.fill();
+        }
+        break;
+      case 'beanbag':
+        if (S) { ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(x + 3, y + 4, 26, 18, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#3b7dd8'; ctx.beginPath(); ctx.ellipse(x, y, 26, 18, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#5a9be8'; ctx.beginPath(); ctx.ellipse(x - 2, y - 4, 16, 10, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.beginPath(); ctx.ellipse(x, y + 1, 9, 5, 0, 0, Math.PI * 2); ctx.fill(); }
+        break;
+      case 'stars':
+        if (S) { ctx.fillStyle = '#2d3a4a'; U.roundRect(ctx, x - 10, y - 4, 20, 12, 4); ctx.fill(); ctx.fillStyle = '#5a6fb0'; ctx.beginPath(); ctx.arc(x, y - 6, 8, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#ffe08a'; for (const [dx, dy] of [[-3, -8], [3, -5], [0, -10]]) { ctx.beginPath(); ctx.arc(x + dx, y + dy, 1.2, 0, Math.PI * 2); ctx.fill(); } }
+        if (D) {
+          // stars drift across the ceiling (which, seen from above, is a soft lightshow over the floor)
+          const R = CFG.UPSTAIRS.room, cx = (R.x0 + R.x1) / 2, cy = (R.y0 + R.y1) / 2;
+          ctx.fillStyle = `rgba(90,111,176,${mode === 'all' ? 0 : 0.08})`; ctx.fillRect(R.x0, R.y0, R.x1 - R.x0, R.y1 - R.y0);
+          for (let k = 0; k < 16; k++) {
+            const a = t * 0.12 + k * 0.39, rad = (mode === 'all' ? 30 : 120) + (k % 4) * (mode === 'all' ? 8 : 34), sx = (mode === 'all' ? x : cx) + Math.cos(a) * rad * 1.6, sy = (mode === 'all' ? y - 26 : cy) + Math.sin(a) * rad * 0.9;
+            const tw = 0.6 + 0.4 * Math.sin(t * 3 + k), s = (mode === 'all' ? 2.5 : 4) * tw;
+            ctx.fillStyle = `rgba(255,224,138,${(0.55 * tw).toFixed(2)})`;
+            ctx.beginPath(); for (let i = 0; i < 8; i++) { const rr = i % 2 ? s * 0.4 : s, aa = i * Math.PI / 4; ctx.lineTo(sx + Math.cos(aa) * rr, sy + Math.sin(aa) * rr); } ctx.closePath(); ctx.fill();
+          }
+        }
+        break;
+      case 'chest':
+        if (S) { ctx.fillStyle = 'rgba(0,0,0,0.18)'; U.roundRect(ctx, x - 27, y - 12, 60, 34, 4); ctx.fill(); ctx.fillStyle = '#5b3a1a'; U.roundRect(ctx, x - 30, y - 16, 60, 34, 4); ctx.fill(); ctx.fillStyle = '#e4572e'; U.roundRect(ctx, x - 27, y - 13, 54, 28, 3); ctx.fill(); ctx.fillStyle = '#ffe08a'; ctx.fillRect(x - 27, y - 2, 54, 3); ctx.fillStyle = '#f2b134'; ctx.beginPath(); ctx.arc(x, y - 1, 4, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = r.font(10); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🧸', x - 14, y - 7); ctx.fillText('🚂', x + 14, y - 7); }
+        break;
+      case 'hamster':
+        if (S) { ctx.fillStyle = 'rgba(0,0,0,0.18)'; U.roundRect(ctx, x - 17, y - 12, 40, 32, 5); ctx.fill(); ctx.fillStyle = '#d7b98a'; U.roundRect(ctx, x - 20, y - 16, 40, 32, 5); ctx.fill(); ctx.strokeStyle = '#8d9299'; ctx.lineWidth = 1; for (let k = -16; k <= 16; k += 5) { ctx.beginPath(); ctx.moveTo(x + k, y - 14); ctx.lineTo(x + k, y + 14); ctx.stroke(); } ctx.fillStyle = '#e8d2b4'; ctx.fillRect(x - 18, y + 8, 36, 6); }
+        if (D) {
+          const ang = mode === 'all' ? t * 6 : st.wheel || 0;
+          ctx.strokeStyle = '#e4572e'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x + 6, y - 1, 11, 0, Math.PI * 2); ctx.stroke();
+          ctx.strokeStyle = '#ff8a65'; ctx.lineWidth = 1.5; for (let k = 0; k < 4; k++) { const a = ang + k * Math.PI / 2; ctx.beginPath(); ctx.moveTo(x + 6 - Math.cos(a) * 11, y - 1 - Math.sin(a) * 11); ctx.lineTo(x + 6 + Math.cos(a) * 11, y - 1 + Math.sin(a) * 11); ctx.stroke(); }
+          const run = mode === 'all' || (st.wheelV || 0) > 0.5, bob = run ? Math.sin(t * 20) * 1 : 0;
+          ctx.fillStyle = '#d9a066'; ctx.beginPath(); ctx.ellipse(x + 6, y + 5 + bob, 6, 4, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#f3e6cf'; ctx.beginPath(); ctx.ellipse(x + 6, y + 6 + bob, 3.5, 2, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.arc(x + 10, y + 4 + bob, 0.8, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#d9a066'; ctx.beginPath(); ctx.arc(x + 3, y + 1 + bob, 1.6, 0, Math.PI * 2); ctx.arc(x + 8, y + 1 + bob, 1.6, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.arc(x - 12, y + 2, 2.5, 0, Math.PI * 2); ctx.fill();   // a seed
+        }
+        break;
+      case 'horse':
+        if (S) { ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(x + 2, y + 10, 20, 6, 0, 0, Math.PI * 2); ctx.fill(); }
+        if (D) {
+          const rock = mode === 'all' ? Math.sin(t * 3) * 0.16 : st.rock || 0;
+          ctx.save(); ctx.translate(x, y + 6); ctx.rotate(rock);
+          ctx.strokeStyle = '#8d5a2b'; ctx.lineWidth = 3.5; ctx.beginPath(); ctx.arc(0, -16, 22, Math.PI * 0.2, Math.PI * 0.8); ctx.stroke();   // the rocker
+          ctx.fillStyle = '#8d5a2b'; ctx.fillRect(-11, -16, 4, 14); ctx.fillRect(7, -16, 4, 14);
+          ctx.fillStyle = '#d9a066'; U.roundRect(ctx, -16, -24, 30, 14, 6); ctx.fill();            // body
+          ctx.fillStyle = '#b23a48'; U.roundRect(ctx, -6, -27, 12, 6, 2); ctx.fill();                // saddle
+          ctx.fillStyle = '#d9a066'; U.roundRect(ctx, 8, -36, 11, 16, 4); ctx.fill(); ctx.fillStyle = '#5b3a1a'; ctx.fillRect(9, -38, 8, 5); ctx.fillRect(10, -40, 3, 3);   // head + mane
+          ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.arc(15, -31, 1.2, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#5b3a1a'; ctx.beginPath(); ctx.moveTo(-16, -20); ctx.quadraticCurveTo(-24, -20, -22, -10); ctx.lineTo(-18, -14); ctx.closePath(); ctx.fill();   // tail
+          ctx.restore();
+        }
+        break;
+      case 'fish':
+        if (S) { ctx.fillStyle = 'rgba(0,0,0,0.18)'; U.roundRect(ctx, x - 17, y - 14, 40, 36, 3); ctx.fill(); ctx.fillStyle = '#2d3a4a'; U.roundRect(ctx, x - 20, y - 18, 40, 36, 3); ctx.fill(); ctx.fillStyle = '#4aa3d8'; ctx.fillRect(x - 17, y - 15, 34, 30); ctx.fillStyle = '#d9a066'; ctx.fillRect(x - 17, y + 10, 34, 5); ctx.fillStyle = '#3f9a4a'; for (const dx of [-12, 10]) { ctx.beginPath(); ctx.moveTo(x + dx, y + 11); ctx.quadraticCurveTo(x + dx - 4, y, x + dx, y - 8); ctx.quadraticCurveTo(x + dx + 4, y, x + dx, y + 11); ctx.fill(); } }
+        if (D) {
+          ctx.save(); ctx.beginPath(); ctx.rect(x - 17, y - 15, 34, 30); ctx.clip();
+          const fishes = [['#ff8a3d', 0, 0.9, -6], ['#ffd166', 2.1, 1.3, 3], ['#ff5c8a', 4.2, 0.7, 7]];
+          for (const [col, ph, sp, dy] of fishes) {
+            const fx = x + Math.sin(t * sp + ph) * 11, dir = Math.cos(t * sp + ph) >= 0 ? 1 : -1, fy = y + dy + Math.sin(t * 2 + ph) * 1.5;
+            ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(fx, fy, 4, 2.4, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.moveTo(fx - dir * 3, fy); ctx.lineTo(fx - dir * 6.5, fy - 2.5); ctx.lineTo(fx - dir * 6.5, fy + 2.5); ctx.closePath(); ctx.fill();
+            ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.arc(fx + dir * 2, fy - 0.6, 0.6, 0, Math.PI * 2); ctx.fill();
+          }
+          ctx.fillStyle = 'rgba(255,255,255,0.6)'; for (let k = 0; k < 3; k++) { const ph = (t * 0.5 + k * 0.33) % 1; ctx.beginPath(); ctx.arc(x + 12 + k * 1.5, y + 10 - ph * 24, 1 + k * 0.3, 0, Math.PI * 2); ctx.fill(); }
+          ctx.restore();
+        }
+        break;
+      case 'drums':
+        if (S) { ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(x + 2, y + 12, 30, 10, 0, 0, Math.PI * 2); ctx.fill(); }
+        if (D) {
+          const hit = mode === 'all' || near ? Math.max(0, Math.sin(t * 9)) * 1.5 : 0;
+          const drum = (dx, dy, rr, col) => { ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.ellipse(x + dx, y + dy + 3, rr, rr * 0.6, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(x + dx, y + dy, rr, rr * 0.6, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff8ee'; ctx.beginPath(); ctx.ellipse(x + dx, y + dy - hit, rr * 0.8, rr * 0.45, 0, 0, Math.PI * 2); ctx.fill(); };
+          drum(-14, -4, 10, '#e4572e'); drum(14, -4, 10, '#e4572e'); drum(0, 8, 13, '#3b7dd8');
+          ctx.fillStyle = '#f2b134'; ctx.beginPath(); ctx.ellipse(x - 24, y - 14, 9, 4, 0, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.ellipse(x + 24, y - 14, 9, 4, 0, 0, Math.PI * 2); ctx.fill();   // cymbals
+          ctx.strokeStyle = '#d7b98a'; ctx.lineWidth = 2; for (const d of [-1, 1]) { ctx.beginPath(); ctx.moveTo(x + d * 6, y - 18 + hit * d); ctx.lineTo(x + d * 16, y - 4 - hit * d); ctx.stroke(); }   // sticks
+        }
+        break;
+      case 'slide':
+        if (S) {
+          const Sl = CFG.UPSTAIRS.slide;
+          ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(Sl.top.x - 10, Sl.top.y + 14, 28, Sl.bottom.y - Sl.top.y - 6);
+          ctx.fillStyle = '#f2b134'; U.roundRect(ctx, Sl.top.x - 14, Sl.top.y + 8, 28, Sl.bottom.y - Sl.top.y - 4, 8); ctx.fill();
+          ctx.fillStyle = '#ffd166'; ctx.fillRect(Sl.top.x - 9, Sl.top.y + 12, 18, Sl.bottom.y - Sl.top.y - 14);
+          ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fillRect(Sl.top.x - 6, Sl.top.y + 14, 4, Sl.bottom.y - Sl.top.y - 20);
+          ctx.fillStyle = '#e4572e'; ctx.fillRect(Sl.top.x - 16, Sl.top.y + 8, 4, Sl.bottom.y - Sl.top.y - 12); ctx.fillRect(Sl.top.x + 12, Sl.top.y + 8, 4, Sl.bottom.y - Sl.top.y - 12);   // rails
+          ctx.fillStyle = '#5b3a1a'; U.roundRect(ctx, Sl.entry.x - 10, Sl.entry.y - 7, 20, 14, 3); ctx.fill();   // the little step you climb on
+          ctx.fillStyle = '#d7b98a'; U.roundRect(ctx, Sl.entry.x - 8, Sl.entry.y - 5, 16, 10, 2); ctx.fill();
+          ctx.fillStyle = '#2b1d14'; ctx.font = r.font(8); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('▼', Sl.top.x, Sl.top.y + 26);
+        }
+        break;
+      case 'telescope':
+        if (S) { ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(x + 2, y + 10, 14, 5, 0, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#5b3a1a'; ctx.lineWidth = 3; for (const d of [-1, 0, 1]) { ctx.beginPath(); ctx.moveTo(x, y - 6); ctx.lineTo(x + d * 10, y + 10); ctx.stroke(); } ctx.save(); ctx.translate(x, y - 8); ctx.rotate(-0.9); ctx.fillStyle = '#2d3a4a'; U.roundRect(ctx, -6, -4, 30, 8, 3); ctx.fill(); ctx.fillStyle = '#8d9299'; U.roundRect(ctx, 20, -5, 8, 10, 3); ctx.fill(); ctx.fillStyle = '#9fd8f2'; ctx.fillRect(26, -3, 2, 6); ctx.restore(); }
+        if (D) { const tw = 0.5 + 0.5 * Math.sin(t * 4); ctx.fillStyle = `rgba(255,224,138,${(0.4 + 0.6 * tw).toFixed(2)})`; ctx.font = r.font(10 + tw * 3); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('✦', x + 22, y - 30); }
+        break;
+      case 'racecar':
+        if (S) this.paintBed(ctx, true);
+        break;
+    }
+  },
+  // Per-frame: the moving parts of the bought decorations and the notes from the drum kit.
+  dynamic(r, g) {
+    if (!this.st || g.area !== 'upstairs') return;
+    const C = CFG.UPSTAIRS;
+    for (const it of C.items) if (this.owned(g, it.key)) this.drawItem(r, g, it, 'dynamic');
+    const ctx = r.ctx;
+    for (const n of this.st.notes) { ctx.globalAlpha = Math.max(0, 1 - n.t / 1.6); ctx.fillStyle = n.col; ctx.font = r.font(14); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(n.ch, n.x + Math.sin(n.t * 5) * 4, n.y - n.t * 30); }
+    ctx.globalAlpha = 1;
+  },
+  updateToys(g, dt) {
+    const st = this.st, p = g.player, C = CFG.UPSTAIRS, byKey = (k) => C.items.find((it) => it.key === k).spot;
+    for (const n of st.notes) n.t += dt;
+    st.notes = st.notes.filter((n) => n.t < 1.6);
+    if (this.owned(g, 'drums')) {
+      const d = byKey('drums');
+      if (U.dist(p.x, p.y, d.x, d.y) < 70) { st.noteT -= dt; if (st.noteT <= 0) { st.noteT = 0.45; st.notes.push({ x: d.x + U.rand(-20, 20), y: d.y - 24, ch: U.pick(['♪', '♫', '♩', '🥁']), col: U.pick(['#e4572e', '#3b7dd8', '#f2b134']), t: 0 }); } }
+      else st.noteT = 0;
+    }
+    if (this.owned(g, 'hamster')) {
+      const h = byKey('hamster'), want = U.dist(p.x, p.y, h.x, h.y) < 70 ? 7 : 0;
+      st.wheelV = U.lerp(st.wheelV, want, 0.04); st.wheel += st.wheelV * dt;
+    }
+    if (this.owned(g, 'horse')) { const h = byKey('horse'), amp = U.dist(p.x, p.y, h.x, h.y) < 70 ? 0.18 : 0.04; st.rock = Math.sin(g.time * 3) * amp; }
+  },
+
+  // ======================= the catalog: one item per page, pages turn with left/right, the big button buys =======================
+  openCatalog(g) { const c = this.st.cat, p = g.player; c.on = true; c.page = 0; c.flip = null; c.ready = false; c.bought = 0; c.nope = 0; c.hold = { x: p.x, y: p.y }; p.moving = false; Sfx.pickup(); Haptics.tap(); },
+  closeCatalog(g) { this.st.cat.on = false; this.st.cat.hold = null; Sfx.drop(); },
+  catalogPages() { return CFG.UPSTAIRS.items.length + 1; },
+  turnPage(g, dir) {
+    const c = this.st.cat, n = this.catalogPages(), to = c.page + dir;
+    if (to < 0 || to >= n || c.flip) return;
+    c.flip = { from: c.page, to, t: 0, dur: 0.32 }; c.page = to; c.bought = 0; c.nope = 0; Sfx.pickup();
+  },
+  catalogAction(g) {
+    const c = this.st.cat, items = CFG.UPSTAIRS.items;
+    if (c.page === 0) return { label: '📕 Close the catalog', run: (gg) => this.closeCatalog(gg) };
+    const it = items[c.page - 1];
+    if (this.owned(g, it.key)) return { label: '✅ You have this one!', run: (gg) => this.turnPage(gg, c.page < this.catalogPages() - 1 ? 1 : -1) };
+    if (g.s.cash >= it.price) return { label: `🛒 Buy for ${U.money(it.price)}`, run: (gg) => this.buyItem(gg, it) };
+    return { label: `💰 Need ${U.money(it.price - g.s.cash)} more`, run: (gg) => { c.nope = 1.4; Sfx.error(); } };
+  },
+  buyItem(g, it) {
+    const c = this.st.cat;
+    if (this.owned(g, it.key) || g.s.cash < it.price) return;
+    g.s.cash -= it.price; g.s.upstairs.owned[it.key] = true;
+    Sfx.buy(); Haptics.success(); c.bought = 1.8; c.nope = 0;
+    this.nudgeOut(g, it);
+    g.fx.push({ kind: 'sparkle', x0: it.spot.x, y0: it.spot.y, x1: it.spot.x, y1: it.spot.y, t: 0, dur: 0.8 });
+    g.floats.push({ x: g.player.x, y: g.player.y - 50, text: `${it.ico} It's in your room!`, color: '#ffe08a', t: 0, dur: 1.6, big: true });
+    g.save();
+  },
+  // A newly solid item must never appear under the chef: step to the nearest free spot beside it.
+  nudgeOut(g, it) {
+    const p = g.player, b = it.block, r = 12;
+    if (!b || !(p.x + r > b[0] && p.x - r < b[0] + b[2] && p.y + r > b[1] && p.y - r < b[1] + b[3])) return;
+    const cands = [[b[0] - r - 2, p.y], [b[0] + b[2] + r + 2, p.y], [p.x, b[1] - r - 2], [p.x, b[1] + b[3] + r + 2]];
+    let best = null, bd = 1e9;
+    for (const [x, y] of cands) { if (!this.roomFree(x, y)) continue; const d = U.dist(p.x, p.y, x, y); if (d < bd) { bd = d; best = [x, y]; } }
+    if (best) { p.x = best[0]; p.y = best[1]; } else this.rescue(g);
+    if (this.st.cat.hold) this.st.cat.hold = { x: p.x, y: p.y };
+  },
+  drawCatalog(r, g, W, H) {
+    const ctx = r.ctx, c = this.st.cat, items = CFG.UPSTAIRS.items, n = this.catalogPages();
+    ctx.fillStyle = 'rgba(10,8,6,0.72)'; ctx.fillRect(0, 0, W, H);
+    const cw = Math.min(360, W - 32), ch = Math.min(440, H - 150), cx = W / 2, cy = 56 + (H - 128) / 2;
+    // page flip: the card squashes to a spine and back, the content switches half way
+    let sq = 1, page = c.page;
+    if (c.flip) { const k = c.flip.t / c.flip.dur; sq = Math.abs(Math.cos(k * Math.PI)); if (k < 0.5) page = c.flip.from; }
+    ctx.save(); ctx.translate(cx, cy); ctx.scale(Math.max(0.04, sq), 1); ctx.translate(-cx, -cy);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)'; U.roundRect(ctx, cx - cw / 2 + 6, cy - ch / 2 + 8, cw, ch, 16); ctx.fill();
+    if (page === 0) {
+      // the cover: a little bed under a night sky
+      ctx.fillStyle = '#3b7dd8'; U.roundRect(ctx, cx - cw / 2, cy - ch / 2, cw, ch, 16); ctx.fill();
+      ctx.fillStyle = '#2f64b0'; U.roundRect(ctx, cx - cw / 2, cy - ch / 2, 22, ch, 16); ctx.fill();
+      ctx.fillStyle = '#fff8ee'; U.roundRect(ctx, cx - cw / 2 + 36, cy - ch / 2 + 22, cw - 56, ch - 44, 10); ctx.fill();
+      ctx.fillStyle = '#2b1d14'; ctx.font = r.font(Math.min(30, cw * 0.08)); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('🛏️ Room Catalog', cx + 8, cy - ch / 2 + 62);
+      const bx = cx + 8, by = cy + 10, bs = Math.min(1.1, ch / 400);
+      ctx.save(); ctx.translate(bx, by); ctx.scale(bs, bs);
+      ctx.fillStyle = '#182040'; U.roundRect(ctx, -110, -80, 220, 70, 10); ctx.fill();
+      ctx.fillStyle = '#ffe08a'; for (let k = 0; k < 9; k++) { const tw = 0.5 + 0.5 * Math.sin(g.time * 3 + k); ctx.globalAlpha = 0.4 + 0.6 * tw; ctx.beginPath(); ctx.arc(-95 + k * 24, -66 + (k % 3) * 16, 2 + tw, 0, Math.PI * 2); ctx.fill(); }
+      ctx.globalAlpha = 1; ctx.fillStyle = '#fff7c2'; ctx.beginPath(); ctx.arc(80, -50, 14, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#182040'; ctx.beginPath(); ctx.arc(74, -54, 12, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#c99a5f'; ctx.fillRect(-110, -10, 220, 70);
+      ctx.save(); ctx.translate(0, 20); ctx.scale(0.55, 0.55); ctx.translate(-(CFG.UPSTAIRS.bed.x0 + CFG.UPSTAIRS.bed.x1) / 2, -(CFG.UPSTAIRS.bed.y0 + CFG.UPSTAIRS.bed.y1) / 2); this.paintBed(ctx, this.owned(g, 'racecar')); ctx.restore();
+      ctx.restore();
+      ctx.fillStyle = '#2b1d14'; ctx.font = r.font(15); ctx.fillText(`${items.length} fun things for your room`, cx + 8, cy + ch / 2 - 72);
+      ctx.fillStyle = '#8a7a6a'; ctx.font = r.font(14); ctx.fillText('Walk ◀ ▶ to turn pages', cx + 8, cy + ch / 2 - 46);
+    } else {
+      const it = items[page - 1], own = this.owned(g, it.key), afford = g.s.cash >= it.price;
+      ctx.fillStyle = '#fff8ee'; U.roundRect(ctx, cx - cw / 2, cy - ch / 2, cw, ch, 16); ctx.fill();
+      ctx.fillStyle = '#e8dcc4'; U.roundRect(ctx, cx - cw / 2, cy - ch / 2, 14, ch, 16); ctx.fill();
+      ctx.fillStyle = '#2b1d14'; ctx.font = r.font(Math.min(26, cw * 0.072)); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(`${it.ico} ${it.label}`, cx + 6, cy - ch / 2 + 40);
+      // the picture, on a plain board
+      const bw = cw - 60, bh = ch - 170, bx = cx + 6, by = cy - 12;
+      ctx.fillStyle = '#fdf3dc'; U.roundRect(ctx, bx - bw / 2, by - bh / 2, bw, bh, 12); ctx.fill();
+      ctx.strokeStyle = '#e8dcc4'; ctx.lineWidth = 2; U.roundRect(ctx, bx - bw / 2, by - bh / 2, bw, bh, 12); ctx.stroke();
+      ctx.save(); ctx.beginPath(); U.roundRect(ctx, bx - bw / 2, by - bh / 2, bw, bh, 12); ctx.clip();
+      const k = it.view.s * Math.min(1, bh / 260);
+      ctx.translate(bx, by + Math.sin(g.time * 1.4) * 2); ctx.scale(k, k); ctx.translate(-it.spot.x, -it.spot.y - it.view.dy);
+      this.drawItem(r, g, it, 'all');
+      ctx.restore();
+      // price / status
+      const tag = own ? '✅ In your room' : U.money(it.price);
+      ctx.font = r.font(22); const tw = ctx.measureText(tag).width + 28;
+      ctx.fillStyle = own ? '#2f9e44' : afford ? '#1f6e2e' : '#b8401c'; U.roundRect(ctx, cx + 6 - tw / 2, cy + ch / 2 - 74, tw, 34, 17); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.fillText(tag, cx + 6, cy + ch / 2 - 57);
+      if (c.bought > 0) { ctx.globalAlpha = Math.min(1, c.bought); ctx.fillStyle = '#ffe08a'; ctx.font = r.font(18); ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(43,29,20,0.85)'; const yy = by - bh / 2 + 22 - (1.8 - c.bought) * 10; ctx.strokeText("✨ It's in your room! ✨", bx, yy); ctx.fillText("✨ It's in your room! ✨", bx, yy); ctx.globalAlpha = 1; }
+      if (c.nope > 0) { ctx.globalAlpha = Math.min(1, c.nope); ctx.fillStyle = '#b8401c'; ctx.font = r.font(13); ctx.fillText('Earn more at the pizzeria 🍕', cx + 6, cy + ch / 2 - 32); ctx.globalAlpha = 1; }
+    }
+    // page counter and the arrows
+    ctx.fillStyle = '#8a7a6a'; ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(`${page + 1} / ${n}`, cx + 6, cy + ch / 2 - 16);
+    ctx.font = r.font(22); ctx.fillStyle = page > 0 ? '#2b1d14' : 'rgba(43,29,20,0.25)'; ctx.fillText('◀', cx - cw / 2 + 34, cy + ch / 2 - 18);
+    ctx.fillStyle = page < n - 1 ? '#2b1d14' : 'rgba(43,29,20,0.25)'; ctx.fillText('▶', cx + cw / 2 - 22, cy + ch / 2 - 18);
+    ctx.restore();
+    ctx.fillStyle = '#fff'; ctx.font = r.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('▼ walk down to close', cx, cy + ch / 2 + 16);
+  },
+
+  // ======================= the owner's drawing: hung on the wall upstairs and in the shop =======================
+  img: null, imgN: 0,
+  // The saved PNG loads asynchronously; `bgKey` changes once it has, so the cached backgrounds rebuild with it.
+  ensureArt(g) {
+    const d = g.s.upstairs && g.s.upstairs.drawing;
+    if (!d) { this.img = null; return; }
+    if (this.img && this.img.src === d) return;
+    const el = new Image(), rec = { src: d, el, ok: false, n: ++this.imgN };
+    el.onload = () => { rec.ok = true; };
+    el.src = d; this.img = rec;
+  },
+  bgKey(g) {
+    if (!g.s.upstairs) return '';
+    this.ensureArt(g);
+    return 'up:' + CFG.UPSTAIRS.items.map((it) => this.owned(g, it.key) ? 1 : 0).join('') + ':' + (this.img && this.img.ok ? this.img.n : 0);
+  },
+  paintArt(ctx, x, y, w, h) {
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; U.roundRect(ctx, x - w / 2 - 2, y - h / 2 - 1, w + 8, h + 8, 3); ctx.fill();
+    ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, x - w / 2 - 4, y - h / 2 - 4, w + 8, h + 8, 3); ctx.fill();
+    ctx.fillStyle = '#5b3a1a'; ctx.fillRect(x - w / 2 - 2, y - h / 2 - 2, w + 4, h + 4);
+    ctx.fillStyle = '#fff'; ctx.fillRect(x - w / 2, y - h / 2, w, h);
+    try { ctx.drawImage(this.img.el, x - w / 2, y - h / 2, w, h); } catch (e) { /* a broken image just leaves the frame empty */ }
+    ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.arc(x, y - h / 2 - 4, 2, 0, Math.PI * 2); ctx.fill();   // the nail
+  },
+
+  // ======================= the drawing pad: a DOM overlay over the game =======================
+  pad: null,
+  padColors: ['#2b1d14', '#e4572e', '#f2b134', '#2f9e44', '#3b7dd8', '#9c6bd8', '#ff8fab', '#8d5a2b'],
+  padSizes: [4, 10, 22],
+  buildPad() {
+    if (this.pad) return this.pad;
+    const el = document.createElement('div'); el.id = 'modal-draw'; el.className = 'modal hidden';
+    el.innerHTML = `<style>
+      .draw-card { width: min(640px, 100%); }
+      .draw-body { padding: 10px; display: flex; flex-direction: column; gap: 10px; overflow: auto; align-items: center; flex: 1; }
+      #draw-canvas { touch-action: none; background: #fff; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.25); aspect-ratio: 4 / 3; width: min(100%, calc(52vh * 4 / 3)); height: auto; cursor: crosshair; }
+      .draw-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; width: 100%; }
+      .draw-sw { width: 44px; height: 44px; border-radius: 50%; border: 4px solid #fff; box-shadow: 0 0 0 2px #e9c48a; cursor: pointer; padding: 0; font-size: 20px; }
+      .draw-sw.on { border-color: #2b1d14; transform: scale(1.12); }
+      .draw-sz { width: 54px; height: 44px; border-radius: 12px; border: 3px solid #e9c48a; background: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+      .draw-sz.on { border-color: #2b1d14; background: #fff3d6; }
+      .draw-sz i { display: block; background: #2b1d14; border-radius: 50%; }
+      .draw-actions .btn { flex: 1; min-height: 48px; font-size: 16px; min-width: 0; white-space: normal; }
+      @media (max-width: 700px) { #draw-canvas { width: 100%; } .draw-actions #draw-hang { flex: 1 1 100%; } }
+    </style>
+    <div class="modal-card pizza-card draw-card">
+      <div class="modal-head"><h2>✏️ Draw a picture</h2><button id="draw-close" class="close" aria-label="Close">✕</button></div>
+      <div class="draw-body">
+        <canvas id="draw-canvas" width="480" height="360"></canvas>
+        <div class="draw-row" id="draw-colors"></div>
+        <div class="draw-row" id="draw-sizes"></div>
+        <div class="draw-row draw-actions"><button id="draw-clear" class="btn danger">🧽 Clear</button><button id="draw-done" class="btn">✅ Done</button><button id="draw-hang" class="btn primary">🖼️ Hang it on the wall</button></div>
+      </div>
+    </div>`;
+    document.body.appendChild(el);
+    const cv = el.querySelector('#draw-canvas'), ctx = cv.getContext('2d');
+    const pad = this.pad = { el, cv, ctx, color: this.padColors[0], size: this.padSizes[1], eraser: false, down: false, last: null, dirty: false };
+    const colors = el.querySelector('#draw-colors'), sizes = el.querySelector('#draw-sizes');
+    const pick = (row, sel) => { for (const b of row.children) b.classList.toggle('on', b === sel); };
+    for (const col of this.padColors.concat(['eraser'])) {
+      const b = document.createElement('button'); b.className = 'draw-sw'; b.type = 'button';
+      if (col === 'eraser') { b.textContent = '🧽'; b.style.background = '#fff'; b.title = 'Eraser'; } else { b.style.background = col; b.title = col; }
+      b.addEventListener('click', () => { pad.eraser = col === 'eraser'; if (!pad.eraser) pad.color = col; pick(colors, b); });
+      colors.appendChild(b);
+    }
+    pick(colors, colors.children[0]);
+    this.padSizes.forEach((sz, i) => {
+      const b = document.createElement('button'); b.className = 'draw-sz'; b.type = 'button'; b.innerHTML = `<i style="width:${6 + i * 8}px;height:${6 + i * 8}px"></i>`;
+      b.addEventListener('click', () => { pad.size = sz; pick(sizes, b); });
+      sizes.appendChild(b);
+    });
+    pick(sizes, sizes.children[1]);
+    const pos = (e) => { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * cv.width / r.width, y: (e.clientY - r.top) * cv.height / r.height }; };
+    cv.addEventListener('pointerdown', (e) => { e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ } pad.down = true; const q = pos(e); pad.last = q; this.padStroke(q.x, q.y, q.x, q.y); });
+    cv.addEventListener('pointermove', (e) => { if (!pad.down) return; e.preventDefault(); const q = pos(e); this.padStroke(pad.last.x, pad.last.y, q.x, q.y); pad.last = q; });
+    const up = (e) => { if (!pad.down) return; pad.down = false; pad.last = null; };
+    cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up); cv.addEventListener('pointerleave', up);
+    cv.addEventListener('contextmenu', (e) => e.preventDefault());
+    el.querySelector('#draw-clear').addEventListener('click', () => this.padClear());
+    el.querySelector('#draw-done').addEventListener('click', () => this.closePad(Game));
+    el.querySelector('#draw-close').addEventListener('click', () => this.closePad(Game));
+    el.querySelector('#draw-hang').addEventListener('click', () => this.hangDrawing(Game));
+    this.padClear();
+    return pad;
+  },
+  padClear() { const p = this.buildPad(); p.ctx.fillStyle = '#fff'; p.ctx.fillRect(0, 0, p.cv.width, p.cv.height); p.dirty = false; },
+  // A brush stroke from (x0, y0) to (x1, y1) in canvas pixels, with the current colour and size (the eraser paints white).
+  padStroke(x0, y0, x1, y1) {
+    const p = this.buildPad(), c = p.ctx;
+    c.strokeStyle = p.eraser ? '#fff' : p.color; c.lineWidth = p.eraser ? p.size * 2 : p.size; c.lineCap = 'round'; c.lineJoin = 'round';
+    c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1 === x0 && y1 === y0 ? x1 + 0.01 : x1, y1); c.stroke();
+    p.dirty = true;
+  },
+  openPad(g) {
+    const p = this.buildPad(), pl = g.player, st = this.st;
+    st.draw.on = true; st.draw.hold = { x: pl.x, y: pl.y }; pl.moving = false;
+    // start from the picture already on the wall, so it can be touched up
+    if (!p.dirty && this.img && this.img.ok) { this.padClear(); try { p.ctx.drawImage(this.img.el, 0, 0, p.cv.width, p.cv.height); } catch (e) { /* ignore */ } }
+    p.el.classList.remove('hidden');
+    Sfx.pickup(); Haptics.tap();
+  },
+  closePad(g) {
+    if (this.pad) this.pad.el.classList.add('hidden');
+    if (this.st) { this.st.draw.on = false; this.st.draw.hold = null; }
+    Sfx.drop();
+  },
+  // Shrink the picture to a tiny PNG, save it, and hang it on the walls.
+  hangDrawing(g) {
+    const p = this.buildPad(), [w, h] = CFG.UPSTAIRS.art.size;
+    const small = document.createElement('canvas'); small.width = w; small.height = h;
+    const sc = small.getContext('2d'); sc.fillStyle = '#fff'; sc.fillRect(0, 0, w, h); sc.drawImage(p.cv, 0, 0, w, h);
+    let url = null;
+    try { url = small.toDataURL('image/png'); } catch (e) { url = null; }
+    if (!url) { g.toast('Oops, could not save that one'); return; }
+    g.s.upstairs.drawing = url; this.ensureArt(g); g.save();
+    Sfx.buy(); Haptics.success();
+    const A = CFG.UPSTAIRS.art.room;
+    g.fx.push({ kind: 'sparkle', x0: A.x, y0: A.y, x1: A.x, y1: A.y, t: 0, dur: 0.8 });
+    g.floats.push({ x: g.player.x, y: g.player.y - 50, text: '🖼️ Hung on the wall!', color: '#ffe08a', t: 0, dur: 1.8, big: true });
+    this.closePad(g);
   },
 };
 Game.ext.push(UpstairsExt);

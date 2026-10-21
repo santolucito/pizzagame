@@ -217,7 +217,7 @@ const CityExt = {
       b.timer -= dt;
       // a heads-up like the train's, so there is time to walk to the stop
       if (!b.warned && b.timer <= B.warn && home) { b.warned = true; g.toast(`🚌 Bus in ${B.warn} seconds! Head to the bus stop!`, true, 'town'); Sfx.ding(); }
-      if (b.timer <= 0) { b.state = 'arriving'; b.x = CFG.WORLD.x1 + 200; b.y = S.y; b.speed = B.speed; b.warned = false; }
+      if (b.timer <= 0) { b.state = 'arriving'; b.x = Math.max(S.x + 1300, g.player.x + 1000); b.y = S.y; b.speed = B.speed; b.warned = false; }   // starts just past the edge of the screen, not way out past the airfield
     } else if (b.state === 'arriving') {
       const d = b.x - S.x;
       b.speed = U.clamp(d * 1.6, 40, B.speed); b.x -= b.speed * dt;

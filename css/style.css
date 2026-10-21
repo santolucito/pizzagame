@@ -93,7 +93,8 @@ body.painting #btn-car, body.painting #btn-make, body.painting #toasts, body.pai
 #zoom-ctl .hud-btn { width: 40px; font-size: 20px; line-height: 1; }
 
 /* Toasts */
-#toasts { position: absolute; right: 60px; max-width: min(70vw, 420px); bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 6; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; pointer-events: none; }
+/* announcements stack under the hint at the top, well away from the action buttons at the bottom */
+#toasts { position: absolute; right: calc(10px + env(safe-area-inset-right)); top: calc(96px + env(safe-area-inset-top)); max-width: min(74vw, 420px); z-index: 4; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; pointer-events: none; }
 .toast {
   background: rgba(43,29,20,0.94); color: #fff; padding: 12px 18px; border-radius: 12px; font-weight: 800; font-size: 17px;
   border-left: 6px solid var(--gold); box-shadow: 0 4px 14px rgba(0,0,0,0.35);
@@ -150,6 +151,8 @@ kbd { background: #eee; border: 1px solid #bbb; border-radius: 4px; padding: 0 5
   .hud-btn { font-size: 12px; padding: 7px 9px; min-height: 38px; }
   .hud-btn.icon { width: 38px; }
   .hint { font-size: 12px; top: calc(92px + env(safe-area-inset-top)); }
+  #toasts { top: calc(130px + env(safe-area-inset-top)); max-width: 80vw; }
+  .toast { font-size: 14px; padding: 9px 12px; }
 }
 
 /* Phones: menus go full screen with bigger type and tap targets */

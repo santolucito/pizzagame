@@ -43,7 +43,7 @@ module.exports = async (t) => {
   await t.ev(() => { const S = CFG.ARCADE.CLAW.spot; T.tp(S.x, S.y, 'arcade'); });
   t.expectEq(await t.ev(() => T.hint()), 'Press the button to grab a prize! 🧸', 'claw hint');
   t.expectEq(await t.ev(() => T.label()), '🧸 Grab a prize', 'claw label');
-  const sweep = await t.ev(() => { const a = ArcadeExt.clawPose(null, Game.time).x; T.step(40); const b = ArcadeExt.clawPose(null, Game.time).x; const C = CFG.ARCADE.CLAW; return { moved: Math.abs(a - b) > 3, inside: a > C.x && a < C.x + C.w && b > C.x && b < C.x + C.w }; });
+  const sweep = await t.ev(() => { const C = CFG.ARCADE.CLAW, xs = []; for (let i = 0; i < 6; i++) { xs.push(ArcadeExt.clawPose(null, Game.time).x); T.step(10); } return { moved: Math.max(...xs) - Math.min(...xs) > 3, inside: xs.every((x) => x > C.x && x < C.x + C.w) }; });   // sampled, so a turning point of the sweep cannot fool it
   t.expect(sweep.moved && sweep.inside, `the idle claw sweeps left and right over the plushies (${JSON.stringify(sweep)})`);
   await t.ev(() => { T.act(); T.step(5); });
   t.expectEq(await t.ev(() => ArcadeExt.st.play && ArcadeExt.st.play.kind), 'claw', 'the claw is grabbing');

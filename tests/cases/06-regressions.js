@@ -75,16 +75,20 @@ module.exports = async (t) => {
   t.expect(bay.carY - 30 > bay.barBottom, `colour bar sits above the car (bar bottom ${Math.round(bay.barBottom)}, car ${Math.round(bay.carY)})`);
   await t.shot('paint-bay-phone');
 
-  // taking off from Cloud Harbor is instant: one press and the flight home starts, the plane never rolls anywhere near the cloud's edge
+  // taking off from Cloud Harbor: the plane turns, rolls down the runway, lifts off and flies right off the screen (past the map's edge) before the flight cut-scene
   await t.boot();
   const off = await t.ev(() => {
     const v = AirfieldExt.rt.cloudPlane, H = CFG.CLOUD.PLANE_HOME; v.x = H.x; v.y = H.y; v.angle = H.angle; v.lift = 0;
     T.tp(v.x + 40, v.y, 'cloud'); Game.enterCar(); AirfieldExt.takeOff(Game);
-    let minX = v.x, maxX = v.x, steps = 0;
-    for (; steps < 600 && !Game.travel; steps++) { Game.update(1 / 60); minX = Math.min(minX, v.x); maxX = Math.max(maxX, v.x); }
-    return { minX, maxX, steps, flying: !!Game.travel && Game.travel.to === 'town', edge: CFG.CLOUD.WORLD.x0, driving: Game.driving };
+    let minX = v.x, maxX = v.x, steps = 0, stuck = 0, last = v.x;
+    for (; steps < 600 && !Game.travel; steps++) {
+      Game.update(1 / 60); Render.updateCamera(Game, 1 / 60); minX = Math.min(minX, v.x); maxX = Math.max(maxX, v.x);
+      if (steps > 90 && Math.abs(v.x - last) < 0.5) stuck++; last = v.x;   // after the turn it must keep moving every step
+    }
+    return { minX, maxX, steps, stuck, flying: !!Game.travel && Game.travel.to === 'town', edge: CFG.CLOUD.WORLD.x0, driving: Game.driving, free: v.free };
   });
-  t.expect(off.flying && off.steps === 0 && !off.driving, `cloud take-off starts the flight home at once (took ${off.steps} steps)`);
-  t.expect(off.minX > off.edge + 100, `the plane never reaches the cloud's west edge (min x ${Math.round(off.minX)}, edge ${off.edge})`);
+  t.expect(off.flying && !off.driving && !off.free, `cloud take-off ends in the flight home (took ${off.steps} steps)`);
+  t.expect(off.stuck === 0, `the plane is never pinned in place while taking off (${off.stuck} stuck steps)`);
+  t.expect(off.minX < off.edge - 60, `the plane flies off past the cloud's edge (min x ${Math.round(off.minX)}, edge ${off.edge})`);
   await t.ev(() => Game.goHome());
 };

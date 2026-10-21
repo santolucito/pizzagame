@@ -41,6 +41,7 @@ CFG.AIRFIELD = {
   BENCH: { x: 2200, y: 920 },
   SIGNS: [[2250, 926, '🔭 PLANE SPOTTING'], [1566, 530, '✈️ AIRFIELD'], [1660, 880, '🅿️ CAR PARK'], [2300, 362, '🔧 WORKSHOP'], [2430, 300, '⛽ FUEL FARM']],   // all walk-through
   CONES: [[1750, 132], [1892, 132], [1750, 1268], [1892, 1268], [1895, 418], [1895, 572], [2210, 850], [2320, 850], [2440, 850], [2205, 320]],
+  RUNUP: 1.2,                                           // seconds the plane races down the runway before it lifts off
   FLIGHT: 8,                                            // seconds the flight takes
   coins: [{ x: 2250, y: 1000 }, { x: 1610, y: 1180 }, { x: 2440, y: 900 }],
 };
@@ -113,10 +114,10 @@ const AirfieldExt = {
   onRunway(v, area) { return this.inRect(v.x, v.y, area === 'town' ? CFG.AIRFIELD.RUNWAY : CFG.CLOUD.RUNWAY, -30); },   // a little slack past the edge lines
   aligned(v, area) { return area === 'town' ? Math.abs(Math.sin(v.angle)) > 0.8 : Math.abs(Math.cos(v.angle)) > 0.8; },
   planeOf(g) { return !this.rt ? null : g.area === 'town' ? this.rt.plane : g.area === 'cloud' ? this.rt.cloudPlane : null; },
-  // sitting in the plane is enough: pressing the button takes off straight away (kid-simple)
+  // sitting in the plane is enough: pressing the button lines it up, races down the runway and takes off (kid-simple)
   readyToFly(g) {
     const v = this.planeOf(g);
-    return !!v && g.driving && g.vehicle === v && !this.rt.roll;
+    return !!v && g.driving && g.vehicle === v && !this.rt.runup && !this.rt.roll;
   },
   chunk(rects, max) {
     const out = [];
@@ -131,7 +132,7 @@ const AirfieldExt = {
   },
 
   // ======================= game hooks =======================
-  home(g) { const rt = this.rt; if (rt) { rt.ride = null; rt.roll = null; rt.cafe.seat = null; rt.cafe.view = 0; rt.cafe.fade = 0; } },
+  home(g) { const rt = this.rt; if (rt) { rt.ride = null; if (rt.runup) { rt.runup.plane.free = false; rt.runup.plane.lift = 0; } rt.runup = null; rt.roll = null; rt.cafe.seat = null; rt.cafe.view = 0; rt.cafe.fade = 0; } },
   build(g) {
     const A = CFG.AIRFIELD, C = CFG.CLOUD;
     this.rt = {
@@ -140,7 +141,7 @@ const AirfieldExt = {
       balloon: { kind: 'balloonride', x: C.BALLOON.x, y: C.BALLOON.y, angle: 0, vx: 0, vy: 0 },
       heli: { kind: 'heli', x: A.HELI.x, y: A.HELI.y, angle: Math.PI, vx: 0, vy: 0, rotor: 0, rotorA: 0, lift: 0 },   // the helicopter: steered like the car, but it flies over everything
       heliUp: false,
-      roll: null, ride: null,
+      runup: null, roll: null, ride: null,
       found: false, balloonRidden: false, glided: false, padLeft: true, rampLeft: true, wave: 0,
       jumpers: [], jumpT: 3, blimpX: C.WORLD.x0 + 300,
       townObs: null, townCarObs: null, cloudObs: null, void: null, land: null,
@@ -217,7 +218,7 @@ const AirfieldExt = {
 
   action(g) {
     const rt = this.rt;
-    if (!rt || rt.roll || g.travel) return null;
+    if (!rt || rt.runup || rt.roll || g.travel) return null;
     if (this.readyToFly(g)) return { label: g.area === 'town' ? '🛫 Take off!' : '🛫 Fly home!', run: (gg) => this.takeOff(gg) };
     if (g.driving || g.onTrain || g.ride || rt.ride) return null;
     const p = g.player, K = CFG.SKYCAFE;
@@ -276,19 +277,53 @@ const AirfieldExt = {
     Haptics.success();
   },
   takeOff(g) {
-    // kid-simple: one press and you are in the air. No taxiing, no run-up, nothing to steer or run into.
-    const v = this.planeOf(g), town = g.area === 'town';
+    // one press: the plane lines up (turning round if it must), races down the runway, lifts off and keeps flying
+    // until it is right off the screen; then the flight cut-scene takes over. The map's edge does not stop it.
+    const rt = this.rt, v = this.planeOf(g), town = g.area === 'town', R = town ? CFG.AIRFIELD.RUNWAY : CFG.CLOUD.RUNWAY;
+    // at home head whichever way leaves the most runway; on the cloud always west, towards the near edge of the map
+    const dir = town ? { x: 0, y: v.y > (R.y0 + R.y1) / 2 ? -1 : 1 } : { x: -1, y: 0 };
+    const entry = town ? { x: (R.x0 + R.x1) / 2, y: U.clamp(v.y, R.y0 + 120, R.y1 - 120) } : { x: U.clamp(v.x, R.x0 + 120, R.x1 - 120), y: (R.y0 + R.y1) / 2 };
+    const far = U.dist(v.x, v.y, entry.x, entry.y);
+    let turn = Math.atan2(dir.y, dir.x) - v.angle; while (turn > Math.PI) turn -= Math.PI * 2; while (turn < -Math.PI) turn += Math.PI * 2;
+    const taxi = far > 12 || Math.abs(turn) > 0.3 ? { from: { x: v.x, y: v.y }, to: entry, t: 0, dur: Math.max(U.clamp(far / 260, 0.4, 1.6), Math.abs(turn) > 0.3 ? 0.9 : 0) } : null;
+    rt.runup = { plane: v, t: 0, dur: CFG.AIRFIELD.RUNUP, dir, centre: town ? (R.x0 + R.x1) / 2 : (R.y0 + R.y1) / 2, to: town ? 'cloud' : 'town', taxi };
     g.floats.push({ x: v.x, y: v.y - 60, text: town ? 'Up, up and away! ✈️' : 'Home we go! ✈️', color: '#ffe08a', t: 0, dur: 1.4, big: true });
     Sfx.tone(110, 1.1, 'sawtooth', 0.03, 260); Haptics.success();
-    v.vx = 0; v.vy = 0; v.lift = 0;
-    g.driving = false; g.vehicle = null;
-    g.startTravel(town ? 'cloud' : 'town', 'flight', CFG.AIRFIELD.FLIGHT);
+  },
+  updateRunup(g, dt) {
+    const rt = this.rt, ru = rt.runup, v = ru.plane;
+    if (!g.driving || g.vehicle !== v) { rt.runup = null; v.lift = 0; v.free = false; return; }   // hopped out: never mind
+    if (ru.taxi) {   // roll gently onto the runway first (or just turn round on the spot)
+      const tx = ru.taxi; tx.t += dt; const k = U.easeOut(Math.min(1, tx.t / tx.dur));
+      v.x = U.lerp(tx.from.x, tx.to.x, k); v.y = U.lerp(tx.from.y, tx.to.y, k);
+      const moving = U.dist(tx.from.x, tx.from.y, tx.to.x, tx.to.y) > 12;
+      const want = moving && k < 0.7 ? Math.atan2(tx.to.y - tx.from.y, tx.to.x - tx.from.x) : Math.atan2(ru.dir.y, ru.dir.x);
+      let d = want - v.angle; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; v.angle += d * Math.min(1, dt * 6);
+      v.vx = 0; v.vy = 0; g.player.x = v.x; g.player.y = v.y;   // no velocity, so the core's steering does not fight the turn
+      if (tx.t >= tx.dur) ru.taxi = null;
+      return;
+    }
+    ru.t += dt;
+    const k = Math.min(1, ru.t / ru.dur), sp = 150 + 520 * k + Math.min(500, Math.max(0, ru.t - ru.dur) * 400);   // and keeps accelerating once airborne
+    v.free = true;   // the core no longer clamps it to the map: it flies right off the screen
+    v.x += ru.dir.x * sp * dt; v.y += ru.dir.y * sp * dt;
+    if (ru.dir.x === 0) v.x += (ru.centre - v.x) * Math.min(1, dt * 4); else v.y += (ru.centre - v.y) * Math.min(1, dt * 4);   // ease onto the centreline
+    v.vx = ru.dir.x * sp; v.vy = ru.dir.y * sp; v.angle = Math.atan2(ru.dir.y, ru.dir.x);
+    v.lift = Math.min(80, 36 * k * k + Math.max(0, ru.t - ru.dur) * 40);
+    g.player.x = v.x; g.player.y = v.y;
+    // gone off the screen (the camera stops at the map's edge and the plane carries on): cut to the flight
+    const R = Render, m = 90, off = v.x < R.camX - m || v.x > R.camX + R.viewW + m || v.y < R.camY - m || v.y > R.camY + R.viewH + m;
+    if ((ru.t >= ru.dur && off) || ru.t > ru.dur + 5) {
+      rt.runup = null; v.lift = 0; v.vx = 0; v.vy = 0; v.free = false;
+      g.driving = false; g.vehicle = null;
+      g.startTravel(ru.to, 'flight', CFG.AIRFIELD.FLIGHT);
+    }
   },
 
   arrive(g, tr) {
     if (tr.via !== 'flight') return;
     const rt = this.rt, A = CFG.AIRFIELD, C = CFG.CLOUD, p = g.player;
-    for (const [v, home] of [[rt.plane, A.PLANE_HOME], [rt.cloudPlane, C.PLANE_HOME]]) { v.x = home.x; v.y = home.y; v.angle = home.angle; v.vx = 0; v.vy = 0; v.lift = 0; }
+    for (const [v, home] of [[rt.plane, A.PLANE_HOME], [rt.cloudPlane, C.PLANE_HOME]]) { v.x = home.x; v.y = home.y; v.angle = home.angle; v.vx = 0; v.vy = 0; v.lift = 0; v.free = false; }
     if (tr.to === 'cloud') { this.startRoll(g, rt.cloudPlane, C.LANDING, 1.8); g.toast('☁️ Welcome to Cloud Harbor!', true); }
     else { this.startRoll(g, rt.plane, A.LANDING, 2.8); g.toast('🍕 Home sweet home!', true); }
     g.floats.push({ x: p.x, y: p.y - 60, text: 'Touchdown! 🛬', color: '#ffe08a', t: 0, dur: 1.4, big: true });
@@ -313,7 +348,8 @@ const AirfieldExt = {
     hl.rotor = U.clamp(hl.rotor + (flying ? dt * 1.5 : -dt * 0.5), 0, 1); hl.rotorA += hl.rotor * 32 * dt; hl.lift = flying ? Math.min(40, hl.lift + 90 * dt) : Math.max(0, hl.lift - 90 * dt);
     if (flying && !rt.heliUp) { rt.heliUp = true; g.floats.push({ x: hl.x, y: hl.y - 60, text: 'Whirrr! 🚁', color: '#ffe08a', t: 0, dur: 1.3, big: true }); Haptics.tap(); }
     if (!flying) rt.heliUp = false;
-    if (rt.roll) this.updateRoll(g, dt);
+    if (rt.runup) this.updateRunup(g, dt);
+    else if (rt.roll) this.updateRoll(g, dt);
     else this.steerHelp(g, dt);
     // the chef stays in the plane while the flight plays (the core still reads the joystick)
     // (parked a little away from the plane, or the core would offer the vehicle button over the cut-scene)
@@ -423,6 +459,7 @@ const AirfieldExt = {
   hint(g) {
     const rt = this.rt; if (!rt) return undefined;
     const p = g.player, A = CFG.AIRFIELD, C = CFG.CLOUD;
+    if (rt.runup) return { text: '🛫 Here we go!', target: null };
     if (rt.roll) return { text: 'Touchdown! 🛬', target: null };
     if (g.area === 'town') {
       if (g.onTrain || g.fishing || g.ride) return undefined;

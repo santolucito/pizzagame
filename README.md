@@ -83,6 +83,7 @@ No build step, no dependencies: plain HTML5 Canvas + vanilla JavaScript.
 19. **Upstairs**: stairs in the office lead to the owner's bedroom; a nap in the bed starts a fresh morning. From outside you see the pizzeria's roof.
 20. **Ice cream drive-thru**: a window on East Road where cars buy cones on their own, once you own the ice cream shop.
 21. **The airfield and Cloud Harbor**: taxi the plane onto the runway past the fire station and fly to floating cloud islands with a hot-air balloon, a glider ramp, bouncy clouds and a sky café.
+22. **The subway**: down the stairs in the City to an underground station, then a ride to the Columbia campus, with the lion, the giant-slice stand, and Barnard with its bear across Broadway.
     walk in to collect the money, and buy More Flavors inside to make it busier.
 
 Impatient customers and cars leave if they wait too long. Progress saves automatically to

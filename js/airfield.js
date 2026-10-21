@@ -7,33 +7,43 @@
 // (customers come out of it and walk to the shops). Taxi the plane onto the runway, get up to speed and
 // press the big button: the plane climbs through the clouds (side-on cut-scene) to CLOUD HARBOR, a map of
 // floating cloud islands joined by rope bridges, with a sky terminal, a hot-air balloon to ride, a glider
-// ramp, bouncy clouds, a café with a waving pilot, a blimp and parachute jumpers. The plane waiting on
-// the cloud runway flies you home again and rolls up to the hangar.
+// ramp, bouncy clouds, a café with a waving pilot (go inside for a Cloud Cocoa and a seat by the window),
+// a blimp and parachute jumpers. The plane waiting on the cloud runway flies you home again and rolls up
+// to the hangar.
 
 // ---------- config ----------
 CFG.AIRFIELD = {
-  STRIP: { x0: 1540, y0: -170, x1: 2060, y1: 1330 },      // the part of the town map that is the airfield
-  RUNWAY: { x0: 1700, y0: 150, x1: 1800, y1: 1250 },
-  TAXIWAY: { x0: 1800, y0: 440, x1: 1880, y1: 490 },
-  APRON: { x0: 1860, y0: 380, x1: 2050, y1: 740 },
-  HANGAR: { x0: 1880, y0: 190, x1: 2040, y1: 372, door: { x: 1960, half: 60 } },
-  PLANE_HOME: { x: 1900, y: 465, angle: 0 },             // parked on the apron by the hangar, nose to the hangar
-  LANDING: [{ x: 1750, y: 200 }, { x: 1750, y: 465 }, { x: 1900, y: 465 }],   // the landing roll: down the runway, then along the taxiway
-  TERMINAL: { x0: 1596, y0: 560, x1: 1672, y1: 650, door: { x: 1590, y: 605 }, doorHalf: 16 },   // the arrivals gate; customers come out of its west door
-  PLAZA: { x0: 1540, y0: 560, x1: 1596, y1: 700 },       // pavement in front of the gate joining the sidewalks
-  PAD: { x0: 1596, y0: 540, x1: 1700, y1: 720 },         // concrete around the terminal
-  TOWER: { x: 1626, y: 400 },
-  WINDSOCK: { x: 1660, y: 236 },
-  FUEL: { x: 2020, y: 560 },
-  CART: { x: 1640, y: 690 },
-  HELI: { x: 1890, y: 690 },
-  PARKED: { x: 1990, y: 640 },                           // a visitor's little blue plane
-  HEDGE: { x0: 1560, y0: 106, x1: 2040, y1: 118 },
-  BENCH: { x: 1960, y: 920 },
-  CONES: [[1690, 132], [1812, 132], [1690, 1268], [1812, 1268], [1870, 530], [1870, 575], [1890, 770], [1930, 790], [1700, 740]],
+  STRIP: { x0: 1540, y0: -170, x1: 2460, y1: 1330 },      // the part of the town map that is the airfield
+  RUNWAY: { x0: 1760, y0: 150, x1: 1880, y1: 1250 },
+  TAXIWAY: { x0: 2140, y0: 180, x1: 2190, y1: 1200 },     // parallel taxiway between the hangar and the main apron
+  STUBS: [[180, 230], [1130, 1180]],                      // y ranges of the links between the runway and the taxiway (the hangar apron is the third)
+  HANGAR_APRON: { x0: 1880, y0: 430, x1: 2140, y1: 560 },  // concrete from the runway edge to the hangar stand and the helipad
+  APRON: { x0: 2190, y0: 300, x1: 2460, y1: 840 },        // the main apron: stands, the jet at its gate
+  HANGAR: { x0: 1910, y0: 240, x1: 2110, y1: 420, bays: [1960, 2060], bayHalf: 42 },   // two bays, doors on the apron side
+  SHED: { x0: 2250, y0: 200, x1: 2350, y1: 320 },         // the maintenance workshop
+  FUEL_FARM: { x0: 2400, y0: 150, x1: 2460, y1: 270 },    // two big tanks behind a fence
+  PLANE_HOME: { x: 1940, y: 480, angle: 0 },             // stand 1, in front of the hangar's first bay, right beside the runway
+  LANDING: [{ x: 1820, y: 200 }, { x: 1820, y: 480 }, { x: 1940, y: 480 }],   // the landing roll: down the runway, then off onto the stand
+  TERMINAL: { x0: 1600, y0: 540, x1: 1700, y1: 670, door: { x: 1590, y: 605 }, doorHalf: 20 },   // the arrivals gate: a hall you walk through, a viewing deck on the roof
+  PLAZA: { x0: 1540, y0: 560, x1: 1600, y1: 700 },       // pavement in front of the gate joining the sidewalks (nothing solid here)
+  PAD: { x0: 1600, y0: 520, x1: 1740, y1: 690 },         // concrete around the terminal
+  CARPARK: { x0: 1600, y0: 700, x1: 1720, y1: 860 },
+  TOWER: { x: 1640, y: 400 },
+  WINDSOCK: { x: 1700, y: 250 },
+  FUEL: { x: 2230, y: 380 },
+  CART: { x: 2430, y: 700 },
+  HELI: { x: 2080, y: 510 },                              // the helipad on the hangar apron
+  PARKED: [{ x: 2260, y: 790, color: '#3b7dd8' }, { x: 2380, y: 790, color: '#e4572e' }],   // visitors' little planes on the stands
+  JET: { x: 2300, y: 600 },                              // the passenger jet at its gate, nose to the taxiway
+  GATE: { x0: 2400, y0: 560, x1: 2460, y1: 640 },        // the gate pier; a jet-bridge reaches the jet's door
+  RADAR: { x: 2400, y: 1000 },
+  HEDGE: { x0: 1560, y0: 106, x1: 2440, y1: 118 },
+  BENCH: { x: 2200, y: 920 },
+  SIGNS: [[2250, 926, '🔭 PLANE SPOTTING'], [1566, 530, '✈️ AIRFIELD'], [1660, 880, '🅿️ CAR PARK'], [2300, 362, '🔧 WORKSHOP'], [2430, 300, '⛽ FUEL FARM']],   // all walk-through
+  CONES: [[1750, 132], [1892, 132], [1750, 1268], [1892, 1268], [1895, 418], [1895, 572], [2210, 850], [2320, 850], [2440, 850], [2205, 320]],
   RUNUP: 1.2,                                           // seconds the plane races down the runway before the fade
   FLIGHT: 8,                                            // seconds the flight takes
-  coins: [{ x: 1960, y: 1020 }, { x: 1600, y: 1180 }, { x: 1860, y: 160 }],
+  coins: [{ x: 2250, y: 1000 }, { x: 1610, y: 1180 }, { x: 2440, y: 900 }],
 };
 CFG.CLOUD = {
   WORLD: { x0: 7200, y0: -170, x1: 8600, y1: 900 },
@@ -57,16 +67,39 @@ CFG.CLOUD = {
   TERMINAL: { x0: 7300, y0: -90, x1: 7560, y1: 40 },
   BOARD: { x: 7430, y: 120 },
   CAFE: { x0: 7580, y0: 140, x1: 7700, y1: 240 },
-  TABLES: [[7560, 300], [7640, 310]],
-  PILOT: { x: 7690, y: 290 },
+  TABLES: [[7560, 310], [7700, 310]],
+  PILOT: { x: 7596, y: 262 },
   GLIDER: { top: { x: 8120, y: 160 }, launch: { x: 8046, y: 218 }, p1: { x: 7900, y: 430 }, p2: { x: 7700, y: 600 }, dur: 3.4 },
   BALLOON: { x: 8420, y: 580 },
   PADS: [{ x: 8110, y: 760 }, { x: 8220, y: 830 }, { x: 8330, y: 760 }],   // bouncy clouds
   FLAGS: [[7290, -110], [7720, -110]],
   coins: [{ x: 7330, y: 300 }, { x: 7860, y: 820 }, { x: 8500, y: 520 }, { x: 8480, y: 80 }],
 };
+// Inside the Sky Café: its own little map (free space south of Cloud Harbor), a cosy room seen from above.
+CFG.SKYCAFE = {
+  WORLD: { x0: 7400, y0: 1500, x1: 7900, y1: 1850 },
+  ROOM: { x0: 7430, y0: 1545, x1: 7870, y1: 1815 }, WALL: 22,
+  WINDOWS: [[7452, 7566], [7596, 7710]],                 // the big windows in the top wall (the sky outside moves)
+  MENU: { x0: 7728, y0: 1500, x1: 7862, y1: 1541 },     // the chalk menu board on the top wall
+  COUNTER: { x0: 7450, y0: 1600, x1: 7610, y1: 1640 },
+  BARISTA: { x: 7498, y: 1588 },
+  PADS: { cocoa: { x: 7490, y: 1684 }, pie: { x: 7576, y: 1684 } },
+  TABLES: [
+    { x: 7690, y: 1710, chairs: [{ x: 7652, y: 1710 }, { x: 7728, y: 1710 }] },
+    { x: 7800, y: 1620, chairs: [{ x: 7762, y: 1620 }, { x: 7838, y: 1620 }] },
+    { x: 7800, y: 1760, chairs: [{ x: 7762, y: 1760 }, { x: 7838, y: 1760 }] },
+  ],
+  JUKEBOX: { x0: 7836, y0: 1676, x1: 7866, y1: 1712 },
+  SHELF: { x0: 7434, y0: 1724, x1: 7462, y1: 1804 },
+  EXIT: { x: 7650, y: 1800 },                            // the mat inside the door (the door is in the bottom wall)
+  DOOR_OUT: { x: 7640, y: 258 },                         // where you stand at the café door in Cloud Harbor
+  COCOA: 60, VIEW: 4.5,                                  // seconds a cocoa lasts; seconds the big window view shows
+  MENU_ITEMS: [['Cloud Cocoa', 5], ['Sky Pie slice', 8], ['Lightning Lemonade', 4]],
+};
 CFG.AREAS.cloud = { WORLD: CFG.CLOUD.WORLD };
+CFG.AREAS.skycafe = { WORLD: CFG.SKYCAFE.WORLD };
 CFG.VEHICLES.plane = { speed: 300, radius: 20, label: '✈️ Taxi', exit: '🚶 Hop out' };
+CFG.VEHICLES.heli = { speed: 380, radius: 20, label: '🚁 Fly', exit: '🛬 Land', flies: true };   // flies over everything in town
 CFG.VEHICLES.balloonride = { speed: 140, radius: 20, label: '🎈 Ride', exit: '🚶 Hop out' };
 CFG.COINS.push(...CFG.AIRFIELD.coins, ...CFG.CLOUD.coins);
 
@@ -99,17 +132,20 @@ const AirfieldExt = {
   },
 
   // ======================= game hooks =======================
-  home(g) { const rt = this.rt; if (rt) { rt.ride = null; rt.runup = null; rt.roll = null; } },
+  home(g) { const rt = this.rt; if (rt) { rt.ride = null; rt.runup = null; rt.roll = null; rt.cafe.seat = null; rt.cafe.view = 0; rt.cafe.fade = 0; } },
   build(g) {
     const A = CFG.AIRFIELD, C = CFG.CLOUD;
     this.rt = {
       plane: { kind: 'plane', x: A.PLANE_HOME.x, y: A.PLANE_HOME.y, angle: A.PLANE_HOME.angle, vx: 0, vy: 0, lift: 0 },
       cloudPlane: { kind: 'plane', x: C.PLANE_HOME.x, y: C.PLANE_HOME.y, angle: C.PLANE_HOME.angle, vx: 0, vy: 0, lift: 0 },
       balloon: { kind: 'balloonride', x: C.BALLOON.x, y: C.BALLOON.y, angle: 0, vx: 0, vy: 0 },
+      heli: { kind: 'heli', x: A.HELI.x, y: A.HELI.y, angle: Math.PI, vx: 0, vy: 0, rotor: 0, rotorA: 0, lift: 0 },   // the helicopter: steered like the car, but it flies over everything
+      heliUp: false,
       runup: null, roll: null, ride: null,
       found: false, balloonRidden: false, glided: false, padLeft: true, rampLeft: true, wave: 0,
       jumpers: [], jumpT: 3, blimpX: C.WORLD.x0 + 300,
       townObs: null, townCarObs: null, cloudObs: null, void: null, land: null,
+      cafe: { seat: null, view: 0, fade: 0, cocoa: 0, cocoaHand: 0, obs: null },   // the Sky Café: a chair you sit on, the big window view, a cocoa to carry
     };
     this.buildObstacles();
   },
@@ -120,16 +156,21 @@ const AirfieldExt = {
     const A = CFG.AIRFIELD, C = CFG.CLOUD, rt = this.rt;
     const T = A.TERMINAL, H = A.HANGAR, foot = [], car = [];
     const solid = (x0, y0, x1, y1) => { const o = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }; foot.push(o); car.push(o); };
+    // buildings: hangar, workshop, fuel farm, gate pier (with its jet-bridge), the tower base
     solid(H.x0, H.y0, H.x1, H.y1);
-    car.push({ x: T.x0, y: T.y0, w: T.x1 - T.x0, h: T.y1 - T.y0 });
-    const dw = 6, dh = T.doorHalf;
-    foot.push({ x: T.x0, y: T.y0, w: T.x1 - T.x0, h: dw }, { x: T.x0, y: T.y1 - dw, w: T.x1 - T.x0, h: dw });
-    for (const x of [T.x0, T.x1 - dw]) foot.push({ x, y: T.y0, w: dw, h: T.door.y - dh - T.y0 }, { x, y: T.door.y + dh, w: dw, h: T.y1 - (T.door.y + dh) });
+    solid(A.SHED.x0, A.SHED.y0, A.SHED.x1, A.SHED.y1);
+    solid(A.FUEL_FARM.x0, A.FUEL_FARM.y0, A.FUEL_FARM.x1, A.FUEL_FARM.y1);
+    solid(A.GATE.x0, A.GATE.y0, A.GATE.x1, A.GATE.y1); solid(A.JET.x + 70, A.JET.y - 14, A.GATE.x0, A.JET.y + 14);
     solid(A.TOWER.x - 22, A.TOWER.y - 20, A.TOWER.x + 22, A.TOWER.y + 12);
+    // the arrivals hall: solid for vehicles; people walk through the corridor between its two doors
+    car.push({ x: T.x0, y: T.y0, w: T.x1 - T.x0, h: T.y1 - T.y0 });
+    foot.push({ x: T.x0, y: T.y0, w: T.x1 - T.x0, h: T.door.y - T.doorHalf - T.y0 }, { x: T.x0, y: T.door.y + T.doorHalf, w: T.x1 - T.x0, h: T.y1 - (T.door.y + T.doorHalf) });
+    // parked aircraft and the small solid props (signs, benches, cones and cars are walk-through)
     solid(A.FUEL.x - 12, A.FUEL.y - 14, A.FUEL.x + 12, A.FUEL.y + 10);
     solid(A.CART.x - 22, A.CART.y - 12, A.CART.x + 22, A.CART.y + 10);
-    solid(A.HELI.x - 36, A.HELI.y - 22, A.HELI.x + 36, A.HELI.y + 20);
-    solid(A.PARKED.x - 46, A.PARKED.y - 40, A.PARKED.x + 46, A.PARKED.y + 36);
+    for (const q of A.PARKED) solid(q.x - 46, q.y - 40, q.x + 46, q.y + 36);
+    solid(A.JET.x - 86, A.JET.y - 86, A.JET.x + 86, A.JET.y + 86);
+    solid(A.RADAR.x - 18, A.RADAR.y - 14, A.RADAR.x + 18, A.RADAR.y + 12);
     rt.townObs = foot; rt.townCarObs = car;
 
     const W = C.WORLD;
@@ -153,22 +194,87 @@ const AirfieldExt = {
     const K = C.CAFE; st.push({ x: K.x0, y: K.y0, w: K.x1 - K.x0, h: K.y1 - K.y0 });
     for (const [x, y] of C.TABLES) st.push({ x: x - 14, y: y - 8, w: 28, h: 16 });
     rt.cloudObs = rt.void.concat(st);
+    // the café: walls, the counter, the tables, the jukebox and the shelf (chairs are where you stand to sit)
+    const SC = CFG.SKYCAFE, R = SC.ROOM, wl = SC.WALL, co = [];
+    co.push({ x: R.x0 - wl, y: R.y0 - wl, w: R.x1 - R.x0 + 2 * wl, h: wl }, { x: R.x0 - wl, y: R.y1, w: R.x1 - R.x0 + 2 * wl, h: wl });
+    co.push({ x: R.x0 - wl, y: R.y0, w: wl, h: R.y1 - R.y0 }, { x: R.x1, y: R.y0, w: wl, h: R.y1 - R.y0 });
+    co.push({ x: SC.COUNTER.x0, y: SC.COUNTER.y0 - 24, w: SC.COUNTER.x1 - SC.COUNTER.x0, h: SC.COUNTER.y1 - SC.COUNTER.y0 + 24 });   // counter plus the barista's side
+    for (const tb of SC.TABLES) co.push({ x: tb.x - 22, y: tb.y - 20, w: 44, h: 40 });
+    co.push({ x: SC.JUKEBOX.x0, y: SC.JUKEBOX.y0, w: SC.JUKEBOX.x1 - SC.JUKEBOX.x0, h: SC.JUKEBOX.y1 - SC.JUKEBOX.y0 });
+    co.push({ x: SC.SHELF.x0, y: SC.SHELF.y0, w: SC.SHELF.x1 - SC.SHELF.x0, h: SC.SHELF.y1 - SC.SHELF.y0 });
+    rt.cafe.obs = co;
   },
 
   obstacles(g, forCar) {
     const rt = this.rt; if (!rt) return [];
     if (g.area === 'town') return forCar ? rt.townCarObs : rt.townObs;
+    if (g.area === 'skycafe') return rt.cafe.obs;
     if (g.area !== 'cloud') return [];
     if (forCar && g.driving && g.vehicle === rt.balloon) return [];   // the balloon floats over everything
     return rt.cloudObs;
   },
-  vehicles(g) { return this.rt ? [this.rt.plane, this.rt.cloudPlane, this.rt.balloon] : []; },
+  vehicles(g) { return this.rt ? [this.rt.plane, this.rt.cloudPlane, this.rt.balloon, this.rt.heli] : []; },
+  flyingHeli(g) { return !!this.rt && g.driving && g.vehicle === this.rt.heli; },
 
   action(g) {
     const rt = this.rt;
     if (!rt || rt.runup || rt.roll || g.travel) return null;
     if (this.readyToFly(g)) return { label: g.area === 'town' ? '🛫 Take off!' : '🛫 Fly home!', run: (gg) => this.takeOff(gg) };
+    if (g.driving || g.onTrain || g.ride || rt.ride) return null;
+    const p = g.player, K = CFG.SKYCAFE;
+    if (g.area === 'cloud' && U.dist(p.x, p.y, K.DOOR_OUT.x, K.DOOR_OUT.y) < 30) return { label: '☕ Go inside', run: (gg) => this.enterCafe(gg) };
+    if (g.area !== 'skycafe') return null;
+    if (rt.cafe.seat) return { label: '🚶 Stand up', run: (gg) => this.standUp(gg) };
+    if (U.dist(p.x, p.y, K.EXIT.x, K.EXIT.y) < 30) return { label: '☕ Go outside', run: (gg) => this.leaveCafe(gg) };
+    const chair = this.nearChair(g); if (chair) return { label: '🪑 Sit down', run: (gg) => this.sitDown(gg, chair) };
     return null;
+  },
+  // ---------- the Sky Café ----------
+  nearChair(g) { const p = g.player; for (const tb of CFG.SKYCAFE.TABLES) for (const c of tb.chairs) if (U.dist(p.x, p.y, c.x, c.y) < 22) return Object.assign({ table: tb }, c); return null; },
+  enterCafe(g) {
+    const K = CFG.SKYCAFE, p = g.player;
+    g.area = 'skycafe'; p.x = K.EXIT.x; p.y = K.EXIT.y - 8; p.moving = false; p.facing = 1; p.hasMoved = true; g.cameraSnap = true;
+    this.rt.cafe.fade = 0.45; Sfx.ding(); Haptics.tap();
+  },
+  leaveCafe(g) {
+    const K = CFG.SKYCAFE, p = g.player;
+    g.area = 'cloud'; p.x = K.DOOR_OUT.x; p.y = K.DOOR_OUT.y; p.moving = false; p.facing = 1; p.hasMoved = true; g.cameraSnap = true;
+    this.rt.cafe.seat = null; this.rt.cafe.view = 0; this.rt.cafe.fade = 0.45; Sfx.drop();
+  },
+  sitDown(g, chair) {
+    const p = g.player, c = this.rt.cafe;
+    c.seat = { x: chair.x, y: chair.y, facing: chair.table.x > chair.x ? 1 : -1 }; c.view = CFG.SKYCAFE.VIEW;
+    p.x = chair.x; p.y = chair.y; p.moving = false; p.facing = c.seat.facing;
+    g.floats.push({ x: p.x, y: p.y - 50, text: 'What a view! ☁️', color: '#ffe08a', t: 0, dur: 1.4, big: true });
+    Sfx.chime(); Haptics.tap();
+  },
+  standUp(g) { const c = this.rt.cafe; c.seat = null; c.view = 0; g.player.moving = false; Sfx.drop(); },
+  cafeFree(x, y) {
+    const R = CFG.SKYCAFE.ROOM, r = 12;
+    if (x < R.x0 + r || x > R.x1 - r || y < R.y0 + r || y > R.y1 - r) return false;
+    for (const o of this.rt.cafe.obs) if (x > o.x && x < o.x + o.w && y > o.y && y < o.y + o.h) return false;
+    return true;
+  },
+  updateCafe(g, dt) {
+    const c = this.rt.cafe, p = g.player, K = CFG.SKYCAFE;
+    if (c.seat) { p.x = c.seat.x; p.y = c.seat.y; p.moving = false; p.facing = c.seat.facing; c.view = Math.max(0, c.view - dt); return; }
+    // a save (or a push) that left the chef in the walls or inside furniture goes back onto the door mat
+    if (!this.cafeFree(p.x, p.y)) { p.x = K.EXIT.x; p.y = K.EXIT.y - 8; p.moving = false; g.floats.push({ x: p.x, y: p.y - 50, text: 'Oops! Back inside', color: '#ffe08a', t: 0, dur: 1.4, big: true }); }
+  },
+  pads(g) {
+    if (g.area !== 'skycafe' || !this.rt) return [];
+    const K = CFG.SKYCAFE;
+    return [
+      { key: 'cafeCocoa', label: 'Cloud Cocoa', ico: '☕', pos: K.PADS.cocoa, price: 5, sub: 'warm & sweet' },
+      { key: 'cafePie', label: 'Sky Pie slice', ico: '🥧', pos: K.PADS.pie, price: 8, sub: 'a slice of heaven' },
+    ];
+  },
+  onPad(g, pad) {
+    const p = g.player, c = this.rt.cafe;
+    g.s.stats = g.s.stats || {};
+    if (pad.key === 'cafeCocoa') { c.cocoa = CFG.SKYCAFE.COCOA; g.s.stats.cocoas = (g.s.stats.cocoas || 0) + 1; g.floats.push({ x: p.x, y: p.y - 60, text: 'Mmm, warm! ☕', color: '#ffe08a', t: 0, dur: 1.5, big: true }); }
+    else if (pad.key === 'cafePie') { g.s.stats.pies = (g.s.stats.pies || 0) + 1; g.floats.push({ x: p.x, y: p.y - 60, text: 'Yum! Sky Pie! 🥧', color: '#ffe08a', t: 0, dur: 1.5, big: true }); for (let i = 0; i < 6; i++) g.fx.push({ kind: 'sparkle', x0: p.x + U.rand(-20, 20), y0: p.y - 30 + U.rand(-20, 20), x1: 0, y1: 0, t: -i * 0.06, dur: 0.5 }); }
+    Haptics.success();
   },
   takeOff(g) {
     const rt = this.rt, v = this.planeOf(g), town = g.area === 'town', R = town ? CFG.AIRFIELD.RUNWAY : CFG.CLOUD.RUNWAY;
@@ -204,6 +310,12 @@ const AirfieldExt = {
     const rt = this.rt; if (!rt) return;
     const p = g.player;
     rt.wave += dt;
+    rt.cafe.fade = Math.max(0, rt.cafe.fade - dt); rt.cafe.cocoa = Math.max(0, rt.cafe.cocoa - dt);
+    // the helicopter: the rotor spins up when you fly it and winds down when it is parked
+    const hl = rt.heli, flying = this.flyingHeli(g);
+    hl.rotor = U.clamp(hl.rotor + (flying ? dt * 1.5 : -dt * 0.5), 0, 1); hl.rotorA += hl.rotor * 32 * dt; hl.lift = flying ? Math.min(40, hl.lift + 90 * dt) : Math.max(0, hl.lift - 90 * dt);
+    if (flying && !rt.heliUp) { rt.heliUp = true; g.floats.push({ x: hl.x, y: hl.y - 60, text: 'Whirrr! 🚁', color: '#ffe08a', t: 0, dur: 1.3, big: true }); Haptics.tap(); }
+    if (!flying) rt.heliUp = false;
     if (rt.runup) this.updateRunup(g, dt);
     else if (rt.roll) this.updateRoll(g, dt);
     else this.steerHelp(g, dt);
@@ -215,6 +327,7 @@ const AirfieldExt = {
       return;
     }
     if (g.area === 'cloud') this.updateCloud(g, dt);
+    else if (g.area === 'skycafe') this.updateCafe(g, dt);
   },
   // Driving the plane near the runway and roughly along it, it lines itself up on the centreline: little
   // thumbs steer wobbly, and turning off the taxiway would otherwise drift it off the far edge.
@@ -343,7 +456,10 @@ const AirfieldExt = {
     if (rt.runup) return { text: '🛫 Here we go!', target: null };
     if (rt.roll) return { text: 'Touchdown! 🛬', target: null };
     if (g.area === 'town') {
-      if (g.onTrain || g.fishing || g.ride || !this.inStrip(p.x, p.y)) return undefined;
+      if (g.onTrain || g.fishing || g.ride) return undefined;
+      if (this.flyingHeli(g)) return p.carry > 0 && g.houses.some((h) => h.order) ? undefined : { text: 'Whirrr! Fly anywhere you like 🚁', target: null };
+      if (!g.driving && U.dist(p.x, p.y, rt.heli.x, rt.heli.y) < 120 && !(p.carry > 0 && g.houses.some((h) => h.order))) return { text: 'Fly the helicopter! 🚁', target: U.dist(p.x, p.y, rt.heli.x, rt.heli.y) < 70 ? null : rt.heli };
+      if (!this.inStrip(p.x, p.y)) return undefined;
       if (g.driving) {
         if (g.vehicle !== rt.plane) return undefined;
         if (this.readyToFly(g)) return { text: '🛫 Press the button to take off!', target: null };
@@ -352,6 +468,12 @@ const AirfieldExt = {
       if (p.carry > 0 && g.houses.some((h) => h.order)) return undefined;   // a delivery is more urgent
       const coin = this.nearCoin(g, A.STRIP, 300); if (coin) return { text: 'Grab the shiny coin!', target: coin };
       return { text: 'Hop in the plane!', target: U.dist(p.x, p.y, rt.plane.x, rt.plane.y) < 70 ? null : rt.plane };
+    }
+    if (g.area === 'skycafe') {
+      const K = CFG.SKYCAFE;
+      if (rt.cafe.seat) return { text: 'Enjoy the view! ☁️', target: null };
+      if (rt.cafe.cocoa <= 0) return { text: 'Try a Cloud Cocoa! ☕', target: K.PADS.cocoa };
+      return { text: 'Have a seat by the window 🪑', target: K.TABLES[1].chairs[0] };
     }
     if (g.area !== 'cloud') return undefined;
     const rd = rt.ride;
@@ -362,6 +484,7 @@ const AirfieldExt = {
       if (this.readyToFly(g)) return { text: '🛫 Press the button to fly home!', target: null };
       return { text: '🛫 Press the button to fly home!', target: null };
     }
+    if (U.dist(p.x, p.y, CFG.SKYCAFE.DOOR_OUT.x, CFG.SKYCAFE.DOOR_OUT.y) < 120) return { text: 'Go inside the Sky Café ☕', target: U.dist(p.x, p.y, CFG.SKYCAFE.DOOR_OUT.x, CFG.SKYCAFE.DOOR_OUT.y) < 30 ? null : CFG.SKYCAFE.DOOR_OUT };
     if (!rt.balloonRidden) return { text: 'Ride the balloon!', target: U.dist(p.x, p.y, rt.balloon.x, rt.balloon.y) < 70 ? null : rt.balloon };
     if (!rt.glided) return { text: 'Try the glider ramp!', target: C.GLIDER.top };
     const coin = this.nearCoin(g, C.WORLD, 420); if (coin) return { text: 'Grab the shiny coin!', target: coin };
@@ -423,36 +546,50 @@ const AirfieldExt = {
   // ---------- town: the airfield strip ----------
   paintTown(r, g) {
     const ctx = r.ctx, A = CFG.AIRFIELD, S = A.STRIP, R = A.RUNWAY, X = A.TAXIWAY, P = A.APRON, H = A.HANGAR;
-    // the core's two sidewalk strips run across the whole world: they end at the plaza in front of the gate
-    this.grass(ctx, 1596, 580, S.x1 - 1596, 50); this.grass(ctx, S.x0, 640, S.x1 - S.x0, 60);
+    // fresh grass over the whole strip below Main Street (it covers the core's two stray sidewalk strips), mowed in stripes;
+    // the plaza in front of the gate keeps the sidewalks that lead to it
+    this.grass(ctx, 1600, 120, S.x1 - 1600, S.y1 - 120); this.grass(ctx, S.x0, 120, 60, 440); this.grass(ctx, S.x0, 700, 60, S.y1 - 700);
+    ctx.fillStyle = 'rgba(255,255,255,0.05)'; for (let x = 1600; x < S.x1; x += 96) ctx.fillRect(x, 120, 48, S.y1 - 120);
     this.pave(ctx, A.PLAZA.x0, A.PLAZA.y0, A.PLAZA.x1 - A.PLAZA.x0, A.PLAZA.y1 - A.PLAZA.y0);
-    // hedge along Main Street, flowers in the south meadow
+    // hedge along Main Street, flowers and bushes in the meadows
     for (let x = A.HEDGE.x0; x <= A.HEDGE.x1; x += 20) { ctx.fillStyle = '#3f9a4a'; ctx.beginPath(); ctx.arc(x, 112 + (x % 40 ? 2 : -2), 9, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#56b862'; ctx.beginPath(); ctx.arc(x - 3, 109 + (x % 40 ? 2 : -2), 4, 0, Math.PI * 2); ctx.fill(); }
     const cols = ['#ff8fab', '#ffd166', '#fff', '#ff6b6b', '#9ad0ff'];
-    for (let i = 0; i < 40; i++) { const x = 1560 + this.hash(i) * 480, y = 1180 + this.hash(i + 50) * 130; if (x > 1680 && x < 1820 && y < 1262) continue; ctx.fillStyle = cols[i % 5]; ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill(); }
-    for (const [x, y] of [[1570, 1300], [1890, 1290], [2030, 1250], [2035, 800], [1570, 870], [1600, 420], [2040, 1050]]) { ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.beginPath(); ctx.ellipse(x + 3, y + 8, 18, 7, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#3f9a4a'; ctx.beginPath(); ctx.arc(x, y, 16, 0, Math.PI * 2); ctx.arc(x - 12, y + 6, 11, 0, Math.PI * 2); ctx.arc(x + 12, y + 6, 11, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#56b862'; ctx.beginPath(); ctx.arc(x - 4, y - 6, 7, 0, Math.PI * 2); ctx.fill(); }
-    // concrete: the terminal pad, the apron, the taxiway; then the runway
+    for (let i = 0; i < 70; i++) { const x = 1560 + this.hash(i) * 880, y = 1150 + this.hash(i + 50) * 160; if (x > 1740 && x < 1900 && y < 1262) continue; ctx.fillStyle = cols[i % 5]; ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill(); }
+    for (const [x, y] of [[1570, 1300], [1950, 1290], [2100, 1250], [2430, 1300], [1570, 870], [1600, 450], [2300, 1100], [1720, 940], [2080, 1000], [2430, 760], [1700, 150], [2330, 950]]) { ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.beginPath(); ctx.ellipse(x + 3, y + 8, 18, 7, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#3f9a4a'; ctx.beginPath(); ctx.arc(x, y, 16, 0, Math.PI * 2); ctx.arc(x - 12, y + 6, 11, 0, Math.PI * 2); ctx.arc(x + 12, y + 6, 11, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#56b862'; ctx.beginPath(); ctx.arc(x - 4, y - 6, 7, 0, Math.PI * 2); ctx.fill(); }
+    // concrete: the terminal pad, the car park, the apron, the taxiway loop; then the runway
     this.pave(ctx, A.PAD.x0, A.PAD.y0, A.PAD.x1 - A.PAD.x0, A.PAD.y1 - A.PAD.y0, '#c9c3b5');
+    this.paintCarPark(r, g, A.CARPARK);
     ctx.fillStyle = '#7c8088'; ctx.fillRect(P.x0, P.y0, P.x1 - P.x0, P.y1 - P.y0);
-    ctx.fillStyle = 'rgba(255,255,255,0.05)'; for (let i = 0; i < 200; i++) ctx.fillRect(P.x0 + ((i * 97) % (P.x1 - P.x0)), P.y0 + ((i * 53) % (P.y1 - P.y0)), 2, 2);
-    ctx.fillStyle = '#6b7078'; ctx.fillRect(X.x0 - 6, X.y0, X.x1 - X.x0 + 6, X.y1 - X.y0);
-    ctx.strokeStyle = '#f2c94c'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(R.x1 - 10, (X.y0 + X.y1) / 2); ctx.lineTo(P.x0 + 60, (X.y0 + X.y1) / 2); ctx.stroke();
-    ctx.setLineDash([6, 6]); ctx.beginPath(); ctx.moveTo(R.x1 + 10, X.y0 + 4); ctx.lineTo(R.x1 + 10, X.y1 - 4); ctx.stroke(); ctx.setLineDash([]);   // hold-short line
-    // parking T for the plane, the helipad circle
+    ctx.fillStyle = 'rgba(255,255,255,0.05)'; for (let i = 0; i < 500; i++) ctx.fillRect(P.x0 + ((i * 97) % (P.x1 - P.x0)), P.y0 + ((i * 53) % (P.y1 - P.y0)), 2, 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.08)'; for (let x = P.x0 + 120; x < P.x1; x += 120) ctx.fillRect(x, P.y0, 2, P.y1 - P.y0); for (let y = P.y0 + 135; y < P.y1; y += 135) ctx.fillRect(P.x0, y, P.x1 - P.x0, 2);   // slab joints
+    const HA = A.HANGAR_APRON; ctx.fillStyle = '#7c8088'; ctx.fillRect(HA.x0, HA.y0, HA.x1 - HA.x0, HA.y1 - HA.y0);
+    ctx.fillStyle = '#6b7078'; ctx.fillRect(X.x0, X.y0, X.x1 - X.x0, X.y1 - X.y0);
+    for (const [y0, y1] of A.STUBS) ctx.fillRect(R.x1 - 6, y0, X.x0 - R.x1 + 6, y1 - y0);
+    ctx.strokeStyle = '#f2c94c'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo((X.x0 + X.x1) / 2, X.y0 + 20); ctx.lineTo((X.x0 + X.x1) / 2, X.y1 - 20); ctx.stroke();
+    for (const [y0, y1] of A.STUBS.concat([[HA.y0 + 50, HA.y0 + 100]])) { const y = (y0 + y1) / 2; ctx.beginPath(); ctx.moveTo(R.x1 - 10, y); ctx.lineTo((X.x0 + X.x1) / 2, y); ctx.stroke(); ctx.setLineDash([6, 6]); ctx.beginPath(); ctx.moveTo(R.x1 + 10, y0 + 4); ctx.lineTo(R.x1 + 10, y1 - 4); ctx.stroke(); ctx.setLineDash([]); }   // hold-short lines
+    ctx.setLineDash([]);
+    // stands: the chef's plane in front of the hangar, the visitors' row, the helipad
     ctx.strokeStyle = '#f2c94c'; ctx.lineWidth = 3; ctx.strokeRect(A.PLANE_HOME.x - 46, A.PLANE_HOME.y - 50, 92, 100);
+    for (const q of A.PARKED) ctx.strokeRect(q.x - 50, q.y - 46, 100, 92);
+    ctx.strokeRect(A.JET.x - 110, A.JET.y - 100, 200, 200);
+    ctx.fillStyle = '#f2c94c'; ctx.font = r.font(10); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    A.PARKED.forEach((q, i) => ctx.fillText('STAND ' + (i + 2), q.x, q.y - 56)); ctx.fillText('STAND 1', A.PLANE_HOME.x, A.PLANE_HOME.y - 60);
     const HL = A.HELI; ctx.strokeStyle = '#f3efe3'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(HL.x, HL.y, 44, 0, Math.PI * 2); ctx.stroke();
-    ctx.fillStyle = 'rgba(243,239,227,0.6)'; ctx.font = r.font(28); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('H', HL.x, HL.y + 1);
+    ctx.fillStyle = 'rgba(243,239,227,0.6)'; ctx.font = r.font(28); ctx.fillText('H', HL.x, HL.y + 1);
     this.paintRunway(r, R, true);
     for (const [x, y] of A.CONES) this.cone(ctx, x, y);
     this.paintHangar(r, g, H);
+    this.paintShed(r, A.SHED);
+    this.paintFuelFarm(r, A.FUEL_FARM);
     this.paintTerminal(r, g, A.TERMINAL);
+    this.paintGate(r, g, A.GATE, A.JET);
     // fuel pump
     const F = A.FUEL;
     ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(F.x - 10, F.y + 6, 24, 6);
     ctx.fillStyle = '#e4572e'; U.roundRect(ctx, F.x - 11, F.y - 14, 22, 24, 3); ctx.fill();
     ctx.fillStyle = '#fff'; ctx.fillRect(F.x - 7, F.y - 10, 14, 8); ctx.fillStyle = '#2b1d14'; ctx.fillRect(F.x - 5, F.y - 8, 10, 2); ctx.fillRect(F.x - 5, F.y - 5, 6, 2);
     ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(F.x + 11, F.y - 8); ctx.quadraticCurveTo(F.x + 22, F.y - 10, F.x + 20, F.y + 4); ctx.stroke();
-    ctx.font = r.font(11); ctx.fillStyle = '#2b1d14'; ctx.fillText('⛽', F.x, F.y - 26);
+    ctx.font = r.font(11); ctx.fillStyle = '#2b1d14'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('⛽', F.x, F.y - 26);
     // luggage cart with two suitcases
     const Ct = A.CART;
     ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(Ct.x - 18, Ct.y + 6, 40, 6);
@@ -460,70 +597,130 @@ const AirfieldExt = {
     ctx.fillStyle = '#3b7dd8'; U.roundRect(ctx, Ct.x - 22, Ct.y - 6, 44, 12, 3); ctx.fill(); ctx.fillRect(Ct.x + 20, Ct.y - 16, 3, 14);
     ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, Ct.x - 18, Ct.y - 16, 18, 12, 2); ctx.fill(); ctx.fillStyle = '#f06292'; U.roundRect(ctx, Ct.x + 2, Ct.y - 18, 16, 14, 2); ctx.fill();
     ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(Ct.x - 12, Ct.y - 18, 6, 3); ctx.fillRect(Ct.x + 7, Ct.y - 20, 6, 3);
-    // a visitor's little plane and a helicopter parked on the apron
-    const Pk = A.PARKED; ctx.save(); ctx.translate(Pk.x, Pk.y); ctx.rotate(-Math.PI / 2); r.drawVehicle('plane', g, '#3b7dd8'); ctx.restore();
-    this.paintHeli(r, HL.x, HL.y);
-    // plane spotting bench by the runway
-    this.bench(ctx, A.BENCH.x, A.BENCH.y); this.sign(r, A.BENCH.x + 50, A.BENCH.y + 6, '🔭 PLANE SPOTTING');
-    // windsock pole shadow and base (the sock itself flutters live)
-    this.sign(r, 1566, 548, '✈️ AIRFIELD', '#3b7dd8', '#fff');
+    // visitors' little planes and the helicopter on their stands
+    for (const q of A.PARKED) { ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(-Math.PI / 2); r.drawVehicle('plane', g, q.color); ctx.restore(); }
+    // the radar dish's base (the dish turns live), the plane spotting bench, signs (all walk-through)
+    const Rd = A.RADAR;
+    ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(Rd.x + 3, Rd.y + 10, 22, 9, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#9aa0a8'; U.roundRect(ctx, Rd.x - 18, Rd.y - 12, 36, 22, 4); ctx.fill(); ctx.fillStyle = '#5c6670'; ctx.fillRect(Rd.x - 14, Rd.y - 8, 28, 4);
+    ctx.strokeStyle = '#2d3a4a'; ctx.lineWidth = 2; ctx.setLineDash([4, 4]); ctx.strokeRect(Rd.x - 34, Rd.y - 30, 68, 50); ctx.setLineDash([]);
+    this.bench(ctx, A.BENCH.x, A.BENCH.y);
+    for (const [x, y, text] of A.SIGNS) this.sign(r, x, y, text, text.includes('AIRFIELD') ? '#3b7dd8' : '#2b1d14', text.includes('AIRFIELD') ? '#fff' : '#ffe08a');
+  },
+  paintCarPark(r, g, C) {
+    const ctx = r.ctx;
+    ctx.fillStyle = '#5a5d63'; ctx.fillRect(C.x0, C.y0, C.x1 - C.x0, C.y1 - C.y0);
+    ctx.fillStyle = 'rgba(255,255,255,0.05)'; for (let i = 0; i < 80; i++) ctx.fillRect(C.x0 + ((i * 37) % (C.x1 - C.x0)), C.y0 + ((i * 53) % (C.y1 - C.y0)), 2, 2);
+    ctx.strokeStyle = '#f3efe3'; ctx.lineWidth = 3; for (let k = 0; k < 3; k++) { const y = C.y0 + 12 + k * 60; ctx.beginPath(); ctx.moveTo(C.x0 + 14, y); ctx.lineTo(C.x1 - 14, y); ctx.stroke(); }
+    ctx.fillStyle = '#f3efe3'; ctx.font = r.font(14); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('P', C.x1 - 16, C.y0 + 150);
+    for (const [i, col] of [[0, '#41b883'], [1, '#8e5bd1']]) { ctx.save(); ctx.translate((C.x0 + C.x1) / 2, C.y0 + 42 + i * 60); r.drawVehicle('car', g, col); ctx.restore(); }
   },
   paintHangar(r, g, H) {
-    const ctx = r.ctx, w = H.x1 - H.x0, h = H.y1 - H.y0, cx = H.door.x;
+    const ctx = r.ctx, w = H.x1 - H.x0, h = H.y1 - H.y0, cx = (H.x0 + H.x1) / 2;
     ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(H.x0 + 6, H.y0 + 6, w, h);
-    // an arched steel roof: darker at the sides, bright along the ridge, with ribs
-    const grd = ctx.createLinearGradient(H.x0, 0, H.x1, 0); grd.addColorStop(0, '#7f8791'); grd.addColorStop(0.5, '#c3c8d0'); grd.addColorStop(1, '#7f8791');
-    ctx.fillStyle = grd; ctx.fillRect(H.x0, H.y0, w, h);
+    // two arched steel roofs side by side: darker at the sides, bright along each ridge, with ribs
+    for (const bx of H.bays) { const grd = ctx.createLinearGradient(bx - 50, 0, bx + 50, 0); grd.addColorStop(0, '#7f8791'); grd.addColorStop(0.5, '#c3c8d0'); grd.addColorStop(1, '#7f8791'); ctx.fillStyle = grd; ctx.fillRect(bx - 50, H.y0, 100, h); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(bx - 4, H.y0, 8, h - 18); }
     ctx.fillStyle = 'rgba(0,0,0,0.1)'; for (let y = H.y0 + 12; y < H.y1 - 20; y += 14) ctx.fillRect(H.x0, y, w, 2);
-    ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(cx - 4, H.y0, 8, h - 18);
-    // the big door on the apron side
-    ctx.fillStyle = '#2b1d14'; ctx.fillRect(cx - H.door.half - 4, H.y1 - 18, H.door.half * 2 + 8, 18);
-    for (let i = 0; i < 4; i++) { ctx.fillStyle = i % 2 ? '#e4572e' : '#f2b134'; ctx.fillRect(cx - H.door.half + i * (H.door.half / 2), H.y1 - 16, H.door.half / 2, 14); }
-    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(cx - H.door.half, H.y1 - 4, H.door.half * 2, 4);
-    ctx.fillStyle = '#9aa0a8'; ctx.fillRect(H.x0, H.y1 - 18, cx - H.door.half - 4 - H.x0, 18); ctx.fillRect(cx + H.door.half + 4, H.y1 - 18, H.x1 - cx - H.door.half - 4, 18);
-    // a little side door and a window
-    ctx.fillStyle = '#5b3a1a'; ctx.fillRect(H.x0 + 14, H.y1 - 30, 14, 20); ctx.fillStyle = '#9fe0ff'; ctx.fillRect(H.x1 - 40, H.y1 - 34, 20, 14);
+    ctx.fillStyle = '#5c6670'; ctx.fillRect(cx - 3, H.y0, 6, h);   // the gutter between the bays
+    // the big doors on the apron side
+    ctx.fillStyle = '#9aa0a8'; ctx.fillRect(H.x0, H.y1 - 18, w, 18);
+    for (const bx of H.bays) {
+      const bh = H.bayHalf;
+      ctx.fillStyle = '#2b1d14'; ctx.fillRect(bx - bh - 4, H.y1 - 18, bh * 2 + 8, 18);
+      for (let i = 0; i < 4; i++) { ctx.fillStyle = i % 2 ? '#e4572e' : '#f2b134'; ctx.fillRect(bx - bh + i * (bh / 2), H.y1 - 16, bh / 2, 14); }
+      ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(bx - bh, H.y1 - 4, bh * 2, 4);
+    }
+    ctx.fillStyle = '#5b3a1a'; ctx.fillRect(H.x0 + 10, H.y1 - 30, 12, 18); ctx.fillStyle = '#9fe0ff'; ctx.fillRect(H.x1 - 30, H.y1 - 32, 18, 12);
     // the sign on the roof
-    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, cx - 86, H.y0 + 54, 172, 36, 8); ctx.fill();
+    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, cx - 88, H.y0 + 54, 176, 36, 8); ctx.fill();
     ctx.fillStyle = '#ffe08a'; ctx.font = r.font(18); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('PIZZA AIR ✈️', cx + 8, H.y0 + 72);
-    r.drawPizza(cx - 66, H.y0 + 72, 11);
-    ctx.fillStyle = '#ffe08a'; ctx.font = r.font(9); ctx.fillText('HANGAR 1', cx, H.y0 + 112);
-    // a windsock-coloured flag on a mast at the corner
+    r.drawPizza(cx - 68, H.y0 + 72, 11);
+    ctx.fillStyle = '#ffe08a'; ctx.font = r.font(9); ctx.fillText('HANGAR 1', H.bays[0], H.y0 + 118); ctx.fillText('HANGAR 2', H.bays[1], H.y0 + 118);
     ctx.fillStyle = '#2d3a4a'; ctx.fillRect(H.x1 - 12, H.y0 + 8, 3, 30); ctx.fillStyle = '#ff8c42'; ctx.beginPath(); ctx.moveTo(H.x1 - 9, H.y0 + 8); ctx.lineTo(H.x1 + 10, H.y0 + 13); ctx.lineTo(H.x1 - 9, H.y0 + 18); ctx.closePath(); ctx.fill();
   },
+  paintShed(r, S) {
+    const ctx = r.ctx, w = S.x1 - S.x0, h = S.y1 - S.y0, cx = (S.x0 + S.x1) / 2;
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(S.x0 + 5, S.y0 + 5, w, h);
+    ctx.fillStyle = '#b98a55'; ctx.fillRect(S.x0, S.y0, w, h);
+    ctx.fillStyle = 'rgba(0,0,0,0.1)'; for (let y = S.y0 + 10; y < S.y1 - 16; y += 12) ctx.fillRect(S.x0, y, w, 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(S.x0, S.y0, w, 6);
+    ctx.fillStyle = '#5b3a1a'; ctx.fillRect(S.x0, S.y1 - 16, w, 16);                       // front wall
+    ctx.fillStyle = '#9aa0a8'; ctx.fillRect(cx - 30, S.y1 - 14, 60, 12); ctx.fillStyle = 'rgba(0,0,0,0.2)'; for (let x = cx - 26; x < cx + 30; x += 8) ctx.fillRect(x, S.y1 - 12, 2, 8);   // sliding door
+    ctx.fillStyle = '#9fe0ff'; ctx.fillRect(S.x0 + 8, S.y1 - 13, 14, 9); ctx.fillRect(S.x1 - 22, S.y1 - 13, 14, 9);
+    // a wrench and an oil drum painted on the roof as the shop's badge, drums by the wall
+    ctx.fillStyle = '#2b1d14'; ctx.font = r.font(16); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🔧', cx, S.y0 + 50);
+    for (const [dx, col] of [[-30, '#3b7dd8'], [-14, '#e4572e']]) { ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(S.x1 + 14 + dx + 40, S.y1 - 30, 7, 5, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(S.x1 + 14 + dx + 40, S.y1 - 28, 5, 3, 0, 0, Math.PI * 2); ctx.fill(); }
+  },
+  paintFuelFarm(r, F) {
+    const ctx = r.ctx;
+    ctx.strokeStyle = '#5c6670'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); ctx.strokeRect(F.x0 - 6, F.y0 - 6, F.x1 - F.x0 + 12, F.y1 - F.y0 + 12); ctx.setLineDash([]);
+    ctx.fillStyle = '#7c8088'; ctx.fillRect(F.x0, F.y0, F.x1 - F.x0, F.y1 - F.y0);
+    for (const cy of [F.y0 + 32, F.y0 + 88]) {
+      const cx = (F.x0 + F.x1) / 2;
+      ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.arc(cx + 4, cy + 5, 26, 0, Math.PI * 2); ctx.fill();
+      const grd = ctx.createRadialGradient(cx - 8, cy - 8, 4, cx, cy, 26); grd.addColorStop(0, '#f5f5f5'); grd.addColorStop(1, '#b8bec6');
+      ctx.fillStyle = grd; ctx.beginPath(); ctx.arc(cx, cy, 26, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, 18, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = '#2b1d14'; ctx.fillRect(F.x0 + 10, F.y0 + 58, F.x1 - F.x0 - 20, 4);   // pipe between the tanks
+  },
   paintTerminal(r, g, T) {
-    const ctx = r.ctx, w = T.x1 - T.x0, h = T.y1 - T.y0, dh = T.doorHalf;
+    const ctx = r.ctx, w = T.x1 - T.x0, h = T.y1 - T.y0, dh = T.doorHalf, dy = T.door.y;
     ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(T.x0 + 4, T.y0 + 4, w, h);
-    // floor tiles (you can walk through the gate), walls with a door on each side
-    for (let y = T.y0; y < T.y1; y += 18) for (let x = T.x0; x < T.x1; x += 18) { ctx.fillStyle = ((x - T.x0) / 18 + (y - T.y0) / 18) % 2 ? '#e6edf5' : '#f6f9fc'; ctx.fillRect(x, y, Math.min(18, T.x1 - x), Math.min(18, T.y1 - y)); }
-    ctx.fillStyle = '#3b7dd8';
-    ctx.fillRect(T.x0, T.y0, w, 6); ctx.fillRect(T.x0, T.y1 - 6, w, 6);
-    for (const x of [T.x0, T.x1 - 6]) { ctx.fillRect(x, T.y0, 6, T.door.y - dh - T.y0); ctx.fillRect(x, T.door.y + dh, 6, T.y1 - T.door.y - dh); }
-    // door mats and little awnings outside both doors
-    ctx.fillStyle = '#e4572e'; ctx.fillRect(T.x0 - 12, T.door.y - dh, 12, dh * 2); ctx.fillRect(T.x1, T.door.y - dh, 12, dh * 2);
-    for (let i = 0; i < 4; i++) { ctx.fillStyle = i % 2 ? '#fff' : '#3b7dd8'; ctx.fillRect(T.x0 - 14, T.door.y - dh - 6 + i * 8, 6, 8); ctx.fillRect(T.x1 + 8, T.door.y - dh - 6 + i * 8, 6, 8); }
-    // inside: a bench, a potted plant, a baggage belt
-    this.bench(ctx, T.x0 + 36, T.y0 + 28);
-    ctx.fillStyle = '#9aa0a8'; U.roundRect(ctx, T.x0 + 12, T.y1 - 30, w - 24, 14, 6); ctx.fill(); ctx.fillStyle = '#2d3a4a'; U.roundRect(ctx, T.x0 + 16, T.y1 - 27, w - 32, 8, 4); ctx.fill();
-    ctx.fillStyle = '#8d5a2b'; ctx.fillRect(T.x0 + 26, T.y1 - 29, 10, 8); ctx.fillStyle = '#f06292'; ctx.fillRect(T.x1 - 40, T.y1 - 29, 10, 8);
-    ctx.fillStyle = '#b86f2d'; ctx.beginPath(); ctx.arc(T.x1 - 14, T.y0 + 16, 5, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#3f9a4a'; ctx.beginPath(); ctx.arc(T.x1 - 14, T.y0 + 10, 6, 0, Math.PI * 2); ctx.fill();
-    // sign on the roof edge facing the plaza
+    ctx.fillStyle = '#dfe3e8'; ctx.fillRect(T.x0, T.y0, w, h);
+    // the arrivals hall is a corridor straight through the building: tiles, glass doors and mats at both ends
+    for (let x = T.x0; x < T.x1; x += 18) { ctx.fillStyle = ((x - T.x0) / 18) % 2 ? '#e6edf5' : '#f6f9fc'; ctx.fillRect(x, dy - dh, Math.min(18, T.x1 - x), dh * 2); }
+    ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(T.x0, dy - dh - 3, w, 3); ctx.fillRect(T.x0, dy + dh, w, 3);
+    ctx.fillStyle = 'rgba(159,224,255,0.6)'; ctx.fillRect(T.x0, dy - dh, 4, dh * 2); ctx.fillRect(T.x1 - 4, dy - dh, 4, dh * 2);
+    ctx.fillStyle = '#e4572e'; ctx.fillRect(T.x0 - 12, dy - dh, 12, dh * 2); ctx.fillRect(T.x1, dy - dh, 12, dh * 2);
+    for (let i = 0; i < 5; i++) { ctx.fillStyle = i % 2 ? '#fff' : '#3b7dd8'; ctx.fillRect(T.x0 - 14, dy - dh - 6 + i * 8, 6, 8); ctx.fillRect(T.x1 + 8, dy - dh - 6 + i * 8, 6, 8); }
+    ctx.fillStyle = '#2b1d14'; ctx.font = r.font(7); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('WELCOME', T.x0 + w / 2, dy);
+    // the south roof: skylights
+    ctx.fillStyle = '#9fe0ff'; for (let x = T.x0 + 12; x < T.x1 - 12; x += 22) ctx.fillRect(x, dy + dh + 12, 14, 20); ctx.fillStyle = 'rgba(255,255,255,0.5)'; for (let x = T.x0 + 12; x < T.x1 - 12; x += 22) ctx.fillRect(x, dy + dh + 12, 14, 4);
+    // the viewing deck on the north roof: railing, a telescope, an umbrella table and two little spotters
+    ctx.fillStyle = '#c9c3b5'; ctx.fillRect(T.x0 + 4, T.y0 + 4, w - 8, dy - dh - 3 - T.y0 - 4);
+    ctx.strokeStyle = '#2d3a4a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(T.x0 + 6, T.y0 + 8); ctx.lineTo(T.x1 - 6, T.y0 + 8); ctx.stroke(); for (let x = T.x0 + 6; x <= T.x1 - 6; x += 10) ctx.fillRect(x - 1, T.y0 + 6, 2, 7);
+    ctx.fillStyle = '#2b1d14'; ctx.font = r.font(7); ctx.fillText('VIEWING DECK', T.x0 + w / 2, dy - dh - 10);
+    for (let i = 0; i < 8; i++) { ctx.fillStyle = i % 2 ? '#e4572e' : '#fff8ee'; ctx.beginPath(); ctx.moveTo(T.x1 - 22, T.y0 + 28); ctx.arc(T.x1 - 22, T.y0 + 28, 14, i * Math.PI / 4, (i + 1) * Math.PI / 4); ctx.closePath(); ctx.fill(); }
+    ctx.fillStyle = '#2d3a4a'; ctx.fillRect(T.x0 + 46, T.y0 + 12, 3, 16); ctx.fillStyle = '#5c6670'; ctx.save(); ctx.translate(T.x0 + 48, T.y0 + 12); ctx.rotate(-0.5); ctx.fillRect(-10, -3, 20, 6); ctx.restore();
+    ctx.save(); ctx.translate(T.x0 + 22, T.y0 + 40); ctx.scale(0.55, 0.55); r.drawPerson(0, 0, { shirt: '#f28e2b', skin: '#f1c27d', hair: '#5a3a1a', hairStyle: 2, facing: 1, moving: false, bob: 0, carry: 0, pants: '#4a4a4a' }); ctx.restore();
+    ctx.save(); ctx.translate(T.x0 + 64, T.y0 + 42); ctx.scale(0.55, 0.55); r.drawPerson(0, 0, { shirt: '#59a14f', skin: '#c68642', hat: 'cap', capColor: '#e4572e', facing: 1, moving: false, bob: 0, carry: 0, pants: '#2d3a4a' }); ctx.restore();
+    // sign facing the plaza
     ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, T.x0 - 6, T.y0 - 24, w + 12, 20, 5); ctx.fill();
     ctx.fillStyle = '#ffe08a'; ctx.font = r.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('✈️ ARRIVALS', T.x0 + w / 2, T.y0 - 14);
   },
-  paintHeli(r, x, y) {
+  // the gate pier on the apron's east edge, the jet-bridge and the passenger jet parked at it
+  paintGate(r, g, G, J) {
     const ctx = r.ctx;
-    ctx.save(); ctx.translate(x, y); ctx.rotate(Math.PI);
-    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(2, 5, 30, 14, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#2b1d14'; ctx.fillRect(-20, -16, 36, 3); ctx.fillRect(-20, 13, 36, 3);   // skids
-    ctx.fillStyle = '#41b883'; U.roundRect(ctx, -46, -4, 34, 8, 3); ctx.fill();   // tail boom
-    ctx.fillStyle = '#2f9e44'; ctx.fillRect(-50, -10, 6, 20); ctx.fillStyle = '#2b1d14'; ctx.fillRect(-49, -14, 4, 3); ctx.fillRect(-49, 11, 4, 3);   // tail fin + rotor
-    ctx.fillStyle = '#41b883'; ctx.beginPath(); ctx.ellipse(0, 0, 24, 13, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#bfe3ff'; ctx.beginPath(); ctx.ellipse(12, 0, 9, 9, 0, 0, Math.PI * 2); ctx.fill();   // cockpit glass
-    ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI * 2); ctx.fill();   // rotor hub (blades turn live)
+    this.paintJet(r, J.x, J.y, Math.PI);
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(J.x + 74, J.y - 10, G.x0 - J.x - 70, 24);
+    ctx.fillStyle = '#9aa0a8'; ctx.fillRect(J.x + 70, J.y - 14, G.x0 - J.x - 70, 28); ctx.fillStyle = 'rgba(0,0,0,0.15)'; for (let x = J.x + 76; x < G.x0; x += 8) ctx.fillRect(x, J.y - 14, 2, 28);
+    ctx.fillStyle = '#bfe3ff'; ctx.fillRect(J.x + 72, J.y - 10, G.x0 - J.x - 74, 4);
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(G.x0 + 5, G.y0 + 5, G.x1 - G.x0, G.y1 - G.y0);
+    ctx.fillStyle = '#cfe3f7'; ctx.fillRect(G.x0, G.y0, G.x1 - G.x0, G.y1 - G.y0);
+    ctx.fillStyle = '#3b7dd8'; ctx.fillRect(G.x0, G.y0, G.x1 - G.x0, 14); ctx.fillStyle = '#9fe0ff'; ctx.fillRect(G.x0 + 4, G.y0 + 22, G.x1 - G.x0 - 8, 30); ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fillRect(G.x0 + 4, G.y0 + 22, G.x1 - G.x0 - 8, 6);
+    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, G.x0 + 2, G.y1 - 22, G.x1 - G.x0 - 4, 16, 4); ctx.fill();
+    ctx.fillStyle = '#ffe08a'; ctx.font = r.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('GATE 1', (G.x0 + G.x1) / 2, G.y1 - 14);
+  },
+  paintJet(r, x, y, ang) {
+    const ctx = r.ctx;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
+    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(4, 8, 88, 22, 0, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(-30, -84); ctx.lineTo(-56, -84); ctx.lineTo(-36, 0); ctx.lineTo(-56, 84); ctx.lineTo(-30, 84); ctx.closePath(); ctx.fill();
+    // swept wings with engines, the tailplane and the fin
+    ctx.fillStyle = '#e6e9ee'; ctx.beginPath(); ctx.moveTo(14, -6); ctx.lineTo(-30, -86); ctx.lineTo(-54, -86); ctx.lineTo(-34, -6); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(14, 6); ctx.lineTo(-30, 86); ctx.lineTo(-54, 86); ctx.lineTo(-34, 6); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.1)'; ctx.beginPath(); ctx.moveTo(-34, -6); ctx.lineTo(-54, -86); ctx.lineTo(-50, -86); ctx.lineTo(-30, -6); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(-34, 6); ctx.lineTo(-54, 86); ctx.lineTo(-50, 86); ctx.lineTo(-30, 6); ctx.closePath(); ctx.fill();
+    for (const sy of [-1, 1]) { ctx.fillStyle = '#5c6670'; U.roundRect(ctx, -22, sy * 44 - 8, 34, 16, 6); ctx.fill(); ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.ellipse(12, sy * 44, 4, 7, 0, 0, Math.PI * 2); ctx.fill(); }
+    ctx.fillStyle = '#e6e9ee'; ctx.beginPath(); ctx.moveTo(-66, -5); ctx.lineTo(-86, -40); ctx.lineTo(-96, -40); ctx.lineTo(-88, -5); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(-66, 5); ctx.lineTo(-86, 40); ctx.lineTo(-96, 40); ctx.lineTo(-88, 5); ctx.closePath(); ctx.fill();
+    // fuselage with a blue cheat line, cockpit and a row of windows; the fin seen from above carries the pizza
+    ctx.fillStyle = '#f7f8fa'; U.roundRect(ctx, -92, -13, 184, 26, 13); ctx.fill();
+    ctx.fillStyle = '#3b7dd8'; ctx.fillRect(-84, -2, 160, 4);
+    ctx.fillStyle = '#2d3a4a'; ctx.beginPath(); ctx.moveTo(90, -4); ctx.quadraticCurveTo(80, -11, 68, -11); ctx.lineTo(68, 11); ctx.quadraticCurveTo(80, 11, 90, 4); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#9fd8ff'; for (let wx = 52; wx > -70; wx -= 12) { ctx.fillRect(wx, -11, 5, 4); ctx.fillRect(wx, 7, 5, 4); }
+    ctx.fillStyle = '#2b1d14'; ctx.fillRect(-64, -13, 8, 5);   // the door the jet-bridge reaches
+    ctx.fillStyle = '#e4572e'; U.roundRect(ctx, -98, -4, 34, 8, 3); ctx.fill(); r.drawPizza(-80, 0, 6);
     ctx.restore();
   },
-
   // ---------- Cloud Harbor ----------
   paint: {
     cloud(r, g) {
@@ -540,6 +737,135 @@ const AirfieldExt = {
       for (const s of C.ISLANDS) E.paintIsland(r, s);
       E.paintCloudThings(r, g);
     },
+    skycafe(r, g) { AirfieldExt.paintCafeRoom(r, g); },
+  },
+  // ---------- inside the Sky Café ----------
+  paintCafeRoom(r, g) {
+    const ctx = r.ctx, K = CFG.SKYCAFE, W = K.WORLD, R = K.ROOM, wl = K.WALL;
+    ctx.fillStyle = '#2f6aa0'; ctx.fillRect(W.x0, W.y0, W.x1 - W.x0, W.y1 - W.y0);
+    // floor: warm planks and a round rug under the tables
+    ctx.fillStyle = '#d9b48c'; ctx.fillRect(R.x0, R.y0, R.x1 - R.x0, R.y1 - R.y0);
+    ctx.fillStyle = 'rgba(0,0,0,0.07)'; for (let y = R.y0; y < R.y1; y += 22) ctx.fillRect(R.x0, y, R.x1 - R.x0, 2); for (let i = 0; i < 40; i++) ctx.fillRect(R.x0 + ((i * 131) % (R.x1 - R.x0)), R.y0 + 11 + Math.floor((i * 7) % 12) * 22, 2, 22);
+    ctx.fillStyle = '#bfe3ff'; ctx.beginPath(); ctx.ellipse(7760, 1690, 120, 90, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#9fd8ff'; ctx.beginPath(); ctx.ellipse(7760, 1690, 96, 68, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.7)'; for (let i = 0; i < 6; i++) { const a = i * 1.05; ctx.beginPath(); ctx.arc(7760 + Math.cos(a) * 60, 1690 + Math.sin(a) * 44, 6, 0, Math.PI * 2); ctx.fill(); }
+    // walls: wood panelling; the top wall holds the windows (the sky in them is drawn live) and the menu board
+    ctx.fillStyle = '#8d5a2b'; ctx.fillRect(R.x0 - wl, R.y0 - wl, R.x1 - R.x0 + 2 * wl, wl); ctx.fillRect(R.x0 - wl, R.y1, R.x1 - R.x0 + 2 * wl, wl); ctx.fillRect(R.x0 - wl, R.y0, wl, R.y1 - R.y0); ctx.fillRect(R.x1, R.y0, wl, R.y1 - R.y0);
+    ctx.fillStyle = 'rgba(0,0,0,0.12)'; for (let x = R.x0 - wl; x < R.x1 + wl; x += 16) { ctx.fillRect(x, R.y0 - wl, 2, wl); ctx.fillRect(x, R.y1, 2, wl); } for (let y = R.y0; y < R.y1; y += 16) { ctx.fillRect(R.x0 - wl, y, wl, 2); ctx.fillRect(R.x1, y, wl, 2); }
+    ctx.fillStyle = '#5b3a1a'; ctx.fillRect(R.x0 - wl, R.y0 - wl, R.x1 - R.x0 + 2 * wl, 4);   // the top of the back wall
+    for (const [x0, x1] of K.WINDOWS) { ctx.fillStyle = '#fff8ee'; ctx.fillRect(x0 - 5, W.y0 - 2, x1 - x0 + 10, R.y0 - W.y0 + 2); }   // window frames (glass drawn live)
+    // the chalk menu board
+    const M = K.MENU; ctx.fillStyle = '#5b3a1a'; U.roundRect(ctx, M.x0 - 4, M.y0 - 2, M.x1 - M.x0 + 8, M.y1 - M.y0 + 4, 4); ctx.fill(); ctx.fillStyle = '#2f3b33'; ctx.fillRect(M.x0, M.y0, M.x1 - M.x0, M.y1 - M.y0);
+    ctx.fillStyle = '#ffe08a'; ctx.font = r.font(8); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('☁️ MENU ☁️', (M.x0 + M.x1) / 2, M.y0 + 7);
+    ctx.font = r.font(7); K.MENU_ITEMS.forEach(([name, price], i) => { ctx.textAlign = 'left'; ctx.fillStyle = '#fff'; ctx.fillText(name, M.x0 + 6, M.y0 + 18 + i * 9); ctx.textAlign = 'right'; ctx.fillStyle = '#8ef0a0'; ctx.fillText('$' + price, M.x1 - 6, M.y0 + 18 + i * 9); });
+    // the counter: wood front, light top, an espresso machine, cups, the pastry case
+    const C = K.COUNTER;
+    ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(C.x0 + 4, C.y0 + 6, C.x1 - C.x0, C.y1 - C.y0);
+    ctx.fillStyle = '#8a5527'; U.roundRect(ctx, C.x0, C.y0, C.x1 - C.x0, C.y1 - C.y0, 6); ctx.fill();
+    ctx.fillStyle = '#f6e7cf'; U.roundRect(ctx, C.x0, C.y0 - 8, C.x1 - C.x0, 24, 6); ctx.fill();
+    ctx.fillStyle = '#2d3a4a'; U.roundRect(ctx, C.x0 + 8, C.y0 - 6, 30, 20, 4); ctx.fill(); ctx.fillStyle = '#c9ccd2'; ctx.fillRect(C.x0 + 12, C.y0 - 2, 22, 4); ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(C.x0 + 30, C.y0 - 3, 2, 0, Math.PI * 2); ctx.fill();   // espresso machine
+    for (let i = 0; i < 4; i++) { ctx.fillStyle = ['#e4572e', '#3b7dd8', '#ffd166', '#41b883'][i]; U.roundRect(ctx, C.x0 + 44 + i * 9, C.y0 - 4, 7, 7, 2); ctx.fill(); }   // cups
+    ctx.fillStyle = 'rgba(159,224,255,0.55)'; U.roundRect(ctx, C.x0 + 92, C.y0 - 8, 60, 22, 4); ctx.fill(); ctx.strokeStyle = '#9aa0a8'; ctx.lineWidth = 1.5; U.roundRect(ctx, C.x0 + 92, C.y0 - 8, 60, 22, 4); ctx.stroke();
+    for (let i = 0; i < 4; i++) { const px = C.x0 + 100 + i * 14, py = C.y0 + 2; if (i % 2) { ctx.fillStyle = '#d98a3c'; ctx.beginPath(); ctx.moveTo(px - 5, py + 4); ctx.lineTo(px + 5, py + 4); ctx.lineTo(px, py - 5); ctx.closePath(); ctx.fill(); } else { ctx.fillStyle = '#f2b134'; ctx.beginPath(); ctx.arc(px, py, 5, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#ff8fab'; ctx.beginPath(); ctx.arc(px, py - 2, 2.5, 0, Math.PI * 2); ctx.fill(); } }   // pastries
+    ctx.fillStyle = '#2b1d14'; ctx.font = r.font(7); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('PASTRIES', C.x0 + 122, C.y0 + 20);
+    ctx.fillStyle = '#ffe08a'; ctx.font = r.font(9); ctx.fillText('ORDER HERE', C.x0 + 40, C.y0 + 30);
+    // round tables with chairs and a little vase
+    for (const tb of K.TABLES) {
+      for (const c of tb.chairs) { ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.beginPath(); ctx.ellipse(c.x + 2, c.y + 10, 12, 5, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#b23a48'; U.roundRect(ctx, c.x - 10, c.y - 10, 20, 20, 5); ctx.fill(); ctx.fillStyle = '#8a2a36'; ctx.fillRect(c.x - 10, c.y - 12, 20, 5); }
+      ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(tb.x + 3, tb.y + 8, 24, 16, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#a97a45'; ctx.beginPath(); ctx.ellipse(tb.x, tb.y + 4, 24, 18, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff8ee'; ctx.beginPath(); ctx.ellipse(tb.x, tb.y, 24, 18, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#3b7dd8'; U.roundRect(ctx, tb.x - 3, tb.y - 8, 6, 9, 2); ctx.fill(); ctx.fillStyle = '#ff8fab'; ctx.beginPath(); ctx.arc(tb.x, tb.y - 11, 3.5, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(tb.x, tb.y - 11, 1.5, 0, Math.PI * 2); ctx.fill();
+    }
+    // the jukebox, the shelf of model planes, a potted plant, the door
+    const J = K.JUKEBOX;
+    ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(J.x0 + 3, J.y0 + 4, J.x1 - J.x0, J.y1 - J.y0);
+    ctx.fillStyle = '#8e5bd1'; U.roundRect(ctx, J.x0, J.y0, J.x1 - J.x0, J.y1 - J.y0, 8); ctx.fill();
+    ctx.fillStyle = '#ffd166'; U.roundRect(ctx, J.x0 + 4, J.y0 + 4, J.x1 - J.x0 - 8, 10, 4); ctx.fill(); ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.arc((J.x0 + J.x1) / 2, J.y0 + 24, 6, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#e4572e'; ctx.fillRect(J.x0 + 6, J.y1 - 8, 4, 4); ctx.fillStyle = '#41b883'; ctx.fillRect(J.x1 - 10, J.y1 - 8, 4, 4);
+    ctx.fillStyle = '#2b1d14'; ctx.font = r.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('♪', (J.x0 + J.x1) / 2, J.y0 + 24);
+    const Sh = K.SHELF;
+    ctx.fillStyle = '#5b3a1a'; ctx.fillRect(Sh.x0, Sh.y0, Sh.x1 - Sh.x0, Sh.y1 - Sh.y0); ctx.fillStyle = '#8d5a2b'; for (let y = Sh.y0 + 6; y < Sh.y1; y += 26) ctx.fillRect(Sh.x0 + 2, y, Sh.x1 - Sh.x0 - 4, 20);
+    [['#e4572e', 0], ['#3b7dd8', 1], ['#ffd166', 2]].forEach(([col, i]) => { ctx.save(); ctx.translate((Sh.x0 + Sh.x1) / 2, Sh.y0 + 16 + i * 26); ctx.scale(0.22, 0.22); r.drawVehicle('plane', g, col); ctx.restore(); });
+    ctx.fillStyle = '#b86f2d'; U.roundRect(ctx, R.x1 - 30, R.y0 + 8, 22, 18, 4); ctx.fill(); ctx.fillStyle = '#3f9a4a'; ctx.beginPath(); ctx.arc(R.x1 - 19, R.y0 + 4, 12, 0, Math.PI * 2); ctx.arc(R.x1 - 28, R.y0 + 10, 8, 0, Math.PI * 2); ctx.arc(R.x1 - 10, R.y0 + 10, 8, 0, Math.PI * 2); ctx.fill();
+    const E = K.EXIT;
+    ctx.fillStyle = '#5b3a1a'; ctx.fillRect(E.x - 22, R.y1, 44, wl); ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.arc(E.x + 12, R.y1 + 11, 2.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#e4572e'; U.roundRect(ctx, E.x - 20, E.y - 8, 40, 14, 3); ctx.fill(); ctx.fillStyle = '#ffe08a'; ctx.font = r.font(7); ctx.fillText('EXIT', E.x, E.y - 1);
+    // bunting across the room and a name plate
+    const cols = ['#e4572e', '#ffd166', '#3b7dd8', '#41b883', '#ff8fab'];
+    ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(R.x0, R.y0 + 16); ctx.quadraticCurveTo((R.x0 + R.x1) / 2, R.y0 + 40, R.x1, R.y0 + 16); ctx.stroke();
+    for (let i = 0; i < 16; i++) { const k = (i + 0.5) / 16, u = 1 - k, x = u * u * R.x0 + 2 * u * k * (R.x0 + R.x1) / 2 + k * k * R.x1, y = u * u * (R.y0 + 16) + 2 * u * k * (R.y0 + 40) + k * k * (R.y0 + 16); ctx.fillStyle = cols[i % 5]; ctx.beginPath(); ctx.moveTo(x - 5, y); ctx.lineTo(x + 5, y); ctx.lineTo(x, y + 10); ctx.closePath(); ctx.fill(); }
+    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, (R.x0 + R.x1) / 2 - 50, R.y1 + 4, 100, 14, 4); ctx.fill(); ctx.fillStyle = '#ffe08a'; ctx.font = r.font(8); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('☕ SKY CAFÉ ☁️', (R.x0 + R.x1) / 2, R.y1 + 11);
+  },
+  // the café's map is smaller than most screens: everything around it is sky, so the café floats in the clouds
+  drawCafeOutside(r, g) {
+    const ctx = r.ctx, W = CFG.SKYCAFE.WORLD, x0 = r.camX - 20, y0 = r.camY - 20, x1 = r.camX + r.viewW + 20, y1 = r.camY + r.viewH + 20;
+    const sky = ctx.createLinearGradient(0, y0, 0, y1); sky.addColorStop(0, '#49a8ea'); sky.addColorStop(1, '#bfe6fb'); ctx.fillStyle = sky;
+    if (y0 < W.y0) ctx.fillRect(x0, y0, x1 - x0, W.y0 - y0);
+    if (y1 > W.y1) ctx.fillRect(x0, W.y1, x1 - x0, y1 - W.y1);
+    if (x0 < W.x0) ctx.fillRect(x0, W.y0, W.x0 - x0, W.y1 - W.y0);
+    if (x1 > W.x1) ctx.fillRect(W.x1, W.y0, x1 - W.x1, W.y1 - W.y0);
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    for (let i = 0; i < 14; i++) {
+      const cx = W.x0 - 700 + this.hash(i) * 1900, cy = W.y0 - 500 + this.hash(i + 20) * 1400, sc = 0.8 + this.hash(i + 40) * 0.8;
+      if (cx > W.x0 - 80 && cx < W.x1 + 20 && cy > W.y0 - 60 && cy < W.y1 + 20) continue;
+      if (cx < x0 - 100 || cx > x1 + 100 || cy < y0 - 60 || cy > y1 + 60) continue;
+      ctx.beginPath(); ctx.arc(cx, cy, 18 * sc, 0, Math.PI * 2); ctx.arc(cx + 20 * sc, cy - 10 * sc, 24 * sc, 0, Math.PI * 2); ctx.arc(cx + 46 * sc, cy, 17 * sc, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(30,80,140,0.18)'; U.roundRect(ctx, W.x0 + 16, W.y1 + 2, W.x1 - W.x0 - 20, 30, 20); ctx.fill();   // the café's shadow on the clouds below
+  },
+  // the sky outside the café windows: clouds drifting by, the blimp, a parachutist
+  drawCafeWindows(r, g) {
+    const ctx = r.ctx, K = CFG.SKYCAFE, W = K.WORLD, R = K.ROOM, t = g.time, top = W.y0 + 2, bottom = R.y0 - K.WALL + 4;
+    for (const [x0, x1] of K.WINDOWS) {
+      ctx.save(); ctx.beginPath(); ctx.rect(x0, top, x1 - x0, bottom - top); ctx.clip();
+      const sky = ctx.createLinearGradient(0, top, 0, bottom); sky.addColorStop(0, '#49a8ea'); sky.addColorStop(1, '#bfe6fb'); ctx.fillStyle = sky; ctx.fillRect(x0, top, x1 - x0, bottom - top);
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      for (let i = 0; i < 3; i++) { const cx = x0 + (((i * 73 + t * 9) % (x1 - x0 + 60)) + x1 - x0 + 60) % (x1 - x0 + 60) - 30, cy = top + 10 + i * 12; ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2); ctx.arc(cx + 7, cy - 4, 8, 0, Math.PI * 2); ctx.arc(cx + 16, cy, 6, 0, Math.PI * 2); ctx.fill(); }
+      ctx.restore();
+    }
+    // the blimp crosses both windows (clipped to the glass), a parachutist floats down behind the second
+    ctx.save(); ctx.beginPath(); for (const [x0, x1] of K.WINDOWS) ctx.rect(x0, top, x1 - x0, bottom - top); ctx.clip();
+    const bx = K.WINDOWS[0][0] - 60 + ((t * 14) % (K.WINDOWS[1][1] - K.WINDOWS[0][0] + 160)), by = top + 16 + Math.sin(t * 0.8) * 3;
+    ctx.fillStyle = '#cfe3f7'; ctx.beginPath(); ctx.ellipse(bx, by, 22, 8, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#3b7dd8'; ctx.beginPath(); ctx.moveTo(bx - 20, by - 1); ctx.lineTo(bx - 27, by - 7); ctx.lineTo(bx - 18, by - 3); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(bx - 20, by + 1); ctx.lineTo(bx - 27, by + 7); ctx.lineTo(bx - 18, by + 3); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#2d3a4a'; ctx.fillRect(bx - 5, by + 7, 10, 4);
+    ctx.fillStyle = '#e4572e'; ctx.font = r.font(5); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('PIZZA AIR', bx, by + 0.5);
+    const jx = K.WINDOWS[1][0] + 70 + Math.sin(t * 0.7) * 20, jy = top - 10 + ((t * 7) % 70);
+    ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(jx, jy, 7, Math.PI, 0); ctx.closePath(); ctx.fill(); ctx.strokeStyle = 'rgba(43,29,20,0.6)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(jx - 6, jy); ctx.lineTo(jx, jy + 9); ctx.lineTo(jx + 6, jy); ctx.stroke(); ctx.fillStyle = '#3b7dd8'; ctx.fillRect(jx - 2, jy + 8, 4, 5);
+    ctx.restore();
+    // steam from the espresso machine
+    const C = K.COUNTER; for (let i = 0; i < 3; i++) { const age = ((t * 0.8 + i * 0.33) % 1); ctx.fillStyle = `rgba(255,255,255,${0.5 * (1 - age)})`; ctx.beginPath(); ctx.arc(C.x0 + 22 + i * 4 + Math.sin(age * 6 + i) * 3, C.y0 - 10 - age * 22, 2.5 + age * 3, 0, Math.PI * 2); ctx.fill(); }
+  },
+  drawBarista(r, g) {
+    const ctx = r.ctx, B = CFG.SKYCAFE.BARISTA, p = g.player, d = U.dist(p.x, p.y, B.x, B.y), t = g.time;
+    r.drawPerson(B.x, B.y, { shirt: '#2d3a4a', skin: '#c68642', hat: 'cap', capColor: '#1f2a38', facing: p.x < B.x ? -1 : 1, moving: false, bob: 0, carry: 0, apron: '#e4572e', pants: '#2d3a4a' });
+    if (d < 150) { ctx.fillStyle = '#c68642'; ctx.beginPath(); ctx.arc(B.x + 18, B.y - 34 + Math.sin(t * 7) * 5, 3.5, 0, Math.PI * 2); ctx.fill(); }
+    if (d < 110) r.drawBubble(B.x, B.y - 66 + Math.sin(t * 4) * 3, () => { ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('Cocoa? ☕', 0, 0); }, 80);
+  },
+  // the steaming mug the chef carries after a Cloud Cocoa
+  drawCocoa(r, g) {
+    const ctx = r.ctx, p = g.player, f = p.facing || 1, x = p.x + f * 16, y = p.y - 20 + (p.moving ? Math.sin(p.bob || 0) * 2 : 0), t = g.time;
+    ctx.fillStyle = '#fff'; U.roundRect(ctx, x - 5, y - 5, 10, 10, 2); ctx.fill(); ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(x + f * 6, y, 3, -Math.PI / 2, Math.PI / 2, f < 0); ctx.stroke();
+    ctx.fillStyle = '#8d5a2b'; ctx.fillRect(x - 4, y - 4, 8, 3); ctx.fillStyle = '#e4572e'; ctx.fillRect(x - 5, y + 1, 10, 2);
+    for (let i = 0; i < 3; i++) { const age = ((t * 0.9 + i * 0.33) % 1); ctx.fillStyle = `rgba(255,255,255,${0.6 * (1 - age)})`; ctx.beginPath(); ctx.arc(x - 3 + i * 3 + Math.sin(age * 6 + i) * 2, y - 8 - age * 16, 1.5 + age * 2.5, 0, Math.PI * 2); ctx.fill(); }
+  },
+  // sitting by the window: the view fills the screen for a few seconds
+  drawCafeView(r, g, W, H) {
+    const ctx = r.ctx, c = this.rt.cafe, t = g.time, k = c.view / CFG.SKYCAFE.VIEW, a = k > 0.85 ? (1 - k) / 0.15 : k < 0.15 ? k / 0.15 : 1;
+    const pw = Math.min(W - 32, 520), ph = Math.min(H - 150, 300), px = W / 2 - pw / 2, py = Math.max(70, H / 2 - ph / 2);
+    ctx.save(); ctx.globalAlpha = a;
+    ctx.fillStyle = 'rgba(43,29,20,0.45)'; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#5b3a1a'; U.roundRect(ctx, px - 10, py - 10, pw + 20, ph + 20, 16); ctx.fill();
+    ctx.save(); U.roundRect(ctx, px, py, pw, ph, 10); ctx.clip();
+    const sky = ctx.createLinearGradient(0, py, 0, py + ph); sky.addColorStop(0, '#49a8ea'); sky.addColorStop(1, '#d9f0ff'); ctx.fillStyle = sky; ctx.fillRect(px, py, pw, ph);
+    ctx.fillStyle = '#fff7c2'; ctx.beginPath(); ctx.arc(px + pw * 0.8, py + 40, 22, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    for (let i = 0; i < 6; i++) { const cx = px + (((i * 137 + t * 22) % (pw + 120)) + pw + 120) % (pw + 120) - 60, cy = py + 40 + (i % 3) * 70 + Math.sin(t + i) * 4, s = 1 + (i % 2) * 0.5; ctx.beginPath(); ctx.arc(cx, cy, 18 * s, 0, Math.PI * 2); ctx.arc(cx + 20 * s, cy - 10 * s, 24 * s, 0, Math.PI * 2); ctx.arc(cx + 46 * s, cy, 17 * s, 0, Math.PI * 2); ctx.fill(); }
+    const bx = px + pw + 90 - ((t * 60) % (pw + 260)), by = py + 70 + Math.sin(t * 0.8) * 6;
+    ctx.fillStyle = '#cfe3f7'; ctx.beginPath(); ctx.ellipse(bx, by, 64, 24, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#3b7dd8'; ctx.beginPath(); ctx.moveTo(bx - 56, by - 2); ctx.lineTo(bx - 72, by - 18); ctx.lineTo(bx - 50, by - 8); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(bx - 56, by + 2); ctx.lineTo(bx - 72, by + 18); ctx.lineTo(bx - 50, by + 8); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#2d3a4a'; U.roundRect(ctx, bx - 14, by + 20, 28, 10, 3); ctx.fill();
+    ctx.fillStyle = '#e4572e'; ctx.font = r.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('PIZZA AIR', bx, by + 1);
+    for (let i = 0; i < 3; i++) { const jx = px + 60 + i * pw * 0.3 + Math.sin(t * 0.7 + i) * 24, jy = py - 40 + ((t * 26 + i * 90) % (ph + 100)), col = ['#e4572e', '#ffd166', '#41b883'][i]; ctx.strokeStyle = 'rgba(43,29,20,0.6)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(jx - 14, jy); ctx.lineTo(jx - 3, jy + 24); ctx.moveTo(jx + 14, jy); ctx.lineTo(jx + 3, jy + 24); ctx.stroke(); ctx.fillStyle = col; ctx.beginPath(); ctx.arc(jx, jy, 16, Math.PI, 0); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#3b7dd8'; U.roundRect(ctx, jx - 4, jy + 24, 8, 10, 3); ctx.fill(); ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(jx, jy + 20, 4, 0, Math.PI * 2); ctx.fill(); }
+    ctx.restore();
+    ctx.strokeStyle = '#fff8ee'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(px + pw / 2, py); ctx.lineTo(px + pw / 2, py + ph); ctx.moveTo(px, py + ph / 2); ctx.lineTo(px + pw, py + ph / 2); ctx.stroke();
+    ctx.fillStyle = 'rgba(43,29,20,0.85)'; U.roundRect(ctx, W / 2 - 110, py + ph + 18, 220, 30, 10); ctx.fill();
+    ctx.fillStyle = '#ffe08a'; ctx.font = r.font(14); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('☁️ What a view! ☕', W / 2, py + ph + 33);
+    ctx.restore();
   },
   paintIsland(r, s) {
     const ctx = r.ctx, w = s.x1 - s.x0, h = s.y1 - s.y0;
@@ -641,6 +967,7 @@ const AirfieldExt = {
     ctx.fillStyle = '#e4572e'; ctx.fillRect(K.x0, K.y0, w, 22); ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(K.x0, K.y0 + 18, w, 4);
     ctx.fillStyle = '#9fe0ff'; ctx.fillRect(K.x0 + 10, K.y0 + 36, 34, 26); ctx.fillRect(K.x1 - 44, K.y0 + 36, 34, 26); ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fillRect(K.x0 + 10, K.y0 + 36, 34, 5); ctx.fillRect(K.x1 - 44, K.y0 + 36, 34, 5);
     ctx.fillStyle = '#5b3a1a'; ctx.fillRect(cx - 11, K.y1 - 34, 22, 34); ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.arc(cx + 6, K.y1 - 16, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#e4572e'; ctx.fillRect(cx - 16, K.y1 + 12, 32, 10); ctx.fillStyle = '#ffe08a'; ctx.font = r.font(6); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('COME IN', cx, K.y1 + 17);   // the door mat outside
     for (let i = 0; i < 6; i++) { ctx.fillStyle = i % 2 ? '#fff8ee' : '#e4572e'; ctx.fillRect(K.x0 + 8 + i * ((w - 16) / 6), K.y1 - 6, (w - 16) / 6 + 0.5, 12); ctx.beginPath(); ctx.arc(K.x0 + 8 + i * ((w - 16) / 6) + (w - 16) / 12, K.y1 + 6, (w - 16) / 12, 0, Math.PI); ctx.fill(); }
     ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, cx - 44, K.y0 + 66, 88, 18, 4); ctx.fill();
     ctx.fillStyle = '#ffe08a'; ctx.font = r.font(10); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('☕ SKY CAFÉ', cx, K.y0 + 75);
@@ -672,11 +999,15 @@ const AirfieldExt = {
     if (g.area === 'town') {
       if (r.camX + r.viewW < CFG.AIRFIELD.STRIP.x0 - 40) return;   // nothing of mine on screen
       this.drawWindsock(r, g, CFG.AIRFIELD.WINDSOCK.x, CFG.AIRFIELD.WINDSOCK.y, 1);
-      const H = CFG.AIRFIELD.HELI;   // the parked helicopter's rotor idles round slowly
-      ctx.save(); ctx.translate(H.x, H.y); ctx.rotate(t * 0.9); ctx.strokeStyle = 'rgba(43,29,20,0.75)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.moveTo(-40, 0); ctx.lineTo(40, 0); ctx.moveTo(0, -40); ctx.lineTo(0, 40); ctx.stroke(); ctx.restore();
+      // the radar dish turns round and round
+      const Rd = CFG.AIRFIELD.RADAR, a = t * 0.8, sx = Math.cos(a);
+      ctx.save(); ctx.translate(Rd.x, Rd.y - 20); ctx.fillStyle = '#2d3a4a'; ctx.fillRect(-2, 0, 4, 10);
+      ctx.rotate(a); ctx.fillStyle = '#e6e9ee'; ctx.beginPath(); ctx.ellipse(0, 0, 22, 9, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.beginPath(); ctx.ellipse(0, 0, 16, 5, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.arc(22, 0, 3, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      ctx.fillStyle = Math.floor(t * 2) % 2 ? '#ff5252' : '#ffb3b3'; ctx.beginPath(); ctx.arc(Rd.x, Rd.y - 30, 2.5 + sx * 0, 0, Math.PI * 2); ctx.fill();
       return;
     }
+    if (g.area === 'skycafe') { this.drawCafeWindows(r, g); return; }
     if (g.area !== 'cloud') return;
     this.drawWindsock(r, g, CFG.CLOUD.WINDSOCK.x, CFG.CLOUD.WINDSOCK.y, -1);
     const rd = rt.ride;
@@ -698,8 +1029,12 @@ const AirfieldExt = {
     if (g.area === 'town') {
       const v = rt.plane; items.push({ y: v.y + 12, draw: () => this.drawPlaneTop(r, g, v) });
       const T = CFG.AIRFIELD.TOWER; items.push({ y: T.y + 14, draw: () => this.drawTower(r, g, T.x, T.y) });
+      if (rt.cafe.cocoa > 0 && !g.driving) items.push({ y: g.player.y + 1, draw: () => this.drawCocoa(r, g) });
+      if (!this.flyingHeli(g)) items.push({ y: rt.heli.y + 12, draw: () => this.drawHeli(r, g) });
       return;
     }
+    if (rt.cafe.cocoa > 0 && !g.driving && !g.onTrain) items.push({ y: g.player.y + 1, draw: () => this.drawCocoa(r, g) });
+    if (g.area === 'skycafe') { items.push({ y: CFG.SKYCAFE.BARISTA.y, draw: () => this.drawBarista(r, g) }); return; }
     if (g.area !== 'cloud') return;
     items.push({ y: rt.cloudPlane.y + 12, draw: () => this.drawPlaneTop(r, g, rt.cloudPlane) });
     items.push({ y: rt.balloon.y + 14, draw: () => this.drawBalloon(r, g, rt.balloon) });
@@ -707,6 +1042,12 @@ const AirfieldExt = {
     const rd = rt.ride, p = g.player;
     if (rd && rd.kind === 'glide') items.push({ y: p.y + 1, draw: () => { const ctx = r.ctx; ctx.save(); ctx.translate(p.x, p.y - 58); this.drawGliderWing(r); ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-10, 6); ctx.lineTo(-14, 40); ctx.moveTo(10, 6); ctx.lineTo(14, 40); ctx.stroke(); ctx.restore(); } });
     if (rd && rd.kind === 'chute') items.push({ y: p.y + 1, draw: () => this.drawChute(r, p.x, p.y) });
+  },
+  // parked (or just landing): a normal y-sorted entity; flying: drawn in the overlay, lifted, above the tree tops
+  drawHeli(r, g) {
+    const ctx = r.ctx, v = this.rt.heli;
+    if (v.lift > 0) { ctx.fillStyle = `rgba(0,0,0,${0.22 - v.lift * 0.003})`; ctx.beginPath(); ctx.ellipse(v.x + v.lift * 0.4, v.y + 6 + v.lift * 0.9, 30 - v.lift * 0.2, 14 - v.lift * 0.1, 0, 0, Math.PI * 2); ctx.fill(); }
+    ctx.save(); ctx.translate(0, -v.lift); r.drawSiteVehicle(g, v, 18); ctx.restore();
   },
   drawPlaneTop(r, g, v) {
     const ctx = r.ctx;
@@ -761,7 +1102,10 @@ const AirfieldExt = {
 
   // ---------- things in the sky above everybody ----------
   overlay(r, g) {
-    const rt = this.rt; if (!rt || g.area !== 'cloud') return;
+    const rt = this.rt; if (!rt) return;
+    if (g.area === 'town') { if (this.flyingHeli(g)) this.drawHeli(r, g); return; }
+    if (g.area === 'skycafe') { this.drawCafeOutside(r, g); return; }
+    if (g.area !== 'cloud') return;
     const ctx = r.ctx, t = g.time, C = CFG.CLOUD;
     const onScreen = (x, y, m) => x > r.camX - m && x < r.camX + r.viewW + m && y > r.camY - m && y < r.camY + r.viewH + m;
     for (const j of rt.jumpers) {
@@ -799,14 +1143,34 @@ const AirfieldExt = {
 
   // the fade at the end of the take-off run
   screen(r, g) {
-    const rt = this.rt; if (!rt || !rt.runup || g.travel) return;
-    const f = (rt.runup.t - (rt.runup.dur - 0.4)) / 0.4; if (f <= 0) return;
+    const rt = this.rt; if (!rt || g.travel) return;
     const ctx = r.ctx, W = r.canvas.width / r.dpr, H = r.canvas.height / r.dpr;
+    if (g.area === 'skycafe' && rt.cafe.seat && rt.cafe.view > 0) this.drawCafeView(r, g, W, H);
+    if (rt.cafe.fade > 0) { ctx.fillStyle = `rgba(20,12,6,${(rt.cafe.fade / 0.45).toFixed(3)})`; ctx.fillRect(0, 0, W, H); }
+    if (!rt.runup) return;
+    const f = (rt.runup.t - (rt.runup.dur - 0.4)) / 0.4; if (f <= 0) return;
     ctx.fillStyle = `rgba(43,29,20,${Math.min(1, f).toFixed(3)})`; ctx.fillRect(0, 0, W, H);
   },
 
   // ---------- vehicle art (drawn at the origin, nose +x) ----------
   vehicleArt: {
+    // the helicopter, nose +x: skids, tail boom, cockpit glass, the main rotor turning as fast as it is spun up
+    heli(r, g, color, v, h) {
+      const ctx = r.ctx, c = color && color !== '#ffffff' ? color : '#41b883', lift = v ? v.lift || 0 : 0, rot = v ? v.rotorA || 0 : 0, spin = v ? v.rotor || 0 : 0;
+      if (!lift) { ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(2, 5, 30, 14, 0, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = '#2b1d14'; ctx.fillRect(-20, -16, 36, 3); ctx.fillRect(-20, 13, 36, 3);   // skids
+      ctx.fillStyle = c; U.roundRect(ctx, -46, -4, 34, 8, 3); ctx.fill();   // tail boom
+      ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(-50, -10, 6, 20); ctx.save(); ctx.translate(-48, 0); ctx.rotate(rot * 1.7); ctx.fillStyle = '#2b1d14'; ctx.fillRect(-2, -13, 4, 26); ctx.restore();   // tail fin + rotor
+      ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(0, 0, 24, 13, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.beginPath(); ctx.ellipse(-4, -5, 12, 4, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#bfe3ff'; ctx.beginPath(); ctx.ellipse(12, 0, 9, 9, 0, 0, Math.PI * 2); ctx.fill();   // cockpit glass
+      r.drawPizza(-8, 0, 5);
+      ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI * 2); ctx.fill();
+      // main rotor: two crossed blades, blurred into a disc when spinning fast
+      ctx.save(); ctx.rotate(rot); ctx.strokeStyle = `rgba(43,29,20,${0.75 - spin * 0.35})`; ctx.lineWidth = 3; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(-40, 0); ctx.lineTo(40, 0); ctx.moveTo(0, -40); ctx.lineTo(0, 40); ctx.stroke(); ctx.restore();
+      if (spin > 0.3) { ctx.fillStyle = `rgba(255,255,255,${(spin - 0.3) * 0.3})`; ctx.beginPath(); ctx.arc(0, 0, 40, 0, Math.PI * 2); ctx.fill(); }
+    },
     plane(r, g, color, v, h) {
       const ctx = r.ctx, c = color || '#f2b134', t = g.time, spinning = v && (v.lift > 0 || (g.driving && g.vehicle === v) || (AirfieldExt.rt && AirfieldExt.rt.roll && AirfieldExt.rt.roll.plane === v));
       if (!(v && v.lift > 0)) { ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.beginPath(); ctx.ellipse(2, 5, 36, 12, 0, 0, Math.PI * 2); ctx.fill(); U.roundRect(ctx, -4, -42, 22, 94, 6); ctx.fill(); }

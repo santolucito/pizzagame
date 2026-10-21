@@ -157,6 +157,9 @@ kbd { background: #eee; border: 1px solid #bbb; border-radius: 4px; padding: 0 5
   .pill { font-size: 13px; padding: 5px 10px; }
   .pill.cash { font-size: 16px; min-width: 80px; }
   .hud-btn { font-size: 12px; padding: 7px 9px; min-height: 38px; }
+  #paint-bar { padding: 8px 10px; max-width: calc(100vw - 16px); }
+  #paint-swatches { gap: 6px; }
+  .swatch { width: 34px; height: 34px; }
   .hud-btn.icon { width: 38px; }
   .hint { font-size: 12px; top: calc(92px + env(safe-area-inset-top)); }
   #toasts { top: calc(130px + env(safe-area-inset-top)); max-width: 80vw; }

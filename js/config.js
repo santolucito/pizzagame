@@ -7,7 +7,7 @@ const CFG = {
   BUILDING: { x0: 0, y0: 98, x1: 966, y1: 646 },    // outer wall rectangle
   DOOR: { y0: 572, y1: 638 },                        // gap in the right wall
   SAVE_KEY: 'pizza-rush-save-v1',
-  VERSION: 70,                                      // shown in the help panel; bump with the service worker cache (sw.js)
+  VERSION: 71,                                      // shown in the help panel; bump with the service worker cache (sw.js)
 
   PLAYER_START: { x: 540, y: 430 }, // open floor in front of the counter, away from every circle
   ENTRANCE: { x: 925, y: 605 },          // just inside the door
@@ -68,7 +68,7 @@ const CFG = {
   // bay can be repainted (as often as you like).
   GARAGE: { x0: 960, y0: 1020, x1: 1140, y1: 1160, door: { x: 1050, half: 46 }, bay: { x: 1050, y: 1100 },
     showroom: { car: { x: 1004, y: 1104, pad: { x: 1004, y: 1058 }, price: 400 }, bike: { x: 1102, y: 1108, pad: { x: 1102, y: 1058 }, price: 250 } } },
-  PAINT_COLORS: ['#ffffff', '#e4572e', '#3b7dd8', '#41b883', '#f2b134', '#8e5bd1', '#f06292', '#607d8b', 'rainbow'],
+  PAINT_COLORS: ['#ffffff', '#e4572e', '#3b7dd8', '#41b883', '#f2b134', '#8e5bd1', '#f06292', 'rainbow'],   // eight swatches fit on a phone in one row
   FIRE_STATION: { x0: 1340, y0: 300, x1: 1520, y1: 540, door: { x: 1340, y: 440 } },
   FIRE_TRUCK_HOME: { x: 1400, y: 460 },                 // parked inside the lower garage bay
   // The fire truck's outing: out of the bay, around the block, into the drive-thru line, then home.

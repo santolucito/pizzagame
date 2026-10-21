@@ -23,6 +23,9 @@ const SportsCarExt = {
     this.town = { kind: 'sportscar', x: S.TOWN_SPOT.x, y: S.TOWN_SPOT.y, angle: S.TOWN_SPOT.angle, vx: 0, vy: 0 };
   },
   vehicles(g) { return g.s.sports.owned ? [this.city, this.town] : []; },
+  onTurntable(g) { const v = this.city, T = CFG.SPORTS.TURNTABLE; return g.area === 'city' && g.driving && g.vehicle === v && U.dist(v.x, v.y, T.x, T.y) < T.r + 10 && Math.hypot(v.vx, v.vy) < 15; },
+  // the turntable doubles as a paint bay: park the sports car on it and the colour swatches appear, like the garage at home
+  update(g, dt) { if (this.onTurntable(g)) g.inPaintBay = true; },
   bgKey(g) { return g.s.sports.owned ? 'sc1' : 'sc0'; },
   pads(g) {
     if (g.s.sports.owned || g.area !== 'city') return [];
@@ -31,10 +34,11 @@ const SportsCarExt = {
   onPad(g, pad) {
     g.s.sports.owned = true; g.s.paint.sportscar = '#ffffff';
     Sfx.unlock(); Haptics.success();
-    g.toast('🏎️ Your sports car! A second one is waiting in the pizzeria lot', true);
+    g.toast('🏎️ Your sports car! Park it on the turntable to pick a colour. A second one is waiting in the pizzeria lot', true);
     for (let i = 0; i < 12; i++) g.fx.push({ kind: 'sparkle', x0: this.city.x + U.rand(-34, 34), y0: this.city.y + U.rand(-20, 20), x1: 0, y1: 0, t: -i * 0.05, dur: 0.5 });
   },
   hint(g) {
+    if (g.area === 'city' && g.s.sports.owned && g.driving && g.vehicle === this.city && (g.s.paint.sportscar || '#ffffff') === '#ffffff' && !this.onTurntable(g)) return { text: 'Park on the turntable to pick a colour 🎨', target: CFG.SPORTS.TURNTABLE };
     if (g.area !== 'city' || g.s.sports.owned || g.driving) return undefined;
     const p = g.player, P = CFG.SPORTS.PAD;
     if (U.dist(p.x, p.y, P.x, P.y) < 420 && g.s.cash + (g.s.padPaid.sportscar || 0) >= CFG.SPORTS.PRICE) return { text: 'Buy the sports car! 🏎️', target: P };
@@ -61,7 +65,7 @@ const SportsCarExt = {
     ctx.fillStyle = '#5b3a1a'; ctx.fillRect(G.x - 3, G.y - 26, 6, 30);
     ctx.fillStyle = '#c62828'; U.roundRect(ctx, G.x - 46, G.y - 50, 92, 26, 6); ctx.fill();
     ctx.fillStyle = '#ffe08a'; ctx.font = r.font(10); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🏎️ SPORTS CARS', G.x, G.y - 42);
-    ctx.font = r.font(8); ctx.fillText(g.s.sports.owned ? 'SOLD!' : 'TEST DRIVE TODAY', G.x, G.y - 31);
+    ctx.font = r.font(8); ctx.fillText(g.s.sports.owned ? 'SOLD! · 🎨 PAINT HERE' : 'TEST DRIVE TODAY', G.x, G.y - 31);
   },
 
   // ---- the car for sale turns slowly on the turntable until it is bought
@@ -99,5 +103,5 @@ const SportsCarExt = {
   },
   home(g) {},
 };
-Game.ext.push(SportsCarExt);
+Game.ext.unshift(SportsCarExt);   // first in line so its paint hint beats the City's coin hint while you drive the sports car
 Render.ext.push(SportsCarExt);

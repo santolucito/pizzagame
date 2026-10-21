@@ -122,4 +122,22 @@ module.exports = async (t) => {
   t.expect(cab.open === '📖 Open the catalog' && cab.cover, `cabin catalog opens on the cover (${cab.open})`);
   t.expect(cab.stillCover && cab.p1 === 1 && cab.closed, `cabin catalog: joystick ignored, ▶ turns, X closes (${JSON.stringify(cab)})`);
   await t.ev(() => Game.goHome());
+
+  // the sports car takes paint on the City turntable, and all the swatches fit on a phone in one row
+  await t.boot({ viewport: { width: 390, height: 740 } });
+  const sc = await t.ev(() => {
+    Game.s.sports.owned = true; Game.s.paint.sportscar = '#ffffff'; const v = SportsCarExt.city, TT = CFG.SPORTS.TURNTABLE;
+    v.x = TT.x + 200; v.y = TT.y; v.vx = 0; v.vy = 0; T.tp(v.x + 30, v.y, 'city'); Game.enterCar(); T.step(5);
+    const hint = T.hint(), before = Game.inPaintBay;
+    v.x = TT.x; v.y = TT.y; v.vx = 0; v.vy = 0; T.step(5);
+    const on = Game.inPaintBay; if (on) Game.paintVehicle('#e4572e');
+    return { driving: Game.driving && Game.vehicle === v, hint, before, on, painted: Game.s.paint.sportscar };
+  });
+  t.expect(sc.driving && !sc.before && sc.on && sc.painted === '#e4572e', `sports car is painted on the City turntable (${JSON.stringify(sc)})`);
+  t.expectEq(sc.hint, 'Park on the turntable to pick a colour 🎨', 'a white sports car is pointed at the turntable');
+  await t.wait(300);
+  const bar = await t.ev(() => { const b = document.getElementById('paint-bar').getBoundingClientRect(), sw = [...document.querySelectorAll('.swatch')].map((e) => e.getBoundingClientRect()); return { shown: !document.getElementById('paint-bar').classList.contains('hidden'), left: Math.round(b.left), right: Math.round(b.right), n: sw.length, oneRow: new Set(sw.map((r) => Math.round(r.top))).size === 1, inside: sw.every((r) => r.left >= b.left && r.right <= b.right) }; });
+  t.expect(bar.shown && bar.left >= 0 && bar.right <= 390 && bar.oneRow && bar.inside, `paint bar fits a 390 px phone in one row (${JSON.stringify(bar)})`);
+  await t.shot('paint-bar-sportscar-phone');
+  await t.ev(() => Game.goHome());
 };

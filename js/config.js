@@ -7,7 +7,7 @@ const CFG = {
   BUILDING: { x0: 0, y0: 98, x1: 966, y1: 646 },    // outer wall rectangle
   DOOR: { y0: 572, y1: 638 },                        // gap in the right wall
   SAVE_KEY: 'pizza-rush-save-v1',
-  VERSION: 73,                                      // shown in the help panel; bump with the service worker cache (sw.js)
+  VERSION: 74,                                      // shown in the help panel; bump with the service worker cache (sw.js)
 
   PLAYER_START: { x: 540, y: 430 }, // open floor in front of the counter, away from every circle
   ENTRANCE: { x: 925, y: 605 },          // just inside the door

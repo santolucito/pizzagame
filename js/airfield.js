@@ -4,7 +4,7 @@
 //
 // The strip of town past the fire station is a little airfield: a north–south runway, a hangar with the
 // chef's plane parked in front of it, a control tower, a windsock and an arrivals gate on the west edge
-// (customers come out of it and walk to the shops). Hop in the plane, press the button and
+// (customers come out of it and walk to the shops). Hop in the plane and
 // press the big button: the plane climbs through the clouds (side-on cut-scene) to CLOUD HARBOR, a map of
 // floating cloud islands joined by rope bridges, with a sky terminal, a hot-air balloon to ride, a glider
 // ramp, bouncy clouds, a café with a waving pilot (go inside for a Cloud Cocoa and a seat by the window),

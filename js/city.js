@@ -60,6 +60,7 @@ CFG.CITY = {
   ARRIVE: { x: 5200, y: 28 },         // where you step off
   TAXI: { x: 5500, y: 470 },          // parked by the square
   TAXI_LOOP: [{ x: 4980, y: 102 }, { x: 5820, y: 102 }, { x: 5820, y: 922 }, { x: 4980, y: 922 }],
+  CAB: { speed: 160, curb: 50, laneIn: 20, fare: 320 },   // riding as a passenger: the taxi's speed, how close to a road counts as a curb, lane offset, px per $1 on the meter
   SUBWAY: { x: 5090, y: 580 },
   HOTDOG: { x: 5720, y: 132 },
   BALLOONS: { x: 5746, y: 466 },
@@ -103,8 +104,8 @@ const CityExt = {
   winLit(bi, wi, t) { const base = this.hash(bi * 101 + wi * 7 + 3) < 0.42 ? 1 : 0, slot = Math.floor(t / 2.5), pick = Math.floor(this.hash(slot * 17 + 1) * 97); if (((bi * 13 + wi) % 97) !== pick) return base; const k = (t / 2.5) % 1, fade = k < 0.3 ? k / 0.3 : k > 0.7 ? (1 - k) / 0.3 : 1; return base ? 1 - fade : fade; },
   shade(hex, f) { const n = parseInt(hex.slice(1), 16); const c = (s) => Math.max(0, Math.min(255, Math.round(((n >> s) & 255) * f))); return `rgb(${c(16)},${c(8)},${c(0)})`; },
   nearTownStop(g) { const p = g.player, S = CFG.CITY.TOWN_STOP; return !g.driving && !g.onTrain && !g.ride && !g.fishing && p.x > S.x - 160 && p.x < S.x + 80 && p.y > -100 && p.y < 16; },   // the sign, the bus door and the shelter with its bench
-  nearCityStop(g) { const p = g.player, S = CFG.CITY.STOP; return !g.driving && !g.onTrain && !this.floor && U.dist(p.x, p.y, S.x, S.y) < 95; },
-  nearTowerDoor(g) { const p = g.player, D = CFG.CITY.TOWER.door; return !g.driving && !g.onTrain && !this.floor && U.dist(p.x, p.y, D.x, D.y) < 36; },
+  nearCityStop(g) { const p = g.player, S = CFG.CITY.STOP; return !g.driving && !g.onTrain && !this.floor && !(this.st && this.st.cab) && U.dist(p.x, p.y, S.x, S.y) < 95; },
+  nearTowerDoor(g) { const p = g.player, D = CFG.CITY.TOWER.door; return !g.driving && !g.onTrain && !this.floor && !(this.st && this.st.cab) && U.dist(p.x, p.y, D.x, D.y) < 36; },
   liftSpot() { const R = CFG.CITY.TOWER.ROOM; return { x: (R.x0 + R.x1) / 2, y: R.y0 + 64 }; },
   exitSpot() { const R = CFG.CITY.TOWER.ROOM; return { x: (R.x0 + R.x1) / 2, y: R.y1 - 24 }; },
   telescope() { const R = CFG.CITY.TOWER.ROOM; return { x: R.x1 - 60, y: R.y1 - 56 }; },
@@ -124,14 +125,14 @@ const CityExt = {
       peds.push(Object.assign({ ln, dir: Math.random() < 0.5 ? -1 : 1, x: ln.h ? t : ln.x, y: ln.h ? ln.y : t, speed: U.rand(50, 85), pause: 0, moving: true, facing: 1, bob: Math.random() * 6 }, look()));
     }
     const taxis = [];
-    for (let i = 0; i < 3; i++) { const a = C.TAXI_LOOP[i], b = C.TAXI_LOOP[(i + 1) % 4]; taxis.push({ x: U.lerp(a.x, b.x, 0.5), y: U.lerp(a.y, b.y, 0.5), angle: Math.atan2(b.y - a.y, b.x - a.x), wp: (i + 1) % 4, speed: U.rand(200, 240) }); }
+    for (let i = 0; i < 3; i++) taxis.push(this.newTaxi(this.loopCum()[i] + this.loopSeg(i) / 2, U.rand(200, 240)));
     const pigeons = [];
     for (let i = 0; i < 7; i++) pigeons.push({ x: U.rand(C.SQUARE.x0 + 40, C.SQUARE.x1 - 40), y: U.rand(C.SQUARE.y0 + 50, C.SQUARE.y1 - 40), tx: 0, ty: 0, state: 'walk', t: U.rand(0, 2), facing: 1, lift: 0, flap: Math.random() * 6 });
     this.st = {
       bus: { x: CFG.WORLD.x1 + 200, y: C.TOWN_STOP.y, angle: Math.PI, state: 'away', timer: U.rand(C.BUS.first[0], C.BUS.first[1]), speed: 0, dwell: 0, honk: 0 },
       cityBus: { x: C.STOP.x, y: C.STOP.y, angle: Math.PI, state: 'stopped' },
       taxi: { kind: 'taxi', x: C.TAXI.x, y: C.TAXI.y, angle: 0, vx: 0, vy: 0 },
-      taxis, peds, pigeons, boarding: null, taxiDriven: false, scattered: 0, notes: [],
+      taxis, peds, pigeons, boarding: null, taxiDriven: false, scattered: 0, notes: [], cab: null,
       lift: null, panel: null, floorT: 0, seenTower: false, seenView: false, roofPigeons: [{ x: 60, y: 240 }, { x: 250, y: 150 }, { x: 470, y: 250 }].map((q) => ({ x: q.x, y: q.y, lift: 0, state: 'walk', facing: 1, flap: 0, t: 0 })),
     };
     this.floor = null; this.viewing = null;
@@ -169,13 +170,9 @@ const CityExt = {
       if (ln.h) { p.x += step; p.facing = p.dir; if (p.x < ln.a || p.x > ln.b) { p.dir *= -1; p.x = U.clamp(p.x, ln.a, ln.b); } }
       else { p.y += step; if (p.y < ln.a || p.y > ln.b) { p.dir *= -1; p.y = U.clamp(p.y, ln.a, ln.b); } }
     }
-    // taxis loop around the blocks
-    for (const t of st.taxis) {
-      const wp = C.TAXI_LOOP[t.wp];
-      const ang = Math.atan2(wp.y - t.y, wp.x - t.x);
-      let d = ang - t.angle; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; t.angle += d * Math.min(1, dt * 6);
-      if (U.moveToward(t, wp.x, wp.y, t.speed, dt)) t.wp = (t.wp + 1) % C.TAXI_LOOP.length;
-    }
+    // taxis loop around the blocks (one of them may be carrying the chef)
+    for (const t of st.taxis) this.moveTaxi(t, dt);
+    if (st.cab) this.updateCab(g, dt);
     // pigeons peck about the square and scatter when you come close
     const p = g.player;
     for (const b of st.pigeons) {
@@ -254,6 +251,8 @@ const CityExt = {
     if (g.area === 'city' && this.nearCityStop(g)) return { label: '🚌 Ride the bus home', run: (gg) => this.board(gg, 'town') };
     if (g.area === 'city' && this.nearTowerDoor(g)) return { label: '🛗 Ride the elevator', run: (gg) => this.enterTower(gg) };
     if (g.area === 'city' && this.floor) return this.towerAction(g);
+    if (g.area === 'city' && st.cab) return st.cab.phase === 'riding' ? { label: '🚶 Get out here', run: (gg) => this.getOut(gg) } : null;
+    if (g.area === 'city' && this.nearCurb(g)) return { label: '🚕 Hail a taxi', run: (gg) => this.hail(gg) };
     return null;
   },
   board(g, to) {
@@ -290,6 +289,7 @@ const CityExt = {
     }
     if (g.area !== 'city') return undefined;
     if (this.floor) return this.towerHint(g);
+    if (st.cab) return { text: st.cab.phase === 'coming' ? '🚕 Taxi’s coming!' : st.cab.phase === 'riding' ? 'Enjoy the ride! Press the button to get out' : '🚕 Pulling over…', target: null };
     const coin = g.coins.filter((c) => !c.taken && c.x >= C.WORLD.x0).sort((a, b) => U.dist(p.x, p.y, a.x, a.y) - U.dist(p.x, p.y, b.x, b.y))[0];
     if (g.driving) return coin && U.dist(p.x, p.y, coin.x, coin.y) < 500 ? { text: 'Drive over the shiny coin!', target: coin } : { text: 'Honk honk! Drive around the City', target: null };
     if (this.nearCityStop(g)) return { text: 'Hop on the bus to go home 🍕', target: null };
@@ -299,9 +299,133 @@ const CityExt = {
     if (!st.seenTower) return { text: 'Visit the Pizza Tower! 🛗', target: C.TOWER.door };
     const sq = C.SQUARE, inSquare = p.x > sq.x0 && p.x < sq.x1 && p.y > sq.y0 && p.y < sq.y1;
     if (!inSquare && st.pigeons.some((b) => b.state === 'walk') && U.dist(p.x, p.y, C.FOUNTAIN.x, C.FOUNTAIN.y) < 600) return { text: 'Sneak up on the pigeons!', target: C.FOUNTAIN };
+    if (this.nearCurb(g)) return { text: 'Hail a taxi! 🚕', target: null };
     return { text: 'Bus stop to go home 🏠', target: { x: C.STOP.x, y: C.STOP.y - 30 } };
   },
 
+  // ---------- riding the yellow taxis as a passenger ----------
+  // The taxis drive a ring around the blocks (CFG.CITY.TAXI_LOOP), measured by `s`, the distance along it. Hailing one
+  // sends it off the ring, along the player's street to the curb, and after the pickup on along that street back onto
+  // the ring. Pressing the button pulls over at the next curb; a full loop brings the rider back to where they got in.
+  loopCum() { if (this._cum) return this._cum; const P = CFG.CITY.TAXI_LOOP, c = [0]; for (let i = 0; i < P.length; i++) c.push(c[i] + U.dist(P[i].x, P[i].y, P[(i + 1) % P.length].x, P[(i + 1) % P.length].y)); this._cum = c; return c; },
+  loopLen() { const c = this.loopCum(); return c[c.length - 1]; },
+  loopSeg(i) { const c = this.loopCum(); return c[i + 1] - c[i]; },
+  loopPos(s) { const P = CFG.CITY.TAXI_LOOP, c = this.loopCum(), L = this.loopLen(); s = ((s % L) + L) % L; let i = 0; while (i < P.length - 1 && s >= c[i + 1]) i++; const a = P[i], b = P[(i + 1) % P.length], k = (s - c[i]) / (c[i + 1] - c[i]); return { x: U.lerp(a.x, b.x, k), y: U.lerp(a.y, b.y, k), seg: i, ang: Math.atan2(b.y - a.y, b.x - a.x) }; },
+  // the nearest point of the ring to (x, y): its distance along the ring and how far away it is
+  loopParam(x, y) { const P = CFG.CITY.TAXI_LOOP, c = this.loopCum(); let best = null; for (let i = 0; i < P.length; i++) { const a = P[i], b = P[(i + 1) % P.length], dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy), k = U.clamp(((x - a.x) * dx + (y - a.y) * dy) / (len * len), 0, 1), px = a.x + dx * k, py = a.y + dy * k, d = U.dist(x, y, px, py); if (!best || d < best.d) best = { s: c[i] + k * len, d, x: px, y: py, seg: i }; } return best; },
+  fwd(from, to) { const L = this.loopLen(); return ((to - from) % L + L) % L; },
+  // the ring's corners you pass driving from s0 to s1 (nothing when s1 is straight ahead on the same side)
+  loopCorners(s0, s1) { const P = CFG.CITY.TAXI_LOOP, out = []; let seg = this.loopPos(s0).seg; const end = this.loopPos(s1).seg; if (seg === end && this.fwd(s0, s1) < this.loopSeg(seg)) return out; for (let n = 0; n < P.length; n++) { seg = (seg + 1) % P.length; out.push({ x: P[seg].x, y: P[seg].y }); if (seg === end) break; } return out; },
+  newTaxi(s, speed) { const q = this.loopPos(s); return { s, x: q.x, y: q.y, angle: q.ang, speed, mul: 1, wait: 0, route: null, arrived: false }; },
+  moveTaxi(t, dt) {
+    if (t.wait > 0) { t.wait -= dt; return; }
+    const sp = t.speed * t.mul;
+    if (t.route && t.route.length) {
+      const wp = t.route[0], ang = Math.atan2(wp.y - t.y, wp.x - t.x);
+      let d = ang - t.angle; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; t.angle += d * Math.min(1, dt * 7);
+      if (U.moveToward(t, wp.x, wp.y, sp, dt)) { t.route.shift(); if (!t.route.length) { t.route = null; t.arrived = true; t.s = this.loopParam(t.x, t.y).s; } }
+      return;
+    }
+    t.s = (t.s + sp * dt) % this.loopLen();
+    const q = this.loopPos(t.s); t.x = q.x; t.y = q.y;
+    let d = q.ang - t.angle; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; t.angle += d * Math.min(1, dt * 7);
+  },
+  roadAt(x, y) { return CFG.CITY.ROADS.find((rd) => x >= rd.x0 && x <= rd.x1 && y >= rd.y0 && y <= rd.y1) || null; },
+  roadDist(x, y, rd) { const dx = Math.max(rd.x0 - x, 0, x - rd.x1), dy = Math.max(rd.y0 - y, 0, y - rd.y1); return Math.hypot(dx, dy); },
+  // the taxi lane next to (x, y): the nearest road, the lane on this side of it, and the point on it beside us
+  laneFor(x, y) {
+    const C = CFG.CITY; let best = null;
+    for (const rd of C.ROADS) { const d = this.roadDist(x, y, rd); if (!best || d < best.d) best = { rd, d }; }
+    const rd = best.rd, horiz = rd.x1 - rd.x0 > rd.y1 - rd.y0, li = C.CAB.laneIn;
+    if (horiz) { const ly = y < (rd.y0 + rd.y1) / 2 ? rd.y0 + li : rd.y1 - li; return { rd, horiz, x: U.clamp(x, rd.x0 + 40, rd.x1 - 40), y: ly, d: best.d }; }
+    const lx = x < (rd.x0 + rd.x1) / 2 ? rd.x0 + li : rd.x1 - li; return { rd, horiz, x: lx, y: U.clamp(y, rd.y0 + 40, rd.y1 - 40), d: best.d };
+  },
+  // where that lane meets the ring: the two ways in (west/east or north/south), each with the ring position it joins
+  laneEntries(ln) { const P = CFG.CITY.TAXI_LOOP, pts = ln.horiz ? [{ x: P[0].x, y: ln.y }, { x: P[1].x, y: ln.y }] : [{ x: ln.x, y: P[0].y }, { x: ln.x, y: P[2].y }]; return pts.map((e) => { const q = this.loopParam(e.x, e.y); return { x: e.x, y: e.y, s: q.s, ring: { x: q.x, y: q.y } }; }); },
+  // a good spot to stand on the sidewalk beside a lane point: off every road, out of every obstacle and off the sports lot
+  curbNear(g, x, y, ln, bias = 0) {
+    const C = CFG.CITY, obs = g.obstacles(), lot = CFG.SPORTS && CFG.SPORTS.LOT;
+    const ok = (px, py) => !this.roadAt(px, py) && !obs.some((o) => g.hitRect(px, py, 13, o)) && !(lot && px > lot.x0 - 26 && px < lot.x1 + 26 && py > lot.y0 - 26 && py < lot.y1 + 26) && px > C.WORLD.x0 + 20 && px < C.WORLD.x1 - 20 && py > C.WORLD.y0 + 20 && py < C.WORLD.y1 - 20;
+    const rd = ln.rd, horiz = ln.horiz, sides = horiz ? (y < (rd.y0 + rd.y1) / 2 ? [rd.y0 - 14, rd.y1 + 14] : [rd.y1 + 14, rd.y0 - 14]) : (x < (rd.x0 + rd.x1) / 2 ? [rd.x0 - 14, rd.x1 + 14] : [rd.x1 + 14, rd.x0 - 14]);
+    for (const side of sides) for (let n = 0; n <= 30; n++) for (const sign of (n ? [1, -1] : [1])) { const off = bias + sign * n * 8, px = horiz ? x + off : side, py = horiz ? side : y + off; if (ok(px, py)) return { x: px, y: py }; }
+    return null;
+  },
+  nearCurb(g) {
+    const st = this.st, p = g.player, C = CFG.CITY;
+    if (!st || st.cab || st.boarding || g.driving || g.onTrain || g.travel || g.fishing || g.ride || this.floor || g.area !== 'city') return false;
+    if (this.nearCityStop(g) || this.nearTowerDoor(g) || U.dist(p.x, p.y, C.SUBWAY.x, C.SUBWAY.y) < 80 || U.dist(p.x, p.y, C.BALLOONS.x, C.BALLOONS.y) < 80 || U.dist(p.x, p.y, C.HOTDOG.x, C.HOTDOG.y) < 50) return false;
+    if (CFG.SPORTS) { const L = CFG.SPORTS.LOT, P = CFG.SPORTS.PAD; if ((p.x > L.x0 - 30 && p.x < L.x1 + 30 && p.y > L.y0 - 30 && p.y < L.y1 + 30) || U.dist(p.x, p.y, P.x, P.y) < 60) return false; }
+    if (this.roadAt(p.x, p.y)) return false;
+    return C.ROADS.some((rd) => this.roadDist(p.x, p.y, rd) <= C.CAB.curb);
+  },
+  hail(g) {
+    const st = this.st, p = g.player, ln = this.laneFor(p.x, p.y), entries = this.laneEntries(ln);
+    // pick the way in and the taxi that get here soonest; a fresh taxi joins the ring if every cab is far away
+    // never drive the passenger past the balloon cart: its "buy a balloon" button would take over the action button
+    const C = CFG.CITY, hot = [{ x: C.BALLOONS.x, y: C.BALLOONS.y, r: 84 }];
+    const clear = (a, b) => hot.every((h) => { const dx = b.x - a.x, dy = b.y - a.y, len2 = dx * dx + dy * dy || 1, k = U.clamp(((h.x - a.x) * dx + (h.y - a.y) * dy) / len2, 0, 1); return U.dist(h.x, h.y, a.x + dx * k, a.y + dy * k) >= h.r; });
+    const ways = entries.filter((e) => clear(e, ln));
+    let best = null;
+    for (const e of ways) for (const t of st.taxis) { if (t.route) continue; const cost = this.fwd(t.s, e.s) + U.dist(e.x, e.y, ln.x, ln.y); if (!best || cost < best.cost) best = { t, e, cost }; }
+    if (!best || best.cost > 900) { const e = ways[0] || entries[0]; const t = this.newTaxi(e.s - 320, 220); st.taxis.push(t); best = { t, e, cost: 0 }; if (st.taxis.length > 6) st.taxis.splice(0, 1); }
+    const t = best.t, e = best.e, other = entries.find((q) => q !== e), exit = other && clear(ln, other) ? other : e;   // on along the street, or back the way we came
+    t.route = this.loopCorners(t.s, e.s).concat([e.ring, { x: e.x, y: e.y }, { x: ln.x, y: ln.y }]); t.arrived = false; t.mul = 1; t.wait = 0;
+    st.cab = { taxi: t, phase: 'coming', t: 0, dist: 0, curb: { x: p.x, y: p.y }, lane: ln, entry: e, exit };
+    p.moving = false; p.facing = ln.horiz ? (ln.x >= p.x ? 1 : -1) : p.facing; p.hasMoved = true;
+    g.floats.push({ x: p.x, y: p.y - 64, text: 'Taxi! 🚕', color: '#ffe08a', t: 0, dur: 1.2, big: true });
+    Haptics.tap();
+  },
+  getOut(g) { const cab = this.st.cab; if (!cab || cab.phase !== 'riding') return; cab.phase = 'pulling'; cab.t = 0; cab.taxi.route = null; Haptics.tap(); },
+  alight(g, spot) {
+    const st = this.st, cab = st.cab, t = cab.taxi, p = g.player;
+    p.x = spot.x; p.y = spot.y; p.moving = false; p.hasMoved = true; p.facing = spot.x < t.x ? 1 : -1;
+    g.floats.push({ x: p.x, y: p.y - 64, text: 'On the house! 🍕', color: '#ffe08a', t: 0, dur: 1.6, big: true });
+    t.mul = 1; t.wait = 1.4; t.route = null; t.s = this.loopParam(t.x, t.y).s; st.cab = null; Haptics.tap();
+  },
+  updateCab(g, dt) {
+    const st = this.st, cab = st.cab, t = cab.taxi, p = g.player, C = CFG.CITY;
+    cab.t += dt;
+    if (cab.phase === 'coming') {
+      p.x = cab.curb.x; p.y = cab.curb.y; p.moving = false;   // waving at the curb
+      const left = t.route ? t.route.length : 0; t.mul = left <= 1 ? Math.max(0.35, Math.min(1, U.dist(t.x, t.y, cab.lane.x, cab.lane.y) / 160)) : 1;
+      if (t.arrived) { t.arrived = false; cab.phase = 'boarding'; cab.t = 0; t.wait = 1.1; g.floats.push({ x: t.x, y: t.y - 50, text: 'Hop in!', color: '#ffe08a', t: 0, dur: 1, big: true }); }
+      return;
+    }
+    p.x = t.x; p.y = t.y; p.moving = false; p.hasMoved = true;   // aboard: the chef rides along, hidden in the cab
+    if (cab.phase === 'boarding') {
+      if (t.wait <= 0) { cab.phase = 'riding'; cab.t = 0; cab.dist = 0; t.speed = C.CAB.speed; t.mul = 1; t.route = [{ x: cab.exit.x, y: cab.exit.y }, cab.exit.ring]; t.arrived = false; }
+      return;
+    }
+    if (cab.phase === 'riding') {
+      cab.dist += t.speed * t.mul * dt; t.arrived = false;
+      if (cab.dist >= this.loopLen() + U.dist(cab.lane.x, cab.lane.y, cab.exit.x, cab.exit.y)) {
+        // one whole loop: back along the street to where the chef got in
+        const e = cab.entry; t.route = this.loopCorners(t.s, e.s).concat([e.ring, { x: e.x, y: e.y }, { x: cab.lane.x, y: cab.lane.y }]); cab.phase = 'returning';
+      }
+      return;
+    }
+    if (cab.phase === 'returning') {
+      const left = t.route ? t.route.length : 0; t.mul = left <= 1 ? Math.max(0.35, Math.min(1, U.dist(t.x, t.y, cab.lane.x, cab.lane.y) / 160)) : 1;
+      if (t.arrived) this.alight(g, cab.curb);
+      return;
+    }
+    if (cab.phase === 'pulling') {
+      t.mul = Math.max(0, 1 - cab.t / 0.8);
+      if (cab.t >= 0.8) { const ln = this.laneFor(t.x, t.y), ahead = (ln.horiz ? (Math.cos(t.angle) >= 0 ? 1 : -1) : (Math.sin(t.angle) >= 0 ? 1 : -1)) * 40, spot = this.curbNear(g, t.x, t.y, ln, ahead) || cab.curb; this.alight(g, spot); }   // step out just ahead of the cab
+    }
+  },
+  drawTaxi(r, g, t) {
+    const ctx = r.ctx, st = this.st, cab = st.cab, mine = cab && cab.taxi === t && cab.phase !== 'coming';
+    if (mine) {   // the chef is inside: paint the street back over them before the cab goes on top
+      const bg = r.bgs && r.bgs.city, W = CFG.CITY.WORLD, p = g.player, top = 72 + Math.min(p.carry, 30) * 4;
+      if (bg) { const res = bg.res; ctx.drawImage(bg.canvas, (p.x - 36 - W.x0) * res, (p.y - top - W.y0) * res, 72 * res, (top + 18) * res, p.x - 36, p.y - top, 72, top + 18); }
+    }
+    ctx.save(); ctx.translate(t.x, t.y); ctx.rotate(t.angle); r.drawVehicle('taxi', g, '#ffd60a');
+    if (mine) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(-24, 0, 6, 8, 0, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(-27, -4, 4, 0, Math.PI * 2); ctx.arc(-27, 4, 4, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(-21, 0, 4, 0, Math.PI * 2); ctx.fill(); }   // the chef's hat in the back window
+    ctx.restore();
+    if (mine && cab.phase !== 'boarding') { const text = cab.phase === 'riding' ? `$${1 + Math.floor(cab.dist / CFG.CITY.CAB.fare)}` : 'On the house! 🍕'; r.drawBubble(t.x, t.y - 46, () => { ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = cab.phase === 'riding' ? '#2b1d14' : '#2f9e44'; ctx.fillText(text, 0, 0); }, cab.phase === 'riding' ? 44 : 118); }
+    else if (cab && cab.taxi === t) r.drawBubble(t.x, t.y - 46, () => { ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('🚕', 0, 0); }, 30);
+  },
   // ---------- static art ----------
   // a little shelter and bench next to the BUS sign on the far sidewalk of Main Street
   paintTown(r, g) {
@@ -582,7 +706,8 @@ const CityExt = {
     if (g.area !== 'city' || this.floor) return;
     items.push({ y: st.cityBus.y + 20, draw: () => this.drawBus(r, g, st.cityBus, !st.boarding && !g.driving ? 'Hop on to go home!' : null) });
     items.push({ y: st.taxi.y + 10, draw: () => r.drawSiteVehicle(g, st.taxi, 30) });
-    for (const t of st.taxis) items.push({ y: t.y + 10, draw: () => { r.ctx.save(); r.ctx.translate(t.x, t.y); r.ctx.rotate(t.angle); r.drawVehicle('taxi', g, '#ffd60a'); r.ctx.restore(); } });
+    for (const t of st.taxis) items.push({ y: t.y + 10, draw: () => this.drawTaxi(r, g, t) });
+    if (st.cab && st.cab.phase === 'coming') items.push({ y: g.player.y + 1, draw: () => { const ctx = r.ctx, p = g.player, lift = Math.sin(g.time * 10) * 4; ctx.strokeStyle = '#f1c27d'; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(p.x + 12, p.y - 20); ctx.lineTo(p.x + 20, p.y - 44 + lift); ctx.stroke(); ctx.lineCap = 'butt'; ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(p.x + 21, p.y - 46 + lift, 4, 0, Math.PI * 2); ctx.fill(); } });   // waving for the taxi
     for (const p of st.peds) items.push({ y: p.y, draw: () => r.drawPerson(p.x, p.y, p) });
     const M = C.MUSICIAN;
     items.push({ y: M.y, draw: () => {
@@ -628,7 +753,8 @@ const CityExt = {
     g.floats.push({ x: g.player.x, y: g.player.y - 60, text: 'Welcome to the Pizza Tower!', color: '#ffe08a', t: 0, dur: 1.6, big: true });
     Haptics.tap();
   },
-  home(g) { this.floor = null; this.viewing = null; this.st.lift = null; this.st.panel = null; this.st.boarding = null; },
+  // the core's Take me home button: out of the tower, off the bus, out of any taxi (which goes back to looping)
+  home(g) { const st = this.st; this.floor = null; this.viewing = null; if (!st) return; st.lift = null; st.panel = null; st.boarding = null; st.cab = null; for (const t of st.taxis) { t.route = null; t.mul = 1; t.wait = 0; t.s = this.loopParam(t.x, t.y).s; } },
   leaveTower(g) {
     const D = CFG.CITY.TOWER.door;
     this.floor = null; this.viewing = null; this.st.lift = null; this.st.panel = null;

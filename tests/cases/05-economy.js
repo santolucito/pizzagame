@@ -10,8 +10,8 @@ module.exports = async (t) => {
       if (!pads.length) break;
       const pad = pads[0];
       Game.player.x = pad.pos.x; Game.player.y = pad.pos.y; Game.player.hasMoved = true; Game.player.moving = false;
-      const before = JSON.stringify([Game.s.unlocked, Game.s.upg, Game.s.staff, Game.s.decor, Game.s.iceCream.owned, Game.s.iceCream.flavors, Game.s.vehicles, Game.s.islands.standOwned, Game.s.icDrive.owned]);
-      const n = T.until(() => JSON.stringify([Game.s.unlocked, Game.s.upg, Game.s.staff, Game.s.decor, Game.s.iceCream.owned, Game.s.iceCream.flavors, Game.s.vehicles, Game.s.islands.standOwned, Game.s.icDrive.owned]) !== before, 900);
+      const before = JSON.stringify([Game.s.unlocked, Game.s.upg, Game.s.staff, Game.s.decor, Game.s.iceCream.owned, Game.s.iceCream.flavors, Game.s.vehicles, Game.s.islands.standOwned, Game.s.icDrive.owned, Game.s.sports.owned]);
+      const n = T.until(() => JSON.stringify([Game.s.unlocked, Game.s.upg, Game.s.staff, Game.s.decor, Game.s.iceCream.owned, Game.s.iceCream.flavors, Game.s.vehicles, Game.s.islands.standOwned, Game.s.icDrive.owned, Game.s.sports.owned]) !== before, 900);
       if (n < 0) return { failed: pad.key, bought };
       bought.push(pad.key);
       Game.player.x = at.x; Game.player.y = at.y; T.step(70);   // step off so the same circle's breather passes
@@ -30,6 +30,14 @@ module.exports = async (t) => {
   t.expect(s.v.car && s.v.bike, 'car and scooter bought from the showroom');
   t.expect(s.icd, 'ice cream drive-thru bought');
   t.expectEq(s.decor, s.items, 'every decoration bought');
+
+  const city = await buyAll('city', { x: 5070, y: 800 });
+  t.expect(!city.failed && city.left.length === 0, `city circles complete: ${JSON.stringify(city)}`);
+  const sc = await t.ev(() => ({ owned: Game.s.sports.owned, paint: Game.s.paint.sportscar, kinds: Game.vehicles().filter((v) => v.kind === 'sportscar').length }));
+  t.expect(sc.owned && sc.paint === '#ffffff' && sc.kinds === 2, `sports car bought, white, in both the City and the town (${JSON.stringify(sc)})`);
+  await t.ev(() => { T.tp(SportsCarExt.town.x + 30, SportsCarExt.town.y, 'town'); T.step(2); Game.enterCar(); });
+  t.expectEq(await t.ev(() => Game.vehicle && Game.vehicle.kind), 'sportscar', 'the delivered sports car can be driven at home');
+  await t.ev(() => Game.exitCar());
 
   const isl = await buyAll('islands', { x: 3000, y: 1905 });
   t.expect(!isl.failed && isl.left.length === 0, `island circles complete: ${JSON.stringify(isl)}`);

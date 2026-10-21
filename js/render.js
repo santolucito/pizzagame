@@ -131,6 +131,7 @@ const Render = {
     if (g.area === 'site') this.paintSite(g);
     else if (g.area === 'town') this.paintBackground(g);
     else { const e = this.ext.find((x) => x.paint && x.paint[g.area]); if (e) e.paint[g.area](this, g); }
+    for (const e of this.ext) if (e.paintAfter) e.paintAfter(this, g, g.area);   // extensions adding static art to any map
     this.ctx = main;
   },
 

@@ -68,6 +68,7 @@ Useful core state and helpers:
 | --- | --- | --- |
 | `paint` (object `{ areaName(r, g) }`) | when that map's cached background is (re)built | static art only; draw everything inside your map's rect |
 | `paintTown(r, g)` | at the end of the town's cached background | add static art to the town (river, forest, bus shelter) |
+| `paintAfter(r, g, area)` | at the end of ANY map's cached background, with the map's name | add static art to another extension's map (a shop in the City, say); check `area` first |
 | `bgKey(g)` | when deciding whether to rebuild backgrounds | return a string that changes when your static art changes (owned shop, etc.) |
 | `dynamic(r, g)` | each frame after the core's moving outside things, before entities | things that move but sit under people |
 | `entities(r, g, items)` | each frame | push `{ y, draw() }` into `items`; the core y-sorts and draws them with people and vehicles |

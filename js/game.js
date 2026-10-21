@@ -678,7 +678,7 @@ const Game = {
     c.vx += (tx - c.vx) * k; c.vy += (ty - c.vy) * k;
     const speed = Math.hypot(c.vx, c.vy);
     if (speed > 15) { const target = Math.atan2(c.vy, c.vx); let d = target - c.angle; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; c.angle += d * Math.min(1, dt * 10); }
-    const r = spec.radius, w = this.bounds(), obs = this.townObstacles(true);
+    const r = spec.radius, w = this.bounds(), obs = spec.flies ? [] : this.townObstacles(true);   // a flying vehicle passes over everything
     c.x = U.clamp(c.x + c.vx * dt, w.x0 + 30, w.x1 - 30);
     for (const o of obs) if (o.w && this.hitRect(c.x, c.y, r, o)) { c.x = c.vx > 0 ? o.x - r : o.x + o.w + r; c.vx = 0; }
     c.y = U.clamp(c.y + c.vy * dt, w.y0 + 30, w.y1 - 30);

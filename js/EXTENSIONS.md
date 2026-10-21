@@ -42,7 +42,7 @@ All optional. `g` is `Game`.
 | `build(g)` | end of `Game.buildRuntime()` (after `g.s` exists; also on a reset) | – |
 | `update(g, dt)` | every fixed step (60 Hz), after the core updates, in every map | – |
 | `obstacles(g, forCar)` | when the player or a vehicle moves | array of `{x, y, w, h}` AABBs (world coords; keep them in your own map) |
-| `vehicles(g)` | often | array of rideable vehicle objects `{ kind, x, y, angle, vx, vy }`; `kind` must exist in `CFG.VEHICLES` |
+| `vehicles(g)` | often | array of rideable vehicle objects `{ kind, x, y, angle, vx, vy }`; `kind` must exist in `CFG.VEHICLES` (a spec with `flies: true` ignores every obstacle while driven, so it can fly over buildings and water; it is still clamped to the map) |
 | `action(g)` | each frame for the big action button | `{ label, run(g) }` or null. Checked after the train/fishing cases |
 | `hint(g)` | each frame | `undefined` = not mine; otherwise a hint `{ text, target: {x,y} | null }` or `null` for no hint. Checked after the core's Construction-Town/travel hints and before the town hints, so return `undefined` unless the player is in your map or next to your thing |
 | `pads(g)` | each frame | array of `{ key, label, ico, pos: {x,y}, price, maxed?, sub? }`; the core draws them and collects money; `onPad(g, pad)` fires when paid |

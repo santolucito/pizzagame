@@ -952,7 +952,7 @@ const Game = {
   },
   computeHint() {
     const s = this.s, p = this.player;
-    if (this.area === 'site' || this.travel) { this.hint = this.siteHint(); return; }
+    if (this.travel) { this.hint = this.siteHint(); return; }
     // Extensions answer in order. When the first answer points at something close by (a shop door, say) and other
     // extensions point at other close things, the nearest one wins, so two neighbouring doors never fight.
     const NEAR = 120;
@@ -964,6 +964,7 @@ const Game = {
       if (d < bd) { bd = d; best = h; }
     }
     if (first !== undefined) { this.hint = first && first.target && bd <= NEAR ? best : first; return; }
+    if (this.area === 'site') { this.hint = this.siteHint(); return; }   // Construction Town's own hints, after the extensions had their say
     const hasCashier = this.staff.some((st) => st.role === 'cashier');
     const paying = this.customers.some((c) => c.state === 'paying' || c.state === 'toPay');
     const hasHelper = this.staff.some((st) => st.role === 'helper');

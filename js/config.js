@@ -7,7 +7,7 @@ const CFG = {
   BUILDING: { x0: 0, y0: 98, x1: 966, y1: 646 },    // outer wall rectangle
   DOOR: { y0: 572, y1: 638 },                        // gap in the right wall
   SAVE_KEY: 'pizza-rush-save-v1',
-  VERSION: 83,                                      // shown in the help panel; bump with the service worker cache (sw.js)
+  VERSION: 84,                                      // shown in the help panel; bump with the service worker cache (sw.js)
 
   PLAYER_START: { x: 540, y: 430 }, // open floor in front of the counter, away from every circle
   ENTRANCE: { x: 925, y: 605 },          // just inside the door
@@ -131,9 +131,9 @@ const CFG = {
   // It shares the world's coordinate space (so nothing in town can reach it) but has its own bounds,
   // background and train. The train ride between the two plays as a little mountain journey.
   SITE: {
-    WORLD: { x0: 2600, y0: -170, x1: 4000, y1: 900 },
+    WORLD: { x0: 2600, y0: -170, x1: 4500, y1: 1300 },   // Construction Town: the site block is 2600..4000 × -170..900; east of x 4000 and south of y 900 is the rest of the town (js/sitetown.js)
     STATION: { trackY: -140, platform: { x0: 2820, y0: -118, x1: 3160, y1: -72 }, house: { x0: 2830, y0: -118, x1: 2930, y1: -72 }, stopX: 3320, boardDx: -330, name: 'CONSTRUCTION TOWN' },
-    ROAD: { x0: 2600, y0: 40, x1: 4000, y1: 120 },            // gravel road along the top
+    ROAD: { x0: 2600, y0: 40, x1: 4500, y1: 120 },            // gravel road along the top, on past the site into the rest of the town
     BUILDING: { x0: 2720, y0: 330, x1: 3020, y1: 560, door: { x: 2870, half: 40 } },  // the half-built house
     CRANE: { x: 3560, y: 330 },
     TOILET: { x: 3260, y: 200 },

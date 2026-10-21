@@ -172,7 +172,7 @@ const ArcadeGames = {
   // ---- PINBALL: launch with the button, flip with the stick (or the button); bumpers, a ramp, lights; the ball
   // never drains for good: it rolls back to the plunger and the button launches it again ----
   pinball: {
-    title: 'PIZZA BALL', ico: '🪩', color: '#ff9f1c', R: 9, GRAV: 520,
+    title: 'PIZZA BALL', ico: '🍕', color: '#ff9f1c', R: 9, GRAV: 520,
     BUMPERS: [{ x: 88, y: 128, c: '#ff4fd8' }, { x: 200, y: 104, c: '#3ff0ff' }, { x: 150, y: 206, c: '#ffe94f' }],
     LAMPS: [100, 150, 200], LAMP_Y: 46,
     FLIP: { len: 46, rest: 0.5, up: -0.5, pivots: [{ x: 100, y: 362 }, { x: 220, y: 362 }] },
@@ -263,7 +263,8 @@ const ArcadeGames = {
       let bx = b.x, by = b.y;
       if (G.at === 'return') { const k = U.easeOut(Math.min(1, G.returnT)); bx = U.lerp(G.drainX, 303, k); by = k < 0.5 ? 392 : U.lerp(392, 372, (k - 0.5) * 2); }
       ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(bx + 2, by + 3, b.r, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#e8e8f0'; ctx.beginPath(); ctx.arc(bx, by, b.r, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(bx - 3, by - 3, 3, 0, Math.PI * 2); ctx.fill();
+      // the ball is a pepperoni pizza, rolling as it goes (a bigger one than the silver ball it replaced, so the pepperoni reads)
+      ctx.save(); ctx.translate(bx, by); ctx.rotate((bx + by) / (b.r + 2)); r.drawPizza(0, 0, b.r + 2); ctx.restore();
       A.drawFx(ctx, r, G);
     },
   },

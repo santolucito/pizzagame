@@ -34,9 +34,9 @@ module.exports = async (t) => {
   // ---- butterflies flutter around the chef and the bee visits the buckets
   const bugs = await t.ev(() => {
     const p = Game.player, b0 = { x: FlowersExt.st.bee.x, y: FlowersExt.st.bee.y };
-    T.step(240);
+    let beeMoved = 0; for (let i = 0; i < 240; i++) { T.step(1); beeMoved = Math.max(beeMoved, Math.hypot(FlowersExt.st.bee.x - b0.x, FlowersExt.st.bee.y - b0.y)); }   // farthest it got, so a round trip still counts
     const near = FlowersExt.st.butterflies.filter((b) => Math.hypot(b.x - p.x, b.y - (p.y - 34)) < 90).length;
-    return { near, beeMoved: Math.hypot(FlowersExt.st.bee.x - b0.x, FlowersExt.st.bee.y - b0.y) };
+    return { near, beeMoved };
   });
   t.expectEq(bugs.near, 3, 'three butterflies flutter close to the chef');
   t.expect(bugs.beeMoved > 20, 'the bee flew off to another flower');

@@ -42,6 +42,7 @@ All optional. `g` is `Game`.
 | `build(g)` | end of `Game.buildRuntime()` (after `g.s` exists; also on a reset) | – |
 | `update(g, dt)` | every fixed step (60 Hz), after the core updates, in every map | – |
 | `obstacles(g, forCar)` | when the player or a vehicle moves | array of `{x, y, w, h}` AABBs (world coords; keep them in your own map) |
+| `obstaclesOverride(g)` | when the player (on foot) moves or steps out of a vehicle | `null` normally; an array of AABBs to REPLACE every obstacle in the game (the core's and every extension's) while some special footing applies, e.g. the chef walking on a roof sees only the roof's edge walls |
 | `vehicles(g)` | often | array of rideable vehicle objects `{ kind, x, y, angle, vx, vy }`; `kind` must exist in `CFG.VEHICLES` (a spec with `flies: true` ignores every obstacle while driven, so it can fly over buildings and water; it is still clamped to the map) |
 | `action(g)` | each frame for the big action button | `{ label, run(g) }` or null. Checked after the train/fishing cases |
 | `hint(g)` | each frame | `undefined` = not mine; otherwise a hint `{ text, target: {x,y} | null }` or `null` for no hint. Checked after the core's Construction-Town/travel hints and before the town hints, so return `undefined` unless the player is in your map or next to your thing |
@@ -59,6 +60,22 @@ Useful core state and helpers:
 - `Sfx.pickup() drop() cash() pay() buy() unlock() whistle() error() ding()`; `Haptics.tap() success()`.
 - `Game.enterCar()/exitCar()` are driven by the vehicle button; vehicles you return from `vehicles()` work with it automatically (speed/radius/labels from `CFG.VEHICLES[kind]`, painted color from `g.s.paint[kind]`).
 - The core keeps simulating the pizza town while the player is elsewhere; do not pause it.
+
+## Interiors ("go inside" a building)
+
+A building interior is just another map: register `CFG.AREAS.<name> = { WORLD: {...} }` in a free rectangle (see the
+reservations below), paint it with `paint.<name>`, give the room walls and furniture through `obstacles`, and switch maps
+directly: `g.area = '<name>'; g.player.x = ...; g.player.y = ...; g.cameraSnap = true;` (no travel ride needed; a short
+fade drawn in your `screen` hook feels nice). Offer `{ label: '🚪 Go inside', run }` from `action` when the chef stands at
+the door in the outer map, and `'🚪 Go outside'` on the exit mat inside. Return `undefined` from `hint` except at your door
+and inside your map; put your extension first with `Game.ext.unshift(...)` so your door's button and hint beat the outer
+map's own (taxis, coins, "go home"). Add `home(g)` so Take-me-home can clear any state you hold, and a rescue: if a save
+or a push leaves the chef in a wall, put them back on the exit mat. Vehicles never come inside (`vehicles` stays empty
+while you are inside: the core only lists vehicles from `vehicles()` hooks, and all are far away in other maps anyway).
+
+Reserved interior rectangles (all 600 × 400, y 3000..3400, 900 apart): City building `i` (its index in
+`CFG.CITY.BUILDINGS`) owns `x0 = -1300 + i * 900`. Other interiors: the barn `0..600 × 4000..4400`, Columbia
+`1000..1600 × 4000..4400`, Barnard `2000..2600 × 4000..4400`, more at `x0 = 3000 + k * 1000, y 4000..4400`.
 
 ## Render hooks (`Render.ext`)
 

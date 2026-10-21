@@ -455,6 +455,7 @@ const Game = {
     return o;
   },
   obstacles() {
+    for (const e of this.ext) if (e.obstaclesOverride) { const o = e.obstaclesOverride(this); if (o) return o; }   // e.g. walking on a roof: only the roof's edges count
     const b = CFG.BUILDING, d = CFG.DOOR;
     const o = [
       { x: b.x0 - 6, y: b.y0, w: b.x1 - b.x0 + 6, h: 12 },               // top wall

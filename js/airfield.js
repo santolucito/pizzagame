@@ -1230,6 +1230,7 @@ const AirfieldExt = {
       const pitch = -0.22 * climb + 0.14 * descent;
       const sky = ctx.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#3f9fe6'); sky.addColorStop(0.55, '#8fd0f7'); sky.addColorStop(1, '#d9f0ff');
       ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+      if (home) { ctx.save(); ctx.translate(W, 0); ctx.scale(-1, 1); }   // flying home runs right to left, mirroring the trip out
       ctx.fillStyle = '#fff7c2'; ctx.beginPath(); ctx.arc(W * 0.82, H * 0.14, Math.min(W, H) * 0.06, 0, Math.PI * 2); ctx.fill();
       const layer = (speed, step, draw) => { const off = dist * speed; const i0 = Math.floor((off - 300) / step), i1 = Math.ceil((off + W + 300) / step); for (let i = i0; i <= i1; i++) draw(i * step - off, i); };
       const cloud = (x, y, s, a) => { ctx.fillStyle = `rgba(255,255,255,${a})`; ctx.beginPath(); ctx.arc(x, y, 18 * s, 0, Math.PI * 2); ctx.arc(x + 20 * s, y - 10 * s, 24 * s, 0, Math.PI * 2); ctx.arc(x + 46 * s, y, 17 * s, 0, Math.PI * 2); ctx.arc(x + 24 * s, y + 6 * s, 20 * s, 0, Math.PI * 2); ctx.fill(); };
@@ -1251,6 +1252,7 @@ const AirfieldExt = {
       const sc = Math.min(1.1, W / 720), px = W * 0.42, py = H * 0.5 + Math.sin(t * 2) * 4 - climb * H * 0.04;
       for (let i = 0; i < 9; i++) { const age = ((t * 1.6 + i * 0.45) % 4) / 4; ctx.fillStyle = `rgba(255,255,255,${0.7 * (1 - age)})`; ctx.beginPath(); ctx.arc(px - 100 * sc - age * 320, py + 8 * sc + Math.sin(i) * 6 + age * 40 * (climb - descent), (5 + age * 20) * sc, 0, Math.PI * 2); ctx.fill(); }
       E.drawPlaneSide(r, g, px, py, sc, pitch, t, r.paintColor(g.s.paint.plane, g) || '#f2b134');
+      if (home) ctx.restore();
       // banner and progress bar, like the train ride
       const msg = home ? '✈️ Next stop: home! 🍕' : '✈️ Next stop: Cloud Harbor! ☁️';
       ctx.fillStyle = 'rgba(43,29,20,0.85)'; const bw = Math.min(W - 24, 360); U.roundRect(ctx, W / 2 - bw / 2, 60, bw, 44, 12); ctx.fill();

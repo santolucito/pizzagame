@@ -21,8 +21,11 @@ module.exports = async (t) => {
   // standing at the bus stop calls the bus; the stop zone covers the bench
   await t.ev(() => { CityExt.st.bus.state = 'away'; CityExt.st.bus.timer = 500; T.tp(380, -30); });
   const called = await t.ev(() => T.until(() => CityExt.st.bus.state === 'stopped', 1500));
-  t.expect(called >= 0 && called <= 1200, `waiting at the stop brings the bus (took ${called} steps)`);
+  t.expect(called >= 0 && called <= 540, `waiting at the stop brings the bus within 9 s (took ${called} steps)`);
   t.expectEq(await t.ev(() => T.label()), '🚌 Ride the bus', 'bus can be boarded from beside the bench');
+  // the stop zone covers the sign, the sidewalk behind the shelter and the kerb along the whole bus
+  const zone = await t.ev(() => [[380, -30], [500, -70], [340, -130], [600, -20], [560, 30], [420, 10]].map(([x, y]) => { T.tp(x, y); T.step(1); return T.label() === '🚌 Ride the bus'; }));
+  t.expect(zone.every(Boolean), `bus can be boarded from all around the stop (${zone.join('/')})`);
   await t.ev(() => { CityExt.st.bus.state = 'away'; CityExt.st.bus.timer = 999; });
 
   // the dog walks to the door and waits outside instead of jumping

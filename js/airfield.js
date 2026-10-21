@@ -132,7 +132,8 @@ const AirfieldExt = {
   },
 
   // ======================= game hooks =======================
-  home(g) { const rt = this.rt; if (rt) { rt.ride = null; if (rt.runup) { rt.runup.plane.free = false; rt.runup.plane.lift = 0; } rt.runup = null; rt.roll = null; rt.cafe.seat = null; rt.cafe.view = 0; rt.cafe.fade = 0; } },
+  home(g) { const rt = this.rt; if (rt) { rt.ride = null; const H = CFG.AIRFIELD.HELI; rt.heli.x = H.x; rt.heli.y = H.y; rt.heli.angle = Math.PI; rt.heli.vx = 0; rt.heli.vy = 0; rt.heli.lift = 0;   // the helicopter goes back to its pad too, so it can never be stranded
+ if (rt.runup) { rt.runup.plane.free = false; rt.runup.plane.lift = 0; } rt.runup = null; rt.roll = null; rt.cafe.seat = null; rt.cafe.view = 0; rt.cafe.fade = 0; } },
   build(g) {
     const A = CFG.AIRFIELD, C = CFG.CLOUD;
     this.rt = {

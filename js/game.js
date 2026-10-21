@@ -658,16 +658,25 @@ const Game = {
   },
   exitCar() {
     if (!this.driving) return;
-    this.inPaintBay = false;
-    const c = this.vehicle;
-    this.driving = false; this.vehicle = null; c.vx = 0; c.vy = 0;
-    // step off beside it, on a spot that is not inside anything
+    const c = this.vehicle, spec = CFG.VEHICLES[c.kind], w = this.bounds(), obs = this.obstacles();
+    // step off beside it, on a spot that is not inside anything (a flying vehicle also looks a little further out)
     const cands = [[0, 46], [46, 0], [-46, 0], [0, -46]];
+    if (spec.flies) for (const d of [46, 64]) for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; cands.push([Math.cos(a) * d, Math.sin(a) * d]); }
+    let spot = null;
     for (const [dx, dy] of cands) {
       const x = c.x + dx, y = c.y + dy;
-      if (!this.obstacles().some((o) => this.hitRect(x, y, 12, o))) { this.player.x = x; this.player.y = y; return; }
+      if (x < w.x0 + 16 || x > w.x1 - 16 || y < w.y0 + 16 || y > w.y1 - 16) continue;
+      if (!obs.some((o) => this.hitRect(x, y, 12, o))) { spot = { x, y }; break; }
     }
-    this.player.x = c.x; this.player.y = c.y + 46;
+    // a flying vehicle will not set you down in the trees or on a roof: it keeps flying until there is room to step out
+    if (!spot && spec.flies) {
+      this.floats.push({ x: c.x, y: c.y - 70, text: 'No room to land here! Find a clear spot', color: '#ffe08a', t: 0, dur: 1.6, big: true });
+      Sfx.error(); Haptics.tap();
+      return;
+    }
+    this.inPaintBay = false;
+    this.driving = false; this.vehicle = null; c.vx = 0; c.vy = 0;
+    this.player.x = spot ? spot.x : c.x; this.player.y = spot ? spot.y : c.y + 46;
   },
   updateDriving(dt) {
     const c = this.vehicle, a = Input.axis();

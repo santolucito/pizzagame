@@ -91,4 +91,18 @@ module.exports = async (t) => {
   t.expect(off.stuck === 0, `the plane is never pinned in place while taking off (${off.stuck} stuck steps)`);
   t.expect(off.minX < off.edge - 60, `the plane flies off past the cloud's edge (min x ${Math.round(off.minX)}, edge ${off.edge})`);
   await t.ev(() => Game.goHome());
+
+  // the helicopter never sets you down inside the woods (you could not get back on), and it comes home with you
+  const heli = await t.ev(() => {
+    const h = AirfieldExt.rt.heli, S = CFG.SECRET, r = {};
+    const land = (x, y) => { h.x = CFG.AIRFIELD.HELI.x; h.y = CFG.AIRFIELD.HELI.y; h.lift = 0; Game.driving = false; Game.vehicle = null; T.tp(h.x + 30, h.y, 'town'); Game.enterCar(); h.x = x; h.y = y; Game.player.x = x; Game.player.y = y; T.step(30); Game.exitCar(); T.step(1); return { out: !Game.driving, near: Game.canEnterCar(), inObs: Game.obstacles().some((o) => Game.hitRect(Game.player.x, Game.player.y, 12, o)) }; };
+    r.woods = land(-1200, 500); r.clearing = land(S.clearing.x, S.clearing.y); r.street = land(500, 800);
+    Game.driving = false; Game.vehicle = null; h.x = -1200; h.y = 500; T.tp(600, 800, 'town'); Game.goHome(); T.step(1);
+    r.home = Math.round(h.x) === CFG.AIRFIELD.HELI.x && Math.round(h.y) === CFG.AIRFIELD.HELI.y;
+    return r;
+  });
+  t.expect(!heli.woods.out, 'landing in the solid woods is refused: you stay in the helicopter');
+  t.expect(heli.clearing.out && heli.clearing.near && !heli.clearing.inObs, 'landing in the forest clearing sets you down on a free spot next to the helicopter');
+  t.expect(heli.street.out && heli.street.near && !heli.street.inObs, 'landing in the street sets you down next to the helicopter');
+  t.expect(heli.home, 'Take me home brings the helicopter back to its pad');
 };

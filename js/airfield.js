@@ -61,8 +61,8 @@ CFG.CLOUD = {
     { x0: 8250, y0: 280, x1: 8310, y1: 480, v: true },
   ],
   RUNWAY: { x0: 7300, y0: 650, x1: 7860, y1: 730 },
-  PLANE_HOME: { x: 7640, y: 690, angle: 0 },
-  LANDING: [{ x: 7330, y: 690 }, { x: 7640, y: 690 }],
+  PLANE_HOME: { x: 7780, y: 690, angle: 0 },   // parked at the east end after the landing roll
+  LANDING: [{ x: 7330, y: 690 }, { x: 7780, y: 690 }],
   WINDSOCK: { x: 7290, y: 600 },
   TERMINAL: { x0: 7300, y0: -90, x1: 7560, y1: 40 },
   BOARD: { x: 7430, y: 120 },
@@ -278,12 +278,14 @@ const AirfieldExt = {
   },
   takeOff(g) {
     const rt = this.rt, v = this.planeOf(g), town = g.area === 'town', R = town ? CFG.AIRFIELD.RUNWAY : CFG.CLOUD.RUNWAY;
-    // head whichever way leaves the most runway, then taxi to the centreline first if the plane is not on it
-    const dir = town ? { x: 0, y: v.y > (R.y0 + R.y1) / 2 ? -1 : 1 } : { x: v.x > (R.x0 + R.x1) / 2 ? -1 : 1, y: 0 };
-    const entry = town ? { x: (R.x0 + R.x1) / 2, y: U.clamp(v.y, R.y0 + 120, R.y1 - 120) } : { x: U.clamp(v.x, R.x0 + 120, R.x1 - 120), y: (R.y0 + R.y1) / 2 };
+    // at home: head whichever way leaves the most runway, taxiing to the centreline first if the plane is not on it.
+    // On the short cloud runway the plane backtracks to the west end and takes off eastward, so it never runs out of cloud.
+    const dir = town ? { x: 0, y: v.y > (R.y0 + R.y1) / 2 ? -1 : 1 } : { x: 1, y: 0 };
+    const entry = town ? { x: (R.x0 + R.x1) / 2, y: U.clamp(v.y, R.y0 + 120, R.y1 - 120) } : { x: R.x0 + 60, y: (R.y0 + R.y1) / 2 };
     const far = U.dist(v.x, v.y, entry.x, entry.y);
     const taxi = far > 12 ? { from: { x: v.x, y: v.y }, to: entry, t: 0, dur: U.clamp(far / 260, 0.4, 1.6) } : null;
-    rt.runup = { plane: v, t: 0, dur: CFG.AIRFIELD.RUNUP, dir, centre: town ? (R.x0 + R.x1) / 2 : (R.y0 + R.y1) / 2, to: town ? 'cloud' : 'town', taxi };
+    const end = town ? (dir.y < 0 ? R.y0 - 40 : R.y1 + 40) : R.x1 + 40;   // past here the plane is airborne, whatever the clock says
+    rt.runup = { plane: v, t: 0, dur: CFG.AIRFIELD.RUNUP, dir, centre: town ? (R.x0 + R.x1) / 2 : (R.y0 + R.y1) / 2, to: town ? 'cloud' : 'town', taxi, end };
     g.floats.push({ x: v.x, y: v.y - 60, text: town ? 'Up, up and away! ✈️' : 'Home we go! ✈️', color: '#ffe08a', t: 0, dur: 1.4, big: true });
     Sfx.tone(110, 1.1, 'sawtooth', 0.03, 260); Haptics.success();
   },
@@ -349,7 +351,7 @@ const AirfieldExt = {
       v.x = U.lerp(tx.from.x, tx.to.x, k); v.y = U.lerp(tx.from.y, tx.to.y, k);
       const ang = Math.atan2(tx.to.y - tx.from.y, tx.to.x - tx.from.x), want = k > 0.7 ? Math.atan2(ru.dir.y, ru.dir.x) : ang;
       let d = want - v.angle; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; v.angle += d * Math.min(1, dt * 6);
-      v.vx = 60 * ru.dir.x; v.vy = 60 * ru.dir.y; g.player.x = v.x; g.player.y = v.y;
+      v.vx = 0; v.vy = 0; g.player.x = v.x; g.player.y = v.y;   // no velocity, so the core's steering does not fight the turn
       if (tx.t >= tx.dur) ru.taxi = null;
       return;
     }
@@ -361,7 +363,8 @@ const AirfieldExt = {
     v.lift = 36 * k * k;
     v.x = U.clamp(v.x, W.x0 + 30, W.x1 - 30); v.y = U.clamp(v.y, W.y0 + 30, W.y1 - 30);
     g.player.x = v.x; g.player.y = v.y;
-    if (ru.t >= ru.dur) {
+    const past = ru.dir.x ? ru.dir.x * (v.x - ru.end) > 0 : ru.dir.y * (v.y - ru.end) > 0;   // off the end of the runway: up we go
+    if (ru.t >= ru.dur || past) {
       rt.runup = null; v.lift = 0; v.vx = 0; v.vy = 0;
       g.driving = false; g.vehicle = null;
       g.startTravel(ru.to, 'flight', CFG.AIRFIELD.FLIGHT);

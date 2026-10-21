@@ -74,4 +74,18 @@ module.exports = async (t) => {
   t.expect(bay.inBay, 'car in the paint bay shows the colour bar');
   t.expect(bay.carY - 30 > bay.barBottom, `colour bar sits above the car (bar bottom ${Math.round(bay.barBottom)}, car ${Math.round(bay.carY)})`);
   await t.shot('paint-bay-phone');
+
+  // taking off from Cloud Harbor: the plane turns, backtracks, and lifts off past the runway's east end, never pinned to the cloud's edge
+  await t.boot();
+  const off = await t.ev(() => {
+    const v = AirfieldExt.rt.cloudPlane, H = CFG.CLOUD.PLANE_HOME; v.x = H.x; v.y = H.y; v.angle = H.angle; v.lift = 0;
+    T.tp(v.x + 40, v.y, 'cloud'); Game.enterCar(); AirfieldExt.takeOff(Game);
+    let minX = v.x, maxX = v.x, steps = 0;
+    for (; steps < 600 && !Game.travel; steps++) { Game.update(1 / 60); minX = Math.min(minX, v.x); maxX = Math.max(maxX, v.x); }
+    return { minX, maxX, steps, flying: !!Game.travel && Game.travel.to === 'town', edge: CFG.CLOUD.WORLD.x0, end: CFG.CLOUD.RUNWAY.x1 };
+  });
+  t.expect(off.flying, `cloud take-off starts the flight home (took ${off.steps} steps)`);
+  t.expect(off.minX > off.edge + 100, `the plane never reaches the cloud's west edge (min x ${Math.round(off.minX)}, edge ${off.edge})`);
+  t.expect(off.maxX >= off.end, `the plane lifts off past the runway's east end (max x ${Math.round(off.maxX)}, end ${off.end})`);
+  await t.ev(() => Game.goHome());
 };

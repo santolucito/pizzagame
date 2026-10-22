@@ -140,4 +140,12 @@ module.exports = async (t) => {
   t.expect(bar.shown && bar.left >= 0 && bar.right <= 390 && bar.oneRow && bar.inside, `paint bar fits a 390 px phone in one row (${JSON.stringify(bar)})`);
   await t.shot('paint-bar-sportscar-phone');
   await t.ev(() => Game.goHome());
+
+  // driving the concrete mixer: the Pour button never sits on top of the Hop out button
+  await t.boot({ viewport: { width: 390, height: 740 } });
+  await t.ev(() => { const m = SiteTownExt.mixers[0]; T.tp(m.x + 30, m.y, 'site'); Game.enterCar(); T.step(5); });
+  await t.wait(300);
+  const mix = await t.ev(() => { const r = (id) => document.getElementById(id).getBoundingClientRect(), a = r('btn-car'), b = r('btn-make'); return { driving: Game.driving && Game.vehicle.kind === 'mixer', car: document.getElementById('btn-car').textContent, act: document.getElementById('btn-make').textContent, overlap: a.bottom > b.top && b.bottom > a.top && a.right > b.left && b.right > a.left, shown: !document.getElementById('btn-make').classList.contains('hidden') }; });
+  t.expect(mix.driving && mix.shown && !mix.overlap, `pour and hop-out buttons do not overlap (${JSON.stringify(mix)})`);
+  await t.ev(() => Game.goHome());
 };

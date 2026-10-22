@@ -89,6 +89,7 @@ No build step, no dependencies: plain HTML5 Canvas + vanilla JavaScript.
 24b. **Construction Town is bigger**: beyond the building site are streets, a concrete factory with drivable mixers (press to pour), a hardware store you can enter, a diner, houses, a park, a slide and a dirt-bike track.
 25. **Interiors**: the barn (goat, pig, hens and eggs, hayloft), the town fire station (truck, pole, crew, Dalmatian), and in the City the toy shop, barber, bakery, arcade, pet shop, hotel, candy shop, bookshop, cat café, gym, flower shop, music shop, cinema, post office, grocery, school, bank, café, aquarium and fire station can all be entered, and on the campus Low Library and Barnard Hall, each with its own things to do.
 26. **Rooftops**: the ice cream shop has a roof too; land the helicopter on the pizzeria or ice cream roof and walk around up there.
+26b. **Pizza rain room**: a second room upstairs where a cloud rains pizza slices; catch and eat three per visit.
 27. **Bedroom telescope**: the bedroom's telescope gives a pannable view over the whole town, like the Pizza Tower's.
 28. **Taxis**: in the City, stand on a sidewalk beside a street and hail a taxi; it pulls up, you hop in and ride around the blocks (on the house), and the button lets you out at the next curb.
     walk in to collect the money, and buy More Flavors inside to make it busier.

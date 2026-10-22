@@ -8,7 +8,7 @@
 
 // ---------- config ----------
 CFG.SUBWAY = {
-  SEAL_IMG: null,   // set to 'icons/barnard-seal.jpg' once that picture is in the repo: it then replaces the drawn Barnard crest
+  SEAL_IMG: 'icons/barnard-seal.png',   // Barnard's real seal, drawn in place of the hand-drawn crest
   EVERY: 20, CALL: 3, DWELL: 10, RIDE: 6, DOOR_T: 0.5,
   LINE: '1', COLOR: '#e4572e', BLUE: '#1f3b63',
   STATION: {

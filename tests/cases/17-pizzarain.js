@@ -104,8 +104,11 @@ module.exports = async (t) => {
   });
   t.expect(full.n >= 0 && full.eaten === 3 && full.full, 'full after the third slice');
   t.expect(full.float, "I'm full float");
-  t.expectEq(full.hint, "You're full! Enjoy the pizza rain 😋", 'the hint changes when full');
+  t.expectEq(full.hint, "You're full! The cloud will rain again next visit 😋", 'the hint changes when full');
   t.expectEq(full.total, 3, 'saved total is 3');
+  // full: the cloud stops raining (what is in the air still lands and fades)
+  const stopped = await t.ev(() => { const st = PizzaRainExt.st, before = st.spawned; T.step(300); return { before, after: st.spawned, left: st.slices.length }; });
+  t.expect(stopped.after === stopped.before && stopped.left === 0, `the rain stops once full (${stopped.before} → ${stopped.after} spawned, ${stopped.left} left)`);
   await t.shot('full');
   // full: more slices bounce off and are not eaten, one burp
   const bounce = await t.ev(() => {

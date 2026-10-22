@@ -115,7 +115,7 @@ const PizzaRainExt = {
   },
   hint(g) {
     if (!this.ready(g)) return undefined;
-    if (g.area === 'pizzarain') return { text: this.st && this.st.full ? "You're full! Enjoy the pizza rain 😋" : 'Catch the falling pizza! 🍕', target: null };
+    if (g.area === 'pizzarain') return { text: this.st && this.st.full ? "You're full! The cloud will rain again next visit 😋" : 'Catch the falling pizza! 🍕', target: null };
     if (!this.bedroomOk(g)) return undefined;
     const p = g.player, C = CFG.PIZZARAIN, M = C.MAT_OUT, d = U.dist(p.x, p.y, M.x, M.y);
     if (d < C.hintReach) return { text: 'A pizza room! 🍕', target: d < C.reach ? null : M };
@@ -131,7 +131,7 @@ const PizzaRainExt = {
     this.rescue(g);
     // the cloud lets a slice go every so often, never more than a handful at a time
     st.spawnT -= dt;
-    if (st.spawnT <= 0) { st.spawnT = C.rain.every; if (st.slices.length < C.rain.max) this.spawn(); }
+    if (st.spawnT <= 0 && !st.full) { st.spawnT = C.rain.every; if (st.slices.length < C.rain.max) this.spawn(); }   // full: the cloud stops raining until the next visit
     const p = g.player, Z = C.catchZone, K = C.rain;
     for (let i = st.slices.length - 1; i >= 0; i--) {
       const s = st.slices[i];

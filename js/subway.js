@@ -8,6 +8,7 @@
 
 // ---------- config ----------
 CFG.SUBWAY = {
+  SEAL_IMG: null,   // set to 'icons/barnard-seal.jpg' once that picture is in the repo: it then replaces the drawn Barnard crest
   EVERY: 20, CALL: 3, DWELL: 10, RIDE: 6, DOOR_T: 0.5,
   LINE: '1', COLOR: '#e4572e', BLUE: '#1f3b63',
   STATION: {
@@ -609,7 +610,16 @@ const SubwayExt = {
   },
 
   // ======================= static art =======================
-  bgKey(g) { return 'sub:' + (this.st ? this.st.end : ''); },
+  bgKey(g) { return 'sub:' + (this.st ? this.st.end : '') + ':' + (this.seal().ok ? 1 : 0); },
+  // Barnard's real seal (CFG.SUBWAY.SEAL_IMG, a picture added by hand) replaces the drawn bear wherever it loads; the maps
+  // repaint once the picture is in (bgKey flips), and the drawn crest stays as the fallback when the file is missing.
+  seal() {
+    if (this._seal) return this._seal;
+    const S = this._seal = { img: null, ok: false };
+    if (typeof Image === 'undefined' || !CFG.SUBWAY.SEAL_IMG) return S;   // SEAL_IMG names the file once it has been added to the repo
+    const img = new Image(); img.onload = () => { S.ok = img.naturalWidth > 0; }; img.onerror = () => { S.ok = false; }; img.src = CFG.SUBWAY.SEAL_IMG; S.img = img;
+    return S;
+  },
   paint: {
     subway(r, g) { SubwayExt.paintStation(r, g); },
     campus(r, g) { SubwayExt.paintCampus(r, g); },
@@ -722,6 +732,9 @@ const SubwayExt = {
       ctx.fillStyle = '#e0a455'; ctx.beginPath(); ctx.arc(0, 0.5, 5, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.arc(-2, -1, 0.9, 0, Math.PI * 2); ctx.arc(2, -1, 0.9, 0, Math.PI * 2); ctx.fill(); ctx.fillRect(-1.2, 1.5, 2.4, 1.4);
       ctx.fillStyle = K.BC_BLUE; ctx.font = r.font(7); ctx.fillText('CU', 0, 10);
+    } else if (this.seal().ok) {
+      // the real seal, clipped to the medallion
+      ctx.save(); ctx.beginPath(); ctx.arc(0, 0, 20.5, 0, Math.PI * 2); ctx.clip(); ctx.drawImage(this.seal().img, -20.5, -20.5, 41, 41); ctx.restore();
     } else {
       // the bear: round ears, a kind face, a muzzle
       ctx.fillStyle = '#7a5230'; ctx.beginPath(); ctx.arc(-7.5, -8, 4, 0, Math.PI * 2); ctx.arc(7.5, -8, 4, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(0, -1, 10.5, 0, Math.PI * 2); ctx.fill();

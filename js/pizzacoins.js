@@ -13,83 +13,38 @@ CFG.PIZZACOINS = {
   SPOTS: [
     // ---- the home town: woods, farm, station, playground, river, park, airfield, a roof
     { id: 'woods-stream', area: 'town', x: -1238, y: 333, note: 'on the stepping stones in the secret woods' },
-    { id: 'woods-clearing', area: 'town', x: -1120, y: 790, note: 'at the edge of the cabin clearing in the woods' },
     { id: 'farm-scarecrow', area: 'town', x: -818, y: 488, note: 'beside the scarecrow on the farm' },
-    { id: 'old-station', area: 'town', x: -950, y: -95, note: 'at the west end of the old train station' },
-    { id: 'playground-reeds', area: 'town', x: -655, y: 1172, note: 'in the reeds behind the playground' },
     { id: 'river-house', area: 'town', x: 300, y: 1180, note: 'behind River House by the water' },
-    { id: 'railway-tree', area: 'town', x: 270, y: -100, note: 'under a tree by the railway' },
-    { id: 'paint-shop-tree', area: 'town', x: 1335, y: 1150, note: 'under the tree behind the paint shop' },
     { id: 'runway-meadow', area: 'town', x: 2075, y: 1262, note: 'in the flowers past the end of the runway' },
-    { id: 'workshop-back', area: 'town', x: 2300, y: 165, note: 'behind the airfield workshop' },
     { id: 'icecream-roof', area: 'town', x: 1140, y: 232, roof: 'icecream', note: 'on the ice cream shop roof (land the helicopter)' },
     // ---- Construction Town
-    { id: 'site-station', area: 'site', x: 2650, y: -100, note: 'west of the station by the rails' },
     { id: 'site-house', area: 'site', x: 2995, y: 360, note: 'inside the future Pizza #2' },
     { id: 'site-track', area: 'site', x: 2800, y: 1185, note: 'in the middle of the dirt track' },
-    { id: 'site-puddle', area: 'site', x: 2650, y: 680, note: 'by the puddle on the building site' },
-    { id: 'site-hardware', area: 'site', x: 4460, y: 300, note: 'beside the hardware store' },
-    { id: 'site-park', area: 'site', x: 4480, y: 900, note: 'in the corner of the park' },
     { id: 'site-factory', area: 'site', x: 4470, y: 1270, note: 'in the far corner of the concrete factory' },
-    { id: 'site-diner-park', area: 'site', x: 3780, y: 1270, note: 'under a tree in the little park by the diner' },
     // ---- the City
     { id: 'city-gardens-west', area: 'city', x: 4630, y: 1080, note: 'west end of Riverside Gardens' },
-    { id: 'city-gardens-east', area: 'city', x: 6170, y: 1080, note: 'under the last tree in Riverside Gardens' },
     { id: 'city-square-tree', area: 'city', x: 5510, y: 445, note: 'by a tree in Pizza Square' },
-    { id: 'city-square-bench', area: 'city', x: 5755, y: 300, note: 'beside a bench in Pizza Square' },
-    { id: 'city-subway-tree', area: 'city', x: 5020, y: 640, note: 'by the tree near the subway stairs' },
     { id: 'city-car-lot', area: 'city', x: 5125, y: 705, note: 'in the corner of the sports car lot' },
-    { id: 'city-flowers-end', area: 'city', x: 6172, y: 470, note: 'at the end of the sidewalk past the flower shop' },
-    { id: 'city-catcafe-end', area: 'city', x: 4625, y: 470, note: 'at the end of the sidewalk past the cat café' },
     // ---- the Islands (the jet ski reaches the little ones)
-    { id: 'isle-sandcastle', area: 'islands', x: 2770, y: 2420, note: 'on the beach past the sandcastle' },
-    { id: 'isle-main-east', area: 'islands', x: 3255, y: 2060, note: 'east beach of Pizza Island' },
-    { id: 'isle-main-nw', area: 'islands', x: 2745, y: 2060, note: 'west beach of Pizza Island' },
     { id: 'isle-coconut', area: 'islands', x: 3720, y: 1560, note: 'behind the Coconut Hut' },
     { id: 'isle-lighthouse', area: 'islands', x: 4370, y: 1695, note: 'below the lighthouse' },
     { id: 'isle-treasure', area: 'islands', x: 3650, y: 2350, note: 'on Treasure Isle' },
-    { id: 'isle-crab', area: 'islands', x: 4400, y: 2300, note: 'east of the Crab Shack' },
-    { id: 'isle-crab-west', area: 'islands', x: 4130, y: 2390, note: 'west beach of Crab Shack island' },
     // ---- Cloud Harbor and the Sky Café
     { id: 'cloud-glider', area: 'cloud', x: 8535, y: -105, note: 'far corner of Glider Cloud' },
-    { id: 'cloud-bouncy', area: 'cloud', x: 8540, y: 830, note: 'far corner of the bouncy clouds' },
-    { id: 'cloud-landing', area: 'cloud', x: 7270, y: 830, note: 'corner of Landing Cloud' },
     { id: 'skycafe', area: 'skycafe', x: 7850, y: 1795, note: 'in the far corner of the Sky Café' },
     // ---- under the City and up at Columbia
     { id: 'subway-platform-end', area: 'subway', x: 7245, y: 2380, note: 'at the end of the subway platform' },
-    { id: 'subway-slice', area: 'subway', x: 7250, y: 2235, note: 'beside the Slice & Soda stand' },
-    { id: 'campus-dance', area: 'campus', x: 9320, y: 1070, note: 'beside the dance studio' },
     { id: 'campus-corner', area: 'campus', x: 10620, y: -120, note: 'behind Low Library' },
-    { id: 'lowlibrary', area: 'lowlibrary', x: 1515, y: 4105, note: 'by the bookshelves in Low Library' },
     { id: 'barnardhall', area: 'barnardhall', x: 2085, y: 4075, note: 'under the notice board in Barnard Hall' },
     // ---- home: the cabin, the bedroom, the pizza rain room, the barn's hayloft, the fire station, the hardware store
     { id: 'cabin', area: 'cabin', x: 4785, y: 1585, note: 'in the corner of the secret cabin' },
-    { id: 'bedroom', area: 'upstairs', x: 6915, y: 1615, note: 'by the bedroom window' },
     { id: 'pizzarain', area: 'pizzarain', x: 5525, y: 4335, note: 'in the corner of the pizza rain room' },
     { id: 'hayloft', area: 'barn', x: 500, y: 4075, loft: true, note: 'up in the hayloft' },
-    { id: 'firestation', area: 'firestation', x: 3535, y: 4125, note: 'in the corner of the fire station' },
-    { id: 'hardware', area: 'hardware', x: 4195, y: 4125, note: 'under the paint shelf in the hardware store' },
     // ---- inside the City's shops
-    { id: 'toyshop', area: 'toyshop', x: -1245, y: 3115, note: 'by the teddy shelf' },
-    { id: 'barber', area: 'barber', x: 135, y: 3125, note: 'in the barber shop corner' },
     { id: 'bakery', area: 'bakery', x: 785, y: 3115, note: 'behind the bakery counter' },
     { id: 'arcade', area: 'arcade', x: 1945, y: 3125, note: 'behind the claw machine' },
-    { id: 'petshop', area: 'petshop', x: 2805, y: 3065, note: 'by the fish tank' },
-    { id: 'hotel', area: 'hotel', x: 3745, y: 3095, note: 'in the hotel lobby corner' },
-    { id: 'books', area: 'books', x: 4635, y: 3175, note: 'by the reading lamp' },
-    { id: 'candy', area: 'candy', x: 5535, y: 3125, note: 'by the candy jars' },
-    { id: 'catcafe', area: 'catcafe', x: 6085, y: 3125, note: 'in the cat café corner' },
-    { id: 'music', area: 'music', x: 7285, y: 3145, note: 'behind the music shop counter' },
-    { id: 'gym', area: 'gym', x: 8665, y: 3135, note: 'in the gym corner' },
     { id: 'cinema', area: 'cinema', x: 10055, y: 3185, note: 'at the back of the cinema' },
-    { id: 'flowers', area: 'flowers', x: 10948, y: 3258, note: 'in the flower shop corner' },
-    { id: 'bank', area: 'bank', x: 11835, y: 3135, note: 'beside the vault' },
-    { id: 'post', area: 'post', x: 12265, y: 3125, note: 'under the PO boxes' },
-    { id: 'school', area: 'school', x: 13635, y: 3145, note: 'in the classroom corner' },
-    { id: 'cafe', area: 'cafe', x: 14065, y: 3125, note: 'beside the little stage' },
     { id: 'aquarium', area: 'aquarium', x: 15065, y: 3255, note: 'in the aquarium corner' },
-    { id: 'firedept', area: 'firedept', x: 15865, y: 3125, note: 'under the helmet rack' },
-    { id: 'grocery', area: 'grocery', x: 16765, y: 3145, note: 'by the bread shelf' },
   ],
   // friendly names for the list in the panel, in the order they are listed
   PLACES: {
@@ -417,6 +372,7 @@ const PizzaCoinsExt = {
     const P = CFG.PIZZACOINS.PLACES, rows = [];
     const places = this.byPlace(g);
     for (const a of Object.keys(places)) {
+      if (!places[a].n) continue;   // places without a coin are not listed
       const o = places[a], seen = !!st.seen[a] || o.got > 0, [ico, name] = P[a] || ['📍', a];
       const cls = o.got >= o.n ? ' pc-full' : seen ? '' : ' pc-unseen';
       rows.push(`<div class="pc-row${cls}" data-area="${a}"><span class="pc-ico">${seen ? ico : '❔'}</span><span class="pc-name">${seen ? name : '???'}</span><span class="pc-c">${o.got >= o.n ? '✅ ' : ''}${o.got} / ${o.n}</span></div>`);

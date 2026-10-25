@@ -115,4 +115,4 @@ js/main.js        bootstrap and fixed‑step game loop
 ```
 
 Tuning the game is mostly a matter of editing `js/config.js`.
-29. **Pizza Coins**: 71 golden coins hidden in every map and interior; the treasure-chest badge under the cash shows how many you've found, and tapping it lists each place.
+29. **Pizza Coins**: 26 golden coins hidden around the world (towns, City, islands, clouds, a roof, the hayloft and a few shops); the treasure-chest badge under the cash shows how many you've found, and tapping it lists each place.

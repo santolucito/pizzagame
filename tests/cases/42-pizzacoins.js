@@ -45,10 +45,9 @@ module.exports = async (t) => {
   });
   console.log('   pizza coins per map: ' + JSON.stringify(spots.per));
   t.expectEq(spots.bad.length, 0, `every pizza coin on free floor:\n     ${spots.bad.join('\n     ')}`);
-  t.expectEq(spots.missing.length, 0, `every map has a pizza coin (missing: ${spots.missing.join(', ')})`);
-  t.expect(spots.n >= 55 && spots.n <= 80, `about 60 coins (${spots.n})`);
-  for (const a of ['town', 'site', 'city', 'islands']) t.expect(spots.per[a] >= 8 && spots.per[a] <= 12, `8–12 coins in ${a} (${spots.per[a]})`);
-  for (const a of ['cloud', 'campus', 'subway']) t.expect(spots.per[a] >= 2 && spots.per[a] <= 4, `2–4 coins in ${a} (${spots.per[a]})`);
+  t.expect(spots.n >= 20 && spots.n <= 30, `20–30 coins (${spots.n})`);
+  for (const a of ['town', 'site', 'city', 'islands']) t.expect(spots.per[a] >= 3 && spots.per[a] <= 6, `3–6 coins in ${a} (${spots.per[a]})`);
+  t.expect(Object.keys(spots.per).length >= 15, `spread over many places (${Object.keys(spots.per).length})`);
 
   // ---- the badge: under the cash pill, clear of the cash, the shop name and the hint, at phone widths too
   const N = spots.n;
@@ -77,7 +76,7 @@ module.exports = async (t) => {
 
   // ---- the soft hint near an uncollected coin: on foot only, no arrow
   const hintNear = await t.ev(() => {
-    const s = CFG.PIZZACOINS.SPOTS.find((q) => q.id === 'paint-shop-tree');
+    const s = CFG.PIZZACOINS.SPOTS.find((q) => q.id === 'river-house');
     T.tp(s.x - 70, s.y, 'town'); T.step(1);
     const onFoot = { hint: T.hint(), target: Game.hint && Game.hint.target, got: !!Game.s.pizzacoins.got[s.id] };
     T.tp(s.x - 200, s.y - 60, 'town'); T.step(1);
@@ -148,7 +147,7 @@ module.exports = async (t) => {
   t.expectEq(panel.rows.length, panel.places, 'one row per place');
   const row = (a) => (panel.rows.find((r) => r.area === a) || {}).text;
   t.expect(/Bakery/.test(row('bakery')) && /✅ 1 \/ 1/.test(row('bakery')), `bakery row: ${row('bakery')}`);
-  t.expect(/City/.test(row('city')) && / 1 \/ 8$/.test(row('city')), `city row: ${row('city')}`);
+  t.expect(/City/.test(row('city')) && / 1 \/ 3$/.test(row('city')), `city row: ${row('city')}`);
   t.expect(/^❔ \?\?\? 0 \/ \d+$/.test(row('islands')), `unvisited islands row is ???: ${row('islands')}`);
   await t.shot('panel');
   await t.page.setViewportSize({ width: 390, height: 844 });
@@ -160,7 +159,7 @@ module.exports = async (t) => {
   await t.page.setViewportSize({ width: 1100, height: 720 });
 
   // ---- Take me home from an interior: nothing lost
-  await t.ev(() => { const s = CFG.PIZZACOINS.SPOTS.find((q) => q.id === 'hotel'); T.tp(s.x - 80, s.y + 80, 'hotel'); Game.goHome(); T.step(2); });
+  await t.ev(() => { const s = CFG.PIZZACOINS.SPOTS.find((q) => q.id === 'cinema'); T.tp(s.x - 80, s.y + 80, 'cinema'); Game.goHome(); T.step(2); });
   t.expect(await t.ev(() => Game.area === 'town' && PizzaCoinsExt.count(Game) === 3), 'Take-me-home keeps the coins');
 
   // ---- a reload keeps the count

@@ -10,6 +10,10 @@
 // B. UPSTAIRS. A staircase in the office corner leads to its own little map (`CFG.AREAS.upstairs`): the owner's
 //    bedroom. Beside the bed you can take a nap: the chef hops in, the screen goes a soft night blue with drifting
 //    z's and dream pizzas for a few seconds, then a rooster wakes you to a fresh morning (the day/night clock resets).
+//    Once bought, the bean bag is a seat: flop into it (the bag squashes, the chef sinks in) and get up again.
+// C. DRAWINGS. The drawing pad (a DOM overlay) paints into a named "slot": 'bedroom' (the desk upstairs; hung on the
+//    bedroom wall and copied in the dining room) and any slot another file adds with `addArtSlot` (the office's
+//    hiring desk in js/hiredesk.js). Each slot saves its own small PNG and hangs it in its own frame.
 CFG.UPSTAIRS = {
   ROOF: {
     fade: 0.35, pad: 8,                                   // seconds to fade; how far the roof overhangs the walls
@@ -43,6 +47,7 @@ CFG.UPSTAIRS = {
   nap: { hop: 0.45, sleep: 3.0, wake: 0.5 },              // seconds
   catalog: { x: 6622, y: 1602, reach: 36 },               // the catalog lies on the bedside table; stand just below it
   chairReach: 36,                                         // stand by the desk chair to draw
+  beanbag: { reach: 46, seat: { dx: 0, dy: 10 }, hop: 0.35 }, // stand beside the (owned) bean bag to flop into it; the chef's feet land on the seat
   art: { room: { x: 6600, y: 1546, w: 44, h: 33 }, shop: { x: 922, y: 132, w: 48, h: 36 }, size: [160, 120] },   // where the drawing hangs
   slide: { entry: { x: 6600, y: 1712 }, top: { x: 6566, y: 1702 }, bottom: { x: 6566, y: 1804 }, reach: 14, dur: 1.1 },
   // bedroom upgrades, bought from the catalog: `spot` is where the item goes, `block` an obstacle rect once owned,
@@ -70,18 +75,19 @@ const UpstairsExt = {
 
   // ---------- game hooks ----------
   defaults: { upstairs: { seen: false, owned: {}, drawing: null } },
-  home(g) { if (this.st) { this.st.nap = null; this.st.slide = null; this.st.fade = 0; this.st.roofA = 1; this.closeCatalog(g); } if (this.st && this.st.draw.on) this.closePad(g); },
+  home(g) { if (this.st) { this.st.nap = null; this.st.slide = null; this.st.sit = null; this.st.fade = 0; this.st.roofA = 1; this.closeCatalog(g); } if (this.st && this.st.draw.on) this.closePad(g); },
   build(g) {
     if (!g.s.upstairs) g.s.upstairs = { seen: false, owned: {}, drawing: null };
     if (!g.s.upstairs.owned) g.s.upstairs.owned = {};
     const R = CFG.UPSTAIRS.ROOF;
-    this.img = null;
+    this.img = null; this.arts = {};
     this.st = {
       roofA: this.insideShop(g) ? 0 : 1, fade: 0, nap: null, slide: null, slideArmed: true,
       smoke: [], smokeT: 1, puffing: 0, rest: 3,
       pigeons: R.pigeons.map((p, i) => ({ x: p.x, y: p.y, tx: p.x, ty: p.y, wait: 1 + i, facing: 1, step: 0 })),
       cat: { on: false, page: 0, flip: null, ready: true, hold: null, bought: 0, nope: 0 },   // the decoration catalog
-      draw: { on: false, hold: null },                                                       // the drawing pad
+      draw: { on: false, hold: null, slot: null },                                           // the drawing pad (and which picture it paints)
+      sit: null,                                                                             // flopped on the bean bag: { t, from, landed }
       notes: [], noteT: 0, wheel: 0, wheelV: 0, rock: 0,
     };
   },
@@ -114,6 +120,8 @@ const UpstairsExt = {
     const st = this.st, C = CFG.UPSTAIRS;
     st.fade = Math.max(0, st.fade - dt);
     if (g.area === 'upstairs') { this.updateRoom(g, dt); return; }
+    // drawing somewhere else (the office's hiring desk): the chef stays on the chair while the pad is open
+    if (st.draw.on && st.draw.hold) { const p = g.player; p.x = st.draw.hold.x; p.y = st.draw.hold.y; p.moving = false; }
     if (g.area !== 'town') return;
     // the roof: fade toward "on" while the chef is outside the shop
     const target = this.insideShop(g) ? 0 : 1;
@@ -151,9 +159,12 @@ const UpstairsExt = {
     const st = this.st;
     if (st.nap || st.slide || st.draw.on) return null;                   // fast asleep, whooshing, or busy drawing
     if (st.cat.on) return this.catalogAction(g);
+    if (st.sit) return { label: '🚶 Get up', run: (gg) => this.getUp(gg) };
     if (U.dist(p.x, p.y, C.top.x, C.top.y) < C.topReach) return { label: '🪜 Go downstairs', run: (gg) => this.goDown(gg) };
     if (U.dist(p.x, p.y, C.catalog.x, C.catalog.y) < C.catalog.reach) return { label: '📖 Open the catalog', run: (gg) => this.openCatalog(gg) };
-    if (U.dist(p.x, p.y, C.chair.x, C.chair.y) < C.chairReach) return { label: '✏️ Sit and draw', run: (gg) => this.openPad(gg) };
+    const nearBag = this.nearBeanbag(g), dChair = U.dist(p.x, p.y, C.chair.x, C.chair.y);
+    if (nearBag && !(dChair < C.chairReach && dChair < nearBag)) return { label: '🛋️ Flop on the bean bag', run: (gg) => this.flop(gg) };
+    if (dChair < C.chairReach) return { label: '✏️ Sit and draw', run: (gg) => this.openPad(gg, 'bedroom') };
     if (U.dist(p.x, p.y, C.sleepSpot.x, C.sleepSpot.y) < C.sleepReach) return { label: '😴 Sleep', run: (gg) => this.startNap(gg) };
     return null;
   },
@@ -161,8 +172,10 @@ const UpstairsExt = {
     const p = g.player, C = CFG.UPSTAIRS;
     if (g.area === 'upstairs') {
       const st = this.st;
-      if (st.nap || st.slide || st.draw.on || st.cat.on) return null;      // the scenes and overlays explain themselves
+      if (st.nap || st.slide || st.draw.on || st.cat.on || st.sit) return null;   // the scenes and overlays explain themselves
       if (U.dist(p.x, p.y, C.catalog.x, C.catalog.y) < C.catalog.reach) return { text: 'Open the catalog to decorate 📖', target: null };
+      const nearBag = this.nearBeanbag(g), dChair = U.dist(p.x, p.y, C.chair.x, C.chair.y);
+      if (nearBag && !(dChair < C.chairReach && dChair < nearBag)) return { text: 'Flop on the bean bag! 🛋️', target: null };
       if (U.dist(p.x, p.y, C.chair.x, C.chair.y) < C.chairReach) return { text: 'Sit at the desk and draw ✏️', target: null };
       if (U.dist(p.x, p.y, C.sleepSpot.x, C.sleepSpot.y) < C.sleepReach) return { text: 'Hop into bed for a nap 😴', target: null };
       return null;
@@ -196,6 +209,8 @@ const UpstairsExt = {
     if (this.roomFree(p.x, p.y)) return false;
     const B = C.bed;
     if (p.x > B.x0 && p.x < B.x1 && p.y > B.y0 && p.y < B.y1) { p.x = C.sleepSpot.x; p.y = C.sleepSpot.y; p.moving = false; return true; }   // a save made mid-nap: just get up
+    const bb = this.beanbagBlock(g);
+    if (bb && p.x > bb.x && p.x < bb.x + bb.w && p.y > bb.y && p.y < bb.y + bb.h) { const q = this.standSpot(g, null); if (q) { p.x = q.x; p.y = q.y; p.moving = false; return true; } }   // a save made on the bean bag: just get up
     p.x = C.top.x; p.y = C.top.y; p.moving = false;
     if (this.st.cat.hold) this.st.cat.hold = { x: p.x, y: p.y };
     g.floats.push({ x: p.x, y: p.y - 50, text: 'Oops! Back inside', color: '#ffe08a', t: 0, dur: 1.4, big: true });
@@ -224,6 +239,8 @@ const UpstairsExt = {
     }
     // drawing at the desk: the chef stays on the chair's side while the pad is open
     if (st.draw.on) { p.x = st.draw.hold.x; p.y = st.draw.hold.y; p.moving = false; return; }
+    // flopped on the bean bag: a little hop in, a squashy landing, then comfy until "Get up"
+    if (st.sit) { this.updateSit(g, dt); return; }
     // the bed slide: step onto the little platform at the foot of the bed and whoosh down
     if (st.slide) {
       const S = C.slide, r = st.slide; r.t += dt; p.moving = false; p.facing = -1;
@@ -262,6 +279,97 @@ const UpstairsExt = {
       const k = Math.min(1, n.t / N.wake); arc(C.napSpot, C.sleepSpot, k);
       if (k >= 1) { st.nap = null; p.x = C.sleepSpot.x; p.y = C.sleepSpot.y; }
     }
+  },
+
+  // ---------- the bean bag: once bought, a squashy seat ----------
+  beanbagItem() { return CFG.UPSTAIRS.items.find((it) => it.key === 'beanbag'); },
+  beanbagBlock(g) {
+    const it = this.beanbagItem();
+    if (!it || !this.owned(g, 'beanbag')) return null;
+    return { x: it.block[0], y: it.block[1], w: it.block[2], h: it.block[3] };
+  },
+  // How far the chef is from the bean bag when they can flop into it from here; 0 when not.
+  nearBeanbag(g) {
+    if (g.area !== 'upstairs' || !this.owned(g, 'beanbag')) return 0;
+    const s = this.beanbagItem().spot, p = g.player, d = U.dist(p.x, p.y, s.x, s.y);
+    return d < CFG.UPSTAIRS.beanbag.reach ? Math.max(d, 0.01) : 0;
+  },
+  seat() { const s = this.beanbagItem().spot, q = CFG.UPSTAIRS.beanbag.seat; return { x: s.x + q.dx, y: s.y + q.dy }; },
+  // A spot where the chef fits, clear of the walls and every piece of furniture.
+  clearSpot(g, x, y) {
+    const R = CFG.UPSTAIRS.room, r = 12;
+    if (x < R.x0 + r || x > R.x1 - r || y < R.y0 + r || y > R.y1 - r) return false;
+    return !this.roomBlocks().some((o) => g.hitRect(x, y, r, o));
+  },
+  // Where to stand up from the bean bag: back where the chef came from, else the first free side of the bag.
+  standSpot(g, from) {
+    const b = this.beanbagBlock(g), s = this.beanbagItem().spot, cands = [];
+    if (from) cands.push([from.x, from.y]);
+    if (b) {
+      const below = b.y + b.h + 14, above = b.y - 14, left = b.x - 14, right = b.x + b.w + 14;
+      cands.push([s.x, below], [left, s.y], [right, s.y], [s.x, above], [left, below], [right, below], [left, above], [right, above]);
+    }
+    for (const [x, y] of cands) if (this.clearSpot(g, x, y)) return { x, y };
+    return null;
+  },
+  flop(g) {
+    const p = g.player;
+    this.st.sit = { t: 0, from: { x: p.x, y: p.y }, landed: false };
+    p.moving = false; Haptics.tap();
+  },
+  updateSit(g, dt) {
+    const s = this.st.sit, p = g.player, seat = this.seat(), hop = CFG.UPSTAIRS.beanbag.hop;
+    s.t += dt; p.moving = false;
+    if (!s.landed) {
+      const k = Math.min(1, s.t / hop);
+      p.x = U.lerp(s.from.x, seat.x, k); p.y = U.lerp(s.from.y, seat.y, k) - Math.sin(k * Math.PI) * 22;
+      if (Math.abs(seat.x - s.from.x) > 4) p.facing = seat.x > s.from.x ? 1 : -1;
+      if (k >= 1) {
+        s.landed = true; s.t = 0; p.x = seat.x; p.y = seat.y;
+        Sfx.drop(); Haptics.tap();
+        g.floats.push({ x: seat.x, y: seat.y - 70, text: 'Ahh, comfy! 😌', color: '#ffe08a', t: 0, dur: 1.8, big: true });
+      }
+      return;
+    }
+    p.x = seat.x; p.y = seat.y;
+  },
+  getUp(g) {
+    const s = this.st.sit, p = g.player, q = this.standSpot(g, s && s.from);
+    this.st.sit = null;
+    if (q) { p.x = q.x; p.y = q.y; } else this.rescue(g);
+    p.moving = false; p.hasMoved = true; Haptics.tap();
+  },
+  // How squashed the bag is: 0 empty, about 1 with the chef in it (a wobble on landing, then a slow breath).
+  squash(g) {
+    const s = this.st && this.st.sit;
+    if (!s || !s.landed || g.area !== 'upstairs') return 0;
+    return 1 + 0.3 * Math.sin(s.t * 16) * Math.exp(-s.t * 5) + 0.04 * Math.sin(g.time * 2.4);
+  },
+  drawBeanbag(ctx, x, y, sq) {
+    const rx = 26 + 6 * sq, ry = 18 - 5 * sq, cy = y + 3 * sq;
+    ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(x + 3, cy + 4, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#3b7dd8'; ctx.beginPath(); ctx.ellipse(x, cy, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#5a9be8'; ctx.beginPath(); ctx.ellipse(x - 2, cy - 4 + 2 * sq, 16 + 3 * sq, Math.max(3, 10 - 4 * sq), 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.beginPath(); ctx.ellipse(x, cy + 1, 9 + 5 * sq, 5 + sq, 0, 0, Math.PI * 2); ctx.fill();
+  },
+  // The front of the squashed bag, drawn over the sitting chef: it hides the legs, puffs up at the sides, and the
+  // chef's feet stick out over the edge.
+  drawBeanbagFront(ctx, g) {
+    const s = this.beanbagItem().spot, sq = this.squash(g), x = s.x, rx = 26 + 6 * sq, ry = 18 - 5 * sq, cy = s.y + 3 * sq;
+    ctx.fillStyle = '#3b7dd8';
+    ctx.beginPath();
+    ctx.moveTo(x + rx, cy);
+    ctx.quadraticCurveTo(x + rx - 2, cy - 13, x + 15, cy - 13);
+    ctx.quadraticCurveTo(x + 9, cy - 6, x, cy - 6);
+    ctx.quadraticCurveTo(x - 9, cy - 6, x - 15, cy - 13);
+    ctx.quadraticCurveTo(x - rx + 2, cy - 13, x - rx, cy);
+    ctx.ellipse(x, cy, rx, ry, 0, Math.PI, 0, true);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#5a9be8'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x - rx + 5, cy - 4); ctx.quadraticCurveTo(x - rx + 6, cy - 11, x - 15, cy - 11); ctx.moveTo(x + rx - 5, cy - 4); ctx.quadraticCurveTo(x + rx - 6, cy - 11, x + 15, cy - 11); ctx.stroke();
+    // legs out in front, and the shoes
+    ctx.fillStyle = '#2d3a4a'; for (const d of [-7, 7]) { U.roundRect(ctx, x + d - 3.5, cy - 5, 7, ry + 1, 3); ctx.fill(); }
+    ctx.fillStyle = '#2b1d14'; for (const d of [-7, 7]) { ctx.beginPath(); ctx.ellipse(x + d, cy + ry - 3, 5, 3.5, 0, 0, Math.PI * 2); ctx.fill(); }
   },
 
   // ======================= render hooks =======================
@@ -607,7 +715,9 @@ const UpstairsExt = {
 
   // ---------- the chef tucked in (drawn with the people so the duvet covers the sprite) ----------
   entities(r, g, items) {
-    if (!this.st || g.area !== 'upstairs' || !this.st.nap || this.st.nap.phase !== 'sleep') return;
+    if (!this.st || g.area !== 'upstairs') return;
+    if (this.st.sit && this.st.sit.landed) { items.push({ y: g.player.y + 0.5, draw: () => this.drawBeanbagFront(r.ctx, g) }); return; }
+    if (!this.st.nap || this.st.nap.phase !== 'sleep') return;
     const C = CFG.UPSTAIRS, B = C.bed, p = g.player;
     items.push({ y: B.y1 + 2, draw: () => {
       const ctx = r.ctx, x = p.x, y = p.y, t = g.time;
@@ -736,7 +846,7 @@ const UpstairsExt = {
         }
         break;
       case 'beanbag':
-        if (S) { ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(x + 3, y + 4, 26, 18, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#3b7dd8'; ctx.beginPath(); ctx.ellipse(x, y, 26, 18, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#5a9be8'; ctx.beginPath(); ctx.ellipse(x - 2, y - 4, 16, 10, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.beginPath(); ctx.ellipse(x, y + 1, 9, 5, 0, 0, Math.PI * 2); ctx.fill(); }
+        if (D) this.drawBeanbag(ctx, x, y, mode === 'dynamic' ? this.squash(g) : 0);   // drawn each frame: it squashes when the chef flops in
         break;
       case 'stars':
         if (S) { ctx.fillStyle = '#2d3a4a'; U.roundRect(ctx, x - 10, y - 4, 20, 12, 4); ctx.fill(); ctx.fillStyle = '#5a6fb0'; ctx.beginPath(); ctx.arc(x, y - 6, 8, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#ffe08a'; for (const [dx, dy] of [[-3, -8], [3, -5], [0, -10]]) { ctx.beginPath(); ctx.arc(x + dx, y + dy, 1.2, 0, Math.PI * 2); ctx.fill(); } }
@@ -949,28 +1059,47 @@ const UpstairsExt = {
     UI.placeCatalog({ x: cx - cw / 2, y: cy - ch / 2, w: cw, h: ch }, page > 0, page < n - 1);   // the ✕ and ◀ ▶ buttons sit on the card
   },
 
-  // ======================= the owner's drawing: hung on the wall upstairs and in the shop =======================
-  img: null, imgN: 0,
-  // The saved PNG loads asynchronously; `bgKey` changes once it has, so the cached backgrounds rebuild with it.
-  ensureArt(g) {
-    const d = g.s.upstairs && g.s.upstairs.drawing;
-    if (!d) { this.img = null; return; }
-    if (this.img && this.img.src === d) return;
-    const el = new Image(), rec = { src: d, el, ok: false, n: ++this.imgN };
-    el.onload = () => { rec.ok = true; };
-    el.src = d; this.img = rec;
+  // ======================= the owner's drawings: one picture per slot, each hung in its own frame =======================
+  // A slot says where its picture is saved (`get`/`set`), where it hangs (`area` + `frame()`, for the sparkle) and
+  // what the chef says once it is up (`hung`). 'bedroom' is the desk upstairs: its picture hangs on the bedroom wall
+  // and, copied, in the dining room. Other files add slots with `UpstairsExt.addArtSlot(name, spec)` and paint
+  // their own frame from `UpstairsExt.art(g, name)`.
+  artSlots: {
+    bedroom: {
+      get: (g) => g.s.upstairs && g.s.upstairs.drawing,
+      set: (g, url) => { g.s.upstairs.drawing = url; },
+      area: 'upstairs', frame: () => CFG.UPSTAIRS.art.room, hung: '🖼️ Hung on the wall!',
+    },
   },
+  addArtSlot(name, spec) { this.artSlots[name] = spec; },
+  img: null, imgN: 0, arts: {},   // `img` is the bedroom slot's picture (kept for the bedroom code and its tests)
+  // A slot's saved PNG as a loaded image record { src, el, ok, n }, or null. It loads asynchronously; the bgKeys
+  // change once it has (`ok`, and `n` counts every new picture), so the cached backgrounds rebuild with it.
+  art(g, name) {
+    const S = this.artSlots[name], d = S && S.get(g);
+    let rec = this.arts[name] || null;
+    if (!d) rec = null;
+    else if (!rec || rec.src !== d) {
+      const el = new Image(), nr = { src: d, el, ok: false, n: ++this.imgN };
+      el.onload = () => { nr.ok = true; };
+      el.src = d; rec = nr;
+    }
+    this.arts[name] = rec;
+    if (name === 'bedroom') this.img = rec;
+    return rec;
+  },
+  ensureArt(g) { this.art(g, 'bedroom'); },
   bgKey(g) {
     if (!g.s.upstairs) return '';
     this.ensureArt(g);
     return 'up:' + CFG.UPSTAIRS.items.map((it) => this.owned(g, it.key) ? 1 : 0).join('') + ':' + (this.img && this.img.ok ? this.img.n : 0);
   },
-  paintArt(ctx, x, y, w, h) {
+  paintArt(ctx, x, y, w, h, el) {
     ctx.fillStyle = 'rgba(0,0,0,0.2)'; U.roundRect(ctx, x - w / 2 - 2, y - h / 2 - 1, w + 8, h + 8, 3); ctx.fill();
     ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, x - w / 2 - 4, y - h / 2 - 4, w + 8, h + 8, 3); ctx.fill();
     ctx.fillStyle = '#5b3a1a'; ctx.fillRect(x - w / 2 - 2, y - h / 2 - 2, w + 4, h + 4);
     ctx.fillStyle = '#fff'; ctx.fillRect(x - w / 2, y - h / 2, w, h);
-    try { ctx.drawImage(this.img.el, x - w / 2, y - h / 2, w, h); } catch (e) { /* a broken image just leaves the frame empty */ }
+    try { ctx.drawImage(el || this.img.el, x - w / 2, y - h / 2, w, h); } catch (e) { /* a broken image just leaves the frame empty */ }
     ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.arc(x, y - h / 2 - 4, 2, 0, Math.PI * 2); ctx.fill();   // the nail
   },
 
@@ -1005,7 +1134,8 @@ const UpstairsExt = {
     </div>`;
     document.body.appendChild(el);
     const cv = el.querySelector('#draw-canvas'), ctx = cv.getContext('2d');
-    const pad = this.pad = { el, cv, ctx, color: this.padColors[0], size: this.padSizes[1], eraser: false, down: false, last: null, dirty: false };
+    // `slot`: whose picture is on the pad; `drafts`: each slot's canvas as it was left (unsaved strokes stay put)
+    const pad = this.pad = { el, cv, ctx, color: this.padColors[0], size: this.padSizes[1], eraser: false, down: false, last: null, dirty: false, slot: null, drafts: {} };
     const colors = el.querySelector('#draw-colors'), sizes = el.querySelector('#draw-sizes');
     const pick = (row, sel) => { for (const b of row.children) b.classList.toggle('on', b === sel); };
     for (const col of this.padColors.concat(['eraser'])) {
@@ -1027,7 +1157,7 @@ const UpstairsExt = {
     const up = (e) => { if (!pad.down) return; pad.down = false; pad.last = null; };
     cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up); cv.addEventListener('pointerleave', up);
     cv.addEventListener('contextmenu', (e) => e.preventDefault());
-    el.querySelector('#draw-clear').addEventListener('click', () => this.padClear());
+    el.querySelector('#draw-clear').addEventListener('click', () => { this.padClear(); pad.dirty = true; });
     el.querySelector('#draw-done').addEventListener('click', () => this.closePad(Game));
     el.querySelector('#draw-close').addEventListener('click', () => this.closePad(Game));
     el.querySelector('#draw-hang').addEventListener('click', () => this.hangDrawing(Game));
@@ -1042,32 +1172,43 @@ const UpstairsExt = {
     c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1 === x0 && y1 === y0 ? x1 + 0.01 : x1, y1); c.stroke();
     p.dirty = true;
   },
-  openPad(g) {
+  // Open the pad for a slot ('bedroom' by default): the chef stays where they stand until it closes.
+  openPad(g, slot) {
+    if (!this.st) this.build(g);
+    if (!slot || !this.artSlots[slot]) slot = 'bedroom';
     const p = this.buildPad(), pl = g.player, st = this.st;
-    st.draw.on = true; st.draw.hold = { x: pl.x, y: pl.y }; pl.moving = false;
-    // start from the picture already on the wall, so it can be touched up
-    if (!p.dirty && this.img && this.img.ok) { this.padClear(); try { p.ctx.drawImage(this.img.el, 0, 0, p.cv.width, p.cv.height); } catch (e) { /* ignore */ } }
+    st.draw.on = true; st.draw.slot = slot; st.draw.hold = { x: pl.x, y: pl.y }; pl.moving = false;
+    // the canvas as this slot's pad was left; else the picture already on its wall, so it can be touched up
+    const draft = p.drafts[slot], rec = this.art(g, slot);
+    this.padClear(); p.slot = slot;
+    if (draft) { try { p.ctx.putImageData(draft.data, 0, 0); } catch (e) { /* ignore */ } p.dirty = draft.dirty; }
+    else if (rec && rec.ok) { try { p.ctx.drawImage(rec.el, 0, 0, p.cv.width, p.cv.height); } catch (e) { /* ignore */ } }
     p.el.classList.remove('hidden');
     Sfx.pickup(); Haptics.tap();
   },
   closePad(g) {
-    if (this.pad) this.pad.el.classList.add('hidden');
+    const p = this.pad;
+    if (p) {
+      p.el.classList.add('hidden'); p.down = false; p.last = null;
+      if (p.slot) { try { p.drafts[p.slot] = { data: p.ctx.getImageData(0, 0, p.cv.width, p.cv.height), dirty: p.dirty }; } catch (e) { delete p.drafts[p.slot]; } }
+    }
     if (this.st) { this.st.draw.on = false; this.st.draw.hold = null; }
     Sfx.drop();
   },
-  // Shrink the picture to a tiny PNG, save it, and hang it on the walls.
+  // Shrink the picture to a tiny PNG, save it in the open slot, and hang it in that slot's frame(s).
   hangDrawing(g) {
     const p = this.buildPad(), [w, h] = CFG.UPSTAIRS.art.size;
+    const slot = (this.st && this.st.draw.slot) || p.slot || 'bedroom', S = this.artSlots[slot] || this.artSlots.bedroom;
     const small = document.createElement('canvas'); small.width = w; small.height = h;
     const sc = small.getContext('2d'); sc.fillStyle = '#fff'; sc.fillRect(0, 0, w, h); sc.drawImage(p.cv, 0, 0, w, h);
     let url = null;
     try { url = small.toDataURL('image/png'); } catch (e) { url = null; }
     if (!url) { g.toast('Oops, could not save that one'); return; }
-    g.s.upstairs.drawing = url; this.ensureArt(g); g.save();
+    S.set(g, url); this.art(g, slot); p.dirty = false; g.save();
     Sfx.buy(); Haptics.success();
-    const A = CFG.UPSTAIRS.art.room;
-    g.fx.push({ kind: 'sparkle', x0: A.x, y0: A.y, x1: A.x, y1: A.y, t: 0, dur: 0.8 });
-    g.floats.push({ x: g.player.x, y: g.player.y - 50, text: '🖼️ Hung on the wall!', color: '#ffe08a', t: 0, dur: 1.8, big: true });
+    const A = S.frame && S.frame(g);
+    if (A && (!S.area || S.area === g.area)) g.fx.push({ kind: 'sparkle', x0: A.x, y0: A.y, x1: A.x, y1: A.y, t: 0, dur: 0.8 });
+    g.floats.push({ x: g.player.x, y: g.player.y - 50, text: S.hung || '🖼️ Hung on the wall!', color: '#ffe08a', t: 0, dur: 1.8, big: true });
     this.closePad(g);
   },
 };

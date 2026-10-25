@@ -52,6 +52,68 @@ module.exports = async (t) => {
   await t.ev(() => { Game.s.cash = 5000; T.step(20); });
   await t.shot('room-bought');
 
+  // ---- the bean bag: a seat once it is bought
+  const bag = C.items.find((it) => it.key === 'beanbag');
+  const side = { x: bag.block[0] - 16, y: bag.spot.y };   // just west of its solid block
+  await t.ev((s) => { delete Game.s.upstairs.owned.beanbag; T.tp(s.x, s.y, 'upstairs'); }, side);
+  t.expect(await t.ev(() => T.label() !== '🛋️ Flop on the bean bag'), 'no flopping before the bean bag is bought');
+  const keyNoBag = await t.ev(() => UpstairsExt.bgKey(Game));
+  await t.ev((s) => { Game.s.upstairs.owned.beanbag = true; T.tp(s.x - 30, s.y, 'upstairs'); }, side);
+  t.expect(await t.ev(() => UpstairsExt.bgKey(Game)) !== keyNoBag, 'the room rebuilds with the bean bag in it');
+  t.expect(await t.ev((b) => Game.obstacles().some((o) => o.x === b[0] && o.y === b[1] && o.w === b[2] && o.h === b[3]), bag.block), 'the bean bag is solid');
+  // walking into it stops at its side
+  const stopX = await t.ev(() => { T.steer(1, 0); T.step(40); T.unsteer(); T.step(2); return Game.player.x; });
+  t.expect(stopX <= bag.block[0] - 11.9 && stopX > bag.block[0] - 20, 'walking east stops at the bean bag (x ' + stopX.toFixed(1) + ')');
+  await t.ev((s) => T.tp(s.x, s.y, 'upstairs'), side);
+  t.expectEq(await t.ev(() => T.label()), '🛋️ Flop on the bean bag', 'flop label beside the bean bag');
+  t.expectEq(await t.ev(() => T.hint()), 'Flop on the bean bag! 🛋️', 'bean bag hint');
+  // also offered from the other sides
+  for (const [dx, dy] of [[0, 30], [0, -30], [36, 0]]) {
+    const lbl = await t.ev(([x, y]) => { T.tp(x, y, 'upstairs'); return T.label(); }, [bag.spot.x + dx, bag.spot.y + dy]);
+    t.expectEq(lbl, '🛋️ Flop on the bean bag', `flop label from (${dx}, ${dy})`);
+  }
+  // not while the drawing pad is open (checked without stepping), nor far away
+  await t.ev((s) => T.tp(s.x, s.y, 'upstairs'), side);
+  t.expect(await t.ev(() => { UpstairsExt.st.draw.on = true; const l = T.label(); UpstairsExt.st.draw.on = false; return l !== '🛋️ Flop on the bean bag'; }), 'no flopping while the drawing pad is open');
+  t.expect(await t.ev(() => { UpstairsExt.st.nap = { phase: 'sleep', t: 0 }; const l = T.label(); UpstairsExt.st.nap = null; return l !== '🛋️ Flop on the bean bag'; }), 'no flopping while napping');
+  // flop!
+  await t.ev(() => T.act());
+  t.expect(await t.ev(() => !!UpstairsExt.st.sit), 'sitting state on');
+  await t.ev(() => T.step(30));
+  const sat = await t.ev(() => ({ p: { x: Game.player.x, y: Game.player.y }, seat: UpstairsExt.seat(), landed: UpstairsExt.st.sit.landed, sq: UpstairsExt.squash(Game), comfy: Game.floats.some((f) => f.text === 'Ahh, comfy! 😌') }));
+  t.expect(sat.landed && Math.abs(sat.p.x - sat.seat.x) < 0.01 && Math.abs(sat.p.y - sat.seat.y) < 0.01, 'the chef lands in the bean bag');
+  t.expect(sat.p.y > bag.spot.y && sat.p.y < bag.block[1] + bag.block[3], 'sitting low, inside the bag');
+  t.expect(sat.sq > 0.5, 'the bag squashes (' + sat.sq.toFixed(2) + ')');
+  t.expect(sat.comfy, 'a happy "Ahh, comfy!" float');
+  t.expectEq(await t.ev(() => T.label()), '🚶 Get up', 'get-up label while seated');
+  t.expectEq(await t.ev(() => T.hint()), null, 'no hint while seated');
+  const pinned = await t.ev(() => { const x = Game.player.x, y = Game.player.y; T.steer(1, 1); T.step(40); T.steer(-1, 0); T.step(20); T.unsteer(); T.step(2); return Math.abs(Game.player.x - x) < 0.01 && Math.abs(Game.player.y - y) < 0.01; });
+  t.expect(pinned, 'the chef stays in the bag while seated');
+  await t.ev(() => { Game.floats.length = 0; Game.floats.push({ x: UpstairsExt.seat().x, y: UpstairsExt.seat().y - 70, text: 'Ahh, comfy! 😌', color: '#ffe08a', t: 0.3, dur: 60, big: true }); T.step(2); });
+  await t.shot('beanbag');
+  await t.page.setViewportSize({ width: 390, height: 844 });
+  await t.wait(300);
+  await t.shot('beanbag-phone');
+  await t.page.setViewportSize({ width: 1100, height: 720 });
+  await t.wait(200);
+  await t.ev(() => { Game.floats.length = 0; });
+  // get up: back where the chef stood, free to walk
+  await t.ev(() => T.act());
+  const up = await t.ev(() => ({ sit: UpstairsExt.st.sit, x: Game.player.x, y: Game.player.y, free: UpstairsExt.clearSpot(Game, Game.player.x, Game.player.y) }));
+  t.expect(!up.sit && up.free, 'stood up on a free spot');
+  t.expect(Math.abs(up.x - side.x) < 0.01 && Math.abs(up.y - side.y) < 0.01, 'stood up where the chef was before');
+  const walked = await t.ev(() => { const x = Game.player.x; T.steer(-1, 0); T.step(20); T.unsteer(); T.step(2); return Game.player.x < x - 10; });
+  t.expect(walked, 'the chef can walk again after getting up');
+  // a save made on the bean bag: after a reload the chef just gets up beside it (not sent back to the stairs)
+  await t.ev((s) => { T.tp(s.x, s.y, 'upstairs'); T.act(); T.step(30); UpstairsExt.st.sit = null; T.step(2); }, side);
+  const res = await t.ev((b) => ({ x: Game.player.x, y: Game.player.y, free: UpstairsExt.clearSpot(Game, Game.player.x, Game.player.y), d: U.dist(Game.player.x, Game.player.y, b.x, b.y) }), bag.spot);
+  t.expect(res.free && res.d < 60, 'a seated save is rescued to beside the bean bag (' + JSON.stringify(res) + ')');
+  // Take me home from the bean bag
+  await t.ev((s) => { T.tp(s.x, s.y, 'upstairs'); T.act(); T.step(30); Game.goHome(); T.step(5); }, side);
+  t.expect(await t.ev(() => !UpstairsExt.st.sit && Game.area !== 'upstairs'), 'Take me home gets the chef out of the bean bag');
+  await t.ev(() => { const L = CFG.UPSTAIRS.STAIRS.landing; T.tp(L.x, L.y, 'town'); T.act(); T.step(30); });
+  t.expectEq(await t.ev(() => Game.area), 'upstairs', 'back up in the bedroom');
+
   // ---- the drawing pad at the desk
   await t.ev(() => { const ch = CFG.UPSTAIRS.chair; T.tp(ch.x - 24, ch.y); });
   t.expectEq(await t.ev(() => T.label()), '✏️ Sit and draw', 'draw label by the desk chair');

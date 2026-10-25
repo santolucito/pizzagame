@@ -633,16 +633,7 @@ const CityExt = {
     ctx.fillStyle = '#5c6670'; ctx.fillRect(SB.x - 36, SB.y - 26, 4, 24); ctx.fillStyle = '#3b7dd8'; ctx.beginPath(); ctx.arc(SB.x - 34, SB.y - 32, 10, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#fff'; ctx.font = r.font(11); ctx.fillText('M', SB.x - 34, SB.y - 31);
     ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, SB.x - 28, SB.y - 30, 56, 12, 3); ctx.fill(); ctx.fillStyle = '#ffe08a'; ctx.font = r.font(8); ctx.fillText('SUBWAY', SB.x, SB.y - 24);
-    // hot dog cart with a striped umbrella
-    const H = C.HOTDOG;
-    ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(H.x + 2, H.y + 10, 24, 7, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#1e1e1e'; ctx.beginPath(); ctx.arc(H.x - 14, H.y + 8, 5, 0, Math.PI * 2); ctx.arc(H.x + 14, H.y + 8, 5, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#f5f5f5'; U.roundRect(ctx, H.x - 22, H.y - 12, 44, 22, 4); ctx.fill();
-    ctx.fillStyle = '#e53935'; ctx.fillRect(H.x - 22, H.y - 4, 44, 4);
-    ctx.fillStyle = '#9aa0a8'; ctx.fillRect(H.x - 16, H.y - 10, 20, 8); ctx.fillStyle = '#ffd166'; ctx.fillRect(H.x - 14, H.y - 8, 16, 4);
-    ctx.fillStyle = '#5c6670'; ctx.fillRect(H.x + 14, H.y - 40, 3, 30);
-    for (let i = 0; i < 6; i++) { ctx.fillStyle = i % 2 ? '#fff' : '#e53935'; ctx.beginPath(); ctx.moveTo(H.x + 15, H.y - 40); ctx.arc(H.x + 15, H.y - 40, 26, Math.PI + i * Math.PI / 6, Math.PI + (i + 1) * Math.PI / 6); ctx.closePath(); ctx.fill(); }
-    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, H.x - 26, H.y + 12, 52, 12, 3); ctx.fill(); ctx.fillStyle = '#ffe08a'; ctx.font = r.font(8); ctx.fillText('🌭 HOT DOGS', H.x, H.y + 18);
+    // the hot dog cart, its vendor and its steam are drawn live by js/hotdog.js (y-sorted, so the vendor stands behind it)
     // balloon cart
     const BL = C.BALLOONS;
     ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(BL.x + 2, BL.y + 10, 16, 6, 0, 0, Math.PI * 2); ctx.fill();
@@ -680,8 +671,6 @@ const CityExt = {
     }
     // chasing bulbs around the pizza billboard
     const bb = C.BUILDINGS.find((b) => b.billboard); if (bb) { const cx = (bb.x0 + bb.x1) / 2, y = bb.y0 + 2, on = Math.floor(t * 2) % 3; let i = 0; for (let x = cx - 60; x <= cx + 60; x += 12, i++) { ctx.fillStyle = (i % 3) === on ? '#ffe08a' : 'rgba(255,224,138,0.35)'; ctx.beginPath(); ctx.arc(x, y - 54, 2.5, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(x, y + 6, 2.5, 0, Math.PI * 2); ctx.fill(); } }
-    // steam from the hot dog cart
-    const H = C.HOTDOG; for (let i = 0; i < 3; i++) { const age = ((t * 0.8 + i * 0.33) % 1); ctx.fillStyle = `rgba(255,255,255,${0.5 * (1 - age)})`; ctx.beginPath(); ctx.arc(H.x - 6 + i * 6 + Math.sin(age * 6 + i) * 3, H.y - 14 - age * 26, 3 + age * 4, 0, Math.PI * 2); ctx.fill(); }
     // the cat on its windowsill, tail swishing
     const cat = C.CAT, sw = Math.sin(t * 2.2) * 8;
     ctx.strokeStyle = '#e67e22'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(cat.x + 8, cat.y); ctx.quadraticCurveTo(cat.x + 18, cat.y - 2 + sw, cat.x + 16, cat.y - 12 + sw); ctx.stroke();

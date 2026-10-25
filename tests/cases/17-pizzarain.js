@@ -2,7 +2,9 @@
 // The pizza room off the bedroom: the door mat on the bedroom's east wall is free floor and reachable, the door's
 // button and hint, going in (map, mat, the one-time toast), slices falling from the cloud (they stay inside the room,
 // land and fade), eating three slices then being full (slices bounce off, the hint changes), going back out (eaten
-// resets for the next visit, the saved total stays, also across a reload), a rescue from a wall, Take me home.
+// resets for the next visit, the saved total stays, also across a reload), a rescue from a wall, the armchair (sit,
+// pinned, stand up), carrying pizzas up and eating a slice at the table, the landline (order, the delivery person comes
+// in, puts a pizza on the plate and leaves; a second order is refused; eat it), leaving mid-delivery, Take me home.
 const path = require('path');
 module.exports = async (t) => {
   // the extension is loaded by index.html once wired in; until then the case injects it itself
@@ -169,11 +171,195 @@ module.exports = async (t) => {
   const rescued2 = await t.ev(() => { const B = CFG.PIZZARAIN.CHAIR.block; Game.player.x = B[0] + B[2] / 2; Game.player.y = B[1] + B[3] / 2; T.step(3); return PizzaRainExt.roomFree(Game.player.x, Game.player.y); });
   t.expect(rescued2, 'rescued from inside the armchair');
 
+  // both screen sizes of the same moment
+  const both = async (name) => {
+    await t.shot(name);
+    await t.page.setViewportSize({ width: 390, height: 844 }); await t.ev(() => { Render.resize(); Game.cameraSnap = true; });
+    await t.shot(name + '-phone');
+    await t.page.setViewportSize({ width: 1100, height: 720 }); await t.ev(() => { Render.resize(); Game.cameraSnap = true; });
+  };
+
+  // ---- the layout: the stool, the spot in front of the armchair, the phone spot and the delivery path are free floor
+  const layout = await t.ev(() => {
+    const C = CFG.PIZZARAIN, free = (x, y) => PizzaRainExt.roomFree(x, y) && !Game.obstacles().some((o) => Game.hitRect(x, y, 12, o));
+    const pts = { seat: C.TABLE.seat, stand: C.CHAIR.stand, phone: C.PHONE.spot, server: C.TABLE.server };
+    const bad = Object.keys(pts).filter((k) => !free(pts[k].x, pts[k].y));
+    const P = C.DELIVERY.path; let pathBad = 0;
+    for (let i = 1; i < P.length - 1; i++) for (let k = 0; k <= 20; k++) { const x = U.lerp(P[i][0], P[i + 1][0], k / 20), y = U.lerp(P[i][1], P[i + 1][1], k / 20); if (!PizzaRainExt.roomFree(x, y)) pathBad++; }
+    // the chef can walk from the exit mat to the phone and to the stool
+    T.tp(C.EXIT.x, C.EXIT.y, 'pizzarain'); T.steer(0.25, -1); T.until(() => Game.player.y <= C.PHONE.spot.y, 200); T.unsteer(); T.step(1);
+    const toPhone = Math.hypot(Game.player.x - C.PHONE.spot.x, Game.player.y - C.PHONE.spot.y);
+    T.tp(5300, C.TABLE.seat.y, 'pizzarain'); T.steer(1, 0); T.until(() => Game.player.x >= C.TABLE.seat.x, 200); T.unsteer(); T.step(1);
+    const toSeat = Math.hypot(Game.player.x - C.TABLE.seat.x, Game.player.y - C.TABLE.seat.y);
+    return { bad, pathBad, toPhone, toSeat };
+  });
+  t.expectEq(layout.bad.join(','), '', 'stool, armchair front, phone spot and server spot are free floor');
+  t.expectEq(layout.pathBad, 0, 'the delivery path crosses only free floor');
+  t.expect(layout.toPhone < 30, `walked from the mat to the phone (${layout.toPhone.toFixed(1)} px)`);
+  t.expect(layout.toSeat < 8, `walked to the stool by the table (${layout.toSeat.toFixed(1)} px)`);
+
+  // ---- the armchair: sit (also when full), pinned facing into the room, a comfy sigh; stand up
+  const chair = await t.ev(() => {
+    const C = CFG.PIZZARAIN.CHAIR, st = PizzaRainExt.st, p = Game.player;
+    T.tp(C.stand.x, C.stand.y, 'pizzarain'); st.full = true; T.step(2);
+    const label = T.label(), hint = T.hint();
+    Game.floats.length = 0; T.act(); T.step(2);
+    const sat = { seat: st.seat, d: Math.hypot(p.x - C.sit.x, p.y - C.sit.y), facing: p.facing, sigh: Game.floats.some((f) => f.text === 'Ahh 😌'), label: T.label(), hint: T.hint(), sits: Game.s.pizzarain.sits };
+    T.steer(-1, 0.6); T.step(60); T.unsteer(); T.steer(1, -1); T.step(40); T.unsteer(); T.step(1);
+    return { label, hint, sat, pinned: Math.hypot(p.x - C.sit.x, p.y - C.sit.y) < 0.5 && st.seat === 'chair' && !p.moving && p.facing === 1, rescued: Game.floats.some((f) => f.text === 'Oops! Back inside') };
+  });
+  t.expectEq(chair.label, '🪑 Sit in the armchair', 'sit button by the armchair (even when full)');
+  t.expectEq(chair.hint, 'Sit in the comfy chair 🪑', 'chair hint by the armchair');
+  t.expect(chair.sat.seat === 'chair' && chair.sat.d < 0.5 && chair.sat.facing === 1, 'sitting in the armchair, facing into the room');
+  t.expect(chair.sat.sigh, 'the comfy sigh float');
+  t.expectEq(chair.sat.label, '🚶 Stand up', 'stand-up button while sitting');
+  t.expectEq(chair.sat.hint, 'Ahh, so comfy 😌', 'comfy hint while sitting');
+  t.expect(chair.sat.sits >= 1, 'sits are counted');
+  t.expect(chair.pinned && !chair.rescued, 'pinned in the chair while steering (and never "rescued" out of it)');
+  await both('armchair');
+  const stood = await t.ev(() => { T.act(); T.step(2); const p = Game.player, x0 = p.x; T.steer(1, 0); T.step(20); T.unsteer(); return { seat: PizzaRainExt.st.seat, free: PizzaRainExt.roomFree(x0, p.y), moved: p.x - x0, label: T.label() }; });
+  t.expect(stood.seat === null && stood.free && stood.moved > 10, `stood up onto free floor and walks again (${JSON.stringify(stood)})`);
+
+  // ---- carry pizzas up from the shop and eat a slice at the table
+  await t.ev(() => { const E = CFG.PIZZARAIN.EXIT; T.tp(E.x, E.y, 'pizzarain'); T.step(2); T.act(); T.step(2); Game.player.carry = 2; T.act(); T.step(2); });
+  const carryIn = await t.ev(() => ({ area: Game.area, carry: Game.player.carry, hint: T.hint(), target: Game.hint && Game.hint.target, seat: CFG.PIZZARAIN.TABLE.seat, label: T.label() }));
+  t.expect(carryIn.area === 'pizzarain' && carryIn.carry === 2, 'came in carrying two pizzas');
+  t.expectEq(carryIn.hint, 'Eat a slice at the table 🍽️', 'the table hint when carrying');
+  t.expect(carryIn.target && carryIn.target.x === carryIn.seat.x && carryIn.target.y === carryIn.seat.y, 'the hint points at the stool');
+  const meal = await t.ev(() => {
+    const C = CFG.PIZZARAIN, st = PizzaRainExt.st, p = Game.player;
+    T.tp(C.TABLE.seat.x - 20, C.TABLE.seat.y - 10, 'pizzarain'); T.step(2);
+    const label = T.label(); Game.floats.length = 0; T.act();
+    const now = { carry: p.carry, plate: st.plate && st.plate.kind, meal: !!st.meal, seat: st.seat, d: Math.hypot(p.x - C.TABLE.seat.x, p.y - C.TABLE.seat.y), facing: p.facing, label: T.label(), hint: T.hint(), left: PizzaRainExt.plateLeft() };
+    T.steer(-1, -1); T.step(50); T.unsteer();
+    now.pinned = Math.hypot(p.x - C.TABLE.seat.x, p.y - C.TABLE.seat.y) < 0.5; now.bites = st.meal ? st.meal.bites : -1; now.left2 = PizzaRainExt.plateLeft();
+    return { label, now };
+  });
+  t.expectEq(meal.label, '🍽️ Eat a slice at the table', 'eat-a-slice button at the table');
+  t.expect(meal.now.carry === 1 && meal.now.plate === 'slice' && meal.now.meal && meal.now.left === 1, `a pizza comes off the stack and a slice lands on the plate (${JSON.stringify(meal.now)})`);
+  t.expect(meal.now.seat === 'table' && meal.now.d < 0.5 && meal.now.facing === 1 && meal.now.pinned, 'sitting on the stool facing the table, pinned');
+  t.expect(meal.now.label === null && meal.now.hint === 'Yum yum! 😋', 'no button and a yum hint while eating');
+  t.expect(meal.now.bites >= 1 && meal.now.left2 < 1, `bite by bite (${meal.now.bites} bites, ${meal.now.left2} left)`);
+  await both('table-eating');
+  const ate = await t.ev(() => {
+    const st = PizzaRainExt.st; let noms = 0, seen = new Set();
+    const n = T.until(() => { for (const f of Game.floats) if (f.text === 'nom' && !seen.has(f)) { seen.add(f); noms++; } return !st.meal; }, 400);
+    return { n, noms, plate: st.plate, seat: st.seat, yum: Game.floats.some((f) => f.text === 'Delicious! 😋'), carry: Game.player.carry, meals: Game.s.pizzarain.meals, crumbs: st.crumbs.length, label: T.label(), free: PizzaRainExt.roomFree(Game.player.x, Game.player.y) };
+  });
+  t.expect(ate.n >= 0 && ate.plate === null && ate.seat === null && ate.free, `eaten up: the plate is empty and the chef is free (${JSON.stringify(ate)})`);
+  t.expect(ate.noms >= 1 && ate.yum, `nom floats and a Delicious float (${ate.noms} noms)`);
+  t.expect(ate.carry === 1 && ate.meals === 1, 'one pizza left on the stack, one meal counted');
+  t.expectEq(ate.label, '🍽️ Eat a slice at the table', 'another slice can be eaten from the stack');
+  // keep the last pizza for the trip back down
+  await t.ev(() => { Game.player.carry = 0; T.step(2); });
+
+  // ---- the landline: order, a delivery person brings a whole pizza to the plate and leaves; then eat it
+  const call = await t.ev(() => {
+    const C = CFG.PIZZARAIN, st = PizzaRainExt.st, p = Game.player;
+    T.tp(C.PHONE.spot.x, C.PHONE.spot.y, 'pizzarain'); T.step(2);
+    const label = T.label(), hint = T.hint();
+    T.act(); const d = st.del, phase = d && d.phase, orders = Game.s.pizzarain.orders, facing = p.facing;
+    T.step(50);
+    const lifted = PizzaRainExt.receiverLifted(Game), hint2 = T.hint();
+    Game.floats.length = 0; T.act();
+    const twice = { same: st.del === d, orders: Game.s.pizzarain.orders, float: Game.floats.some((f) => f.text === 'Your pizza is on its way! 🍕') };
+    return { label, hint, phase, orders, facing, lifted, hint2, twice };
+  });
+  t.expectEq(call.label, '📞 Order a pizza', 'order button at the phone');
+  t.expectEq(call.hint, 'Call for a pizza! 📞', 'phone hint at the phone');
+  t.expect(call.phase === 'call' && call.orders === 1 && call.facing === -1, 'the call starts (turned to the phone, one order)');
+  t.expect(call.lifted, 'the receiver is lifted during the call');
+  t.expectEq(call.hint2, 'Your pizza is on its way! 🍕', 'on-its-way hint');
+  t.expect(call.twice.same && call.twice.orders === 1 && call.twice.float, 'a second order is refused while one is on its way');
+  await t.shot('phone-call');
+  // the chef walks off and sits in the armchair; the delivery still comes
+  const arrive = await t.ev(() => {
+    const C = CFG.PIZZARAIN, st = PizzaRainExt.st, d = st.del;
+    T.steer(1, 1); T.step(40); T.unsteer();
+    T.tp(C.CHAIR.stand.x, C.CHAIR.stand.y, 'pizzarain'); T.step(1); T.act();
+    const sat = st.seat;
+    const n = T.until(() => d.phase === 'in' && d.wp >= 2, 600);
+    return { sat, n, door: st.door, x: d.x, y: d.y, phase: d.phase, hung: !PizzaRainExt.receiverLifted(Game) };
+  });
+  t.expect(arrive.sat === 'chair', 'sitting in the armchair while waiting');
+  t.expect(arrive.n >= 0 && arrive.door > 0.5 && arrive.hung, `the delivery person comes in through the open door (${JSON.stringify(arrive)})`);
+  await both('delivery-arriving');
+  const served = await t.ev(() => {
+    const C = CFG.PIZZARAIN, st = PizzaRainExt.st, d = st.del; let off = 0;
+    const n = T.until(() => { if (d.phase === 'in' && !PizzaRainExt.roomFree(d.x, d.y)) off++; return d.placed; }, 900);
+    return { n, off, phase: d.phase, dServer: Math.hypot(d.x - C.TABLE.server.x, d.y - C.TABLE.server.y), plate: st.plate && st.plate.kind, seat: st.seat, hint: T.hint() };
+  });
+  t.expect(served.n >= 0 && served.plate === 'pizza', `a whole pizza is put on the plate (${JSON.stringify(served)})`);
+  t.expect(served.dServer < 1 && served.off === 0, 'the delivery person walked on free floor to the table');
+  t.expect(served.seat === 'chair', 'the chef stayed in the armchair the whole time');
+  t.expectEq(served.hint, 'Your pizza is here! 🍽️', 'pizza-is-here hint, even from the armchair');
+  await t.ev(() => T.step(20));
+  await t.shot('delivery-serving');
+  const gone = await t.ev(() => {
+    const st = PizzaRainExt.st, d = st.del; let waved = false, said = false;
+    const n = T.until(() => { if (d.phase === 'wave') waved = true; return !st.del; }, 1500);
+    T.act(); T.step(2);   // stand up
+    return { n, waved, door: st.door, plate: st.plate && st.plate.kind, delivered: st.delivered, hint: T.hint(), seat: st.seat };
+  });
+  t.expect(gone.n >= 0 && gone.waved && gone.door === 0, `the delivery person waves, walks out and the door closes (${JSON.stringify(gone)})`);
+  t.expect(gone.plate === 'pizza' && gone.delivered >= 1 && gone.seat === null, 'the pizza waits on the plate');
+  t.expectEq(gone.hint, 'Your pizza is here! 🍽️', 'pizza-is-here hint');
+  await t.ev(() => { T.tp(CFG.PIZZARAIN.TABLE.x - 70, CFG.PIZZARAIN.TABLE.y - 50, 'pizzarain'); T.step(2); });
+  await both('pizza-plate');
+  const already = await t.ev(() => {
+    const C = CFG.PIZZARAIN, st = PizzaRainExt.st;
+    T.tp(C.PHONE.spot.x, C.PHONE.spot.y, 'pizzarain'); T.step(2); Game.floats.length = 0; T.act();
+    return { del: st.del, orders: Game.s.pizzarain.orders, float: Game.floats.some((f) => f.text === 'Your pizza is already here! 🍕') };
+  });
+  t.expect(already.del === null && already.orders === 1 && already.float, 'ordering with a pizza on the plate says it is already here');
+  const eatPizza = await t.ev(() => {
+    const C = CFG.PIZZARAIN, st = PizzaRainExt.st;
+    T.tp(C.TABLE.x, C.TABLE.y - 40, 'pizzarain'); T.step(2);
+    const label = T.label(); T.act(); const kind = st.meal && st.meal.kind, seat = st.seat; T.step(110);
+    return { label, kind, seat, carry: Game.player.carry, left: PizzaRainExt.plateLeft() };
+  });
+  t.expectEq(eatPizza.label, '🍽️ Eat the pizza', 'eat-the-pizza button at the table');
+  t.expect(eatPizza.kind === 'pizza' && eatPizza.seat === 'table' && eatPizza.carry === 0, 'eating the delivered pizza at the table');
+  t.expect(eatPizza.left > 0 && eatPizza.left < 1, `the pizza gets smaller (${eatPizza.left} left)`);
+  await both('pizza-eating');
+  const pizzaDone = await t.ev(() => { const st = PizzaRainExt.st; const n = T.until(() => !st.meal, 400); return { n, plate: st.plate, seat: st.seat, yum: Game.floats.some((f) => f.text === 'Delicious! 😋'), meals: Game.s.pizzarain.meals }; });
+  t.expect(pizzaDone.n >= 0 && pizzaDone.plate === null && pizzaDone.seat === null && pizzaDone.yum && pizzaDone.meals === 2, 'the pizza is eaten up, the plate is empty');
+
+  // ---- leaving mid-delivery: the pizza waits on the plate, nothing is left half done
+  const midway = await t.ev(() => {
+    const C = CFG.PIZZARAIN, st = PizzaRainExt.st;
+    T.tp(C.PHONE.spot.x, C.PHONE.spot.y, 'pizzarain'); T.step(2); T.act();
+    T.until(() => st.del && st.del.phase === 'in' && st.del.wp >= 2, 600);
+    T.tp(C.EXIT.x, C.EXIT.y, 'pizzarain'); T.step(1); const label = T.label(); T.act(); T.step(30);
+    const out = { label, area: Game.area, del: st.del, door: st.door, plate: st.plate && st.plate.kind };
+    T.act(); T.step(30);
+    const back = { area: Game.area, del: st.del, plate: st.plate && st.plate.kind, hint: T.hint() };
+    // leaving in the middle of the call works too
+    st.plate = null; T.tp(C.PHONE.spot.x, C.PHONE.spot.y, 'pizzarain'); T.step(2); T.act(); T.step(10);
+    const phase = st.del && st.del.phase;
+    T.tp(C.EXIT.x, C.EXIT.y, 'pizzarain'); T.step(1); T.act(); T.step(10);
+    const out2 = { phase, area: Game.area, del: st.del, plate: st.plate && st.plate.kind };
+    T.act(); T.step(2);
+    return { out, back, out2 };
+  });
+  t.expectEq(midway.out.label, '🚪 Back to the bedroom', 'exit button mid-delivery');
+  t.expect(midway.out.area === 'upstairs' && midway.out.del === null && midway.out.door === 0 && midway.out.plate === 'pizza', `leaving mid-delivery completes it at once (${JSON.stringify(midway.out)})`);
+  t.expect(midway.back.area === 'pizzarain' && midway.back.del === null && midway.back.plate === 'pizza' && midway.back.hint === 'Your pizza is here! 🍽️', 'back inside: the pizza waits on the plate, nobody walking about');
+  t.expect(midway.out2.phase === 'call' && midway.out2.del === null && midway.out2.plate === 'pizza', 'leaving during the call works the same');
+
   // ---- Take me home from inside clears everything and lands in the shop
-  await t.ev(() => { T.tp(5300, 4250, 'pizzarain'); T.step(60); Game.goHome(); T.step(2); });
-  const home = await t.ev(() => ({ area: Game.area, slices: PizzaRainExt.st.slices.length, eaten: PizzaRainExt.st.eaten, inside: PizzaRainExt.st.inside, total: Game.s.pizzarain.eaten, hint: PizzaRainExt.hint(Game) }));
+  // (with a pizza on the plate, another on its way and the chef in the armchair)
+  await t.ev(() => {
+    const C = CFG.PIZZARAIN, st = PizzaRainExt.st; T.tp(5300, 4250, 'pizzarain'); T.step(60);
+    st.plate = null; T.tp(C.PHONE.spot.x, C.PHONE.spot.y, 'pizzarain'); T.step(2); T.act(); T.until(() => st.del && st.del.phase === 'in', 600);
+    T.tp(C.CHAIR.stand.x, C.CHAIR.stand.y, 'pizzarain'); T.step(1); T.act(); T.step(2);
+    Game.goHome(); T.step(2);
+  });
+  const home = await t.ev(() => { const st = PizzaRainExt.st; return { area: Game.area, slices: st.slices.length, eaten: st.eaten, inside: st.inside, total: Game.s.pizzarain.eaten, hint: PizzaRainExt.hint(Game), del: st.del, plate: st.plate, seat: st.seat, meal: st.meal, door: st.door, label: T.label() }; });
   t.expectEq(home.area, 'town', 'Take me home lands in the shop');
   t.expect(home.slices === 0 && home.eaten === 0 && !home.inside, 'the room state is cleared');
-  t.expectEq(home.total, 4, 'the total is still saved');
+  t.expect(home.del === null && home.plate === null && home.seat === null && home.meal === null && home.door === 0, `the delivery, plate, seat and meal are cleared (${JSON.stringify(home)})`);
+  t.expect(home.label !== '🚶 Stand up', 'no stand-up button left over in the shop');
+  t.expect(home.total >= 4, `the total is still saved (${home.total}: the rain may feed the chef while the delivery comes)`);
   t.expectEq(home.hint, undefined, 'no pizza-room hint in the shop');
 };

@@ -7,8 +7,13 @@
 // water with a few islands. On the main island you set up a pizza stand (a pad); it bakes pizzas on its
 // own. Huts on the other islands order pizza now and then; hop on the jet ski parked at the beach and
 // deliver to their doors. The ferry at the island dock brings you home.
+//
+// South of Pizza Island a sandbar leads to Sunny Beach (a volleyball game to join, a shaved-ice kiosk), a rope bridge to
+// Starfish Cove (tide pools to peek into, a little marina whose pier reaches Treasure Isle) and another rope bridge to
+// Rocket Island (js/rocket.js: a rocket under construction). The huts, the lighthouse and the rocket's mission control
+// can be entered (js/islands-inside.js); both files read their spots from CFG.ISLANDS and load after this one.
 
-CFG.AREAS.islands = { WORLD: { x0: 2600, y0: 1400, x1: 4600, y1: 2600 } };
+CFG.AREAS.islands = { WORLD: { x0: 2600, y0: 1400, x1: 4600, y1: 2950 } };   // y 3000+ belongs to the City's interiors
 CFG.VEHICLES.jetski = { speed: 420, radius: 16, label: '🚤 Ride', exit: '🚶 Hop off' };
 CFG.ISLANDS = {
   WORLD: CFG.AREAS.islands.WORLD,
@@ -26,19 +31,57 @@ CFG.ISLANDS = {
   ISLANDS: [
     { key: 'main', name: 'Pizza Island', x0: 2720, y0: 1960, x1: 3280, y1: 2440, palms: [[2770, 2020], [3230, 2010], [2760, 2410], [3080, 2425], [3250, 2330]] },
     { key: 'coconut', name: 'Coconut Hut', x0: 3480, y0: 1500, x1: 3780, y1: 1760, hut: { x: 3630, y: 1660 }, palms: [[3520, 1545], [3740, 1550], [3545, 1735]] },
-    { key: 'lighthouse', name: 'Lighthouse', x0: 4140, y0: 1480, x1: 4400, y1: 1720, hut: { x: 4320, y: 1620 }, tower: { x: 4205, y: 1690 }, palms: [[4165, 1525]] },
+    { key: 'lighthouse', name: 'Lighthouse', x0: 4140, y0: 1480, x1: 4400, y1: 1720, hut: { x: 4320, y: 1620 }, tower: { x: 4210, y: 1645 }, palms: [[4165, 1525]] },
     { key: 'crab', name: 'Crab Shack', x0: 4100, y0: 2150, x1: 4420, y1: 2420, hut: { x: 4260, y: 2325 }, palms: [[4135, 2195], [4395, 2190], [4400, 2405]] },
     { key: 'treasure', name: 'Treasure Isle', x0: 3560, y0: 2300, x1: 3720, y1: 2430, palms: [[3695, 2335]], chest: { x: 3592, y: 2404 } },
     { key: 'turtle', name: 'Turtle Rock', x0: 3860, y0: 1860, x1: 3980, y1: 1960, rock: true },
+    // ---- the southern islands, joined to Pizza Island on foot (see LINKS)
+    { key: 'sunny', name: 'Sunny Beach', x0: 2700, y0: 2580, x1: 3260, y1: 2900, sand: true, toast: '🏖️ Sunny Beach! Play volleyball!', palms: [[2735, 2618], [3225, 2618], [2728, 2868], [3232, 2872]] },
+    { key: 'cove', name: 'Starfish Cove', x0: 3400, y0: 2590, x1: 3700, y1: 2880, sand: true, toast: '⭐ Starfish Cove! Peek in the tide pools', palms: [[3428, 2622], [3676, 2862]] },
+    { key: 'rocket', name: 'Rocket Island', x0: 3840, y0: 2540, x1: 4460, y1: 2900, toast: '🚀 Rocket Island! A rocket is being built!', palms: [[3872, 2578], [4432, 2578], [4436, 2876]] },
   ],
+  // walkable strips over the water between islands: [kind] sand = a sandbar, bridge = a rope bridge, pier = planks on posts
+  LINKS: [
+    { key: 'sandbar', kind: 'sand', x0: 2980, y0: 2424, x1: 3050, y1: 2596 },      // Pizza Island ↔ Sunny Beach
+    { key: 'bridge1', kind: 'bridge', x0: 3244, y0: 2700, x1: 3416, y1: 2756 },    // Sunny Beach ↔ Starfish Cove
+    { key: 'bridge2', kind: 'bridge', x0: 3684, y0: 2700, x1: 3856, y1: 2756 },    // Starfish Cove ↔ Rocket Island
+    { key: 'pier', kind: 'pier', x0: 3600, y0: 2414, x1: 3644, y1: 2604 },         // the marina pier: Starfish Cove ↔ Treasure Isle
+  ],
+  // Sunny Beach: a volleyball court with two players (the chef can take the left side), a shaved-ice kiosk
+  SUNNY: {
+    COURT: { x0: 2740, y0: 2680, x1: 2960, y1: 2810 }, NET: { x: 2850, y0: 2684, y1: 2806 },
+    PLAYERS: [{ x: 2786, y: 2745 }, { x: 2914, y: 2745 }], ASIDE: { x: 2770, y: 2836 },   // the left player steps aside here when the chef plays
+    KIOSK: { x: 3140, y: 2808, w: 120 }, PAD: { x: 3140, y: 2862 }, PRICE: 3,
+    UMBRELLAS: [[3062, 2640, '#3b7dd8'], [3148, 2630, '#ff8fab']], TOWELS: [[3040, 2662, '#ffd166'], [3124, 2654, '#41b883']],
+    CASTLE: { x: 2960, y: 2872 }, FLIGHT: 1.05,
+  },
+  // Starfish Cove: rock-ringed tide pools with things living in them, a marina with two sailboats along the pier
+  COVE: {
+    POOLS: [{ x: 3476, y: 2814, rx: 42, ry: 24 }, { x: 3606, y: 2828, rx: 34, ry: 20 }, { x: 3486, y: 2642, rx: 32, ry: 19 }],
+    CRITTERS: [['A starfish! ⭐', '⭐'], ['A hermit crab! 🐚', '🐚'], ['A little fish! 🐟', '🐟'], ['A sea snail! 🐌', '🐌'], ['An octopus! 🐙', '🐙']],
+    BOATS: [{ x: 3566, y: 2520, hull: '#3b7dd8', sail: '#fff8ee', flag: '#e4572e' }, { x: 3680, y: 2528, hull: '#e4572e', sail: '#ffe08a', flag: '#3b7dd8' }],
+    SAIL_LOOP: { x: 2990, y: 1640, rx: 250, ry: 120, period: 70 },   // a sailboat cruising round the open water up north
+  },
+  // Rocket Island (js/rocket.js paints and animates it; js/islands-inside.js owns mission control's inside)
+  ROCKET: {
+    PAD: { x0: 4060, y0: 2630, x1: 4300, y1: 2850 },
+    BASE: { x: 4180, y: 2768 },                       // the rocket's feet
+    SCAFFOLD: { x0: 4222, x1: 4286, y: 2770, h: 200 },
+    CRANE: { x: 4372, y: 2690, h: 228 },
+    TRUCK: { x: 3992, y: 2850 },
+    MISSION: { x: 3960, y: 2640, w: 120, h: 80 },     // the hut; its door faces south
+    SIGN: { x: 3940, y: 2800 },
+    PARTS: { x: 4382, y: 2842 },
+    ASK: { x: 4180, y: 2812 },
+  },
   DOCK: { x0: 2970, y0: 1850, x1: 3030, y1: 1975 },         // ferry dock on the north shore of Pizza Island
   FERRY: { x: 3100, y: 1895 },
   ARRIVE: { x: 3000, y: 1905 },
   STAND: { x: 2880, y: 2130, oven: { x: 2975, y: 2140 }, pile: { x: 2975, y: 2200 }, pad: { x: 2905, y: 2225 }, price: 400 },
   JETSKI: { x: 3312, y: 2200 },
   BUOY: { x: 3400, y: 1720 },
-  CRABS: [[3050, 3200, 1984], [4140, 4370, 2398], [3500, 3620, 1515]],       // [x0, x1, y] beach runs
-  DOLPHIN_SPOTS: [[3000, 1600], [3350, 2020], [3900, 1620], [3820, 2250], [2800, 1760], [4480, 1950], [3330, 1560]],
+  CRABS: [[3050, 3200, 1984], [4140, 4370, 2398], [3500, 3620, 1515], [2770, 2900, 2886], [3420, 3540, 2872]],       // [x0, x1, y] beach runs
+  DOLPHIN_SPOTS: [[3000, 1600], [3350, 2020], [3900, 1620], [3820, 2250], [2800, 1760], [4480, 1950], [3330, 1560], [3330, 2870], [3770, 2860], [2660, 2700]],
   BAKE: 6, PILE_MAX: 6, TAKE_RADIUS: 56,
   ORDER_EVERY: [30, 50], ORDER_MAX: 2, ORDER_WAIT: 120, FIRST_ORDER: 10,
   TRAVEL: 7,
@@ -48,8 +91,8 @@ CFG.COINS.push({ x: 2790, y: 2300 }, { x: CFG.ISLANDS.ISLANDS[4].chest.x, y: CFG
 
 const IslandsExt = {
   name: 'islands',
-  defaults: { islands: { standOwned: false, pile: 0, dockPizzas: 0 } },
-  rt: null,   // runtime (not saved): huts, jet ski, crabs, dolphin, wake, timers
+  defaults: { islands: { standOwned: false, pile: 0, dockPizzas: 0, seen: {}, rally: 0, peeks: 0, snacks: 0 } },
+  rt: null,   // runtime (not saved): huts, jet ski, crabs, dolphin, wake, timers, the volleyball, the tide pools, a treat in hand
 
   // ======================= game hooks =======================
   build(g) {
@@ -58,6 +101,8 @@ const IslandsExt = {
     const st = g.s.islands;
     if (st.dockPizzas === undefined) st.dockPizzas = 0;
     if (st.pile === undefined) st.pile = 0;
+    if (!st.seen) st.seen = {};
+    for (const k of ['rally', 'peeks', 'snacks']) if (st[k] === undefined) st[k] = 0;
     const huts = I.ISLANDS.filter((s) => s.hut).map((s) => ({ key: s.key, name: s.name, hut: s.hut, door: { x: s.hut.x, y: s.hut.y + 44 }, order: null, happy: 0 }));
     this.rt = {
       huts,
@@ -66,7 +111,14 @@ const IslandsExt = {
       crabs: I.CRABS.map(([x0, x1, y], i) => ({ x: U.rand(x0, x1), y, x0, x1, dir: i % 2 ? 1 : -1, t: U.rand(0, 2), pause: 0, step: 0 })),
       dolphin: { t: -U.rand(3, 7), x: 3000, y: 1600, dir: 1 },
       water: null, carObs: null, statics: null, river: null,
+      // volleyball: the ball flies between the two players (or the chef, who takes the left side): { from, to, t, by }
+      vb: { ball: null, chef: false, wait: false, cheer: 0, rally: 0, hitT: [0, 0], who: [0, 0] },
+      peek: null, peekN: 0,      // a tide pool showing what lives in it: { i, t, k }
+      treat: null,               // something tasty in the chef's hand: { kind, t }
     };
+    const SU = I.SUNNY, rt = this.rt;
+    rt.vb.who = SU.PLAYERS.map((q) => ({ x: q.x, y: q.y, facing: q.x < SU.NET.x ? 1 : -1, moving: false, bob: 0, arm: 0 }));
+    rt.vb.ball = { from: { x: SU.PLAYERS[0].x, y: SU.PLAYERS[0].y }, to: { x: SU.PLAYERS[1].x, y: SU.PLAYERS[1].y }, t: 0, by: 0 };
     this.buildObstacles();
   },
 
@@ -77,6 +129,7 @@ const IslandsExt = {
     const I = CFG.ISLANDS, W = I.WORLD, rt = this.rt;
     const land = I.ISLANDS.map((s) => ({ x0: s.x0 + 8, y0: s.y0 + 8, x1: s.x1 - 8, y1: s.y1 - 8 }));
     land.push({ x0: I.DOCK.x0, y0: I.DOCK.y0, x1: I.DOCK.x1, y1: I.DOCK.y1 });
+    for (const L of I.LINKS) land.push({ x0: L.x0, y0: L.y0, x1: L.x1, y1: L.y1 });
     const ys = [...new Set(land.flatMap((l) => [l.y0, l.y1]).concat([W.y0, W.y1]))].sort((a, b) => a - b);
     const water = [];
     for (let i = 0; i < ys.length - 1; i++) {
@@ -97,6 +150,12 @@ const IslandsExt = {
       if (s.tower) statics.push({ x: s.tower.x - 16, y: s.tower.y - 16, w: 32, h: 22 });
       if (s.chest) statics.push({ x: s.chest.x - 14, y: s.chest.y - 4, w: 28, h: 4 });
     }
+    // Sunny Beach: the net and its posts, the kiosk; Starfish Cove: the tide pools; the moored sailboats
+    const SU = I.SUNNY, K = SU.KIOSK, N = SU.NET;
+    statics.push({ x: N.x - 4, y: N.y0, w: 8, h: N.y1 - N.y0 });
+    statics.push({ x: K.x - K.w / 2, y: K.y - 38, w: K.w, h: 60 });
+    for (const P of I.COVE.POOLS) statics.push({ x: P.x - P.rx * 0.8, y: P.y - P.ry * 0.7, w: P.rx * 1.6, h: P.ry * 1.4 });
+    for (const B of I.COVE.BOATS) statics.push({ x: B.x - 14, y: B.y - 36, w: 28, h: 72 });
     rt.statics = statics;
     const S = I.STAND;
     rt.standObs = [{ x: S.x - 58, y: S.y - 46, w: 116, h: 66 }, { x: S.oven.x - 22, y: S.oven.y - 22, w: 44, h: 36 }];
@@ -104,6 +163,7 @@ const IslandsExt = {
     rt.carObs = I.ISLANDS.map((s) => ({ x: s.x0 + 20, y: s.y0 + 20, w: s.x1 - s.x0 - 40, h: s.y1 - s.y0 - 40 }));
     rt.carObs.push({ x: I.DOCK.x0, y: I.DOCK.y0, w: I.DOCK.x1 - I.DOCK.x0, h: I.DOCK.y1 - I.DOCK.y0 });
     rt.carObs.push({ x: I.FERRY.x - 60, y: I.FERRY.y - 24, w: 120, h: 48 });
+    for (const B of I.COVE.BOATS) rt.carObs.push({ x: B.x - 14, y: B.y - 36, w: 28, h: 72 });
   },
 
   // Wide rectangles cut into pieces no wider than `max`: the core pushes a thing that overlaps a
@@ -138,11 +198,14 @@ const IslandsExt = {
   vehicles(g) { return this.rt ? [this.rt.jetski] : []; },
 
   pads(g) {
-    if (g.s.islands.standOwned) return [];
-    const S = CFG.ISLANDS.STAND;
-    return [{ key: 'islandStand', label: 'Island Pizza Stand', ico: '🏝️', pos: S.pad, price: S.price }];
+    const S = CFG.ISLANDS.STAND, SU = CFG.ISLANDS.SUNNY, out = [], p = g.player;
+    if (!g.s.islands.standOwned) out.push({ key: 'islandStand', label: 'Island Pizza Stand', ico: '🏝️', pos: S.pad, price: S.price });
+    // the kiosk's circle only shows to someone at the kiosk (it can be bought again and again, so it never "completes")
+    if (g.area === 'islands' && U.dist(p.x, p.y, SU.PAD.x, SU.PAD.y) < 150) out.push({ key: 'sunnySnack', label: 'Shaved ice', ico: '🍧', pos: SU.PAD, price: SU.PRICE, sub: 'so cold!', maxed: !!(this.rt && this.rt.treat && this.rt.treat.kind === 'snowcone') });
+    return out;
   },
   onPad(g, pad) {
+    if (pad.key === 'sunnySnack') { g.s.islands.snacks++; this.giveTreat(g, 'snowcone'); g.floats.push({ x: g.player.x, y: g.player.y - 64, text: 'Shaved ice! 🍧', color: '#ffe08a', t: 0, dur: 1.5, big: true }); Haptics.success(); return; }
     if (pad.key !== 'islandStand') return;
     g.s.islands.standOwned = true; this.rt.bakeT = CFG.ISLANDS.BAKE - 2;
     Sfx.unlock(); Haptics.success();
@@ -158,7 +221,84 @@ const IslandsExt = {
     const p = g.player;
     if (g.area === 'town' && this.onTownDock(p)) return { label: '⛴️ Ride the ferry', run: (gg) => this.boardFerry(gg, 'islands') };
     if (g.area === 'islands' && this.onIslandDock(p)) return { label: '⛴️ Ferry home', run: (gg) => this.boardFerry(gg, 'town') };
+    if (g.area !== 'islands' || g.travel || !this.rt) return null;
+    if (this.atCourt(g)) return { label: '🏐 Hit the ball!', run: (gg) => this.hitBall(gg) };
+    const pool = this.nearPool(g);
+    if (pool >= 0) return { label: '⭐ Peek in the tide pool', run: (gg) => this.peekPool(gg, pool) };
     return null;
+  },
+  // ---- Sunny Beach volleyball: stand on the left side of the net and press to hit the ball over
+  atCourt(g) {
+    const p = g.player, C = CFG.ISLANDS.SUNNY.COURT, N = CFG.ISLANDS.SUNNY.NET;
+    return !g.driving && p.x > C.x0 - 30 && p.x < N.x - 16 && p.y > C.y0 - 20 && p.y < C.y1 + 24;
+  },
+  // the ball flies from one side to the other: a lob over the net, landing where the other player stands
+  serve(fromX, fromY, toX, toY, by) {
+    const vb = this.rt.vb;
+    vb.ball = { from: { x: fromX, y: fromY }, to: { x: toX, y: toY }, t: 0, by };
+    vb.wait = false;
+  },
+  hitBall(g) {
+    const vb = this.rt.vb, p = g.player, SU = CFG.ISLANDS.SUNNY, B = vb.who[1];
+    vb.chef = true; vb.rally++; g.s.islands.rally = Math.max(g.s.islands.rally, vb.rally);
+    this.serve(p.x + 6, p.y, B.x, U.rand(SU.COURT.y0 + 26, SU.COURT.y1 - 26), 'chef');
+    vb.hitT[0] = 0.3; p.facing = 1;
+    const words = ['Bump! 🏐', 'Nice hit!', 'Over the net!', 'Spike! 💥', 'Super!'];
+    g.floats.push({ x: p.x, y: p.y - 70, text: vb.rally > 1 ? `${words[vb.rally % words.length]} ×${vb.rally}` : 'Bump! 🏐', color: '#ffe08a', t: 0, dur: 1.1, big: true });
+    Sfx.pickup(); Haptics.tap();
+  },
+  ballPos(g) {
+    const vb = this.rt.vb, b = vb.ball, SU = CFG.ISLANDS.SUNNY;
+    if (vb.wait) { const p = g.player, k = Math.abs(Math.sin(g.time * 3.2)); return { x: p.x + 8, y: p.y, h: 70 + k * 26 }; }
+    const k = U.clamp(b.t / SU.FLIGHT, 0, 1);
+    return { x: U.lerp(b.from.x, b.to.x, k), y: U.lerp(b.from.y, b.to.y, k), h: 40 + Math.sin(k * Math.PI) * 120 };
+  },
+  updateVolleyball(g, dt) {
+    const vb = this.rt.vb, SU = CFG.ISLANDS.SUNNY, p = g.player, [A, B] = vb.who, b = vb.ball;
+    vb.hitT[0] = Math.max(0, vb.hitT[0] - dt); vb.hitT[1] = Math.max(0, vb.hitT[1] - dt); vb.cheer += dt;
+    if (vb.chef && !this.atCourt(g)) {
+      // the chef wandered off: the left player takes over again
+      vb.chef = false; vb.rally = 0;
+      if (vb.wait || b.to.x < SU.NET.x) this.serve(B.x, B.y, A.x, A.y, 'B');
+    }
+    // the players shuffle to where the ball will land; the left one waits aside while the chef plays
+    const aim = (who, x, y) => { const moved = !U.moveToward(who, x, y, 90, dt); who.bob = moved ? who.bob + dt * 14 : 0; };
+    if (vb.chef) aim(A, SU.ASIDE.x, SU.ASIDE.y); else aim(A, SU.PLAYERS[0].x, b.to.x < SU.NET.x ? b.to.y : SU.PLAYERS[0].y);
+    aim(B, SU.PLAYERS[1].x, b.to.x > SU.NET.x ? b.to.y : SU.PLAYERS[1].y);
+    A.facing = vb.chef ? (p.x < A.x ? -1 : 1) : 1; B.facing = -1;
+    if (vb.wait) return;
+    b.t += dt;
+    if (b.t < SU.FLIGHT) return;
+    // landed at someone: they bump it straight back (the chef gets it bouncing above the head, waiting for the button)
+    if (b.to.x > SU.NET.x) {
+      vb.hitT[1] = 0.3;
+      if (vb.chef) { this.serve(B.x - 6, B.y, p.x, p.y, 'B'); }
+      else this.serve(B.x - 6, B.y, A.x, U.rand(SU.COURT.y0 + 26, SU.COURT.y1 - 26), 'B');
+    } else if (vb.chef) { vb.wait = true; b.t = 0; }
+    else { vb.hitT[0] = 0.3; this.serve(A.x + 6, A.y, B.x, U.rand(SU.COURT.y0 + 26, SU.COURT.y1 - 26), 'A'); }
+  },
+  // ---- Starfish Cove: peek into a tide pool and something living there pops up
+  nearPool(g) {
+    if (g.driving) return -1;
+    const p = g.player;
+    return CFG.ISLANDS.COVE.POOLS.findIndex((P) => Math.abs(p.x - P.x) < P.rx + 24 && Math.abs(p.y - P.y) < P.ry + 26);
+  },
+  peekPool(g, i) {
+    const rt = this.rt, C = CFG.ISLANDS.COVE, P = C.POOLS[i], c = C.CRITTERS[rt.peekN % C.CRITTERS.length];
+    rt.peekN++; g.s.islands.peeks++;
+    rt.peek = { i, t: 0, k: (rt.peekN - 1) % C.CRITTERS.length };
+    g.floats.push({ x: P.x, y: P.y - 50, text: c[0], color: '#ffe08a', t: 0, dur: 1.6, big: true });
+    for (let k = 0; k < 4; k++) g.fx.push({ kind: 'sparkle', x0: P.x + U.rand(-P.rx * 0.6, P.rx * 0.6), y0: P.y + U.rand(-6, 6), x1: 0, y1: 0, t: -k * 0.06, dur: 0.5 });
+    Sfx.ding(); Haptics.tap();
+  },
+  // ---- a treat in the chef's hand (the kiosk's shaved ice, the Crab Shack's cookie, the Coconut Hut's drink)
+  giveTreat(g, kind, secs) { if (this.rt) this.rt.treat = { kind, t: secs || 30 }; },
+  home(g) {
+    if (!this.rt) return;
+    const vb = this.rt.vb, SU = CFG.ISLANDS.SUNNY;
+    this.rt.treat = null; this.rt.peek = null;
+    vb.chef = false; vb.wait = false; vb.rally = 0;
+    this.serve(SU.PLAYERS[0].x, SU.PLAYERS[0].y, SU.PLAYERS[1].x, SU.PLAYERS[1].y, 'A');
   },
   horn() { Sfx.tone(170, 0.5, 'sawtooth', 0.045); setTimeout(() => Sfx.tone(170, 0.7, 'sawtooth', 0.045), 650); },
   boardFerry(g, to) {
@@ -256,7 +396,15 @@ const IslandsExt = {
     // hopping off in open water: swim to the nearest beach
     if (rt.wasDriving && !g.driving && g.area === 'islands') this.swimToShore(g);
     rt.wasDriving = g.driving;
+    if (rt.treat) { rt.treat.t -= dt; if (rt.treat.t <= 0) rt.treat = null; }
     if (!inIslands) return;
+    // the first time the chef sets foot on one of the new islands, a friendly welcome
+    for (const sI of I.ISLANDS) {
+      if (!sI.toast || st.seen[sI.key] || g.driving || p.x < sI.x0 || p.x > sI.x1 || p.y < sI.y0 || p.y > sI.y1) continue;
+      st.seen[sI.key] = true; g.toast(sI.toast, true);
+    }
+    this.updateVolleyball(g, dt);
+    if (rt.peek) { rt.peek.t += dt; if (rt.peek.t > 2.2) rt.peek = null; }
     // crabs scuttle sideways along their beach, pausing now and then
     for (const c of rt.crabs) {
       if (c.pause > 0) { c.pause -= dt; continue; }
@@ -302,6 +450,7 @@ const IslandsExt = {
       if (p.carry === 0 && st.pile > 0) return { text: 'Park at the beach and grab pizzas', target: I.STAND.pile };
       return { text: 'Zoom! Ride around the islands', target: null };
     }
+    if (!(p.carry > 0 && order)) { const loc = this.localHint(g); if (loc) return loc; }
     if (!st.standOwned) {
       const need = I.STAND.price - (g.s.padPaid.islandStand || 0) - g.s.cash;
       return need > 0 ? { text: `Save up ${U.money(need)} more for the pizza stand`, target: I.STAND.pad } : { text: 'Set up the pizza stand', target: I.STAND.pad };
@@ -312,6 +461,22 @@ const IslandsExt = {
     if (p.carry > 0) return { text: 'Hop on the jet ski and find a hungry hut!', target: js };
     if (order) return { text: 'Pizzas are baking… get ready!', target: I.STAND.pile };
     return U.dist(p.x, p.y, js.x, js.y) < 70 ? { text: 'Hop on the jet ski!', target: null } : { text: 'Hop on the jet ski!', target: js };
+  },
+
+  // the things to do on Sunny Beach and Starfish Cove, when the chef is right there
+  localHint(g) {
+    const I = CFG.ISLANDS, p = g.player, rt = this.rt, SU = I.SUNNY;
+    if (this.atCourt(g)) return rt.vb.wait ? { text: 'Hit the ball back over the net! 🏐', target: null } : { text: 'Press the button to hit the ball! 🏐', target: null };
+    const C = SU.COURT;
+    if (p.x > C.x0 - 80 && p.x < C.x1 + 60 && p.y > C.y0 - 70 && p.y < C.y1 + 60) return { text: 'Play volleyball! 🏐', target: { x: SU.PLAYERS[0].x - 20, y: SU.PLAYERS[0].y + 40 } };
+    const dk = U.dist(p.x, p.y, SU.PAD.x, SU.PAD.y);
+    if (dk < 110) {
+      if (rt.treat && rt.treat.kind === 'snowcone') return { text: 'Yum, shaved ice! 🍧', target: null };
+      return g.s.cash + (g.s.padPaid.sunnySnack || 0) >= SU.PRICE ? { text: 'Stand on the circle for a shaved ice! 🍧', target: dk < 30 ? null : SU.PAD } : { text: 'Shaved ice costs $3 🍧', target: null };
+    }
+    if (this.nearPool(g) >= 0) return { text: 'Peek in the tide pool! ⭐', target: null };
+    for (const P of I.COVE.POOLS) if (U.dist(p.x, p.y, P.x, P.y) < 110) return { text: 'Peek in the tide pools! ⭐', target: { x: P.x, y: P.y + P.ry + 14 } };
+    return null;
   },
 
   // ======================= render hooks =======================
@@ -418,7 +583,121 @@ const IslandsExt = {
       ctx.fillStyle = '#5b3a1a'; ctx.fillRect(2817, 2010, 6, 34);
       ctx.fillStyle = '#f2b705'; U.roundRect(ctx, 2760, 1980, 120, 34, 6); ctx.fill();
       ctx.fillStyle = '#2b1d14'; ctx.font = r.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🏝️ PIZZA ISLAND', 2820, 1992); ctx.font = r.font(8); ctx.fillText('jet ski at the beach →', 2820, 2006);
+      // the way south: sandbar, rope bridges, the marina pier; then what is on Sunny Beach and Starfish Cove
+      for (const L of I.LINKS) E.paintLink(r, L);
+      E.paintSunny(r, g);
+      E.paintCove(r, g);
+      E.signpost(r, 2928, 2408, '🏖️ SUNNY BEACH', 'walk across the sand ↓');
+      E.signpost(r, 3226, 2694, '⭐ STARFISH COVE', 'over the bridge →');
+      E.signpost(r, 3655, 2694, '🚀 ROCKET ISLAND', 'over the bridge →');
     },
+  },
+  signpost(r, x, y, title, sub) {
+    const ctx = r.ctx; ctx.font = r.font(10); const w = Math.max(ctx.measureText(title).width, 70) + 18;
+    ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(x + 3, y + 2, 8, 3, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#5b3a1a'; ctx.fillRect(x - 3, y - 30, 6, 32);
+    ctx.fillStyle = '#f2b705'; U.roundRect(ctx, x - w / 2, y - 58, w, 32, 6); ctx.fill();
+    ctx.fillStyle = '#2b1d14'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(title, x, y - 48); ctx.font = r.font(7); ctx.fillText(sub, x, y - 35);
+  },
+  // the sandbar (wet sand with puddles), a rope bridge (planks, posts and sagging ropes) or the marina pier
+  paintLink(r, L) {
+    const ctx = r.ctx, w = L.x1 - L.x0, h = L.y1 - L.y0;
+    if (L.kind === 'sand') {
+      ctx.fillStyle = '#c6ecf8'; U.roundRect(ctx, L.x0 - 18, L.y0, w + 36, h, 22); ctx.fill();
+      ctx.fillStyle = '#e8cf8f'; U.roundRect(ctx, L.x0 - 6, L.y0, w + 12, h, 18); ctx.fill();
+      ctx.fillStyle = '#f2dea2'; U.roundRect(ctx, L.x0 + 2, L.y0, w - 4, h, 14); ctx.fill();
+      ctx.fillStyle = 'rgba(111,195,236,0.55)'; for (const [dx, dy, rx] of [[12, 40, 9], [50, 76, 7], [20, 120, 11], [56, 150, 6]]) { ctx.beginPath(); ctx.ellipse(L.x0 + dx, L.y0 + dy, rx, rx * 0.5, 0, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = 'rgba(0,0,0,0.08)'; for (let k = 0; k < 7; k++) { const fy = L.y0 + 22 + k * 22, fx = L.x0 + w / 2 + (k % 2 ? 7 : -7); ctx.beginPath(); ctx.ellipse(fx, fy, 3, 5, 0, 0, Math.PI * 2); ctx.fill(); }   // footprints
+      ctx.fillStyle = '#ff9f43'; for (let k = 0; k < 5; k++) { const a = (k / 5) * Math.PI * 2; ctx.beginPath(); ctx.ellipse(L.x0 + 14 + Math.cos(a) * 4, L.y0 + 98 + Math.sin(a) * 4, 5, 2.2, a, 0, Math.PI * 2); ctx.fill(); }
+      return;
+    }
+    if (L.kind === 'pier') {
+      ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(L.x0 + 5, L.y0 + 6, w, h);
+      this.drawPlanks(ctx, L.x0, L.y0, w, h, false);
+      ctx.fillStyle = '#6b4a2b'; for (let y = L.y0 + 30; y < L.y1 - 10; y += 46) for (const x of [L.x0 + 4, L.x1 - 4]) { ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = '#5c6670'; for (const [x, y] of [[L.x0 + 2, L.y0 + 86], [L.x1 - 12, L.y0 + 104]]) { U.roundRect(ctx, x, y, 10, 6, 2); ctx.fill(); }   // cleats for the boats' ropes
+      ctx.fillStyle = '#3b7dd8'; U.roundRect(ctx, L.x0 - 6, L.y1 - 46, w + 12, 16, 4); ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = r.font(8); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('⛵ MARINA', (L.x0 + L.x1) / 2, L.y1 - 38);
+      return;
+    }
+    // a rope bridge running east-west: shadow on the water, planks across, a post at each end and rope rails
+    ctx.fillStyle = 'rgba(0,0,0,0.16)'; ctx.fillRect(L.x0 + 4, L.y0 + 10, w, h);
+    ctx.fillStyle = '#b98a55'; ctx.fillRect(L.x0, L.y0 + 6, w, h - 12);
+    ctx.fillStyle = 'rgba(0,0,0,0.16)'; for (let x = L.x0; x < L.x1; x += 11) ctx.fillRect(x, L.y0 + 6, 2, h - 12);
+    ctx.fillStyle = 'rgba(255,255,255,0.14)'; ctx.fillRect(L.x0, L.y0 + 6, w, 2);
+    for (const ry of [L.y0 + 4, L.y1 - 4]) {
+      ctx.strokeStyle = '#d9b27c'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(L.x0, ry); ctx.quadraticCurveTo((L.x0 + L.x1) / 2, ry + 7, L.x1, ry); ctx.stroke();
+      ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(L.x0, ry + 2); ctx.quadraticCurveTo((L.x0 + L.x1) / 2, ry + 9, L.x1, ry + 2); ctx.stroke();
+      ctx.fillStyle = '#6b4a2b'; for (const px of [L.x0 + 4, L.x0 + w / 3, L.x0 + (2 * w) / 3, L.x1 - 4]) { ctx.beginPath(); ctx.arc(px, ry + (px === L.x0 + 4 || px === L.x1 - 4 ? 0 : 5), 4.5, 0, Math.PI * 2); ctx.fill(); }
+    }
+  },
+  // Sunny Beach: court lines, the net's shadow, beach towels and umbrellas, a sandcastle, the kiosk's back and roof
+  paintSunny(r, g) {
+    const ctx = r.ctx, SU = CFG.ISLANDS.SUNNY, C = SU.COURT, N = SU.NET, K = SU.KIOSK;
+    ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(C.x0, C.y0, C.x1 - C.x0, C.y1 - C.y0);
+    ctx.strokeStyle = '#3b7dd8'; ctx.lineWidth = 4; ctx.strokeRect(C.x0, C.y0, C.x1 - C.x0, C.y1 - C.y0);
+    ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(N.x - 2, N.y0 + 6, 18, N.y1 - N.y0 - 8);   // the net's shadow
+    for (const [x, y, col] of SU.TOWELS) { ctx.fillStyle = col; U.roundRect(ctx, x - 22, y - 13, 44, 26, 4); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.7)'; for (let k = 0; k < 3; k++) ctx.fillRect(x - 22, y - 8 + k * 8, 44, 2.5); }
+    for (const [x, y, col] of SU.UMBRELLAS) {
+      ctx.fillStyle = 'rgba(0,0,0,0.14)'; ctx.beginPath(); ctx.ellipse(x + 12, y + 30, 30, 10, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#5b3a1a'; ctx.fillRect(x - 1.5, y - 10, 3, 40);
+      for (let k = 0; k < 6; k++) { ctx.fillStyle = k % 2 ? '#fff' : col; ctx.beginPath(); ctx.moveTo(x, y - 10); ctx.arc(x, y - 10, 28, Math.PI + (k / 6) * Math.PI, Math.PI + ((k + 1) / 6) * Math.PI); ctx.closePath(); ctx.fill(); }
+    }
+    this.paintSandcastle(ctx, SU.CASTLE.x, SU.CASTLE.y);
+    ctx.fillStyle = '#fff3e0'; for (const [x, y] of [[2760, 2650], [3000, 2700], [3210, 2760], [2820, 2860], [3080, 2880]]) { ctx.beginPath(); ctx.ellipse(x, y, 6, 4, 0.4, 0, Math.PI * 2); ctx.fill(); }
+    // the kiosk: thatched roof behind the counter (the counter and the seller are drawn live), a big sign
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; U.roundRect(ctx, K.x - K.w / 2 + 4, K.y - 66, K.w, 92, 12); ctx.fill();
+    ctx.fillStyle = '#8fd6f2'; ctx.fillRect(K.x - K.w / 2 + 6, K.y - 46, K.w - 12, 40);   // the back wall, sky blue
+    ctx.fillStyle = '#d9b55a'; U.roundRect(ctx, K.x - K.w / 2 - 4, K.y - 74, K.w + 8, 34, 12); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.12)'; for (let y = K.y - 68; y < K.y - 44; y += 7) ctx.fillRect(K.x - K.w / 2, y, K.w, 2);
+    for (let i = 0; i < 10; i++) { ctx.fillStyle = i % 2 ? '#fff' : '#ff8fab'; const x = K.x - K.w / 2 - 4 + i * (K.w + 8) / 10; ctx.fillRect(x, K.y - 44, (K.w + 8) / 10, 8); ctx.beginPath(); ctx.arc(x + (K.w + 8) / 20, K.y - 36, (K.w + 8) / 20, 0, Math.PI); ctx.fill(); }
+    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, K.x - 50, K.y - 96, 100, 20, 6); ctx.fill();
+    ctx.fillStyle = '#ffe08a'; ctx.font = r.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🍧 SHAVED ICE', K.x, K.y - 86);
+  },
+  // the kiosk's counter front with the syrup bottles, drawn over the seller's legs
+  drawKioskFront(r, g) {
+    const ctx = r.ctx, K = CFG.ISLANDS.SUNNY.KIOSK;
+    ctx.fillStyle = '#8a5527'; U.roundRect(ctx, K.x - K.w / 2, K.y - 10, K.w, 32, 6); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.12)'; for (let x = K.x - K.w / 2 + 8; x < K.x + K.w / 2; x += 14) ctx.fillRect(x, K.y - 4, 2, 24);
+    ctx.fillStyle = '#d9b27c'; U.roundRect(ctx, K.x - K.w / 2 - 2, K.y - 16, K.w + 4, 12, 5); ctx.fill();
+    ['#e4572e', '#3b7dd8', '#ffd166', '#41b883'].forEach((col, i) => { const x = K.x - 44 + i * 12; ctx.fillStyle = col; U.roundRect(ctx, x, K.y - 32, 8, 18, 3); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(x + 2, K.y - 37, 4, 6); });
+    // an ice block and a few cones on the counter
+    ctx.fillStyle = '#e3f6ff'; U.roundRect(ctx, K.x + 14, K.y - 30, 22, 16, 3); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(K.x + 17, K.y - 28, 6, 3);
+    for (let k = 0; k < 2; k++) this.drawSnowcone(ctx, K.x + 46 + k * 10, K.y - 18, ['#e4572e', '#3b7dd8'][k], 0.7);
+    ctx.fillStyle = '#fff8ee'; U.roundRect(ctx, K.x - 22, K.y + 2, 44, 14, 3); ctx.fill(); ctx.fillStyle = '#2b1d14'; ctx.font = r.font(8); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('$3 🍧', K.x, K.y + 9);
+  },
+  drawSnowcone(ctx, x, y, col, s = 1) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+    ctx.fillStyle = '#fff8ee'; ctx.beginPath(); ctx.moveTo(-6, -4); ctx.lineTo(6, -4); ctx.lineTo(3, 10); ctx.lineTo(-3, 10); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.15)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-6, -4); ctx.lineTo(6, -4); ctx.lineTo(3, 10); ctx.lineTo(-3, 10); ctx.closePath(); ctx.stroke();
+    ctx.fillStyle = col; ctx.beginPath(); ctx.arc(0, -6, 7, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(-3, -7, 3.5, Math.PI, 0); ctx.fill(); ctx.fillStyle = '#3b7dd8'; ctx.beginPath(); ctx.arc(3.5, -7, 3, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.beginPath(); ctx.arc(-1, -10, 1.6, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  },
+  // Starfish Cove: boulders, the tide pools with starfish and anemones (fish swim in them live)
+  paintCove(r, g) {
+    const ctx = r.ctx, C = CFG.ISLANDS.COVE;
+    for (const [x, y, rr] of [[3420, 2740, 14], [3690, 2800, 12], [3560, 2610, 10], [3530, 2870, 11]]) { ctx.fillStyle = '#7d8591'; ctx.beginPath(); ctx.ellipse(x, y, rr, rr * 0.65, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#9aa2ad'; ctx.beginPath(); ctx.ellipse(x - rr * 0.25, y - rr * 0.2, rr * 0.5, rr * 0.3, 0, 0, Math.PI * 2); ctx.fill(); }
+    C.POOLS.forEach((P, i) => {
+      ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.beginPath(); ctx.ellipse(P.x + 3, P.y + 4, P.rx + 10, P.ry + 8, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#8d949e'; ctx.beginPath(); ctx.ellipse(P.x, P.y, P.rx + 9, P.ry + 7, 0, 0, Math.PI * 2); ctx.fill();
+      for (let k = 0; k < 10; k++) { const a = (k / 10) * Math.PI * 2; ctx.fillStyle = k % 2 ? '#7d8591' : '#a4acb6'; ctx.beginPath(); ctx.ellipse(P.x + Math.cos(a) * (P.rx + 5), P.y + Math.sin(a) * (P.ry + 4), 7, 4.5, a, 0, Math.PI * 2); ctx.fill(); }
+      const wg = ctx.createRadialGradient(P.x - P.rx * 0.3, P.y - P.ry * 0.3, 2, P.x, P.y, P.rx); wg.addColorStop(0, '#9fe6f0'); wg.addColorStop(1, '#2fa3b8');
+      ctx.fillStyle = wg; ctx.beginPath(); ctx.ellipse(P.x, P.y, P.rx, P.ry, 0, 0, Math.PI * 2); ctx.fill();
+      // seaweed, anemones and a starfish on the bottom
+      ctx.strokeStyle = '#2e8b57'; ctx.lineWidth = 2; for (let k = 0; k < 3; k++) { const sx = P.x - P.rx * 0.6 + k * 9; ctx.beginPath(); ctx.moveTo(sx, P.y + P.ry * 0.6); ctx.quadraticCurveTo(sx + 5, P.y + 2, sx - 2, P.y - 4); ctx.stroke(); }
+      ctx.fillStyle = '#ff8fab'; for (let k = 0; k < 2; k++) { ctx.beginPath(); ctx.arc(P.x + P.rx * 0.45 + k * 8, P.y + P.ry * 0.35 - k * 5, 3.5, 0, Math.PI * 2); ctx.fill(); }
+      this.drawStar(ctx, P.x + P.rx * 0.15, P.y - P.ry * 0.2, 7, ['#ff9f43', '#e4572e', '#ffd166'][i % 3]);
+      ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.beginPath(); ctx.ellipse(P.x - P.rx * 0.4, P.y - P.ry * 0.45, P.rx * 0.3, 2.5, 0, 0, Math.PI * 2); ctx.fill();
+    });
+    // starfish on the sand too
+    for (const [x, y, col] of [[3440, 2700, '#ff9f43'], [3650, 2770, '#e4572e'], [3540, 2860, '#ffd166']]) this.drawStar(ctx, x, y, 6, col);
+  },
+  drawStar(ctx, x, y, rr, col) {
+    ctx.fillStyle = col; ctx.beginPath();
+    for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + (k / 10) * Math.PI * 2, d = k % 2 ? rr * 0.45 : rr; ctx.lineTo(x + Math.cos(a) * d, y + Math.sin(a) * d); }
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.beginPath(); ctx.arc(x, y, rr * 0.18, 0, Math.PI * 2); ctx.fill();
   },
   paintIsland(r, s) {
     const ctx = r.ctx, w = s.x1 - s.x0, h = s.y1 - s.y0, rad = Math.min(56, w / 2.4, h / 2.4);
@@ -437,7 +716,7 @@ const IslandsExt = {
     ctx.fillStyle = '#e8cf8f'; U.roundRect(ctx, s.x0 - 2, s.y0 - 2, w + 4, h + 4, rad); ctx.fill();   // wet sand edge
     ctx.fillStyle = '#f6e4ad'; U.roundRect(ctx, s.x0, s.y0, w, h, rad); ctx.fill();
     ctx.fillStyle = 'rgba(0,0,0,0.05)'; for (let i = 0; i < w * h / 900; i++) { const x = s.x0 + 8 + ((i * 193) % (w - 16)), y = s.y0 + 8 + ((i * 101) % (h - 16)); ctx.beginPath(); ctx.ellipse(x, y, 3, 1.5, 0, 0, Math.PI * 2); ctx.fill(); }
-    if (w > 200 && h > 160) {
+    if (w > 200 && h > 160 && !s.sand) {
       const gx = s.x0 + 40, gy = s.y0 + 40, gw = w - 80, gh = h - 80;
       ctx.fillStyle = '#79b85e'; U.roundRect(ctx, gx, gy, gw, gh, rad * 0.8); ctx.fill();
       ctx.fillStyle = 'rgba(0,0,0,0.07)'; for (let i = 0; i < gw * gh / 1400; i++) { const x = gx + 6 + ((i * 193) % (gw - 12)), y = gy + 6 + ((i * 101) % (gh - 12)); ctx.beginPath(); ctx.ellipse(x, y, 7, 3.5, 0, 0, Math.PI * 2); ctx.fill(); }
@@ -557,6 +836,10 @@ const IslandsExt = {
     ctx.fillStyle = '#fff'; ctx.fillRect(-11, -2, 22, 3);
     ctx.fillStyle = '#e4572e'; ctx.fillRect(-4, -24, 8, 22); ctx.fillStyle = Math.floor(t * 2) % 2 ? '#ffe08a' : '#f2b134'; ctx.beginPath(); ctx.arc(0, -26, 4, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
+    this.drawCoveLive(r, g);
+    this.drawCruiser(r, g);
+    // the volleyball's shadow on the sand
+    { const b = this.ballPos(g); ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(b.x, b.y + 2, 7 - Math.min(4, b.h / 50), 3, 0, 0, Math.PI * 2); ctx.fill(); }
     // the dolphin's jump
     const d = rt.dolphin;
     if (d.t >= 0 && d.t <= 1.6) this.drawDolphin(ctx, d, t);
@@ -580,6 +863,96 @@ const IslandsExt = {
         r.drawBubble(h.hut.x, hy - 10, () => { ctx.font = r.font(14); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('😋', 0, 0); }, 30);
       }
     }
+  },
+  // a beach player: shorts and a tank top, arms up when they hit the ball
+  drawPlayerVB(r, g, w, i) {
+    const ctx = r.ctx, vb = this.rt.vb, hit = vb.hitT[i] > 0, cheer = i === 0 && vb.chef;
+    r.drawPerson(w.x, w.y, { shirt: i ? '#ff8fab' : '#ffd166', skin: i ? '#8d5524' : '#f1c27d', hair: i ? '#2b1d14' : '#e0b44c', hairStyle: i ? 2 : 1, facing: w.facing, moving: w.bob > 0, bob: w.bob, carry: 0, pants: i ? '#3b7dd8' : '#41b883' });
+    if (hit || cheer) {
+      const up = cheer ? Math.abs(Math.sin(g.time * 6)) * 6 : 0;
+      ctx.fillStyle = i ? '#8d5524' : '#f1c27d';
+      for (const d of [-1, 1]) { ctx.beginPath(); ctx.arc(w.x + d * 9, w.y - 52 - up, 4, 0, Math.PI * 2); ctx.fill(); }
+      if (cheer && Math.sin(g.time * 3) > 0.6) { ctx.font = r.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('Go chef!', w.x, w.y - 70); }
+    }
+  },
+  // the net seen from the front-ish: two poles and a mesh band between their tops
+  drawNet(r, g) {
+    const ctx = r.ctx, N = CFG.ISLANDS.SUNNY.NET, H = 34;
+    ctx.fillStyle = '#5c6670'; for (const y of [N.y0, N.y1]) { ctx.fillRect(N.x - 2.5, y - H - 6, 5, H + 6); ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(N.x, y, 6, 2.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#5c6670'; }
+    ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(N.x - 2, N.y0 - H, 4, N.y1 - N.y0);
+    ctx.strokeStyle = 'rgba(43,29,20,0.55)'; ctx.lineWidth = 1;
+    for (let y = N.y0 - H; y < N.y1 - H; y += 6) { ctx.beginPath(); ctx.moveTo(N.x - 3, y); ctx.lineTo(N.x + 3, y + 6); ctx.moveTo(N.x + 3, y); ctx.lineTo(N.x - 3, y + 6); ctx.stroke(); }
+    ctx.fillStyle = '#fff'; ctx.fillRect(N.x - 3, N.y0 - H - 2, 6, 3); ctx.fillRect(N.x - 3, N.y1 - H - 2, 6, 3);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(N.x, N.y0 - H); ctx.lineTo(N.x, N.y1 - H); ctx.stroke();
+  },
+  // a sailboat seen from above with its sail standing up: angle is the heading
+  drawSailboat(r, g, x, y, angle, B, phase) {
+    const ctx = r.ctx, t = g.time + phase, bob = Math.sin(t * 1.7) * 1.5;
+    ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.beginPath(); ctx.ellipse(x, y + 4, 22, 22, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.save(); ctx.translate(x, y + bob); ctx.rotate(angle);
+    ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(3, 4, 34, 13, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = B.hull; ctx.beginPath(); ctx.moveTo(36, 0); ctx.quadraticCurveTo(22, -13, -6, -12); ctx.lineTo(-30, -10); ctx.quadraticCurveTo(-34, 0, -30, 10); ctx.lineTo(-6, 12); ctx.quadraticCurveTo(22, 13, 36, 0); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#d9b27c'; ctx.beginPath(); ctx.moveTo(28, 0); ctx.quadraticCurveTo(18, -9, -4, -8); ctx.lineTo(-26, -7); ctx.quadraticCurveTo(-29, 0, -26, 7); ctx.lineTo(-4, 8); ctx.quadraticCurveTo(18, 9, 28, 0); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.12)'; for (let k = -20; k < 24; k += 7) ctx.fillRect(k, -7, 1.5, 14);
+    ctx.fillStyle = '#fff'; U.roundRect(ctx, -24, -5, 12, 10, 3); ctx.fill();
+    ctx.restore();
+    // the mast and sail stand up off the deck, flapping a little
+    const mx = x + Math.cos(angle) * 6, my = y + bob + Math.sin(angle) * 6, sw = Math.sin(t * 2.3) * 3;
+    ctx.fillStyle = '#5b3a1a'; ctx.fillRect(mx - 1.5, my - 62, 3, 62);
+    ctx.fillStyle = B.sail; ctx.strokeStyle = 'rgba(43,29,20,0.3)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(mx + 2, my - 60); ctx.quadraticCurveTo(mx + 22 + sw, my - 32, mx + 28, my - 6); ctx.lineTo(mx + 2, my - 6); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(mx - 2, my - 50); ctx.quadraticCurveTo(mx - 14 + sw * 0.5, my - 30, mx - 16, my - 10); ctx.lineTo(mx - 2, my - 10); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = B.flag; ctx.beginPath(); ctx.moveTo(mx, my - 62); ctx.lineTo(mx + 12, my - 59 + sw * 0.5); ctx.lineTo(mx, my - 56); ctx.closePath(); ctx.fill();
+  },
+  // a sailboat cruising round the open water up north, with a little wake
+  drawCruiser(r, g) {
+    const L = CFG.ISLANDS.COVE.SAIL_LOOP, a = (g.time / L.period) * Math.PI * 2;
+    const x = L.x + Math.cos(a) * L.rx, y = L.y + Math.sin(a) * L.ry;
+    if (x < r.camX - 90 || x > r.camX + r.viewW + 90 || y < r.camY - 90 || y > r.camY + r.viewH + 90) return;
+    const ctx = r.ctx, head = Math.atan2(Math.cos(a) * L.ry, -Math.sin(a) * L.rx);
+    for (let k = 1; k < 6; k++) { const b = a - k * 0.03, wx = L.x + Math.cos(b) * L.rx, wy = L.y + Math.sin(b) * L.ry; ctx.fillStyle = `rgba(255,255,255,${(0.5 - k * 0.08).toFixed(2)})`; ctx.beginPath(); ctx.arc(wx, wy, 4 + k * 2, 0, Math.PI * 2); ctx.fill(); }
+    this.drawSailboat(r, g, x, y, head, { hull: '#fff8ee', sail: '#ff8fab', flag: '#41b883' }, 1.7);
+  },
+  // the tide pools come alive: little fish dart about, and whatever you peeked at pops up with a splash
+  drawCoveLive(r, g) {
+    const ctx = r.ctx, C = CFG.ISLANDS.COVE, t = g.time, rt = this.rt;
+    C.POOLS.forEach((P, i) => {
+      for (let k = 0; k < 2; k++) {
+        const a = t * (0.9 + k * 0.4) + i * 2 + k * 3, fx = P.x + Math.cos(a) * P.rx * 0.55, fy = P.y + Math.sin(a * 1.3) * P.ry * 0.45, dir = -Math.sin(a) >= 0 ? 1 : -1;
+        ctx.fillStyle = k ? '#ffd166' : '#ff8c42'; ctx.beginPath(); ctx.ellipse(fx, fy, 5, 2.6, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(fx - dir * 4, fy); ctx.lineTo(fx - dir * 9, fy - 3); ctx.lineTo(fx - dir * 9, fy + 3); ctx.closePath(); ctx.fill();
+      }
+      const ring = (t * 0.5 + i * 0.3) % 1; ctx.strokeStyle = `rgba(255,255,255,${(0.4 * (1 - ring)).toFixed(2)})`; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(P.x + P.rx * 0.2, P.y, 4 + ring * P.rx * 0.5, 2 + ring * P.ry * 0.5, 0, 0, Math.PI * 2); ctx.stroke();
+    });
+    const pk = rt.peek;
+    if (pk) {
+      const P = C.POOLS[pk.i], k = Math.min(1, pk.t / 0.35), out = pk.t < 1.8 ? k : Math.max(0, 1 - (pk.t - 1.8) / 0.4);
+      for (let j = 0; j < 2; j++) { const q = (pk.t * 1.2 + j * 0.4) % 1; ctx.strokeStyle = `rgba(255,255,255,${(0.7 * (1 - q)).toFixed(2)})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(P.x, P.y, 6 + q * P.rx, 3 + q * P.ry, 0, 0, Math.PI * 2); ctx.stroke(); }
+      ctx.font = r.font(26); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.globalAlpha = out; ctx.fillText(C.CRITTERS[pk.k][1], P.x, P.y - 8 - out * 16 + Math.sin(pk.t * 8) * 2); ctx.globalAlpha = 1;
+    }
+  },
+  // the treat in the chef's hand, held out to the side
+  drawTreat(r, g, kind) {
+    const ctx = r.ctx, p = g.player, f = p.facing || 1, x = p.x + f * 17, y = p.y - 20 + (p.moving ? Math.sin(p.bob || 0) * 2 : 0), t = g.time;
+    if (kind === 'snowcone') { this.drawSnowcone(ctx, x, y - 2, '#e4572e', 1); return; }
+    if (kind === 'cookie') {   // a crab-shaped cookie with icing eyes
+      ctx.fillStyle = '#d98e3f'; ctx.beginPath(); ctx.ellipse(x, y, 9, 6.5, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(x - 9, y - 6, 3.5, 0, Math.PI * 2); ctx.arc(x + 9, y - 6, 3.5, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#d98e3f'; ctx.lineWidth = 2; for (const d of [-1, 1]) for (let k = 0; k < 2; k++) { ctx.beginPath(); ctx.moveTo(x + d * 7, y + 2 + k * 3); ctx.lineTo(x + d * 12, y + 6 + k * 3); ctx.stroke(); }
+      ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.ellipse(x, y + 1, 5, 3, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x - 3, y - 4, 2, 0, Math.PI * 2); ctx.arc(x + 3, y - 4, 2, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.arc(x - 3, y - 4, 0.9, 0, Math.PI * 2); ctx.arc(x + 3, y - 4, 0.9, 0, Math.PI * 2); ctx.fill();
+      return;
+    }
+    // a coconut with a straw and a tiny umbrella
+    ctx.fillStyle = '#6b4a2b'; ctx.beginPath(); ctx.arc(x, y, 8, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#f5f0dc'; ctx.beginPath(); ctx.ellipse(x, y - 4, 6, 2.5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#ff8fab'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x + 2, y - 4); ctx.lineTo(x + 6, y - 16); ctx.stroke();
+    ctx.strokeStyle = '#8d5a2b'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x - 2, y - 4); ctx.lineTo(x - 5, y - 15); ctx.stroke();
+    ctx.fillStyle = '#41b883'; ctx.beginPath(); ctx.moveTo(x - 5, y - 15); ctx.arc(x - 5, y - 15, 7, Math.PI * 1.1, Math.PI * 1.9); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.beginPath(); ctx.arc(x - 3, y + 2, 2, 0, Math.PI * 2); ctx.fill();
+    if (Math.sin(t * 2) > 0.7) { ctx.fillStyle = 'rgba(159,224,255,0.8)'; ctx.beginPath(); ctx.arc(x + 6, y - 18 - ((t * 20) % 6), 1.5, 0, Math.PI * 2); ctx.fill(); }
   },
   drawDolphin(ctx, d, t) {
     const q = d.t / 1.6, px = d.x + d.dir * (q * 130 - 65), py = d.y - Math.sin(q * Math.PI) * 60 + 6;
@@ -632,8 +1005,16 @@ const IslandsExt = {
 
   // ---- y-sorted things: the jet ski, palms, the lighthouse
   entities(r, g, items) {
-    if (g.area !== 'islands' || !this.rt) return;
-    const js = this.rt.jetski;
+    if (!this.rt) return;
+    const p = g.player, tr = this.rt.treat;
+    if (tr && !g.driving && !g.onTrain && !g.travel) items.push({ y: p.y + 1, draw: () => this.drawTreat(r, g, tr.kind) });
+    if (g.area !== 'islands') return;
+    const js = this.rt.jetski, SU = CFG.ISLANDS.SUNNY, K = SU.KIOSK, vb = this.rt.vb;
+    vb.who.forEach((w, i) => items.push({ y: w.y, draw: () => this.drawPlayerVB(r, g, w, i) }));
+    items.push({ y: SU.NET.y0, draw: () => this.drawNet(r, g) });
+    items.push({ y: K.y + 4, draw: () => r.drawPerson(K.x + Math.sin(g.time * 0.7) * 18, K.y + 4, { shirt: '#4dd0e1', skin: '#c68642', hair: '#2b1d14', hairStyle: 1, facing: 1, moving: false, bob: 0, carry: 0, pants: '#3a3f5c', apron: '#fff' }) });
+    items.push({ y: K.y + 22, draw: () => this.drawKioskFront(r, g) });
+    for (const B of CFG.ISLANDS.COVE.BOATS) items.push({ y: B.y + 36, draw: () => this.drawSailboat(r, g, B.x, B.y, -Math.PI / 2, B, 0.5) });
     items.push({ y: js.y + 8, draw: () => r.drawSiteVehicle(g, js, 24) });
     for (const s of CFG.ISLANDS.ISLANDS) {
       if (s.palms) for (const [px, py] of s.palms) items.push({ y: py, draw: () => this.drawPalm(r, g, px, py) });
@@ -676,6 +1057,8 @@ const IslandsExt = {
   overlay(r, g) {
     if (g.area !== 'islands') return;
     const ctx = r.ctx, t = g.time;
+    // the volleyball, high over the net
+    if (this.rt) { const b = this.ballPos(g), y = b.y - b.h; ctx.fillStyle = '#fff8ee'; ctx.beginPath(); ctx.arc(b.x, y, 8, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#3b7dd8'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(b.x, y, 8, 0.2, 1.6); ctx.stroke(); ctx.strokeStyle = '#ffd166'; ctx.beginPath(); ctx.arc(b.x, y, 8, 2.3, 3.8); ctx.stroke(); ctx.strokeStyle = 'rgba(43,29,20,0.4)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(b.x, y, 8, 0, Math.PI * 2); ctx.stroke(); }
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
     for (let i = 0; i < 4; i++) {
       const cx = 3600 + (i % 2) * 500, cy = 1800 + Math.floor(i / 2) * 400, a = t * 0.35 + i * 1.7;

@@ -116,3 +116,4 @@ js/main.js        bootstrap and fixed‑step game loop
 
 Tuning the game is mostly a matter of editing `js/config.js`.
 29. **Pizza Coins**: 26 golden coins hidden around the world (towns, City, islands, clouds, a roof, the hayloft and a few shops); the treasure-chest badge under the cash shows how many you've found, and tapping it lists each place.
+30. **More islands**: Sunny Beach, Starfish Cove and Rocket Island (a rocket under construction, a placeholder for a future area), joined by a sandbar and rope bridges; the Lighthouse, Crab Shack, Coconut Hut and Mission Control can be entered.

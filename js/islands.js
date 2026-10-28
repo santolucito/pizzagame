@@ -42,7 +42,9 @@ CFG.ISLANDS = {
     // ---- the southern islands, joined to Pizza Island on foot (see LINKS)
     { key: 'sunny', name: 'Sunny Beach', x0: 2700, y0: 2580, x1: 3260, y1: 2900, sand: true, toast: '🏖️ Sunny Beach! Play volleyball!', palms: [[2735, 2618], [3225, 2618], [2728, 2868], [3232, 2872]] },
     { key: 'cove', name: 'Starfish Cove', x0: 3400, y0: 2590, x1: 3700, y1: 2880, sand: true, toast: '⭐ Starfish Cove! Peek in the tide pools', palms: [[3428, 2622], [3676, 2862]] },
-    { key: 'rocket', name: 'Rocket Island', x0: 3840, y0: 2540, x1: 4460, y1: 2900, toast: '🚀 Rocket Island! A rocket is being built!', palms: [[3872, 2578], [4432, 2578], [4436, 2876]] },
+    // Rocket Island reaches east to the map's edge for a second launch pad (still water all round: Crab Shack's beach is
+    // 60 px north, the map's edge 20 px east and 30 px south)
+    { key: 'rocket', name: 'Rocket Island', x0: 3840, y0: 2480, x1: 4580, y1: 2920, toast: '🚀 Rocket Island! A rocket is being built!', palms: [[3872, 2524], [3884, 2888]] },
   ],
   // walkable strips over the water between islands: [kind] sand = a sandbar, bridge = a rope bridge, pier = planks on posts
   LINKS: [
@@ -74,12 +76,23 @@ CFG.ISLANDS = {
     PAD: { x0: 4060, y0: 2630, x1: 4300, y1: 2850 },
     BASE: { x: 4180, y: 2768 },                       // the rocket's feet
     SCAFFOLD: { x0: 4222, x1: 4286, y: 2770, h: 200 },
-    CRANE: { x: 4372, y: 2690, h: 228 },
+    CRANE: { x: 4326, y: 2604, h: 200 },              // north-east of the pad, out of the second site's way
     TRUCK: { x: 3992, y: 2850 },
     MISSION: { x: 3960, y: 2640, w: 120, h: 80 },     // the hut; its door faces south
     SIGN: { x: 3940, y: 2800 },
-    PARTS: { x: 4382, y: 2842 },
+    PARTS: { x: 4300, y: 2886 },
     ASK: { x: 4180, y: 2812 },
+    // the second site east of the pad: a fenced lot until the first rocket is finished, then Rocket #2 (never finished)
+    // in tall scaffolding the chef can climb, a second crane, a tool shed and stacks of panels
+    SITE2: {
+      LOT: { x0: 4356, y0: 2524, x1: 4572, y1: 2900 },
+      PAD: { x0: 4360, y0: 2620, x1: 4568, y1: 2872 },
+      BASE: { x: 4462, y: 2786 },                     // Rocket #2's feet
+      CRANE: { x: 4552, y: 2582, h: 230 },
+      PARTS: { x: 4492, y: 2566 },                    // the panels the crane lifts
+      STACK: { x: 4446, y: 2886 },                    // the panels the worker carries
+      SHED: { x: 4398, y: 2556, w: 76, h: 50 },
+    },
   },
   DOCK: { x0: 2970, y0: 1850, x1: 3030, y1: 1975 },         // ferry dock on the north shore of Pizza Island
   FERRY: { x: 3100, y: 1895 },

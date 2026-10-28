@@ -12,6 +12,16 @@
 //   3-2-1 with smoke and flames, the rocket lifts off the pad and leaves the screen, and the 'rocket' cut-scene flies
 //   to Pizza Moon (js/moon.js). Flying home plays it backwards and the rocket lands back on its pad.
 // The launch, the landing, the smoke and the cut-scene live here and work on any map (the moon uses them too).
+//
+// Rocket #2: east of the pad the island goes on to a fenced lot ("COMING SOON: ROCKET #2"). Once the first rocket is
+// finished (stage 2) a second launch pad opens there with a half-built rocket that stays half-built for ever: a second
+// crane lifting panels, a tool shed, stacks of panels, workers in hard hats (a carrier, welders throwing sparks, one
+// hammering up top; they hop and show 👋 bubbles). Tall scaffolding stands round it: '🪜 Climb up' at the ladder's foot
+// takes the chef up to a walkway in front of the rocket (level 1), a second ladder leads to a higher, narrower one (level
+// 2) beside the rocket's open hatch: '👀 Peek inside' shows the half-built cabin with its wires and a worker waving.
+// While the chef is up there `obstaclesOverride` leaves only the walkway's edges as walls, so nobody falls off, and the
+// chef is drawn over the scaffold art. '🪜 Climb down' from each level. `g.s.rocket.up` remembers a save made up there:
+// the reload puts the chef back on the ground at the ladder's foot.
 // Reads its spots from CFG.ISLANDS.ROCKET (js/islands.js, loaded first).
 // Extension module: registered with Game.ext (first, so its button and hint beat the islands' own) and Render.ext.
 
@@ -28,16 +38,19 @@ CFG.ROCKETISLE = {
   CHEER: [{ x: 4062, y: 2862 }, { x: 4112, y: 2884 }, { x: 4256, y: 2878 }, { x: 4318, y: 2852 }, { x: 4116, y: 2712 }],
   // the launch: walk in, 3-2-1, lift off; the flight; the landing
   BOARD: 0.6, MARKS: [0.9, 1.7, 2.5, 3.3], LIFTOFF: 3.3, FLIGHT: 8, LAND: 2.8, LAND_H: 900,
+  // Rocket #2 (spots in CFG.ISLANDS.ROCKET.SITE2): its height, the two scaffold walkways (height above the ground and
+  // half-width), how close the ladders and the hatch answer, the crane's round trip, the climb's speed, the peek's length
+  SITE2: { H: 300, DECKS: [{ z: 70, half: 100 }, { z: 150, half: 66 }], LADDER_R: 34, HINT_R: 70, HATCH_R: 40, CRANE_PERIOD: 13, CLIMB_SPEED: 210, PEEK: 5 },
 };
 
 const RocketExt = {
   name: 'rocket',
-  defaults: { rocket: { visits: 0 } },
+  defaults: { rocket: { visits: 0, up: 0 } },
   st: null,   // runtime only: workers, the crane's clock, sparks, bubbles, the countdown, a launch or landing, smoke
 
   // ---------- state ----------
   build(g) {
-    if (!g.s.rocket) g.s.rocket = { visits: 0 };
+    if (!g.s.rocket) g.s.rocket = { visits: 0, up: 0 };
     if (!(g.s.rocket.visits >= 0)) g.s.rocket.visits = 0;
     const R = CFG.ISLANDS.ROCKET, B = R.BASE, S = R.SCAFFOLD, P = R.PARTS;
     const W = (o) => Object.assign({ facing: 1, moving: false, bob: 0, z: 0, wave: 0, waveCd: 0, weld: 0, hop: 0 }, o);
@@ -62,6 +75,8 @@ const RocketExt = {
       cheer: null, cheerT: 2,                      // a worker's cheering bubble once it is finished
       fly: null,                                   // a launch or a landing in progress (on any map)
       smoke: [], puff: null,                       // smoke particles, and the big cloud on the pad
+      up: 0, climb: null, peek: null,              // Rocket #2's scaffold: which walkway the chef is on, a climb in progress, the hatch view
+      s2: this.buildSite2(),                       // Rocket #2's workers, crane and sparks
     };
     this.st.wasOn = this.onRocketLand(g) || g.area === 'missionctl';   // reloading on the island is not a new visit
     const C = R.CRANE, M = R.MISSION, T = R.TRUCK, SG = R.SIGN;
@@ -73,11 +88,57 @@ const RocketExt = {
       { x: SG.x - 98, y: SG.y - 6, w: 10, h: 10 }, { x: SG.x + 88, y: SG.y - 6, w: 10, h: 10 },   // the sign's posts
       { x: P.x - 34, y: P.y - 14, w: 68, h: 26 },                          // the pile of parts
     ];
+    // east of the pad: the fenced lot while the first rocket is built, then Rocket #2's site
+    const S2 = R.SITE2, L = S2.LOT, G = this.geo(), D1 = G.D[1], SH = S2.SHED, C2 = S2.CRANE, P2 = S2.PARTS, ST = S2.STACK;
+    this.st.obsLot = this.st.obs.concat([{ x: L.x0, y: L.y0, w: L.x1 - L.x0, h: L.y1 - L.y0 }]);
+    this.st.obsSite = this.st.obs.concat([
+      { x: D1.x0 - 2, y: S2.PAD.y0 - 16, w: D1.x1 - D1.x0 + 4, h: G.B.y + 34 - (S2.PAD.y0 - 16) },   // the rocket and the scaffold's legs (and the pad behind them)
+      { x: SH.x - SH.w / 2, y: SH.y - SH.h / 2, w: SH.w, h: SH.h },                                    // the tool shed
+      { x: C2.x - 20, y: C2.y - 18, w: 40, h: 36 },                                                     // the crane's base
+      { x: P2.x - 34, y: P2.y - 14, w: 68, h: 26 },                                                     // the panels for the crane
+      { x: ST.x - 34, y: ST.y - 12, w: 68, h: 24 },                                                     // the panels for the carrier
+    ]);
+    // a save made up on the scaffold reloads on the ground at the ladder's foot
+    if (g.s.rocket.up) { if (g.area === 'islands') { g.player.x = G.L1.foot.x; g.player.y = G.L1.foot.y; g.player.moving = false; } g.s.rocket.up = 0; }
+  },
+  buildSite2() {
+    const S2 = CFG.ISLANDS.ROCKET.SITE2, G = this.geo(), B = G.B, ST = S2.STACK;
+    const W = (o) => Object.assign({ facing: 1, moving: false, bob: 0, z: 0, wave: 0, waveCd: 0, weld: 0, hop: 0, deck: 0, bang: 0, pause: 0, ph: 0 }, o);
+    return {
+      workers: [
+        // carries panels from the stack to the scaffold's foot and walks back for more
+        W({ role: 'carry', x: ST.x - 30, y: ST.y - 24, path: [{ x: ST.x - 30, y: ST.y - 24 }, { x: B.x + 34, y: B.y + 50 }], leg: 1, carrying: true, hat: '#ff8c42', shirt: '#3b7dd8', skin: '#f1c27d' }),
+        // welds a fin down on the pad
+        W({ role: 'weldLow', x: B.x + 70, y: B.y + 46, facing: -1, ph: 0.7, hat: '#ffd166', shirt: '#e4572e', skin: '#8d5524' }),
+        // welds the rocket's side from the back of the first walkway (off the chef's way)
+        W({ role: 'weldHigh', deck: 1, x: B.x - 58, y: G.D[1].yb + 6, facing: 1, ph: 2.1, hat: '#ffffff', shirt: '#41b883', skin: '#e0ac69' }),
+        // hammers at the top, at the back of the second walkway
+        W({ role: 'hammer', deck: 2, x: B.x - 46, y: G.D[2].yb + 6, facing: 1, hat: '#ffd166', shirt: '#ff8fab', skin: '#c68642' }),
+      ],
+      crane: 4, sparks: [], sparkT: 0,
+    };
+  },
+  // Rocket #2's scaffold, worked out from its feet: the two walkways (z: height, x0..x1: the planks, yb/yf: the back
+  // and front edges as drawn, walk: where the chef's feet may be), the two ladders (foot, top: where the chef stands
+  // before and after the climb; x, y0, y1: the ladder as drawn), and the hatch spot on the top walkway
+  geo() {
+    if (this._geo) return this._geo;
+    const B = CFG.ISLANDS.ROCKET.SITE2.BASE, K = CFG.ROCKETISLE.SITE2;
+    const deck = (d) => { const x0 = B.x - d.half, x1 = B.x + d.half; return { z: d.z, x0, x1, yb: B.y - 22 - d.z, yf: B.y + 22 - d.z, walk: { x0: x0 + 14, x1: x1 - 14, y0: B.y - 6 - d.z, y1: B.y + 16 - d.z } }; };
+    const D1 = deck(K.DECKS[0]), D2 = deck(K.DECKS[1]);
+    this._geo = {
+      B, D: [null, D1, D2],
+      L1: { x: D1.x0 - 8, y0: B.y + 40, y1: D1.yf - 26, foot: { x: D1.x0 - 10, y: B.y + 56 }, top: { x: D1.walk.x0 + 8, y: D1.walk.y0 + 12 } },
+      L2: { x: D2.x1 + 12, y0: D1.walk.y0 + 18, y1: D2.yf - 26, foot: { x: D2.x1 + 4, y: D1.walk.y0 + 12 }, top: { x: D2.walk.x1 - 6, y: D2.walk.y0 + 12 } },
+      HATCH: { x: B.x, y: D2.walk.y0 },
+    };
+    return this._geo;
   },
   // 0: a bare frame, 1: most panels on and the nose cone on the crane, 2: finished and ready to fly
   stage(g) { const v = (g && g.s && g.s.rocket && g.s.rocket.visits) || 0; return U.clamp(v - 1, 0, 2); },
   ready(g) { return this.stage(g) >= 2; },
   canFly(g) { return this.ready(g) && !!CFG.AREAS.moon && typeof MoonExt !== 'undefined'; },
+  site2On(g) { return this.stage(g) >= 2; },   // Rocket #2's site opens once the first rocket is finished
   island() { return CFG.ISLANDS.ISLANDS.find((q) => q.key === 'rocket'); },
   onRocketIsle(g) { const s = this.island(), p = g.player; return g.area === 'islands' && p.x > s.x0 && p.x < s.x1 && p.y > s.y0 && p.y < s.y1; },
   // properly on the island's sand (the jet ski nosing up to the beach does not count)
@@ -110,7 +171,10 @@ const RocketExt = {
     if (who) { who.facing = p.x < who.x ? -1 : 1; who.wave = 1.6; who.waveCd = 7; }
     if (stage === 0) g.toast('🚧 Come back later to see it grow!');   // the islands already welcome the chef here
     else if (stage === 1) g.toast('🚀 The rocket grew! Come back once more!', true);
-    else { g.toast('🚀 The rocket is ready! Hop in!', true); st.swing = 0; st.cheerT = 1.5; }
+    else {
+      g.toast('🚀 The rocket is ready! Hop in!', true); st.swing = 0; st.cheerT = 1.5;
+      const B2 = R.SITE2.BASE; g.floats.push({ x: B2.x, y: B2.y - 300, text: 'Rocket #2! 🚧', color: '#ffe08a', t: 0, dur: 2.2, big: true });
+    }
     if (stage > 0) {
       for (let i = 0; i < 10; i++) g.fx.push({ kind: 'sparkle', x0: R.BASE.x + U.rand(-40, 40), y0: R.BASE.y - U.rand(20, H), x1: 0, y1: 0, t: -i * 0.06, dur: 0.6 });
       Sfx.chime(); Haptics.success();
@@ -118,10 +182,26 @@ const RocketExt = {
   },
 
   // ---------- game hooks ----------
-  obstacles(g, forCar) { return g.area === 'islands' && this.st && !forCar ? this.st.obs : []; },
+  obstacles(g, forCar) { return g.area === 'islands' && this.st && !forCar ? (this.site2On(g) ? this.st.obsSite : this.st.obsLot) : []; },
+  // up on the scaffold only the walkway's edges count (thick walls just outside it, their inner faces 12 px past the
+  // walkable edge so the chef's body stays on the planks), like walking on a roof
+  obstaclesOverride(g) {
+    const st = this.st;
+    if (!st || !st.up || st.climb || g.area !== 'islands') return null;
+    const W = this.geo().D[st.up].walk, T = 80, r = 12;
+    const x = W.x0 - r - T, y = W.y0 - r - T, w = W.x1 - W.x0 + 2 * r + 2 * T, h = W.y1 - W.y0 + 2 * r;
+    return [{ x, y, w, h: T }, { x, y: W.y1 + r, w, h: T }, { x, y: W.y0 - r, w: T, h }, { x: W.x1 + r, y: W.y0 - r, w: T, h }];
+  },
+  nearLadder(g) { const F = this.geo().L1.foot, p = g.player; return U.dist(p.x, p.y, F.x, F.y) < CFG.ROCKETISLE.SITE2.LADDER_R; },
+  nearHatch(g) { const H = this.geo().HATCH, p = g.player; return this.st.up === 2 && Math.abs(p.x - H.x) < CFG.ROCKETISLE.SITE2.HATCH_R; },
+  onDeck(g, lv) { const W = this.geo().D[lv].walk, p = g.player, m = 30; return p.x > W.x0 - m && p.x < W.x1 + m && p.y > W.y0 - m && p.y < W.y1 + m; },
   action(g) {
     const st = this.st;
-    if (!st || st.fly || g.area !== 'islands' || !this.onFoot(g) || !this.nearAsk(g)) return null;
+    if (!st || st.fly || g.area !== 'islands' || !this.onFoot(g)) return null;
+    if (st.climb) return null;
+    if (st.up) return this.deckAction(g);
+    if (this.site2On(g) && this.nearLadder(g)) return { label: '🪜 Climb up', run: (gg) => this.climb(gg, 1) };
+    if (!this.nearAsk(g)) return null;
     if (this.canFly(g)) return { label: '🚀 Blast off!', run: (gg) => this.startLaunch(gg, CFG.ISLANDS.ROCKET.BASE, 'moon') };
     return { label: '🚀 Ask about the rocket', run: (gg) => this.ask(gg) };
   },
@@ -136,10 +216,55 @@ const RocketExt = {
     st.count = { t: 0, n: 0 };
     Sfx.ding(); Haptics.tap();
   },
+  // on a walkway: the next ladder up, a peek in the hatch at the top, otherwise back down a level
+  deckAction(g) {
+    const st = this.st, G = this.geo(), p = g.player;
+    if (st.up === 1) {
+      if (U.dist(p.x, p.y, G.L2.foot.x, G.L2.foot.y) < CFG.ROCKETISLE.SITE2.LADDER_R) return { label: '🪜 Climb up', run: (gg) => this.climb(gg, 2) };
+      return { label: '🪜 Climb down', run: (gg) => this.climb(gg, 0) };
+    }
+    if (this.nearHatch(g)) return { label: '👀 Peek inside', run: (gg) => this.peek(gg) };
+    return { label: '🪜 Climb down', run: (gg) => this.climb(gg, 1) };
+  },
+  // climb a ladder to walkway `to` (0 = the ground): along the ladder, then a step onto the planks (or the ground)
+  climb(g, to) {
+    const st = this.st, G = this.geo(), p = g.player, from = st.up, L = (to === 2 || from === 2) ? G.L2 : G.L1, up = to > from;
+    const pts = up ? [{ x: p.x, y: p.y }, { x: L.x, y: p.y }, { x: L.x, y: L.top.y }, L.top]
+      : [{ x: p.x, y: p.y }, L.top, { x: L.x, y: L.top.y }, { x: L.x, y: L.foot.y }, L.foot];
+    const b = up ? L.top : L.foot;
+    let len = 0; for (let i = 1; i < pts.length; i++) len += U.dist(pts[i - 1].x, pts[i - 1].y, pts[i].x, pts[i].y);
+    st.climb = { pts, len: Math.max(1, len), d: 0, to, from };
+    st.peek = null;
+    g.s.rocket.up = Math.max(from, to);   // a save mid-climb still counts as up there
+    p.moving = false; p.hasMoved = true; p.facing = b.x < p.x ? -1 : 1;
+    if (up) Sfx.pickup(); else Sfx.drop();
+    Haptics.tap();
+  },
+  updateClimb(g, dt) {
+    const st = this.st, c = st.climb, p = g.player;
+    c.d = Math.min(c.len, c.d + CFG.ROCKETISLE.SITE2.CLIMB_SPEED * dt);
+    let left = c.d, i = 1;
+    for (; i < c.pts.length - 1; i++) { const seg = U.dist(c.pts[i - 1].x, c.pts[i - 1].y, c.pts[i].x, c.pts[i].y); if (left <= seg) break; left -= seg; }
+    const A = c.pts[i - 1], Bp = c.pts[i], seg = Math.max(1e-6, U.dist(A.x, A.y, Bp.x, Bp.y)), k = Math.min(1, left / seg);
+    p.x = U.lerp(A.x, Bp.x, k); p.y = U.lerp(A.y, Bp.y, k); p.moving = true; p.bob += dt * 12;
+    if (c.d < c.len) return;
+    const end = c.pts[c.pts.length - 1];
+    p.x = end.x; p.y = end.y; p.moving = false; st.climb = null; st.up = c.to; g.s.rocket.up = c.to;
+    if (c.to === 1 && c.from === 0) g.floats.push({ x: p.x, y: p.y - 70, text: 'Up on the scaffold! 🪜', color: '#ffe08a', t: 0, dur: 1.4, big: true });
+    if (c.to === 2) { g.floats.push({ x: p.x - 30, y: p.y - 80, text: 'What a view! 🚀', color: '#ffe08a', t: 0, dur: 1.8, big: true }); Haptics.success(); }
+  },
+  // the peek through Rocket #2's open hatch (drawn full screen by `screen`)
+  peek(g) {
+    const st = this.st, H = this.geo().HATCH, p = g.player;
+    st.peek = { t: 0 }; p.facing = H.x < p.x ? -1 : 1; p.moving = false;
+    Sfx.chime(); Haptics.tap();
+  },
+  leaveScaffold(g) { const st = this.st; st.up = 0; st.climb = null; st.peek = null; if (g.s.rocket) g.s.rocket.up = 0; },
   home(g) {
     const st = this.st; if (!st) return;
     st.ask = null; st.count = null; st.sparks = []; st.fly = null; st.smoke = []; st.puff = null; st.cheer = null;
     st.wasOn = false;
+    this.leaveScaffold(g); st.s2.sparks = [];
   },
   flyHint() {
     const f = this.st && this.st.fly; if (!f) return undefined;
@@ -150,7 +275,9 @@ const RocketExt = {
     const st = this.st;
     if (!st || g.travel) return undefined;
     if (st.fly) return this.flyHint();
-    if (g.area !== 'islands' || !this.onFoot(g) || !this.onRocketIsle(g) || this.nearMissionDoor(g)) return undefined;
+    if (g.area !== 'islands' || !this.onFoot(g)) return undefined;
+    const s2 = this.scaffoldHint(g); if (s2 !== undefined) return s2;
+    if (!this.onRocketIsle(g) || this.nearMissionDoor(g)) return undefined;
     if (g.player.carry > 0 && typeof IslandsExt !== 'undefined' && IslandsExt.rt && IslandsExt.rt.huts.some((h) => h.order)) return undefined;   // a delivery comes first
     const p = g.player, A = CFG.ISLANDS.ROCKET.ASK, d = U.dist(p.x, p.y, A.x, A.y), ready = this.canFly(g);
     if (ready) {
@@ -161,6 +288,20 @@ const RocketExt = {
     if (st.ask && st.ask.t < 2.6) return { text: 'Come back later! The rocket is growing 🚧', target: null };
     if (d < CFG.ROCKETISLE.ASK_R) return { text: 'Ask the workers about the rocket! 🚀', target: null };
     if (d < CFG.ROCKETISLE.HINT_R) return { text: 'A real rocket! 🚀', target: A };
+    return undefined;
+  },
+  // Rocket #2's scaffold: at the ladder's foot, on the walkways, while climbing
+  scaffoldHint(g) {
+    const st = this.st, G = this.geo(), p = g.player, K = CFG.ROCKETISLE.SITE2;
+    if (st.climb) return { text: st.climb.to > st.climb.from ? 'Up we go! 🪜' : 'Down we go! 🪜', target: null };
+    if (st.up === 2) {
+      if (st.peek) return { text: 'Hello in there! 👋', target: null };
+      return { text: 'Peek in the hatch! 👀', target: this.nearHatch(g) ? null : G.HATCH };
+    }
+    if (st.up === 1) { const F = G.L2.foot; return { text: 'Climb up to the top! 🪜', target: U.dist(p.x, p.y, F.x, F.y) < K.LADDER_R ? null : F }; }
+    if (!this.site2On(g)) return undefined;
+    const F = G.L1.foot, d = U.dist(p.x, p.y, F.x, F.y);
+    if (d < K.HINT_R) return { text: 'Climb the scaffolding! 🪜', target: d < K.LADDER_R ? null : F };
     return undefined;
   },
   arrive(g, tr) {
@@ -174,11 +315,22 @@ const RocketExt = {
     this.countVisit(g);
     if (st.fly) this.updateFly(g, dt);
     this.updateSmoke(g, dt);
-    if (g.area !== 'islands') { st.sparks.length = 0; return; }
+    // off the scaffold when something else moved the chef (another map, a ride, a teleport)
+    if ((st.up || st.climb) && (g.area !== 'islands' || !this.onFoot(g) || (st.up && !st.climb && !this.onDeck(g, st.up)))) this.leaveScaffold(g);
+    if (st.climb) this.updateClimb(g, dt);
+    if (st.peek) { st.peek.t += dt; if (st.peek.t > CFG.ROCKETISLE.SITE2.PEEK || !this.nearHatch(g)) st.peek = null; }
+    if (g.area !== 'islands') { st.sparks.length = 0; st.s2.sparks.length = 0; return; }
     const R = CFG.ISLANDS.ROCKET, p = g.player, t = g.time, stage = this.stage(g), chefNear = (w) => this.onFoot(g) && U.dist(p.x, p.y, w.x, w.y - w.z) < CFG.ROCKETISLE.WAVE_R;
     // a save (or a push) that left the chef inside the rocket's feet puts them back at its door
-    const foot = st.obs[0];
-    if (!st.fly && this.onFoot(g) && p.x > foot.x && p.x < foot.x + foot.w && p.y > foot.y && p.y < foot.y + foot.h) { p.x = R.ASK.x; p.y = R.ASK.y; p.moving = false; }
+    const foot = st.obs[0], inside = (o) => p.x > o.x && p.x < o.x + o.w && p.y > o.y && p.y < o.y + o.h;
+    if (!st.fly && !st.up && !st.climb && this.onFoot(g)) {
+      if (inside(foot)) { p.x = R.ASK.x; p.y = R.ASK.y; p.moving = false; }
+      // ... and one inside Rocket #2's site (or the fenced lot before it opens) at the scaffold's ladder (or before the lot)
+      const L = R.SITE2.LOT, F = this.geo().L1.foot;
+      if (this.site2On(g)) { if (st.obsSite.slice(st.obs.length).some(inside)) { p.x = F.x; p.y = F.y; p.moving = false; } }
+      else if (p.x > L.x0 - 12 && p.x < L.x1 + 12 && p.y > L.y0 - 12 && p.y < L.y1 + 12) { p.x = L.x0 - 30; p.y = (R.PAD.y0 + R.PAD.y1) / 2 + 20; p.moving = false; }
+    }
+    if (this.site2On(g)) this.updateSite2(g, dt);
     st.crane = (st.crane + dt) % CFG.ROCKETISLE.CRANE_PERIOD;
     st.swing = stage >= 2 ? Math.min(1, st.swing + dt / 2.5) : 0;
     st.workers.forEach((w, i) => {
@@ -233,6 +385,39 @@ const RocketExt = {
       }
       if (c.n >= marks.length) st.count = null;
     }
+  },
+  // Rocket #2's busy site (it never gets finished): the crane goes round and round, the carrier fetches panels, the
+  // welders throw sparks, the one at the top hammers away; each hops and waves 👋 at a chef close by on the same level
+  updateSite2(g, dt) {
+    const s2 = this.st.s2, st = this.st, p = g.player, t = g.time, lv = st.climb ? -1 : st.up;
+    s2.crane = (s2.crane + dt) % CFG.ROCKETISLE.SITE2.CRANE_PERIOD;
+    for (const w of s2.workers) {
+      w.waveCd = Math.max(0, w.waveCd - dt); w.wave = Math.max(0, w.wave - dt); w.bang = Math.max(0, w.bang - dt);
+      if (w.waveCd <= 0 && lv === w.deck && this.onFoot(g) && U.dist(p.x, p.y, w.x, w.y) < CFG.ROCKETISLE.WAVE_R) { w.wave = 1.6; w.waveCd = 7; w.facing = p.x < w.x ? -1 : 1; }
+      w.hop = w.wave > 0 ? Math.abs(Math.sin(t * 11)) * 5 : 0;
+      if (w.wave > 0) { w.moving = false; w.bob = 0; w.weld = 0; continue; }
+      if (w.role === 'carry') {
+        if (w.pause > 0) { w.pause -= dt; w.moving = false; continue; }
+        const to = w.path[w.leg], arrived = U.moveToward(w, to.x, to.y, 50, dt);
+        w.bob = w.moving ? w.bob + dt * 12 : 0;
+        if (arrived) { w.leg = (w.leg + 1) % w.path.length; w.pause = 1.2; w.carrying = w.leg === 1; }
+      } else if (w.role === 'hammer') {
+        // a few bangs, a look at the work, again
+        w.facing = 1; const c = (t + 0.4) % 3.4;
+        if (c < 2 && (c % 0.5) < dt * 1.5) w.bang = 0.16;
+      } else {
+        w.facing = w.role === 'weldLow' ? -1 : 1;
+        w.weld = Math.sin(t * 1.3 + w.ph) > -0.3 ? 1 : 0;
+      }
+    }
+    s2.sparkT -= dt;
+    if (s2.sparkT <= 0) {
+      s2.sparkT = 0.05;
+      for (const w of s2.workers) if (w.weld) { const tx = w.x + w.facing * 18, ty = w.y - 18; for (let k = 0; k < 2; k++) s2.sparks.push({ x: tx, y: ty, vx: U.rand(-70, 70), vy: U.rand(-110, -20), t: 0, life: U.rand(0.3, 0.6), floor: w.y + 2 }); }
+    }
+    for (const q of s2.sparks) { q.t += dt; q.x += q.vx * dt; q.y += q.vy * dt; q.vy += 380 * dt; if (q.y > q.floor) { q.y = q.floor; q.vy *= -0.3; q.vx *= 0.5; } }
+    s2.sparks = s2.sparks.filter((q) => q.t < q.life);
+    if (s2.sparks.length > 120) s2.sparks.splice(0, s2.sparks.length - 120);
   },
   // finished: everyone climbs down, gathers round the pad and hops for joy
   updateCheer(g, w, i, dt) {
@@ -332,7 +517,25 @@ const RocketExt = {
   paintAfter(r, g, area) {
     if (area !== 'islands') return;
     const ctx = r.ctx, R = CFG.ISLANDS.ROCKET, P = R.PAD, B = R.BASE;
-    // the concrete pad with hazard stripes round the edge and a flame trench grate under the rocket
+    this.paintPad(r, P, B);
+    // a painted pizza on the pad, for luck
+    r.drawPizza(P.x0 + 44, P.y1 - 44, 16);
+    // traffic cones along the edge
+    for (const [x, y] of [[P.x0 + 10, P.y0 + 30], [P.x0 + 10, P.y1 - 90], [P.x1 - 10, P.y1 - 30], [P.x1 - 10, P.y0 + 90]]) this.paintCone(ctx, x, y);
+    // the fuel hose from the truck to the rocket
+    const T = R.TRUCK;
+    ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(T.x + 44, T.y - 4); ctx.bezierCurveTo(T.x + 110, T.y + 20, B.x - 90, B.y + 30, B.x - 24, B.y - 4); ctx.stroke();
+    ctx.strokeStyle = '#41b883'; ctx.lineWidth = 2; ctx.stroke();
+    this.paintMission(r, g);
+    this.paintSign(r, g);
+    // the crane's footing: tracks in the sand
+    const C = R.CRANE; ctx.fillStyle = 'rgba(0,0,0,0.12)'; for (let k = -2; k <= 2; k++) ctx.fillRect(C.x - 30, C.y + k * 8 + 22, 60, 3);
+    this.paintSite2(r, g);
+  },
+  paintCone(ctx, x, y) { ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.moveTo(x - 6, y); ctx.lineTo(x + 6, y); ctx.lineTo(x, y - 16); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(x - 3.5, y - 9, 7, 3); ctx.fillStyle = '#3e424a'; ctx.fillRect(x - 8, y - 1, 16, 3); },
+  // a concrete launch pad with hazard stripes round the edge and a flame trench grate under the rocket's feet B
+  paintPad(r, P, B) {
+    const ctx = r.ctx;
     ctx.fillStyle = 'rgba(0,0,0,0.15)'; U.roundRect(ctx, P.x0 + 5, P.y0 + 6, P.x1 - P.x0, P.y1 - P.y0, 14); ctx.fill();
     ctx.fillStyle = '#b9bcc2'; U.roundRect(ctx, P.x0, P.y0, P.x1 - P.x0, P.y1 - P.y0, 14); ctx.fill();
     ctx.fillStyle = 'rgba(0,0,0,0.06)'; for (let x = P.x0 + 40; x < P.x1; x += 40) ctx.fillRect(x, P.y0 + 4, 2, P.y1 - P.y0 - 8); for (let y = P.y0 + 40; y < P.y1; y += 40) ctx.fillRect(P.x0 + 4, y, P.x1 - P.x0 - 8, 2);
@@ -342,18 +545,52 @@ const RocketExt = {
     ctx.strokeStyle = '#ffd166'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(B.x, B.y - 10, 70, 0, Math.PI * 2); ctx.stroke();
     ctx.fillStyle = '#5c6670'; U.roundRect(ctx, B.x - 40, B.y - 26, 80, 30, 6); ctx.fill();
     ctx.fillStyle = '#3e424a'; for (let x = B.x - 34; x < B.x + 36; x += 8) ctx.fillRect(x, B.y - 22, 4, 22);
-    // a painted pizza on the pad, for luck
-    r.drawPizza(P.x0 + 44, P.y1 - 44, 16);
-    // traffic cones along the edge
-    for (const [x, y] of [[P.x0 + 10, P.y0 + 30], [P.x0 + 10, P.y1 - 90], [P.x1 - 10, P.y1 - 30], [P.x1 - 10, P.y0 + 90]]) { ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.moveTo(x - 6, y); ctx.lineTo(x + 6, y); ctx.lineTo(x, y - 16); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(x - 3.5, y - 9, 7, 3); ctx.fillStyle = '#3e424a'; ctx.fillRect(x - 8, y - 1, 16, 3); }
-    // the fuel hose from the truck to the rocket
-    const T = R.TRUCK;
-    ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(T.x + 44, T.y - 4); ctx.bezierCurveTo(T.x + 110, T.y + 20, B.x - 90, B.y + 30, B.x - 24, B.y - 4); ctx.stroke();
-    ctx.strokeStyle = '#41b883'; ctx.lineWidth = 2; ctx.stroke();
-    this.paintMission(r, g);
-    this.paintSign(r, g);
-    // the crane's footing: tracks in the sand
-    const C = R.CRANE; ctx.fillStyle = 'rgba(0,0,0,0.12)'; for (let k = -2; k <= 2; k++) ctx.fillRect(C.x - 30, C.y + k * 8 + 22, 60, 3);
+  },
+  // east of the pad: a fenced lot with a COMING SOON sign and a rocket chalked on the sand while the first rocket is
+  // built; then Rocket #2's pad (the rocket, scaffold, crane, shed and panels are live entities)
+  paintSite2(r, g) {
+    const ctx = r.ctx, S2 = CFG.ISLANDS.ROCKET.SITE2, L = S2.LOT, B = S2.BASE;
+    if (!this.site2On(g)) {
+      ctx.fillStyle = 'rgba(160,120,60,0.12)'; U.roundRect(ctx, L.x0, L.y0, L.x1 - L.x0, L.y1 - L.y0, 10); ctx.fill();
+      // tyre tracks, survey stakes with pink ribbons, and the next rocket chalked out where it will stand
+      ctx.fillStyle = 'rgba(0,0,0,0.07)'; for (let k = 0; k < 9; k++) { ctx.fillRect(L.x0 + 30 + k * 6, L.y0 + 30 + k * 34, 46, 3); ctx.fillRect(L.x1 - 70 - k * 4, L.y0 + 44 + k * 34, 40, 3); }
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 3; ctx.setLineDash([10, 8]);
+      ctx.beginPath(); ctx.arc(B.x, B.y - 110, 70, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(B.x - 18, B.y - 50); ctx.lineTo(B.x - 18, B.y - 150); ctx.quadraticCurveTo(B.x, B.y - 196, B.x + 18, B.y - 150); ctx.lineTo(B.x + 18, B.y - 50); ctx.closePath(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(B.x - 18, B.y - 80); ctx.lineTo(B.x - 36, B.y - 50); ctx.lineTo(B.x - 18, B.y - 50); ctx.moveTo(B.x + 18, B.y - 80); ctx.lineTo(B.x + 36, B.y - 50); ctx.lineTo(B.x + 18, B.y - 50); ctx.stroke();
+      ctx.setLineDash([]);
+      for (const [x, y] of [[L.x0 + 26, L.y0 + 30], [L.x1 - 26, L.y0 + 30], [L.x0 + 26, L.y1 - 26], [L.x1 - 26, L.y1 - 26], [B.x, B.y - 206]]) { ctx.fillStyle = '#c9975f'; ctx.fillRect(x - 2, y - 18, 4, 18); ctx.fillStyle = '#ff6fa5'; ctx.beginPath(); ctx.moveTo(x + 2, y - 18); ctx.lineTo(x + 14, y - 14); ctx.lineTo(x + 2, y - 10); ctx.closePath(); ctx.fill(); }
+      // the fence: orange-and-white barrier boards between posts all round the lot
+      const post = (x, y) => { ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(x - 2, y - 1, 8, 4); ctx.fillStyle = '#7d8591'; ctx.fillRect(x - 2, y - 22, 4, 22); };
+      const rail = (x0, y0, x1, y1) => {
+        const n = Math.max(1, Math.round(Math.hypot(x1 - x0, y1 - y0) / 12));
+        for (let i = 0; i < n; i++) { const a = i / n, b = (i + 1) / n; ctx.strokeStyle = i % 2 ? '#fff' : '#ff8c42'; ctx.lineWidth = 5; ctx.lineCap = 'butt'; ctx.beginPath(); ctx.moveTo(U.lerp(x0, x1, a), U.lerp(y0, y1, a) - 16); ctx.lineTo(U.lerp(x0, x1, b), U.lerp(y0, y1, b) - 16); ctx.stroke(); }
+      };
+      rail(L.x0, L.y0, L.x1, L.y0); rail(L.x0, L.y0, L.x0, L.y1); rail(L.x1, L.y0, L.x1, L.y1); rail(L.x0, L.y1, L.x1, L.y1);
+      for (let x = L.x0; x <= L.x1 + 1; x += (L.x1 - L.x0) / 5) { post(x, L.y0); post(x, L.y1); }
+      for (let y = L.y0; y <= L.y1 + 1; y += (L.y1 - L.y0) / 8) { post(L.x0, y); post(L.x1, y); }
+      // the sign in the middle: COMING SOON: ROCKET #2
+      const sx = (L.x0 + L.x1) / 2, sy = L.y1 - 34, w = 176, h = 62, y0 = sy - 92;
+      ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(sx - w / 2 + 6, sy - 2, w, 6);
+      ctx.fillStyle = '#5b3a1a'; ctx.fillRect(sx - 74, y0 + 10, 6, sy - y0 - 8); ctx.fillRect(sx + 68, y0 + 10, 6, sy - y0 - 8);
+      ctx.fillStyle = '#ffd166'; U.roundRect(ctx, sx - w / 2, y0, w, h, 6); ctx.fill();
+      ctx.save(); U.roundRect(ctx, sx - w / 2, y0, w, h, 6); ctx.clip();
+      for (let i = -2; i < 26; i++) { ctx.fillStyle = '#2b1d14'; const x = sx - w / 2 + i * 14; ctx.beginPath(); ctx.moveTo(x, y0 + h - 7); ctx.lineTo(x + 7, y0 + h - 7); ctx.lineTo(x + 14, y0 + h); ctx.lineTo(x + 7, y0 + h); ctx.closePath(); ctx.fill(); }
+      ctx.restore();
+      ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 2; U.roundRect(ctx, sx - w / 2, y0, w, h, 6); ctx.stroke();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#2b1d14'; ctx.font = r.font(12); ctx.fillText('🚧 COMING SOON:', sx, y0 + 15);
+      ctx.fillStyle = '#e4572e'; ctx.font = r.font(18); ctx.fillText('🚀 ROCKET #2', sx, y0 + 37);
+      return;
+    }
+    const P = S2.PAD;
+    this.paintPad(r, P, B);
+    // the scaffold's shadow, a big "2" painted by the ladder, cones, the crane's tracks and a path of planks to the shed
+    ctx.fillStyle = 'rgba(0,0,0,0.09)'; ctx.fillRect(B.x - 104, B.y - 22, 212, 50);
+    ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(P.x0 + 30, P.y1 - 26, 15, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#2b1d14'; ctx.font = r.font(16); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('2', P.x0 + 30, P.y1 - 25);
+    for (const [x, y] of [[P.x1 - 10, P.y1 - 40], [P.x0 + 64, P.y1 - 12], [P.x1 - 12, P.y0 + 24]]) this.paintCone(ctx, x, y);
+    const C = S2.CRANE; ctx.fillStyle = 'rgba(0,0,0,0.12)'; for (let k = -2; k <= 2; k++) ctx.fillRect(C.x - 26, C.y + k * 8 + 22, 44, 3);
   },
   paintMission(r, g) {
     const ctx = r.ctx, M = CFG.ISLANDS.ROCKET.MISSION, x0 = M.x - M.w / 2, y0 = M.y - M.h / 2;
@@ -412,15 +649,31 @@ const RocketExt = {
     this.smokeItem(r, g, items);
     if (g.area !== 'islands') return;
     const R = CFG.ISLANDS.ROCKET, B = R.BASE, st = this.st, fs = this.flyState(g, 'islands');
-    // only bother when Rocket Island is somewhere near the screen (the rocket and crane are tall)
-    if (!fs && (r.camY + r.viewH < R.PAD.y0 - 420 || r.camX > R.CRANE.x + 120 || r.camX + r.viewW < R.MISSION.x - 120)) return;
+    // only bother when Rocket Island is somewhere near the screen (the rockets and cranes are tall)
+    const isle = this.island();
+    if (!fs && (r.camY + r.viewH < isle.y0 - 360 || r.camY > isle.y1 + 40 || r.camX > isle.x1 + 80 || r.camX + r.viewW < isle.x0 - 80)) return;
     const stage = this.stage(g);
+    if (stage >= 2) this.site2Items(r, g, items);
     items.push({ y: B.y, draw: () => this.drawPadRocket(r, g, B, stage, fs) });
     items.push({ y: B.y + 1, draw: () => this.drawScaffold(r, g) });
     items.push({ y: R.CRANE.y + 18, draw: () => this.drawCrane(r, g) });
     items.push({ y: R.TRUCK.y + 14, draw: () => this.drawTruck(r, g) });
     items.push({ y: R.PARTS.y + 10, draw: () => this.drawParts(r, g) });
     for (const w of st.workers) items.push({ y: w.z > 4 && (w.role === 'climb' || w.role === 'weldHigh') ? B.y + 2 : w.y, draw: () => this.drawWorker(r, g, w) });
+  },
+  // Rocket #2's site, y-sorted: the rocket, then the scaffold, the workers up on it, the chef up there (or on a ladder),
+  // and last the walkways' front rails, so the chef stands on the planks behind the railing; the crane, shed and panels
+  site2Items(r, g, items) {
+    const S2 = CFG.ISLANDS.ROCKET.SITE2, G = this.geo(), B = G.B, st = this.st, SH = S2.SHED;
+    items.push({ y: B.y, draw: () => this.drawRocket2(r.ctx, B.x, B.y, g.time) });
+    items.push({ y: B.y + 1, draw: () => this.drawScaffold2(r, g) });
+    for (const w of st.s2.workers) items.push({ y: w.deck ? B.y + 2 : w.y, draw: () => this.drawWorker(r, g, w) });
+    if ((st.up || st.climb) && !g.driving && !g.onTrain) items.push({ y: B.y + 3, draw: () => r.drawPlayer(g) });
+    items.push({ y: B.y + 4, draw: () => this.drawScaffold2Front(r, g) });
+    items.push({ y: S2.CRANE.y + 18, draw: () => this.drawCrane2(r, g) });
+    items.push({ y: S2.PARTS.y + 10, draw: () => this.drawPanels(r, S2.PARTS.x, S2.PARTS.y, 3, true) });
+    items.push({ y: S2.STACK.y + 10, draw: () => this.drawPanels(r, S2.STACK.x, S2.STACK.y, 4, false) });
+    items.push({ y: SH.y + SH.h / 2, draw: () => this.drawShed(r, g) });
   },
   // the rocket standing on a pad (Rocket Island's or the moon's): steps up to its hatch once it is finished, and
   // while it flies its shadow stays on the ground, shrinking, under the flames
@@ -474,6 +727,17 @@ const RocketExt = {
     }
     if (st.cheer && (!st.ask || st.ask.who !== st.cheer.who)) say(st.cheer.who, st.cheer.text, 0);
     for (const w of st.workers) if (w.wave > 0.4 && (!st.ask || st.ask.who !== w) && (!st.cheer || st.cheer.who !== w)) r.drawBubble(w.x, w.y - w.z - (w.hop || 0) - 66, () => { ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('👋', 0, 0); }, 30);
+    if (!this.site2On(g)) return;
+    // Rocket #2's site: sparks, torch glows, the hammer's bang and the workers' waves
+    const s2 = st.s2;
+    ctx.lineCap = 'round';
+    for (const q of s2.sparks) { const k = q.t / q.life; ctx.strokeStyle = k < 0.4 ? '#fffbe0' : '#ffd166'; ctx.globalAlpha = 1 - k; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q.x - q.vx * 0.03, q.y - q.vy * 0.03); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+    for (const w of s2.workers) {
+      if (w.weld) { const fl = 0.6 + Math.random() * 0.4; ctx.fillStyle = `rgba(200,240,255,${(0.7 * fl).toFixed(2)})`; ctx.beginPath(); ctx.arc(w.x + w.facing * 18, w.y - 18, 5 + fl * 4, 0, Math.PI * 2); ctx.fill(); }
+      if (w.bang > 0) { ctx.font = r.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#fff'; ctx.fillText('bang!', w.x + w.facing * 24, w.y - 50); }
+      if (w.wave > 0.4) r.drawBubble(w.x, w.y - (w.hop || 0) - 66, () => { ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('👋', 0, 0); }, 30);
+    }
   },
 
   // The rocket, side on, standing on its feet at (x, y). `s` scales it (mission control's screens draw it small);
@@ -590,13 +854,22 @@ const RocketExt = {
   // the tower crane: mast, jib out over the rocket, a trolley running along it and a hook that fetches panels
   // (stage 0), the nose cone (stage 1), or nothing: once the rocket is finished it turns its jib away to the east
   craneState(stage) {
-    const R = CFG.ISLANDS.ROCKET, C = R.CRANE, B = R.BASE, P = R.PARTS, T = CFG.ROCKETISLE.CRANE_PERIOD, k = this.st.crane / T;
+    const R = CFG.ISLANDS.ROCKET, C = R.CRANE, B = R.BASE, P = R.PARTS, k = this.st.crane / CFG.ROCKETISLE.CRANE_PERIOD;
     const jibY = C.y - C.h + 10;
     if (stage >= 2) return { x: C.x - 90, hy: jibY + 30, load: false, jibY, ph: 'parked' };
-    const nose = stage === 1, rest = nose ? jibY + 12 : jibY + 40, pileX = P.x, rocketX = B.x + 2;
+    const nose = stage === 1, rest = nose ? jibY + 12 : jibY + 40;
     const low = nose ? P.y - 82 : P.y - 26, topY = nose ? B.y - CFG.ROCKETISLE.ROCKET_H + 60 - 74 : B.y - CFG.ROCKETISLE.ROCKET_H + 70;
+    return Object.assign(this.craneCalc(k, P.x, B.x + 2, rest, low, topY, nose), { jibY, nose });
+  },
+  // Rocket #2's crane: panels up to the top, round and round (it never gets finished)
+  crane2State() {
+    const S2 = CFG.ISLANDS.ROCKET.SITE2, C = S2.CRANE, B = S2.BASE, P = S2.PARTS, k = this.st.s2.crane / CFG.ROCKETISLE.SITE2.CRANE_PERIOD, jibY = C.y - C.h + 10;
+    return Object.assign(this.craneCalc(k, P.x, B.x + 2, jibY + 40, P.y - 26, B.y - CFG.ROCKETISLE.SITE2.H + 60, false), { jibY, nose: false });
+  },
+  // one round trip of a crane's hook (k 0..1): down to the pile, up, over to the rocket, lower, hold, raise, back, rest
+  craneCalc(k, pileX, rocketX, rest, low, topY, nose) {
     const seg = [[0.12, 'down'], [0.24, 'up'], [0.4, 'over'], [0.5, 'lower'], [0.64, 'hold'], [0.74, 'raise'], [0.9, 'back'], [1, 'rest']];
-    let i = 0; while (k > seg[i][0]) i++;
+    let i = 0; while (i < seg.length - 1 && k > seg[i][0]) i++;
     const a = i ? seg[i - 1][0] : 0, q = U.clamp((k - a) / (seg[i][0] - a), 0, 1), e = q * q * (3 - 2 * q), ph = seg[i][1];
     let x = pileX, hy = rest, load = nose;
     if (ph === 'down') { hy = U.lerp(rest, low, e); }
@@ -606,19 +879,28 @@ const RocketExt = {
     else if (ph === 'hold') { x = rocketX; hy = topY; load = true; }
     else if (ph === 'raise') { x = rocketX; hy = U.lerp(topY, rest, e); }
     else if (ph === 'back') { x = U.lerp(rocketX, pileX, e); }
-    return { x, hy, load, jibY, ph, nose };
+    return { x, hy, load, ph };
   },
   drawCrane(r, g) {
-    const ctx = r.ctx, C = CFG.ISLANDS.ROCKET.CRANE, stage = this.stage(g), cs = this.craneState(stage), top = cs.jibY;
+    const R = CFG.ISLANDS.ROCKET, stage = this.stage(g);
+    this.drawCraneAt(r, g, R.CRANE, this.craneState(stage), R.BASE.x - 40, R.CRANE.x + 70, stage >= 2, '#e0ac69');
+  },
+  drawCrane2(r, g) {
+    const S2 = CFG.ISLANDS.ROCKET.SITE2;
+    this.drawCraneAt(r, g, S2.CRANE, this.crane2State(), S2.BASE.x - 40, S2.CRANE.x + 44, false, '#8d5524');
+  },
+  // a tower crane at C: mast, jib from jx0 to the counter-jib's end jx1, a trolley running along it and a hook carrying
+  // cs's load; `parked`: turned round to point the other way, with a pennant
+  drawCraneAt(r, g, C, cs, jx0, jx1, parked, driver) {
+    const ctx = r.ctx, top = cs.jibY;
     ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(C.x - 22, C.y + 10, 48, 10);
     ctx.fillStyle = '#5c6670'; U.roundRect(ctx, C.x - 22, C.y - 6, 44, 22, 4); ctx.fill();
     // the mast: two yellow rails with zigzag bracing
     ctx.strokeStyle = '#f2b705'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(C.x - 8, C.y - 4); ctx.lineTo(C.x - 8, top); ctx.moveTo(C.x + 8, C.y - 4); ctx.lineTo(C.x + 8, top); ctx.stroke();
     ctx.lineWidth = 1.5; ctx.beginPath(); for (let y = C.y - 4, k = 0; y > top; y -= 16, k++) { ctx.moveTo(C.x + (k % 2 ? 8 : -8), y); ctx.lineTo(C.x + (k % 2 ? -8 : 8), y - 16); } ctx.stroke();
-    // finished: the whole top turns round, so the jib points east, away from the rocket's way up
-    ctx.save(); if (stage >= 2) { ctx.translate(C.x, 0); ctx.scale(-1, 1); ctx.translate(-C.x, 0); }
+    // parked: the whole top turns round, so the jib points the other way, away from the rocket's way up
+    ctx.save(); if (parked) { ctx.translate(C.x, 0); ctx.scale(-1, 1); ctx.translate(-C.x, 0); }
     // the jib out to the left over the rocket, the counter-jib with its weight to the right
-    const jx0 = CFG.ISLANDS.ROCKET.BASE.x - 40, jx1 = C.x + 70;
     ctx.strokeStyle = '#f2b705'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(jx0, top); ctx.lineTo(jx1, top); ctx.moveTo(jx0 + 20, top + 10); ctx.lineTo(C.x, top + 10); ctx.stroke();
     ctx.lineWidth = 1.2; ctx.beginPath(); for (let x = jx0 + 20, k = 0; x < C.x; x += 14, k++) { ctx.moveTo(x, top + (k % 2 ? 0 : 10)); ctx.lineTo(x + 14, top + (k % 2 ? 10 : 0)); } ctx.stroke();
     ctx.strokeStyle = '#9aa0a8'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(C.x, top - 30); ctx.lineTo(jx0 + 10, top); ctx.moveTo(C.x, top - 30); ctx.lineTo(jx1 - 6, top); ctx.stroke();
@@ -626,7 +908,7 @@ const RocketExt = {
     ctx.fillStyle = '#5c6670'; ctx.fillRect(jx1 - 30, top + 2, 28, 18);   // counterweight
     // the cab with its driver
     ctx.fillStyle = '#e4572e'; U.roundRect(ctx, C.x + 10, top + 4, 22, 20, 4); ctx.fill(); ctx.fillStyle = '#bfe3ff'; ctx.fillRect(C.x + 13, top + 7, 16, 9);
-    ctx.fillStyle = '#e0ac69'; ctx.beginPath(); ctx.arc(C.x + 21, top + 13, 4, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(C.x + 21, top + 11, 4.5, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = driver; ctx.beginPath(); ctx.arc(C.x + 21, top + 13, 4, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(C.x + 21, top + 11, 4.5, Math.PI, 0); ctx.fill();
     // trolley, cable, hook and whatever it carries
     ctx.fillStyle = '#3e424a'; ctx.fillRect(cs.x - 7, top - 3, 14, 7);
     ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(cs.x - 2, top + 4); ctx.lineTo(cs.x - 2, cs.hy); ctx.moveTo(cs.x + 2, top + 4); ctx.lineTo(cs.x + 2, cs.hy); ctx.stroke();
@@ -637,7 +919,7 @@ const RocketExt = {
       ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(cs.x, cs.hy + 12); ctx.lineTo(cs.x - 18, cs.hy + 54); ctx.moveTo(cs.x, cs.hy + 12); ctx.lineTo(cs.x + 18, cs.hy + 54); ctx.stroke();
       this.drawNose(ctx, cs.x, cs.hy + 76, g.time, false);
     } else if (cs.load) { ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(cs.x, cs.hy + 12); ctx.lineTo(cs.x - 12, cs.hy + 22); ctx.moveTo(cs.x, cs.hy + 12); ctx.lineTo(cs.x + 12, cs.hy + 22); ctx.stroke(); ctx.fillStyle = '#ff8c42'; U.roundRect(ctx, cs.x - 14, cs.hy + 22, 28, 18, 3); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(cs.x - 12, cs.hy + 24, 24, 3); ctx.fillStyle = '#c9ccd2'; for (const dx of [-9, 9]) { ctx.beginPath(); ctx.arc(cs.x + dx, cs.hy + 34, 1.6, 0, Math.PI * 2); ctx.fill(); } }
-    if (stage >= 2) { ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.moveTo(jx0, top); ctx.lineTo(jx0 - 18, top - 7 + Math.sin(g.time * 4) * 2); ctx.lineTo(jx0, top - 14); ctx.closePath(); ctx.fill(); }   // a pennant on the jib's end
+    if (parked) { ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.moveTo(jx0, top); ctx.lineTo(jx0 - 18, top - 7 + Math.sin(g.time * 4) * 2); ctx.lineTo(jx0, top - 14); ctx.closePath(); ctx.fill(); }   // a pennant on the jib's end
     ctx.restore();
   },
   drawTruck(r, g) {
@@ -680,13 +962,193 @@ const RocketExt = {
       if (w.weld) { ctx.fillStyle = '#2d3a4a'; U.roundRect(ctx, -9 + w.facing * 3, -44, 16, 11, 3); ctx.fill(); ctx.fillStyle = '#4dd0e1'; ctx.fillRect(-6 + w.facing * 3, -41, 10, 3); ctx.fillStyle = '#5c6670'; U.roundRect(ctx, w.facing * 12 - 3, -20, 8, 5, 2); ctx.fill(); }   // visor and torch
       if (w.role === 'carry' && w.carrying) { ctx.fillStyle = '#ff8c42'; U.roundRect(ctx, -16, -34, 32, 14, 3); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(-14, -32, 28, 3); }
       if (w.role === 'boss') { ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, w.facing * 8 - 6, -30, 12, 15, 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(w.facing * 8 - 4, -27, 8, 10); ctx.fillStyle = '#9aa0a8'; for (let k = 0; k < 3; k++) ctx.fillRect(w.facing * 8 - 3, -25 + k * 3, 6, 1); }
-      if (w.role === 'climb' && w.bang > 0) { ctx.fillStyle = '#3e424a'; U.roundRect(ctx, 14, -30, 10, 6, 2); ctx.fill(); }   // the hammer, mid-bang
+      if ((w.role === 'climb' || w.role === 'hammer') && w.bang > 0) { ctx.fillStyle = '#3e424a'; U.roundRect(ctx, w.facing < 0 ? -24 : 14, -30, 10, 6, 2); ctx.fill(); }   // the hammer, mid-bang
     }
     // the hard hat
     ctx.fillStyle = w.hat; ctx.beginPath(); ctx.arc(0, -42, 11.5, Math.PI, 0); ctx.fill();
     U.roundRect(ctx, -14, -43, 28, 4, 2); ctx.fill();
     ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(-1.5, -53, 3, 10);
     ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.beginPath(); ctx.arc(-4, -48, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  },
+
+  // ---------- Rocket #2 ----------
+  // Rocket #2, side on, feet at (x, y): panelled up past its open hatch, a bare frame above, one fin in primer and one
+  // still bare metal, wires hanging out of the hatch, "#2" on the side. It stays like this for ever.
+  drawRocket2(ctx, x, y, t) {
+    const H = CFG.ROCKETISLE.SITE2.H, ty = -H, hb = -(CFG.ROCKETISLE.SITE2.DECKS[1].z + 26), pt = hb - 52;   // the hatch's sill (just above the top walkway), the panels' top
+    ctx.save(); ctx.translate(x, y);
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(6, 2, 44, 10, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#5c6670'; ctx.beginPath(); ctx.moveTo(-14, -16); ctx.lineTo(14, -16); ctx.lineTo(20, 0); ctx.lineTo(-20, 0); ctx.closePath(); ctx.fill();   // engine bell
+    for (const d of [-1, 1]) { ctx.fillStyle = d < 0 ? '#ff8c42' : '#9aa0a8'; ctx.beginPath(); ctx.moveTo(d * 24, -80); ctx.lineTo(d * 46, -24); ctx.lineTo(d * 46, 0); ctx.lineTo(d * 24, -18); ctx.closePath(); ctx.fill(); }
+    // the frame: dark inside, four rails, rings every 20 px, cross braces
+    ctx.fillStyle = 'rgba(46,50,58,0.65)'; U.roundRect(ctx, -26, ty, 52, H - 14, 6); ctx.fill();
+    ctx.strokeStyle = '#b9bcc2'; ctx.lineWidth = 1.2; ctx.beginPath();
+    for (let yy = -14, k = 0; yy > ty + 10; yy -= 20, k++) { ctx.moveTo(-24, yy); ctx.lineTo(-8, yy - 20); ctx.moveTo(8, yy - (k % 2 ? 0 : 20)); ctx.lineTo(24, yy - (k % 2 ? 20 : 0)); }
+    ctx.stroke();
+    ctx.strokeStyle = '#9aa0a8'; ctx.lineWidth = 3; ctx.beginPath(); for (const rx of [-25, -8, 8, 25]) { ctx.moveTo(rx, -14); ctx.lineTo(rx, ty); } ctx.stroke();
+    ctx.lineWidth = 2.5; ctx.beginPath(); for (let yy = -14; yy >= ty; yy -= 20) { ctx.moveTo(-26, yy); ctx.lineTo(26, yy); } ctx.stroke();
+    // panels: all the way round low down, up past the hatch on the left, a few patches higher up
+    const bg = ctx.createLinearGradient(-26, 0, 26, 0); bg.addColorStop(0, '#d9dde3'); bg.addColorStop(0.35, '#ffffff'); bg.addColorStop(1, '#c9ccd2');
+    ctx.fillStyle = bg; ctx.fillRect(-26, pt, 52, -14 - pt); ctx.fillRect(-26, pt - 24, 22, 24);
+    ctx.fillStyle = '#ff8c42'; ctx.fillRect(4, -150, 22, 20); ctx.fillRect(-26, -110, 18, 22); ctx.fillRect(8, pt - 20, 18, 20);
+    ctx.fillStyle = 'rgba(0,0,0,0.14)'; for (let yy = -34; yy > pt; yy -= 22) ctx.fillRect(-26, yy, 52, 1.5);
+    ctx.fillStyle = '#7d8591'; for (let yy = -40; yy > pt; yy -= 22) for (const bx of [-22, 22]) { ctx.beginPath(); ctx.arc(bx, yy, 1.3, 0, Math.PI * 2); ctx.fill(); }
+    ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(-18, pt + 4, 4, -24 - pt);
+    // "#2" in blue beside the hatch, and the open top ring waiting for more frame
+    ctx.fillStyle = '#3b7dd8'; ctx.font = '800 13px "Trebuchet MS", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('#2', 19, hb - 30);
+    ctx.fillStyle = '#7d8591'; ctx.beginPath(); ctx.ellipse(0, ty, 26, 4, 0, 0, Math.PI * 2); ctx.fill();
+    // the open hatch: a warm work light inside, wires spilling out, its door swung open to the right
+    ctx.fillStyle = '#7d8591'; U.roundRect(ctx, -14, hb - 46, 28, 46, 9); ctx.fill();
+    ctx.fillStyle = '#1a1f29'; U.roundRect(ctx, -11, hb - 43, 22, 40, 8); ctx.fill();
+    const glow = 0.3 + 0.08 * Math.sin(t * 3); ctx.fillStyle = `rgba(255,209,102,${glow.toFixed(3)})`; ctx.beginPath(); ctx.arc(0, hb - 26, 9, 0, Math.PI * 2); ctx.fill();
+    ctx.lineWidth = 2; ctx.lineCap = 'round';
+    for (const [col, dx, sag] of [['#e4572e', -5, 14], ['#ffd166', 1, 20], ['#4dd0e1', 6, 11]]) { const sw = Math.sin(t * 1.6 + dx) * 2; ctx.strokeStyle = col; ctx.beginPath(); ctx.moveTo(dx, hb - 6); ctx.quadraticCurveTo(dx + sw, hb - 6 + sag, dx + 4 + sw, hb + 2 + sag * 0.6); ctx.stroke(); }
+    ctx.fillStyle = '#d9dde3'; U.roundRect(ctx, 14, hb - 43, 7, 40, 3); ctx.fill(); ctx.fillStyle = '#bfe3ff'; ctx.beginPath(); ctx.arc(17.5, hb - 30, 2.2, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  },
+  // a walkway's planks seen from above (with a darker strip at the back where the workers stand) and its striped edge
+  drawDeck(ctx, D) {
+    ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(D.x0 + 4, D.yb + 6, D.x1 - D.x0, D.yf - D.yb + 6);
+    ctx.fillStyle = '#b98a55'; ctx.fillRect(D.x0, D.yb, D.x1 - D.x0, D.yf - D.yb);
+    ctx.fillStyle = '#a77a48'; ctx.fillRect(D.x0, D.yb, D.x1 - D.x0, 14);
+    ctx.fillStyle = 'rgba(0,0,0,0.13)'; for (let x = D.x0 + 12; x < D.x1; x += 12) ctx.fillRect(x, D.yb, 1.5, D.yf - D.yb);
+    ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.fillRect(D.x0, D.yb, D.x1 - D.x0, 2);
+    ctx.save(); ctx.beginPath(); ctx.rect(D.x0, D.yf, D.x1 - D.x0, 7); ctx.clip();
+    for (let x = D.x0 - 14; x < D.x1; x += 14) { ctx.fillStyle = '#2b1d14'; ctx.fillRect(x, D.yf, 14, 7); ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.moveTo(x, D.yf); ctx.lineTo(x + 7, D.yf); ctx.lineTo(x + 14, D.yf + 7); ctx.lineTo(x + 7, D.yf + 7); ctx.closePath(); ctx.fill(); }
+    ctx.restore();
+  },
+  drawLadder(ctx, x, y0, y1) {
+    ctx.strokeStyle = '#e4572e'; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x - 6, y0); ctx.lineTo(x - 6, y1); ctx.moveTo(x + 6, y0); ctx.lineTo(x + 6, y1); ctx.stroke();
+    ctx.lineWidth = 1.8; for (let yy = y0 - 6; yy > y1 + 2; yy -= 9) { ctx.beginPath(); ctx.moveTo(x - 6, yy); ctx.lineTo(x + 6, yy); ctx.stroke(); }
+  },
+  // the scaffold round Rocket #2: poles, braces in the end bays, the two walkways and the two ladders, a work lamp
+  drawScaffold2(r, g) {
+    const ctx = r.ctx, G = this.geo(), B = G.B, D1 = G.D[1], D2 = G.D[2], line = (x0, y0, x1, y1) => { ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke(); };
+    ctx.lineCap = 'butt';
+    // back poles and the back handrail (it stops short of the rocket)
+    ctx.strokeStyle = '#9aa0a8'; ctx.lineWidth = 3;
+    for (const x of [D1.x0 + 4, D1.x1 - 4]) line(x, B.y - 30, x, D1.yb - 26);
+    for (const x of [D2.x0 + 4, D2.x1 - 4]) line(x, D1.yb, x, D2.yb - 26);
+    ctx.fillStyle = '#ffd166';
+    for (const [D, gap] of [[D1, 36], [D2, 34]]) { ctx.fillRect(D.x0, D.yb - 22, B.x - gap - D.x0, 2.5); ctx.fillRect(B.x + gap, D.yb - 22, D.x1 - B.x - gap, 2.5); }
+    // the lower bays: front poles from the sand up to the first walkway, crossed braces at both ends
+    ctx.strokeStyle = '#9aa0a8'; ctx.lineWidth = 3;
+    for (const x of [D1.x0 + 4, D1.x0 + 34, D1.x1 - 34, D1.x1 - 4]) line(x, B.y + 30, x, D1.yf + 6);
+    ctx.strokeStyle = '#b9bcc2'; ctx.lineWidth = 1.5;
+    for (const [xa, xb] of [[D1.x0 + 4, D1.x0 + 34], [D1.x1 - 34, D1.x1 - 4]]) { line(xa, B.y + 30, xb, D1.yf + 6); line(xb, B.y + 30, xa, D1.yf + 6); }
+    // the upper bays: from the first walkway's back up to the second, crossed too
+    for (const [xa, xb] of [[D2.x0 + 4, D2.x0 + 26], [D2.x1 - 26, D2.x1 - 4]]) { line(xa, D1.yb, xb, D2.yf + 6); line(xb, D1.yb, xa, D2.yf + 6); }
+    this.drawDeck(ctx, D1);
+    this.drawDeck(ctx, D2);
+    // a toolbox and a coil of cable on the walkways' back strips
+    ctx.fillStyle = '#e4572e'; U.roundRect(ctx, D1.x1 - 40, D1.yb + 1, 20, 10, 2); ctx.fill(); ctx.fillStyle = '#5c6670'; ctx.fillRect(D1.x1 - 34, D1.yb - 2, 8, 3);
+    ctx.strokeStyle = '#41b883'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(D2.x1 - 22, D2.yb + 7, 8, 4, 0, 0, Math.PI * 2); ctx.stroke(); ctx.beginPath(); ctx.ellipse(D2.x1 - 22, D2.yb + 7, 5, 2.5, 0, 0, Math.PI * 2); ctx.stroke();
+    // the ladders: from the sand up to the first walkway on the left, from it up to the second on the right
+    this.drawLadder(ctx, G.L1.x, G.L1.y0, G.L1.y1);
+    this.drawLadder(ctx, G.L2.x, G.L2.y0, G.L2.y1);
+    // a work lamp on a pole at the top, blinking
+    ctx.fillStyle = '#9aa0a8'; ctx.fillRect(D2.x0 + 2, D2.yb - 60, 3, 36);
+    ctx.fillStyle = Math.floor(g.time * 2) % 2 ? '#ffd166' : '#b8862c'; ctx.beginPath(); ctx.arc(D2.x0 + 3.5, D2.yb - 62, 5, 0, Math.PI * 2); ctx.fill();
+  },
+  // the walkways' front railings (after the chef: they stand on the planks behind them) and the ROCKET #2 banner
+  drawScaffold2Front(r, g) {
+    const ctx = r.ctx, G = this.geo(), B = G.B, D1 = G.D[1], D2 = G.D[2];
+    ctx.strokeStyle = '#9aa0a8'; ctx.lineWidth = 3; ctx.lineCap = 'butt';
+    for (const x of [D2.x0 + 4, D2.x1 - 4]) { ctx.beginPath(); ctx.moveTo(x, D1.yf); ctx.lineTo(x, D2.yf); ctx.stroke(); }   // the upper walkway's front poles
+    for (const D of [D1, D2]) {
+      ctx.fillStyle = '#9aa0a8'; for (let x = D.x0 + 2; x <= D.x1 - 2; x += (D.x1 - D.x0 - 4) / Math.round((D.x1 - D.x0) / 44)) ctx.fillRect(x - 1.5, D.yf - 26, 3, 26);
+      ctx.fillStyle = '#ffd166'; ctx.fillRect(D.x0, D.yf - 27, D.x1 - D.x0, 3.5); ctx.fillStyle = 'rgba(255,209,102,0.85)'; ctx.fillRect(D.x0, D.yf - 14, D.x1 - D.x0, 2.5);
+    }
+    // the banner hanging from the lower walkway's edge
+    const bw = 88, bx = B.x - bw / 2, by = D1.yf + 5;
+    ctx.fillStyle = '#9aa0a8'; ctx.fillRect(bx + 6, D1.yf + 2, 2, 5); ctx.fillRect(bx + bw - 8, D1.yf + 2, 2, 5);
+    ctx.fillStyle = '#3b7dd8'; U.roundRect(ctx, bx, by, bw, 20, 4); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = r.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('ROCKET #2', B.x, by + 10.5);
+  },
+  // panels stacked on a pallet (`bolts`: with the box of bolts on top)
+  drawPanels(r, x, y, n, bolts) {
+    const ctx = r.ctx;
+    ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(x - 34, y + 6, 72, 8);
+    ctx.fillStyle = '#8d5a2b'; ctx.fillRect(x - 34, y - 6, 68, 14); ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(x - 34, y, 68, 2);
+    for (let k = 0; k < n; k++) { ctx.fillStyle = k % 2 ? '#ff8c42' : '#d9dde3'; U.roundRect(ctx, x - 30 + (k % 2) * 4, y - 14 - k * 7, 56, 8, 2); ctx.fill(); ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(x - 30 + (k % 2) * 4, y - 8 - k * 7, 56, 2); }
+    if (bolts) { ctx.fillStyle = '#5c6670'; U.roundRect(ctx, x + 10, y - 22 - n * 7, 18, 12, 2); ctx.fill(); ctx.fillStyle = '#ffd166'; ctx.font = r.font(7); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('BOLTS', x + 19, y - 16 - n * 7); }
+  },
+  // the tool shed: a little blue hut with a sloping tin roof, its door open on the tools
+  drawShed(r, g) {
+    const ctx = r.ctx, SH = CFG.ISLANDS.ROCKET.SITE2.SHED, x0 = SH.x - SH.w / 2, y0 = SH.y - SH.h / 2, w = SH.w, h = SH.h;
+    ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(x0 + 5, y0 + 8, w, h);
+    ctx.fillStyle = '#3b7dd8'; ctx.fillRect(x0 + 2, y0 + 16, w - 4, h - 16);
+    ctx.fillStyle = 'rgba(0,0,0,0.1)'; for (let x = x0 + 8; x < x0 + w - 4; x += 8) ctx.fillRect(x, y0 + 16, 1.5, h - 16);
+    ctx.fillStyle = '#c9ccd2'; ctx.beginPath(); ctx.moveTo(x0 - 4, y0 + 20); ctx.lineTo(x0 + 6, y0 - 6); ctx.lineTo(x0 + w - 6, y0 - 6); ctx.lineTo(x0 + w + 4, y0 + 20); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.12)'; for (let x = x0 + 4; x < x0 + w; x += 9) ctx.fillRect(x, y0 - 4, 2, 22);
+    // the open door with a spade and a saw hanging inside, and a sign
+    ctx.fillStyle = '#2b1d14'; ctx.fillRect(SH.x - 12, y0 + 24, 24, h - 24);
+    ctx.strokeStyle = '#c9975f'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(SH.x - 6, y0 + 28); ctx.lineTo(SH.x - 6, y0 + 44); ctx.stroke(); ctx.fillStyle = '#9aa0a8'; ctx.fillRect(SH.x - 9, y0 + 42, 6, 6);
+    ctx.fillStyle = '#9aa0a8'; ctx.beginPath(); ctx.moveTo(SH.x + 2, y0 + 30); ctx.lineTo(SH.x + 9, y0 + 30); ctx.lineTo(SH.x + 9, y0 + 44); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#5a9be6'; ctx.fillRect(SH.x + 12, y0 + 24, 7, h - 24);
+    ctx.fillStyle = '#ffd166'; U.roundRect(ctx, x0 + 6, y0 + 20, 22, 11, 2); ctx.fill(); ctx.fillStyle = '#2b1d14'; ctx.font = r.font(8); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🔧', x0 + 17, y0 + 26);
+    // a wheelbarrow by the door
+    const wx = x0 + w - 12, wy = y0 + h + 4;
+    ctx.fillStyle = '#41b883'; ctx.beginPath(); ctx.moveTo(wx - 12, wy - 10); ctx.lineTo(wx + 10, wy - 10); ctx.lineTo(wx + 6, wy - 2); ctx.lineTo(wx - 8, wy - 2); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.arc(wx + 6, wy, 3, 0, Math.PI * 2); ctx.fill();
+  },
+  // the peek through the hatch, in screen space: the half-built cabin, its wires, and a worker inside who waves
+  screen(r, g) {
+    const st = this.st;
+    if (!st || !st.peek || g.area !== 'islands') return;
+    const ctx = r.ctx, W = r.canvas.width / r.dpr, H = r.canvas.height / r.dpr, t = g.time, pk = st.peek;
+    const a = Math.min(1, pk.t / 0.25, (CFG.ROCKETISLE.SITE2.PEEK - pk.t) / 0.3);
+    if (a <= 0) return;
+    const pw = Math.min(W - 32, 400), s = pw / 380, ph = 236 * s, x = (W - pw) / 2, y = Math.max(80, (H - ph) / 2 - 60);
+    ctx.save(); ctx.globalAlpha = a;
+    ctx.fillStyle = 'rgba(20,24,34,0.35)'; ctx.fillRect(0, 0, W, H);
+    ctx.translate(x, y + (1 - a) * 20); ctx.scale(s, s);
+    // the hatch's frame, with rivets
+    ctx.fillStyle = 'rgba(0,0,0,0.3)'; U.roundRect(ctx, 6, 10, 380, 236, 30); ctx.fill();
+    ctx.fillStyle = '#9aa0a8'; U.roundRect(ctx, 0, 0, 380, 236, 30); ctx.fill();
+    ctx.fillStyle = '#7d8591'; U.roundRect(ctx, 6, 6, 368, 224, 26); ctx.fill();
+    ctx.fillStyle = '#c9ccd2'; for (let i = 0; i < 12; i++) { const px = 22 + i * 30.5; ctx.beginPath(); ctx.arc(px, 9, 2.5, 0, Math.PI * 2); ctx.arc(px, 227, 2.5, 0, Math.PI * 2); ctx.fill(); }
+    ctx.save(); U.roundRect(ctx, 14, 14, 352, 208, 20); ctx.clip();
+    // the cabin: dark walls with ribs, a metal floor, a work lamp hanging from the ceiling
+    const wall = ctx.createLinearGradient(0, 14, 0, 222); wall.addColorStop(0, '#24303f'); wall.addColorStop(1, '#3a4a5e'); ctx.fillStyle = wall; ctx.fillRect(14, 14, 352, 208);
+    ctx.fillStyle = 'rgba(255,255,255,0.06)'; for (let rx = 34; rx < 366; rx += 44) ctx.fillRect(rx, 14, 8, 170);
+    ctx.fillStyle = '#5c6670'; ctx.fillRect(14, 184, 352, 38); ctx.fillStyle = 'rgba(0,0,0,0.18)'; for (let fx = 14; fx < 366; fx += 32) ctx.fillRect(fx, 184, 1.5, 38);
+    ctx.fillStyle = 'rgba(255,255,255,0.12)'; ctx.fillRect(14, 184, 352, 2);
+    const lg = ctx.createRadialGradient(190, 40, 4, 190, 40, 150); lg.addColorStop(0, 'rgba(255,224,138,0.45)'); lg.addColorStop(1, 'rgba(255,224,138,0)'); ctx.fillStyle = lg; ctx.fillRect(14, 14, 352, 208);
+    ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(190 + Math.sin(t * 1.4) * 3, 14); ctx.lineTo(190 + Math.sin(t * 1.4) * 6, 32); ctx.stroke();
+    ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(190 + Math.sin(t * 1.4) * 6, 36, 7, 0, Math.PI * 2); ctx.fill();
+    // two seats: one with its cushion on, one still a bare frame
+    const seat = (sx, done) => {
+      ctx.fillStyle = '#9aa0a8'; ctx.fillRect(sx - 3, 166, 6, 20); ctx.fillRect(sx - 18, 184, 36, 4);
+      if (done) { ctx.fillStyle = '#e4572e'; U.roundRect(ctx, sx - 18, 116, 30, 46, 8); ctx.fill(); U.roundRect(ctx, sx - 20, 150, 40, 18, 6); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(sx - 14, 120, 4, 36); }
+      else { ctx.strokeStyle = '#9aa0a8'; ctx.lineWidth = 3; U.roundRect(ctx, sx - 18, 116, 30, 46, 8); ctx.stroke(); U.roundRect(ctx, sx - 20, 150, 40, 18, 6); ctx.stroke(); }
+    };
+    seat(66, true); seat(126, false);
+    // the control panel: a screen showing a pizza, blinking lights, a gap where buttons will go
+    ctx.fillStyle = '#5c6670'; U.roundRect(ctx, 246, 74, 100, 84, 8); ctx.fill();
+    ctx.fillStyle = '#1a1f29'; U.roundRect(ctx, 256, 84, 44, 32, 4); ctx.fill();
+    r.drawPizza(278, 100, 10);
+    for (let i = 0; i < 4; i++) { const on = Math.sin(t * (3 + i) + i * 1.7) > 0; ctx.fillStyle = on ? ['#8ef0a0', '#ffd166', '#4dd0e1', '#ff6b6b'][i] : 'rgba(255,255,255,0.15)'; ctx.beginPath(); ctx.arc(314 + (i % 2) * 18, 92 + Math.floor(i / 2) * 18, 5, 0, Math.PI * 2); ctx.fill(); }
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]); U.roundRect(ctx, 258, 126, 76, 22, 4); ctx.stroke(); ctx.setLineDash([]);
+    // wires dangling from the ceiling and out of the panel
+    ctx.lineCap = 'round'; ctx.lineWidth = 3;
+    for (const [col, x0, x1, sag, ph2] of [['#e4572e', 230, 262, 70, 0], ['#ffd166', 238, 284, 92, 1.3], ['#4dd0e1', 300, 330, 60, 2.1], ['#41b883', 160, 140, 64, 0.7]]) {
+      const sw = Math.sin(t * 1.8 + ph2) * 5; ctx.strokeStyle = col; ctx.beginPath(); ctx.moveTo(x0, 14); ctx.quadraticCurveTo((x0 + x1) / 2 + sw, 14 + sag * 1.6, x1 + sw * 0.5, 14 + sag); ctx.stroke();
+    }
+    ctx.strokeStyle = '#ff8fab'; ctx.beginPath(); ctx.moveTo(296, 158); ctx.quadraticCurveTo(300 + Math.sin(t * 2) * 4, 186, 284, 196); ctx.stroke();
+    // a toolbox on the floor
+    ctx.fillStyle = '#e4572e'; U.roundRect(ctx, 102, 196, 38, 18, 3); ctx.fill(); ctx.fillStyle = '#2b1d14'; ctx.fillRect(114, 190, 14, 4); ctx.fillStyle = '#ffd166'; ctx.fillRect(102, 202, 38, 3);
+    // the worker inside, hopping and waving
+    const hop = Math.abs(Math.sin(t * 9)) * 6;
+    ctx.save(); ctx.translate(196, 206); ctx.scale(1.45, 1.45);
+    this.drawWorker(r, g, { x: 0, y: 0, z: 0, hop, facing: -1, moving: false, bob: 0, role: 'peek', weld: 0, hat: '#ffd166', shirt: '#ff8c42', skin: '#e0ac69' });
+    ctx.restore();
+    r.drawBubble(196, 206 - hop * 1.45 - 98, () => { ctx.font = r.font(16); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('👋', 0, 0); }, 36);
+    ctx.restore();
+    // a little plate on the frame
+    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, 130, -6, 120, 20, 6); ctx.fill();
+    ctx.fillStyle = '#ffe08a'; ctx.font = r.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🚀 ROCKET #2', 190, 4.5);
     ctx.restore();
   },
 

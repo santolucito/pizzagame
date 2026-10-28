@@ -26,6 +26,23 @@ module.exports = async (t) => {
   t.expect(reg.inside && reg.rocket && reg.areas && reg.render, `extensions and interior maps registered ${JSON.stringify(reg)}`);
   t.expect(reg.order, 'the interiors and the rocket answer before the City and the islands');
   t.expect(reg.world.x0 >= 2600 && reg.world.x1 <= 4600 && reg.world.y1 > 2600 && reg.world.y1 <= 2950, `the Islands map grew south within its limits ${JSON.stringify(reg.world)}`);
+  // Rocket Island grew east (and a little north) for Rocket #2's site: still inside the map with water round it, clear
+  // of every other island (the Crab Shack's beach is just north), and the rope bridge from Starfish Cove still lands on it
+  const rk = await t.ev(() => {
+    const I = CFG.ISLANDS, W = I.WORLD, s = I.ISLANDS.find((q) => q.key === 'rocket'), b = I.LINKS.find((l) => l.key === 'bridge2'), cove = I.ISLANDS.find((q) => q.key === 'cove');
+    const gap = (a, c) => Math.max(c.x0 - a.x1, a.x0 - c.x1, c.y0 - a.y1, a.y0 - c.y1);
+    const others = I.ISLANDS.filter((q) => q !== s).map((q) => [q.key, gap(s, q)]);
+    const S2 = I.ROCKET.SITE2, inIsle = (r) => r.x0 >= s.x0 + 8 && r.x1 <= s.x1 - 8 && r.y0 >= s.y0 + 8 && r.y1 <= s.y1 - 8;
+    return {
+      s: { x0: s.x0, y0: s.y0, x1: s.x1, y1: s.y1 }, water: Math.min(s.x0 - W.x0, W.x1 - s.x1, s.y0 - W.y0, W.y1 - s.y1), others,
+      bridge: b.x0 < cove.x1 - 8 && b.x1 > s.x0 + 8 && b.y0 > s.y0 && b.y1 < s.y1, grew: s.x1 - s.x0 > 620 && s.y1 - s.y0 > 360,
+      site2: inIsle(S2.LOT) && inIsle(S2.PAD) && S2.LOT.x0 > I.ROCKET.PAD.x1,
+    };
+  });
+  t.expect(rk.grew && rk.water >= 20, `Rocket Island is bigger and has water all round ${JSON.stringify(rk)}`);
+  t.expect(rk.others.every(([k, d]) => d >= 40), `Rocket Island keeps water between it and the other islands ${JSON.stringify(rk.others)}`);
+  t.expect(rk.bridge, 'the rope bridge joins Starfish Cove and Rocket Island');
+  t.expect(rk.site2, `Rocket #2's lot sits on Rocket Island's land, east of the first pad ${JSON.stringify(rk)}`);
   const rects = await t.ev(() => Object.keys(CFG.ISLE_IN.ROOMS).map((k) => [k, CFG.AREAS[k].WORLD]));
   const want = { lighthouse: 6000, crabshack: 7000, coconuthut: 8000, missionctl: 9000, beachhut: 10000 };
   for (const [k, W] of rects) t.expect(W.x0 === want[k] && W.x1 - W.x0 === 600 && W.y0 === 4000 && W.y1 === 4400, `${k} sits in its reserved rectangle`);
@@ -54,7 +71,7 @@ module.exports = async (t) => {
     const spots = {
       start: A, sunny: mid(isle('sunny')), cove: { x: 3550, y: 2730 }, rocket: { x: 4000, y: 2760 }, treasure: { x: 3640, y: 2340 },
       court: I.SUNNY.PLAYERS[0], kiosk: I.SUNNY.PAD, pool: { x: I.COVE.POOLS[0].x, y: I.COVE.POOLS[0].y + I.COVE.POOLS[0].ry + 20 },
-      ask: R.ASK, missionDoor: { x: M.x, y: M.y + M.h / 2 + 20 }, beachHutDoor: I.BEACHHUT.door,
+      ask: R.ASK, missionDoor: { x: M.x, y: M.y + M.h / 2 + 20 }, beachHutDoor: I.BEACHHUT.door, rocket2Lot: { x: R.SITE2.LOT.x0 - 30, y: 2760 },
     };
     const out = {}; for (const [k, s] of Object.entries(spots)) out[k] = reach(s.x, s.y);
     out.crabDoorNeedsJetski = !reach(isle('crab').hut.x, isle('crab').hut.y + 54);

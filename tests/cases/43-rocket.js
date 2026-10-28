@@ -5,6 +5,9 @@
 // the ask answers per stage, Blast off only once it is ready, the launch and the cut-scene, the moon (landing on free
 // ground, the welcome toast, hints, the flag, the alien's moon pizza, a crater bounce, the buggy), the flight home,
 // Take-me-home from the moon, rescues, and a reload keeping the visits and the flag. Screenshots desktop + phone.
+// Rocket #2: a fenced lot until the first rocket is finished, then its site (workers, crane, sparks), the scaffold's two
+// walkways (climb up, edges hold, peek in the hatch, climb down), a save up there reloading at the ladder's foot, rescues
+// and Take-me-home from the top.
 module.exports = async (t) => {
   // until the coordinator wires js/moon.js into index.html, serve the page with it added after js/rocket.js
   await t.page.route(/^http:\/\/127\.0\.0\.1:\d+\/(index\.html)?(\?.*)?$/, async (route) => {
@@ -31,6 +34,12 @@ module.exports = async (t) => {
     return { ask: R.ASK, isle: { x: 4000, y: 2760 }, cove: { x: 3550, y: 2730 }, start: CFG.PLAYER_START, mission: { x: 9300, y: 4200 } };
   });
   const tp = (x, y, area) => t.ev(([x, y, area]) => { T.tp(x, y, area); T.step(2); }, [x, y, area]);
+  // Rocket #2's site: is it there (entities drawn, obstacles), and how many entities Rocket Island draws
+  const site2 = () => t.ev(() => {
+    const S2 = CFG.ISLANDS.ROCKET.SITE2, L = S2.LOT, G = RocketExt.geo(), obs = Game.obstacles(), items = [];
+    RocketExt.entities(Render, Game, items);
+    return { on: RocketExt.site2On(Game), lot: obs.some((o) => o.x === L.x0 && o.y === L.y0 && o.w === L.x1 - L.x0), scaffold: obs.some((o) => o.x === G.D[1].x0 - 2), items: items.length };
+  });
   const state = () => t.ev(() => ({ visits: Game.s.rocket.visits, stage: RocketExt.stage(Game), label: T.label(), hint: T.hint(), ask: RocketExt.st.ask && RocketExt.st.ask.line, more: RocketExt.st.ask && RocketExt.st.ask.more, key: RocketExt.bgKey(Game), crane: RocketExt.craneState(RocketExt.stage(Game)), swing: RocketExt.st.swing }));
 
   // ---- visit 1: walk over the bridge from Starfish Cove onto Rocket Island
@@ -55,6 +64,12 @@ module.exports = async (t) => {
   t.expect(cd.f.includes('🚧 Not yet! Coming soon!') && cd.area === 'islands' && !cd.travel, 'the countdown still ends in Not yet');
   await t.ev(() => { const A = CFG.ISLANDS.ROCKET.ASK; T.tp(A.x - 60, A.y + 30, 'islands'); Render.setZoom(1); T.step(30); });
   await t.shot('stage0');
+  // no Rocket #2 yet: a fenced lot; the ladder's spot is inside the fence (a chef put there lands outside the lot)
+  const lot0 = await site2();
+  t.expect(!lot0.on && lot0.lot && !lot0.scaffold, `stage 0: the fenced lot, no Rocket #2 ${JSON.stringify(lot0)}`);
+  const lotIn = await t.ev(() => { const F = RocketExt.geo().L1.foot, L = CFG.ISLANDS.ROCKET.SITE2.LOT; T.tp(F.x, F.y, 'islands'); T.step(2); const p = Game.player; return { label: T.label(), hint: T.hint(), out: p.x < L.x0 - 12, free: !Game.obstacles().some((o) => Game.hitRect(p.x, p.y, 12, o)), onIsle: RocketExt.onRocketLand(Game) }; });
+  t.expect(lotIn.label !== '🪜 Climb up' && lotIn.hint !== 'Climb the scaffolding! 🪜', `stage 0: nothing to climb ${JSON.stringify(lotIn)}`);
+  t.expect(lotIn.out && lotIn.free && lotIn.onIsle, `stage 0: a chef inside the fenced lot lands outside it ${JSON.stringify(lotIn)}`);
 
   // ---- visit 2: off the island (to Starfish Cove) and back
   await tp(S.cove.x, S.cove.y, 'islands');
@@ -73,6 +88,10 @@ module.exports = async (t) => {
   t.expectEq((await state()).more, '1 more visit!', 'stage 1 answer: 1 more visit');
   await t.ev(() => { T.step(240); const A = CFG.ISLANDS.ROCKET.ASK; T.tp(A.x - 60, A.y + 30, 'islands'); RocketExt.st.crane = 0.62 * CFG.ROCKETISLE.CRANE_PERIOD; T.step(30); });
   await t.shot('stage1');
+  const lot1 = await site2();
+  t.expect(!lot1.on && lot1.lot && !lot1.scaffold, `stage 1: still the fenced lot ${JSON.stringify(lot1)}`);
+  await t.ev(() => { const L = CFG.ISLANDS.ROCKET.SITE2.LOT; T.tp(L.x0 - 40, 2720, 'islands'); T.step(20); });
+  await t.shot('site2-lot');
 
   // ---- visit 3: to another map (town) and back
   await tp(S.start.x, S.start.y, 'town');
@@ -98,6 +117,117 @@ module.exports = async (t) => {
   // ---- a rescue: a chef saved inside the rocket's feet goes back to its door
   const resc = await t.ev(() => { const B = CFG.ISLANDS.ROCKET.BASE, A = CFG.ISLANDS.ROCKET.ASK; T.tp(B.x, B.y - 20, 'islands'); T.step(2); return Math.hypot(Game.player.x - A.x, Game.player.y - A.y); });
   t.expect(resc < 1, 'inside the rocket: back at its door');
+
+  // ---- Rocket #2: its site opened next door once the first rocket was finished
+  const on2 = await site2();
+  t.expect(on2.on && !on2.lot && on2.scaffold && on2.items >= lot1.items + 11, `stage 2: Rocket #2's site is there ${JSON.stringify([lot1, on2])}`);
+  const busy = await t.ev(() => {
+    const s2 = RocketExt.st.s2, c = s2.workers.find((w) => w.role === 'carry'), x0 = c.x, y0 = c.y, crane0 = RocketExt.crane2State();
+    let sparks = 0, bang = false, deckSparks = false, weldLow = false, moved = 0;
+    for (let i = 0; i < 300; i++) { T.step(1); moved = Math.max(moved, Math.hypot(c.x - x0, c.y - y0)); sparks = Math.max(sparks, s2.sparks.length); bang = bang || s2.workers.some((w) => w.bang > 0); deckSparks = deckSparks || s2.workers.some((w) => w.deck === 1 && w.weld); weldLow = weldLow || s2.workers.some((w) => w.role === 'weldLow' && w.weld); }
+    const crane1 = RocketExt.crane2State();
+    return { moved, carrying: s2.workers.filter((w) => w.carrying).length, sparks, bang, deckSparks, weldLow, crane: crane0.ph !== crane1.ph || crane0.hy !== crane1.hy, hats: s2.workers.every((w) => !!w.hat), n: s2.workers.length };
+  });
+  t.expect(busy.moved > 20 && busy.sparks > 0 && busy.bang && busy.deckSparks && busy.weldLow && busy.crane && busy.hats && busy.n >= 4, `Rocket #2's workers are busy: carrying, welding, hammering, the crane turning ${JSON.stringify(busy)}`);
+  const waved = await t.ev(() => { const w = RocketExt.st.s2.workers.find((q) => q.role === 'weldLow'); w.waveCd = 0; T.tp(w.x - 40, w.y + 20, 'islands'); T.step(3); const r = { wave: w.wave > 0, hop: 0 }; for (let i = 0; i < 20; i++) { T.step(1); r.hop = Math.max(r.hop, w.hop); } return r; });
+  t.expect(waved.wave && waved.hop > 1, `a Rocket #2 worker hops and waves at the chef ${JSON.stringify(waved)}`);
+  await t.ev(() => { const L = CFG.ISLANDS.ROCKET.SITE2.LOT; T.tp(L.x0 - 40, 2720, 'islands'); T.step(20); });
+  await t.shot('site2');
+  // the ladder: a hint nearby, the button at its foot
+  const lad = await t.ev(() => {
+    const F = RocketExt.geo().L1.foot; T.tp(F.x + 30, F.y + 30, 'islands'); T.step(2);
+    const near = { text: Game.hint && Game.hint.text, target: Game.hint && Game.hint.target }; T.tp(F.x, F.y, 'islands'); T.step(2);
+    return { near, label: T.label(), hint: T.hint() };
+  });
+  t.expect(lad.near.text === 'Climb the scaffolding! 🪜' && lad.near.target, `ladder hint nearby ${JSON.stringify(lad.near)}`);
+  t.expectEq(lad.label, '🪜 Climb up', 'climb up at the ladder');
+  t.expectEq(lad.hint, 'Climb the scaffolding! 🪜', 'ladder hint at its foot');
+  // up to the first walkway
+  const climbTo = (lv) => t.ev((lv) => {
+    const G = RocketExt.geo(), L = lv === 1 ? G.L1 : G.L2; T.tp(L.foot.x, L.foot.y, 'islands'); T.step(1);
+    const label = T.label(); T.act(); const climbing = !!RocketExt.st.climb, hint = T.hint();
+    const n = T.until(() => !RocketExt.st.climb, 300); T.step(2);
+    const p = Game.player, W = G.D[lv].walk;
+    return { label, climbing, hint, n, up: RocketExt.st.up, saved: Game.s.rocket.up, on: p.x >= W.x0 && p.x <= W.x1 && p.y >= W.y0 && p.y <= W.y1, after: T.label(), hint2: Game.hint && Game.hint.text, target: !!(Game.hint && Game.hint.target), floats: Game.floats.map((f) => f.text), override: (RocketExt.obstaclesOverride(Game) || []).length, onIsle: RocketExt.onRocketLand(Game), visits: Game.s.rocket.visits };
+  }, lv);
+  const up1 = await climbTo(1);
+  t.expect(up1.label === '🪜 Climb up' && up1.climbing && up1.hint === 'Up we go! 🪜' && up1.n >= 0, `climbing the ladder ${JSON.stringify(up1)}`);
+  t.expect(up1.up === 1 && up1.saved === 1 && up1.on && up1.override === 4, `on the first walkway, only its edges count ${JSON.stringify(up1)}`);
+  t.expect(up1.floats.includes('Up on the scaffold! 🪜'), 'up on the scaffold float');
+  t.expect(up1.hint2 === 'Climb up to the top! 🪜' && up1.target, `hint to the next ladder ${JSON.stringify(up1)}`);
+  t.expectEq(up1.after, '🪜 Climb down', 'climb down from the first walkway');
+  t.expect(up1.onIsle && up1.visits === 3, 'still on Rocket Island: no new visit');
+  // the edges hold: walking 2 s each way stays on the planks (and reaches the edge)
+  const edges = (lv) => t.ev((lv) => {
+    const W = RocketExt.geo().D[lv].walk, out = [];
+    for (const [x, y] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      T.steer(x, y); T.step(120); T.unsteer(); T.step(1);
+      const p = Game.player, edge = x > 0 ? Math.abs(p.x - W.x1) : x < 0 ? Math.abs(p.x - W.x0) : y > 0 ? Math.abs(p.y - W.y1) : Math.abs(p.y - W.y0);
+      out.push({ dir: [x, y], x: Math.round(p.x), y: Math.round(p.y), up: RocketExt.st.up, on: p.x >= W.x0 - 0.5 && p.x <= W.x1 + 0.5 && p.y >= W.y0 - 0.5 && p.y <= W.y1 + 0.5, edge: edge < 3 });
+    }
+    return out;
+  }, lv);
+  const e1 = await edges(1);
+  t.expect(e1.every((e) => e.up === 1 && e.on && e.edge), `the first walkway's edges hold ${JSON.stringify(e1)}`);
+  await t.ev(() => { const G = RocketExt.geo(); T.tp(G.B.x - 30, G.D[1].walk.y1 - 4, 'islands'); T.step(30); });
+  t.expectEq(await t.ev(() => RocketExt.st.up), 1, 'walking about on the first walkway keeps the chef up');
+  await t.shot('scaffold-l1');
+  // up to the top walkway: what a view, then peek into the hatch
+  const up2 = await climbTo(2);
+  t.expect(up2.label === '🪜 Climb up' && up2.climbing && up2.up === 2 && up2.saved === 2 && up2.on && up2.override === 4, `on the top walkway ${JSON.stringify(up2)}`);
+  t.expect(up2.floats.includes('What a view! 🚀'), 'what a view float at the top');
+  t.expect(up2.hint2 === 'Peek in the hatch! 👀' && up2.target, `hint to the hatch ${JSON.stringify(up2)}`);
+  t.expectEq(up2.after, '🪜 Climb down', 'climb down from the top walkway (away from the hatch)');
+  const e2 = await edges(2);
+  t.expect(e2.every((e) => e.up === 2 && e.on && e.edge), `the top walkway's edges hold ${JSON.stringify(e2)}`);
+  await t.ev(() => { const H = RocketExt.geo().HATCH; T.tp(H.x + 28, H.y + 18, 'islands'); T.step(30); });
+  await t.shot('scaffold-l2');
+  const pk = await t.ev(() => {
+    const H = RocketExt.geo().HATCH; T.tp(H.x, H.y + 10, 'islands'); T.step(2);
+    const label = T.label(), hint = T.hint(); T.act(); T.step(20);
+    return { label, hint, peek: !!RocketExt.st.peek, hint2: T.hint() };
+  });
+  t.expectEq(pk.label, '👀 Peek inside', 'peek inside at the hatch');
+  t.expectEq(pk.hint, 'Peek in the hatch! 👀', 'peek hint at the hatch');
+  t.expect(pk.peek && pk.hint2 === 'Hello in there! 👋', `peeking into Rocket #2 ${JSON.stringify(pk)}`);
+  await t.shot('peek');
+  t.expect(await t.ev(() => { T.step(60 * CFG.ROCKETISLE.SITE2.PEEK); return !RocketExt.st.peek; }), 'the peek closes by itself');
+  // back down, a level at a time
+  const down = await t.ev(() => {
+    const G = RocketExt.geo(); T.tp(G.L2.top.x, G.L2.top.y, 'islands'); T.step(1);
+    const l2 = T.label(); T.act(); T.until(() => !RocketExt.st.climb, 300); T.step(2);
+    const at1 = { up: RocketExt.st.up, d: Math.hypot(Game.player.x - G.L2.foot.x, Game.player.y - G.L2.foot.y) };
+    T.tp(G.L1.top.x, G.L1.top.y, 'islands'); T.step(1);
+    const l1 = T.label(); T.act(); const hint = T.hint(); T.until(() => !RocketExt.st.climb, 300); T.step(2);
+    const p = Game.player;
+    return { l2, at1, l1, hint, up: RocketExt.st.up, saved: Game.s.rocket.up, d: Math.hypot(p.x - G.L1.foot.x, p.y - G.L1.foot.y), override: RocketExt.obstaclesOverride(Game), free: !Game.obstacles().some((o) => Game.hitRect(p.x, p.y, 12, o)), label: T.label() };
+  });
+  t.expect(down.l2 === '🪜 Climb down' && down.at1.up === 1 && down.at1.d < 1, `down from the top to the first walkway ${JSON.stringify(down)}`);
+  t.expect(down.l1 === '🪜 Climb down' && down.hint === 'Down we go! 🪜' && down.up === 0 && down.saved === 0 && down.d < 1 && down.override === null && down.free, `down to the sand at the ladder's foot ${JSON.stringify(down)}`);
+  t.expectEq(down.label, '🪜 Climb up', 'and up again from there');
+  // a rescue: a chef inside Rocket #2's scaffold on the ground lands at the ladder's foot
+  const resc2 = await t.ev(() => { const G = RocketExt.geo(); T.tp(G.B.x, G.D[1].walk.y0 + 10, 'islands'); T.step(2); return Math.hypot(Game.player.x - G.L1.foot.x, Game.player.y - G.L1.foot.y); });
+  t.expect(resc2 < 1, 'inside Rocket #2 scaffold: back at the ladder');
+  // a save made up at the top reloads on the ground at the ladder's foot
+  const saved = await t.ev(() => {
+    const G = RocketExt.geo();
+    for (const L of [G.L1, G.L2]) { T.tp(L.foot.x, L.foot.y, 'islands'); T.act(); T.until(() => !RocketExt.st.climb, 300); }
+    T.step(2); Game.save(); return { up: RocketExt.st.up, saved: Game.s.rocket.up };
+  });
+  t.expect(saved.up === 2 && saved.saved === 2, `saved at the top ${JSON.stringify(saved)}`);
+  await t.reload();
+  const rel = await t.ev(() => { const F = RocketExt.geo().L1.foot, p = Game.player; T.step(2); return { area: Game.area, up: RocketExt.st.up, saved: Game.s.rocket.up, d: Math.hypot(p.x - F.x, p.y - F.y), free: !Game.obstacles().some((o) => Game.hitRect(p.x, p.y, 12, o)), label: T.label(), visits: Game.s.rocket.visits }; });
+  t.expect(rel.area === 'islands' && rel.up === 0 && rel.saved === 0 && rel.d < 1 && rel.free && rel.label === '🪜 Climb up' && rel.visits === 3, `the reload lands at the ladder's foot ${JSON.stringify(rel)}`);
+  // Take me home from the top
+  const gh2 = await t.ev(() => {
+    const G = RocketExt.geo();
+    for (const L of [G.L1, G.L2]) { T.tp(L.foot.x, L.foot.y, 'islands'); T.act(); T.until(() => !RocketExt.st.climb, 300); }
+    const H = G.HATCH; T.tp(H.x, H.y + 10, 'islands'); T.act(); const up = RocketExt.st.up, peek = !!RocketExt.st.peek;
+    Game.goHome(); T.step(2);
+    return { up, peek, area: Game.area, now: RocketExt.st.up, saved: Game.s.rocket.up, peek2: RocketExt.st.peek, override: RocketExt.obstaclesOverride(Game), hint: RocketExt.hint(Game), action: RocketExt.action(Game) };
+  });
+  t.expect(gh2.up === 2 && gh2.peek, 'peeking from the top before going home');
+  t.expect(gh2.area === 'town' && gh2.now === 0 && gh2.saved === 0 && gh2.peek2 === null && gh2.override === null && gh2.hint === undefined && gh2.action === null, `Take me home from the top of the scaffold ${JSON.stringify(gh2)}`);
 
   // ---- blast off: climb in, 3-2-1, smoke and flames, up and off the screen, the flight, landing on the moon
   await tp(S.ask.x, S.ask.y, 'islands');
@@ -203,7 +333,7 @@ module.exports = async (t) => {
   await t.ev(() => { const D = CFG.MOON.DOOR; T.tp(D.x + 60, D.y, 'moon'); Game.save(); });
   await t.reload();
   const re = await t.ev(() => ({ area: Game.area, visits: Game.s.rocket.visits, flag: Game.s.moon.flag, stage: RocketExt.stage(Game), pizzas: Game.s.moon.pizzas }));
-  t.expect(re.area === 'moon' && re.visits === 3 && re.stage === 2 && re.flag === true && re.pizzas >= 1, `reload keeps the moon, the visits and the flag ${JSON.stringify(re)}`);
+  t.expect(re.area === 'moon' && re.visits >= 3 && re.stage === 2 && re.flag === true && re.pizzas >= 1, `reload keeps the moon, the visits and the flag ${JSON.stringify(re)}`);
 
   // ---- fly home: the same trip backwards, landing on Rocket Island's pad
   const home = await t.ev(() => {
@@ -254,6 +384,19 @@ module.exports = async (t) => {
     t.expectEq(pv, v + 1, 'phone: the visit counted');
     await t.shot(`phone-stage${v}`);
   }
+  // phone: up on the scaffold, and the peek
+  await t.ev(() => {
+    const G = RocketExt.geo();
+    for (const L of [G.L1, G.L2]) { T.tp(L.foot.x, L.foot.y, 'islands'); T.act(); T.until(() => !RocketExt.st.climb, 300); }
+    T.tp(G.HATCH.x + 28, G.HATCH.y + 18, 'islands'); T.step(20);
+  });
+  t.expectEq(await t.ev(() => RocketExt.st.up), 2, 'phone: up at the top');
+  await t.shot('phone-scaffold-l2');
+  await t.ev(() => { const H = RocketExt.geo().HATCH; T.tp(H.x, H.y + 10, 'islands'); T.act(); T.step(30); });
+  t.expect(await t.ev(() => !!RocketExt.st.peek), 'phone: peeking');
+  await t.shot('phone-peek');
+  await t.ev(() => { const A = CFG.ISLANDS.ROCKET.ASK; T.tp(A.x, A.y + 20, 'islands'); T.step(5); });
+  t.expectEq(await t.ev(() => RocketExt.st.up), 0, 'phone: back on the ground at the rocket');
   await t.ev(() => { T.act(); T.until(() => RocketExt.st.fly && RocketExt.st.fly.t > CFG.ROCKETISLE.LIFTOFF + 0.5, 400); });
   await t.shot('phone-liftoff');
   await t.ev(() => { T.until(() => !!Game.travel, 600); Game.travel.dur = CFG.ROCKETISLE.FLIGHT; Game.travel.t = 3.6; });

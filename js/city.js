@@ -295,10 +295,8 @@ const CityExt = {
     if (g.area !== 'city') return undefined;
     if (this.floor) return this.towerHint(g);
     if (st.cab) return { text: st.cab.phase === 'coming' ? '🚕 Taxi’s coming!' : st.cab.phase === 'riding' ? 'Enjoy the ride! Press the button to get out' : '🚕 Pulling over…', target: null };
-    const coin = g.coins.filter((c) => !c.taken && c.x >= C.WORLD.x0).sort((a, b) => U.dist(p.x, p.y, a.x, a.y) - U.dist(p.x, p.y, b.x, b.y))[0];
-    if (g.driving) return coin && U.dist(p.x, p.y, coin.x, coin.y) < 500 ? { text: 'Drive over the shiny coin!', target: coin } : { text: 'Honk honk! Drive around the City', target: null };
+    if (g.driving) return null;   // just let them drive
     if (this.nearCityStop(g)) return { text: 'Hop on the bus to go home 🍕', target: null };
-    if (coin && U.dist(p.x, p.y, coin.x, coin.y) < 420) return { text: 'Grab the shiny coin!', target: coin };
     if (this.nearTowerDoor(g)) return { text: 'Press the button to ride the elevator! 🛗', target: null };
     if (!st.taxiDriven) return { text: 'Hop in the taxi!', target: st.taxi };
     if (!st.seenTower) return { text: 'Visit the Pizza Tower! 🛗', target: C.TOWER.door };

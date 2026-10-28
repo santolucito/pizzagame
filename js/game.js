@@ -55,7 +55,7 @@ const Game = {
     for (const role of Object.keys(s.staff)) {
       for (let i = 0; i < s.staff[role].count; i++) this.staff.push(new Staff(role, i));
     }
-    this.coins = CFG.COINS.map((c) => ({ x: c.x, y: c.y, taken: false, t: 0, phase: Math.random() * 6 }));
+    this.coins = [];   // the old cash coins are gone: the hidden Pizza Coins (js/pizzacoins.js) are the only coins in the world
     this.dog = new Dog();
     this.houses = CFG.HOUSES.map((h, i) => Object.assign({ i, order: null, happy: 0 }, h));
     this.icCustomers = [];

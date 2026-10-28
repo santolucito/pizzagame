@@ -148,4 +148,14 @@ module.exports = async (t) => {
   const mix = await t.ev(() => { const r = (id) => document.getElementById(id).getBoundingClientRect(), a = r('btn-car'), b = r('btn-make'); return { driving: Game.driving && Game.vehicle.kind === 'mixer', car: document.getElementById('btn-car').textContent, act: document.getElementById('btn-make').textContent, overlap: a.bottom > b.top && b.bottom > a.top && a.right > b.left && b.right > a.left, shown: !document.getElementById('btn-make').classList.contains('hidden') }; });
   t.expect(mix.driving && mix.shown && !mix.overlap, `pour and hop-out buttons do not overlap (${JSON.stringify(mix)})`);
   await t.ev(() => Game.goHome());
+
+  // unlocking something repaints the whole town picture: that must stay quick (it used to freeze the game for 5+ seconds)
+  await t.boot();
+  const repaint = await t.ev(() => {
+    T.tp(540, 600, 'town'); Render.draw(Game); Render.bgs.town.canvas.getContext('2d').getImageData(0, 0, 1, 1);
+    const times = [];
+    for (const k of ['oven2', 'tables2', 'driveThru']) { Game.s.unlocked[k] = true; const s = performance.now(); Render.draw(Game); Render.ctx.getImageData(0, 0, 1, 1); times.push(Math.round(performance.now() - s)); }
+    return times;
+  });
+  t.expect(Math.max(...repaint) < 1000, `unlocking things repaints the town quickly (${repaint.join(' / ')} ms)`);
 };

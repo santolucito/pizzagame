@@ -3,20 +3,23 @@
 // Extension module: registered with Game.ext and Render.ext. See the hook list in js/EXTENSIONS.md.
 //
 // The strip of town past the fire station is a little airfield: a north–south runway, a hangar with the
-// chef's plane parked in front of it, a control tower, a windsock and an arrivals gate on the west edge
-// (customers come out of it and walk to the shops). Hop in the plane and
-// press the big button: the plane climbs through the clouds (side-on cut-scene) to CLOUD HARBOR, a map of
-// floating cloud islands joined by rope bridges, with a sky terminal, a hot-air balloon to ride, a glider
-// ramp, bouncy clouds, a café with a waving pilot (go inside for a Cloud Cocoa and a seat by the window),
-// a blimp and parachute jumpers. The plane waiting on the cloud runway flies you home again and rolls up
-// to the hangar.
+// chef's plane parked in front of it (STAND 1), two visitors' little planes (STAND 2 and 3), a passenger jet
+// at GATE 1, a control tower, a windsock and an arrivals gate on the west edge (customers come out of it and
+// walk to the shops). Hop in ANY of the planes and press the big button: it taxis out, lines up, races down
+// the runway and climbs through the clouds (side-on cut-scene, showing the plane you took) to CLOUD HARBOR, a
+// map of floating cloud islands joined by rope bridges, with a sky terminal, a hot-air balloon to ride, a
+// glider ramp, bouncy clouds, a café with a waving pilot (go inside for a Cloud Cocoa and a seat by the
+// window), a blimp and parachute jumpers. The plane you came in waits on the cloud runway and flies you home
+// again, landing and rolling back to its own stand. The jet is big: it turns slowly and its wings never
+// pass through buildings.
 
 // ---------- config ----------
 CFG.AIRFIELD = {
   STRIP: { x0: 1540, y0: -170, x1: 2460, y1: 1330 },      // the part of the town map that is the airfield
   RUNWAY: { x0: 1760, y0: 150, x1: 1880, y1: 1250 },
   TAXIWAY: { x0: 2140, y0: 180, x1: 2190, y1: 1200 },     // parallel taxiway between the hangar and the main apron
-  STUBS: [[180, 230], [1130, 1180]],                      // y ranges of the links between the runway and the taxiway (the hangar apron is the third)
+  STUBS: [[180, 230], [679, 729], [1130, 1180]],          // y ranges of the links between the runway and the taxiway (the hangar apron is the fourth)
+  LANE_Y: 704,                                            // the middle link carries on across the apron: the visitors' stands and the jet use it
   HANGAR_APRON: { x0: 1880, y0: 430, x1: 2140, y1: 560 },  // concrete from the runway edge to the hangar stand and the helipad
   APRON: { x0: 2190, y0: 300, x1: 2460, y1: 840 },        // the main apron: stands, the jet at its gate
   HANGAR: { x0: 1910, y0: 240, x1: 2110, y1: 420, bays: [1960, 2060], bayHalf: 42 },   // two bays, doors on the apron side
@@ -31,11 +34,13 @@ CFG.AIRFIELD = {
   TOWER: { x: 1640, y: 400 },
   WINDSOCK: { x: 1700, y: 250 },
   FUEL: { x: 2230, y: 380 },
-  CART: { x: 2430, y: 700 },
+  CART: { x: 2420, y: 380 },
   HELI: { x: 2080, y: 510 },                              // the helipad on the hangar apron
-  PARKED: [{ x: 2260, y: 790, color: '#3b7dd8' }, { x: 2380, y: 790, color: '#e4572e' }],   // visitors' little planes on the stands
-  JET: { x: 2300, y: 600 },                              // the passenger jet at its gate, nose to the taxiway
-  GATE: { x0: 2400, y0: 560, x1: 2460, y1: 640 },        // the gate pier; a jet-bridge reaches the jet's door
+  PARKED: [{ x: 2270, y: 792, color: '#3b7dd8' }, { x: 2390, y: 792, color: '#e4572e' }],   // visitors' little planes on stands 2 and 3, nose south (rideable)
+  JET: { x: 2300, y: 568 },                              // the passenger jet at GATE 1, nose west to the taxiway (rideable)
+  JET_TURN_X: 2155,                                      // where the jet turns between its gate and the lane (clear of the stands)
+  JET_TURN: 1.3,                                         // how fast the jet can turn (rad/s): a big turning circle
+  GATE: { x0: 2400, y0: 528, x1: 2460, y1: 608 },        // the gate pier; a jet-bridge reaches out towards the jet
   RADAR: { x: 2400, y: 1000 },
   HEDGE: { x0: 1560, y0: 106, x1: 2440, y1: 118 },
   BENCH: { x: 2200, y: 920 },
@@ -99,6 +104,7 @@ CFG.SKYCAFE = {
 CFG.AREAS.cloud = { WORLD: CFG.CLOUD.WORLD };
 CFG.AREAS.skycafe = { WORLD: CFG.SKYCAFE.WORLD };
 CFG.VEHICLES.plane = { speed: 300, radius: 20, label: '✈️ Taxi', exit: '🚶 Hop out' };
+CFG.VEHICLES.jet = { speed: 240, radius: 30, label: '✈️ Taxi', exit: '🚶 Hop out' };   // slower on the ground; its wings are checked separately (jetHits)
 CFG.VEHICLES.heli = { speed: 380, radius: 20, label: '🚁 Fly', exit: '🛬 Land', flies: true };   // flies over everything in town
 CFG.VEHICLES.balloonride = { speed: 140, radius: 20, label: '🎈 Ride', exit: '🚶 Hop out' };
 CFG.COINS.push(...CFG.AIRFIELD.coins, ...CFG.CLOUD.coins);
@@ -113,7 +119,29 @@ const AirfieldExt = {
   inRect(x, y, R, m = 0) { return x > R.x0 + m && x < R.x1 - m && y > R.y0 + m && y < R.y1 - m; },
   onRunway(v, area) { return this.inRect(v.x, v.y, area === 'town' ? CFG.AIRFIELD.RUNWAY : CFG.CLOUD.RUNWAY, -30); },   // a little slack past the edge lines
   aligned(v, area) { return area === 'town' ? Math.abs(Math.sin(v.angle)) > 0.8 : Math.abs(Math.cos(v.angle)) > 0.8; },
-  planeOf(g) { return !this.rt ? null : g.area === 'town' ? this.rt.plane : g.area === 'cloud' ? this.rt.cloudPlane : null; },
+  // the plane that matters here: in town the one you are sitting in (any of the four), else the chef's own; on the cloud the one waiting there
+  planeOf(g) {
+    const rt = this.rt; if (!rt) return null;
+    if (g.area === 'town') return g.driving && rt.planes.includes(g.vehicle) ? g.vehicle : rt.plane;
+    return g.area === 'cloud' ? rt.cloudPlane : null;
+  },
+  wrap(d) { while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d; },
+  // a path ready to roll along: the heading on each leg (a point marked `back` is reached rolling backwards) and the length
+  mkPath(path) {
+    const dirs = []; let len = 0;
+    for (let i = 0; i < path.length - 1; i++) { const a = path[i], b = path[i + 1]; dirs.push(Math.atan2(b.y - a.y, b.x - a.x) + (b.back ? Math.PI : 0)); len += U.dist(a.x, a.y, b.x, b.y); }
+    return { path, dirs, len };
+  },
+  // where distance s along the path is, which leg that is and how far along that leg
+  pathAt(P, s) {
+    let acc = 0;
+    for (let i = 0; i < P.path.length - 1; i++) {
+      const a = P.path[i], b = P.path[i + 1], L = U.dist(a.x, a.y, b.x, b.y);
+      if (s <= acc + L || i === P.path.length - 2) { const f = L > 0 ? U.clamp((s - acc) / L, 0, 1) : 1; return { x: U.lerp(a.x, b.x, f), y: U.lerp(a.y, b.y, f), i, f }; }
+      acc += L;
+    }
+    const e = P.path[P.path.length - 1]; return { x: e.x, y: e.y, i: 0, f: 1 };
+  },
   // sitting in the plane is enough: pressing the button lines it up, races down the runway and takes off (kid-simple)
   readyToFly(g) {
     const v = this.planeOf(g);
@@ -133,11 +161,28 @@ const AirfieldExt = {
 
   // ======================= game hooks =======================
   home(g) { const rt = this.rt; if (rt) { rt.ride = null; const H = CFG.AIRFIELD.HELI; rt.heli.x = H.x; rt.heli.y = H.y; rt.heli.angle = Math.PI; rt.heli.vx = 0; rt.heli.vy = 0; rt.heli.lift = 0;   // the helicopter goes back to its pad too, so it can never be stranded
- if (rt.runup) { rt.runup.plane.free = false; rt.runup.plane.lift = 0; } rt.runup = null; rt.roll = null; rt.cafe.seat = null; rt.cafe.view = 0; rt.cafe.fade = 0; } },
+ if (rt.runup) { rt.runup.plane.free = false; rt.runup.plane.lift = 0; } rt.runup = null; rt.roll = null; rt.cafe.seat = null; rt.cafe.view = 0; rt.cafe.fade = 0;
+ this.parkAway(); } },
+  // a plane that flew off to Cloud Harbor is back on its own stand once the chef is home some other way (Take me home)
+  parkAway() { for (const v of this.rt.planes) if (v.away) { v.away = false; this.park(v, v.home); } },
+  park(v, at) { v.x = at.x; v.y = at.y; v.angle = at.angle; v.vx = 0; v.vy = 0; v.lift = 0; v.free = false; v.px = undefined; },
   build(g) {
-    const A = CFG.AIRFIELD, C = CFG.CLOUD;
+    const A = CFG.AIRFIELD, C = CFG.CLOUD, J = A.JET, L = A.LANE_Y, RX = (A.RUNWAY.x0 + A.RUNWAY.x1) / 2, TX = A.JET_TURN_X, TD = A.LANDING[0].y;
+    // every plane on the airfield is rideable. Each knows its own stand (`home`), the taxi route from the stand out to the
+    // runway (`out`; none for the chef's plane, which simply rolls across), and the landing roll that brings it back (`land`)
+    const plane = (key, kind, home, color, out, land) => ({ kind, key, x: home.x, y: home.y, angle: home.angle, vx: 0, vy: 0, lift: 0, color, home, out, land });
+    const chefs = plane('stand1', 'plane', A.PLANE_HOME, undefined, null, A.LANDING);
+    const visitors = A.PARKED.map((q, i) => plane('stand' + (i + 2), 'plane', { x: q.x, y: q.y, angle: Math.PI / 2 }, q.color,
+      [{ x: q.x, y: q.y }, { x: q.x, y: L }, { x: RX, y: L }],
+      [{ x: RX, y: TD }, { x: RX, y: L }, { x: q.x, y: L }, { x: q.x, y: q.y }]));
+    // the jet leaves its gate nose first; coming home it cuts across to the gate row (its wings well clear of the
+    // helipad), turns round short of the gate and backs onto it
+    const jet = plane('gate1', 'jet', { x: J.x, y: J.y, angle: Math.PI }, undefined,
+      [{ x: J.x, y: J.y }, { x: TX, y: J.y }, { x: TX, y: L }, { x: RX, y: L }],
+      [{ x: RX, y: TD }, { x: RX, y: L }, { x: TX, y: L }, { x: TX, y: L - 50 }, { x: J.x - 70, y: J.y }, { x: J.x, y: J.y, back: true }]);
     this.rt = {
-      plane: { kind: 'plane', x: A.PLANE_HOME.x, y: A.PLANE_HOME.y, angle: A.PLANE_HOME.angle, vx: 0, vy: 0, lift: 0 },
+      plane: chefs, visitors, jet, planes: [chefs, ...visitors, jet],
+      flown: chefs,   // the plane the chef flew off in (the one waiting at Cloud Harbor, the one that lands back home)
       cloudPlane: { kind: 'plane', x: C.PLANE_HOME.x, y: C.PLANE_HOME.y, angle: C.PLANE_HOME.angle, vx: 0, vy: 0, lift: 0 },
       balloon: { kind: 'balloonride', x: C.BALLOON.x, y: C.BALLOON.y, angle: 0, vx: 0, vy: 0 },
       heli: { kind: 'heli', x: A.HELI.x, y: A.HELI.y, angle: Math.PI, vx: 0, vy: 0, rotor: 0, rotorA: 0, lift: 0 },   // the helicopter: steered like the car, but it flies over everything
@@ -161,16 +206,14 @@ const AirfieldExt = {
     solid(H.x0, H.y0, H.x1, H.y1);
     solid(A.SHED.x0, A.SHED.y0, A.SHED.x1, A.SHED.y1);
     solid(A.FUEL_FARM.x0, A.FUEL_FARM.y0, A.FUEL_FARM.x1, A.FUEL_FARM.y1);
-    solid(A.GATE.x0, A.GATE.y0, A.GATE.x1, A.GATE.y1); solid(A.JET.x + 70, A.JET.y - 14, A.GATE.x0, A.JET.y + 14);
+    solid(A.GATE.x0, A.GATE.y0, A.GATE.x1, A.GATE.y1); solid(A.JET.x + 70, A.JET.y - 14, A.GATE.x0, A.JET.y + 14);   // the pier and its jet-bridge
     solid(A.TOWER.x - 22, A.TOWER.y - 20, A.TOWER.x + 22, A.TOWER.y + 12);
     // the arrivals hall: solid for vehicles; people walk through the corridor between its two doors
     car.push({ x: T.x0, y: T.y0, w: T.x1 - T.x0, h: T.y1 - T.y0 });
     foot.push({ x: T.x0, y: T.y0, w: T.x1 - T.x0, h: T.door.y - T.doorHalf - T.y0 }, { x: T.x0, y: T.door.y + T.doorHalf, w: T.x1 - T.x0, h: T.y1 - (T.door.y + T.doorHalf) });
-    // parked aircraft and the small solid props (signs, benches, cones and cars are walk-through)
+    // the small solid props (signs, benches, cones and cars are walk-through; the planes are vehicles, nothing solid on the stands)
     solid(A.FUEL.x - 12, A.FUEL.y - 14, A.FUEL.x + 12, A.FUEL.y + 10);
     solid(A.CART.x - 22, A.CART.y - 12, A.CART.x + 22, A.CART.y + 10);
-    for (const q of A.PARKED) solid(q.x - 46, q.y - 40, q.x + 46, q.y + 36);
-    solid(A.JET.x - 86, A.JET.y - 86, A.JET.x + 86, A.JET.y + 86);
     solid(A.RADAR.x - 18, A.RADAR.y - 14, A.RADAR.x + 18, A.RADAR.y + 12);
     rt.townObs = foot; rt.townCarObs = car;
 
@@ -214,7 +257,7 @@ const AirfieldExt = {
     if (forCar && g.driving && g.vehicle === rt.balloon) return [];   // the balloon floats over everything
     return rt.cloudObs;
   },
-  vehicles(g) { return this.rt ? [this.rt.plane, this.rt.cloudPlane, this.rt.balloon, this.rt.heli] : []; },
+  vehicles(g) { const rt = this.rt; return rt ? rt.planes.filter((v) => !v.away).concat([rt.cloudPlane, rt.balloon, rt.heli]) : []; },
   flyingHeli(g) { return !!this.rt && g.driving && g.vehicle === this.rt.heli; },
 
   action(g) {
@@ -286,7 +329,13 @@ const AirfieldExt = {
     const entry = town ? { x: (R.x0 + R.x1) / 2, y: U.clamp(v.y, R.y0 + 120, R.y1 - 120) } : { x: U.clamp(v.x, R.x0 + 120, R.x1 - 120), y: (R.y0 + R.y1) / 2 };
     const far = U.dist(v.x, v.y, entry.x, entry.y);
     let turn = Math.atan2(dir.y, dir.x) - v.angle; while (turn > Math.PI) turn -= Math.PI * 2; while (turn < -Math.PI) turn += Math.PI * 2;
-    const taxi = far > 12 || Math.abs(turn) > 0.3 ? { from: { x: v.x, y: v.y }, to: entry, t: 0, dur: Math.max(U.clamp(far / 260, 0.4, 1.6), Math.abs(turn) > 0.3 ? 0.9 : 0) } : null;
+    let taxi = far > 12 || Math.abs(turn) > 0.3 ? Object.assign(this.mkPath([{ x: v.x, y: v.y }, entry]), { t: 0, dur: Math.max(U.clamp(far / 260, 0.4, 1.6), Math.abs(turn) > 0.3 ? 0.9 : 0) }) : null;
+    // a plane on (or next to) its own stand follows its taxi route out to the runway, so it never cuts across the other planes
+    if (town && v.out && U.dist(v.x, v.y, v.home.x, v.home.y) < 120) {
+      const P = this.mkPath([{ x: v.x, y: v.y }].concat(v.out.slice(1)));
+      taxi = Object.assign(P, { t: 0, dur: U.clamp(P.len / (v.kind === 'jet' ? 200 : 240), 0.6, 3.4), route: true });
+      const end = v.out[v.out.length - 1]; dir.y = end.y > (R.y0 + R.y1) / 2 ? -1 : 1;
+    }
     rt.runup = { plane: v, t: 0, dur: CFG.AIRFIELD.RUNUP, dir, centre: town ? (R.x0 + R.x1) / 2 : (R.y0 + R.y1) / 2, to: town ? 'cloud' : 'town', taxi };
     g.floats.push({ x: v.x, y: v.y - 60, text: town ? 'Up, up and away! ✈️' : 'Home we go! ✈️', color: '#ffe08a', t: 0, dur: 1.4, big: true });
     Sfx.tone(110, 1.1, 'sawtooth', 0.03, 260); Haptics.success();
@@ -294,12 +343,13 @@ const AirfieldExt = {
   updateRunup(g, dt) {
     const rt = this.rt, ru = rt.runup, v = ru.plane;
     if (!g.driving || g.vehicle !== v) { rt.runup = null; v.lift = 0; v.free = false; return; }   // hopped out: never mind
-    if (ru.taxi) {   // roll gently onto the runway first (or just turn round on the spot)
-      const tx = ru.taxi; tx.t += dt; const k = U.easeOut(Math.min(1, tx.t / tx.dur));
-      v.x = U.lerp(tx.from.x, tx.to.x, k); v.y = U.lerp(tx.from.y, tx.to.y, k);
-      const moving = U.dist(tx.from.x, tx.from.y, tx.to.x, tx.to.y) > 12;
-      const want = moving && k < 0.7 ? Math.atan2(tx.to.y - tx.from.y, tx.to.x - tx.from.x) : Math.atan2(ru.dir.y, ru.dir.x);
-      let d = want - v.angle; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; v.angle += d * Math.min(1, dt * 6);
+    if (ru.taxi) {   // roll gently onto the runway first (or just turn round on the spot); from a stand, along its taxi route
+      const tx = ru.taxi; tx.t += dt; const q = Math.min(1, tx.t / tx.dur), k = tx.route ? q * q * (3 - 2 * q) : U.easeOut(q);
+      const at = this.pathAt(tx, tx.len * k); v.x = at.x; v.y = at.y;
+      const last = at.i === tx.dirs.length - 1;
+      const moving = tx.len > 12 && (tx.route ? !(last && at.f > 0.7) : k < 0.7);
+      const want = moving ? tx.dirs[at.i] : Math.atan2(ru.dir.y, ru.dir.x);
+      const d = this.wrap(want - v.angle); v.angle += d * Math.min(1, dt * 6);
       v.vx = 0; v.vy = 0; g.player.x = v.x; g.player.y = v.y;   // no velocity, so the core's steering does not fight the turn
       if (tx.t >= tx.dur) ru.taxi = null;
       return;
@@ -317,26 +367,28 @@ const AirfieldExt = {
     if ((ru.t >= ru.dur && off) || ru.t > ru.dur + 5) {
       rt.runup = null; v.lift = 0; v.vx = 0; v.vy = 0; v.free = false;
       g.driving = false; g.vehicle = null;
+      if (ru.to === 'cloud') { rt.flown = v; v.away = true; }   // gone from the airfield until it lands back on its stand
       g.startTravel(ru.to, 'flight', CFG.AIRFIELD.FLIGHT);
     }
   },
 
   arrive(g, tr) {
     if (tr.via !== 'flight') return;
-    const rt = this.rt, A = CFG.AIRFIELD, C = CFG.CLOUD, p = g.player;
-    for (const [v, home] of [[rt.plane, A.PLANE_HOME], [rt.cloudPlane, C.PLANE_HOME]]) { v.x = home.x; v.y = home.y; v.angle = home.angle; v.vx = 0; v.vy = 0; v.lift = 0; v.free = false; }
-    if (tr.to === 'cloud') { this.startRoll(g, rt.cloudPlane, C.LANDING, 1.8); g.toast('☁️ Welcome to Cloud Harbor!', true); }
-    else { this.startRoll(g, rt.plane, A.LANDING, 2.8); g.toast('🍕 Home sweet home!', true); }
+    const rt = this.rt, C = CFG.CLOUD, p = g.player, f = rt.flown, cp = rt.cloudPlane;
+    this.park(cp, C.PLANE_HOME);
+    // at Cloud Harbor the plane on the runway is the one you came in (same kind, same colour); back home that plane
+    // lands and rolls to its own stand, and every other plane stays just where it was
+    if (tr.to === 'cloud') { cp.kind = f.kind; cp.color = f.color; this.startRoll(g, cp, C.LANDING, 1.8); g.toast('☁️ Welcome to Cloud Harbor!', true); }
+    else { f.away = false; this.park(f, f.home); const P = this.mkPath(f.land); this.startRoll(g, f, f.land, f === rt.plane ? 2.8 : 2.8 * Math.sqrt(P.len / 400)); g.toast('🍕 Home sweet home!', true); }
     g.floats.push({ x: p.x, y: p.y - 60, text: 'Touchdown! 🛬', color: '#ffe08a', t: 0, dur: 1.4, big: true });
     p.hasMoved = true; p.moving = false; Haptics.success();
   },
   // the plane touches down at the start of the runway and rolls along the path, slowing to a stop; then you hop out
   startRoll(g, v, path, dur) {
-    const dirs = []; let len = 0;
-    for (let i = 0; i < path.length - 1; i++) { const a = path[i], b = path[i + 1]; dirs.push(Math.atan2(b.y - a.y, b.x - a.x)); len += U.dist(a.x, a.y, b.x, b.y); }
-    v.x = path[0].x; v.y = path[0].y; v.vx = 0; v.vy = 0; v.lift = 0; v.angle = dirs[0];
+    const P = this.mkPath(path);
+    v.x = path[0].x; v.y = path[0].y; v.vx = 0; v.vy = 0; v.lift = 0; v.angle = P.dirs[0]; v.px = undefined;
     g.driving = true; g.vehicle = v; g.player.x = v.x; g.player.y = v.y;
-    this.rt.roll = { plane: v, path, dirs, len, t: 0, dur };
+    this.rt.roll = Object.assign(P, { plane: v, t: 0, dur });
   },
 
   update(g, dt) {
@@ -351,16 +403,61 @@ const AirfieldExt = {
     if (!flying) rt.heliUp = false;
     if (rt.runup) this.updateRunup(g, dt);
     else if (rt.roll) this.updateRoll(g, dt);
-    else this.steerHelp(g, dt);
+    else { if (g.driving && g.vehicle && g.vehicle.kind === 'jet' && !g.vehicle.free) this.jetDrive(g, dt); this.steerHelp(g, dt); }
+    const jv = g.driving && g.vehicle && g.vehicle.kind === 'jet' ? g.vehicle : null;
+    for (const v of [rt.jet, rt.cloudPlane]) {   // the jet remembers its pose for the next frame (or forgets it: the next drive starts afresh)
+      if (v === jv && !rt.runup && !rt.roll) { v.px = v.x; v.py = v.y; v.pa = v.angle; } else v.px = undefined;
+    }
     // the chef stays in the plane while the flight plays (the core still reads the joystick)
     // (parked a little away from the plane, or the core would offer the vehicle button over the cut-scene)
-    if (g.travel && g.travel.via === 'flight') { const v = g.travel.from === 'town' ? rt.plane : rt.cloudPlane; p.x = v.x; p.y = v.y - 120; p.moving = false; return; }
+    if (g.travel && g.travel.via === 'flight') { const v = g.travel.from === 'town' ? rt.flown : rt.cloudPlane; p.x = v.x; p.y = v.y - 120; p.moving = false; return; }
     if (g.area === 'town') {
+      if (!g.travel && rt.planes.some((v) => v.away)) this.parkAway();   // home without flying (another way back): the plane is home too
       if (!rt.found && !g.onTrain && this.inStrip(p.x, p.y)) { rt.found = true; g.toast('✈️ You found the airfield!', true); Sfx.ding(); }
       return;
     }
     if (g.area === 'cloud') this.updateCloud(g, dt);
     else if (g.area === 'skycafe') this.updateCafe(g, dt);
+  },
+  // The jet on the ground: it only rolls forwards along its nose and turns slowly (a big turning circle; pull the stick
+  // the other way and it turns round on the spot), and none of its wings, nose or tail may move into anything solid.
+  // The core has already moved it this frame from the last pose; that move is replaced by the jet's own.
+  jetDrive(g, dt) {
+    const v = g.vehicle;
+    if (v.px === undefined) return;   // just hopped in: start from here next frame
+    const sp = Math.hypot(v.vx, v.vy), turn = CFG.AIRFIELD.JET_TURN;
+    let a = v.pa, fwd = 0;
+    if (sp > 15) {
+      const want = Math.atan2(v.vy, v.vx);
+      a += U.clamp(this.wrap(want - a), -turn * dt, turn * dt);
+      fwd = sp * U.clamp(0.35 + 0.65 * Math.cos(this.wrap(want - a)), 0, 1);
+    }
+    const w = g.bounds();
+    let x = U.clamp(v.px + Math.cos(a) * fwd * dt, w.x0 + 30, w.x1 - 30), y = U.clamp(v.py + Math.sin(a) * fwd * dt, w.y0 + 30, w.y1 - 30);
+    // blocked? try, in turn: turning on the spot, easing slowly the way the stick points, backing away slowly, and if it
+    // is wedged in a corner, easing off in whichever direction is clear (nearest the stick first), so it is never stuck
+    const F = 2000, obs = g.townObstacles(true).concat([   // the map's edges count as walls too: no part of the jet pokes off the map
+      { x: w.x0 - F, y: w.y0 - F, w: w.x1 - w.x0 + 2 * F, h: F }, { x: w.x0 - F, y: w.y1, w: w.x1 - w.x0 + 2 * F, h: F },
+      { x: w.x0 - F, y: w.y0, w: F, h: w.y1 - w.y0 }, { x: w.x1, y: w.y0, w: F, h: w.y1 - w.y0 }]), was = this.jetHits(g, v.px, v.py, v.pa, obs), ok = (cx, cy, ca) => this.jetHits(g, cx, cy, ca, obs) <= was;
+    if (!ok(x, y, a)) {
+      const back = sp > 15 ? 70 * dt : 0;
+      const want = Math.atan2(v.vy, v.vx), tries = [[v.px, v.py, a], [v.px + Math.cos(want) * back, v.py + Math.sin(want) * back, v.pa], [v.px - Math.cos(v.pa) * back, v.py - Math.sin(v.pa) * back, v.pa]];
+      if (back) { for (let i = 1; i < 8; i++) { const e = want + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * Math.PI / 4; tries.push([v.px + Math.cos(e) * back, v.py + Math.sin(e) * back, v.pa]); } }
+      const t = tries.find(([cx, cy, ca]) => ok(cx, cy, ca)) || [v.px, v.py, v.pa];
+      [x, y, a] = t; fwd = back;
+    }
+    v.x = x; v.y = y; v.angle = a;
+    g.player.x = x; g.player.y = y; g.player.moving = fwd > 15;
+  },
+  // how many parts of the jet (centre, nose, wing tips, tail) are inside something solid in this pose
+  // (close enough together that even the thin jet-bridge cannot slip between two of them)
+  JET_PTS: [[92, 0], [74, 0], [56, 0], [38, 0], [-46, 0], [-64, 0], [-80, 0], [-92, 0], [-84, 22], [-90, 40], [-84, -22], [-90, -40]]
+    .concat([0.2, 0.4, 0.6, 0.8, 1].flatMap((k) => [[-10 - 32 * k, 14 + 72 * k], [-10 - 32 * k, -14 - 72 * k]])),
+  jetHits(g, x, y, a, obs) {
+    const c = Math.cos(a), s = Math.sin(a);
+    let n = obs.some((o) => o.w && g.hitRect(x, y, CFG.VEHICLES.jet.radius, o)) ? 1 : 0;
+    for (const [px, py] of this.JET_PTS) { const wx = x + px * c - py * s, wy = y + px * s + py * c; if (obs.some((o) => o.w && g.hitRect(wx, wy, 3, o))) n++; }
+    return n;
   },
   // Driving the plane near the runway and roughly along it, it lines itself up on the centreline: little
   // thumbs steer wobbly, and turning off the taxiway would otherwise drift it off the far edge.
@@ -379,14 +476,9 @@ const AirfieldExt = {
     if (!g.driving || g.vehicle !== v) { rt.roll = null; return; }
     ro.t += dt;
     const k = Math.min(1, ro.t / ro.dur), s = ro.len * (1 - (1 - k) * (1 - k));
-    let acc = 0, pos = ro.path[ro.path.length - 1], dir = ro.dirs[ro.dirs.length - 1];
-    for (let i = 0; i < ro.path.length - 1; i++) {
-      const a = ro.path[i], b = ro.path[i + 1], L = U.dist(a.x, a.y, b.x, b.y);
-      if (s <= acc + L) { const f = (s - acc) / L; pos = { x: U.lerp(a.x, b.x, f), y: U.lerp(a.y, b.y, f) }; dir = ro.dirs[i]; break; }
-      acc += L;
-    }
-    v.x = pos.x; v.y = pos.y; v.vx = 0; v.vy = 0;
-    let d = dir - v.angle; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; v.angle += d * Math.min(1, dt * 6);
+    const at = this.pathAt(ro, s), dir = k >= 1 ? ro.dirs[ro.dirs.length - 1] : ro.dirs[at.i];
+    v.x = at.x; v.y = at.y; v.vx = 0; v.vy = 0;
+    v.angle += this.wrap(dir - v.angle) * Math.min(1, dt * 6);
     g.player.x = v.x; g.player.y = v.y;
     if (k >= 1) { rt.roll = null; v.angle = dir; g.exitCar(); g.player.facing = 1; }
   },
@@ -467,14 +559,15 @@ const AirfieldExt = {
       if (this.flyingHeli(g)) return p.carry > 0 && g.houses.some((h) => h.order) ? undefined : { text: 'Whirrr! Fly anywhere you like 🚁', target: null };
       if (!g.driving && U.dist(p.x, p.y, rt.heli.x, rt.heli.y) < 120 && !(p.carry > 0 && g.houses.some((h) => h.order))) return { text: 'Fly the helicopter! 🚁', target: U.dist(p.x, p.y, rt.heli.x, rt.heli.y) < 70 ? null : rt.heli };
       if (!this.inStrip(p.x, p.y)) return undefined;
-      if (g.driving) {
-        if (g.vehicle !== rt.plane) return undefined;
-        if (this.readyToFly(g)) return { text: '🛫 Press the button to take off!', target: null };
-        return { text: '🛫 Press the button to take off!', target: null };
-      }
+      if (g.driving) return rt.planes.includes(g.vehicle) ? { text: '🛫 Press the button to take off!', target: null } : undefined;
       if (p.carry > 0 && g.houses.some((h) => h.order)) return undefined;   // a delivery is more urgent
+      // the nearest plane still on the airfield (the jet has its own words)
+      let near = null, nd = Infinity;
+      for (const v of rt.planes) { if (v.away) continue; const d = U.dist(p.x, p.y, v.x, v.y); if (d < nd) { nd = d; near = v; } }
+      const hop = near && { text: near.kind === 'jet' ? 'Hop in the big jet! ✈️' : 'Hop in a plane! ✈️', target: nd < 70 ? null : near };
+      if (hop && nd < 120) return hop;
       const coin = this.nearCoin(g, A.STRIP, 300); if (coin) return { text: 'Grab the shiny coin!', target: coin };
-      return { text: 'Hop in the plane!', target: U.dist(p.x, p.y, rt.plane.x, rt.plane.y) < 70 ? null : rt.plane };
+      return hop || undefined;
     }
     if (g.area === 'skycafe') {
       const K = CFG.SKYCAFE;
@@ -575,6 +668,11 @@ const AirfieldExt = {
     ctx.strokeStyle = '#f2c94c'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo((X.x0 + X.x1) / 2, X.y0 + 20); ctx.lineTo((X.x0 + X.x1) / 2, X.y1 - 20); ctx.stroke();
     for (const [y0, y1] of A.STUBS.concat([[HA.y0 + 50, HA.y0 + 100]])) { const y = (y0 + y1) / 2; ctx.beginPath(); ctx.moveTo(R.x1 - 10, y); ctx.lineTo((X.x0 + X.x1) / 2, y); ctx.stroke(); ctx.setLineDash([6, 6]); ctx.beginPath(); ctx.moveTo(R.x1 + 10, y0 + 4); ctx.lineTo(R.x1 + 10, y1 - 4); ctx.stroke(); ctx.setLineDash([]); }   // hold-short lines
     ctx.setLineDash([]);
+    // lead-in lines on the apron: along the lane to stands 2 and 3, and from the taxiway to the jet's gate
+    const LY = A.LANE_Y, J = A.JET, TXc = (X.x0 + X.x1) / 2;
+    ctx.beginPath(); ctx.moveTo(TXc, LY); ctx.lineTo(A.PARKED[A.PARKED.length - 1].x, LY);
+    for (const q of A.PARKED) { ctx.moveTo(q.x, LY); ctx.lineTo(q.x, q.y - 20); }
+    ctx.moveTo(TXc, J.y); ctx.lineTo(J.x + 40, J.y); ctx.stroke();
     // stands: the chef's plane in front of the hangar, the visitors' row, the helipad
     ctx.strokeStyle = '#f2c94c'; ctx.lineWidth = 3; ctx.strokeRect(A.PLANE_HOME.x - 46, A.PLANE_HOME.y - 50, 92, 100);
     for (const q of A.PARKED) ctx.strokeRect(q.x - 50, q.y - 46, 100, 92);
@@ -604,8 +702,6 @@ const AirfieldExt = {
     ctx.fillStyle = '#3b7dd8'; U.roundRect(ctx, Ct.x - 22, Ct.y - 6, 44, 12, 3); ctx.fill(); ctx.fillRect(Ct.x + 20, Ct.y - 16, 3, 14);
     ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, Ct.x - 18, Ct.y - 16, 18, 12, 2); ctx.fill(); ctx.fillStyle = '#f06292'; U.roundRect(ctx, Ct.x + 2, Ct.y - 18, 16, 14, 2); ctx.fill();
     ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(Ct.x - 12, Ct.y - 18, 6, 3); ctx.fillRect(Ct.x + 7, Ct.y - 20, 6, 3);
-    // visitors' little planes and the helicopter on their stands
-    for (const q of A.PARKED) { ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(-Math.PI / 2); r.drawVehicle('plane', g, q.color); ctx.restore(); }
     // the radar dish's base (the dish turns live), the plane spotting bench, signs (all walk-through)
     const Rd = A.RADAR;
     ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(Rd.x + 3, Rd.y + 10, 22, 9, 0, 0, Math.PI * 2); ctx.fill();
@@ -697,10 +793,9 @@ const AirfieldExt = {
     ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, T.x0 - 6, T.y0 - 24, w + 12, 20, 5); ctx.fill();
     ctx.fillStyle = '#ffe08a'; ctx.font = r.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('✈️ ARRIVALS', T.x0 + w / 2, T.y0 - 14);
   },
-  // the gate pier on the apron's east edge, the jet-bridge and the passenger jet parked at it
+  // the gate pier on the apron's east edge and its jet-bridge (the jet itself is a vehicle, drawn with the others)
   paintGate(r, g, G, J) {
     const ctx = r.ctx;
-    this.paintJet(r, J.x, J.y, Math.PI);
     ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(J.x + 74, J.y - 10, G.x0 - J.x - 70, 24);
     ctx.fillStyle = '#9aa0a8'; ctx.fillRect(J.x + 70, J.y - 14, G.x0 - J.x - 70, 28); ctx.fillStyle = 'rgba(0,0,0,0.15)'; for (let x = J.x + 76; x < G.x0; x += 8) ctx.fillRect(x, J.y - 14, 2, 28);
     ctx.fillStyle = '#bfe3ff'; ctx.fillRect(J.x + 72, J.y - 10, G.x0 - J.x - 74, 4);
@@ -710,14 +805,17 @@ const AirfieldExt = {
     ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, G.x0 + 2, G.y1 - 22, G.x1 - G.x0 - 4, 16, 4); ctx.fill();
     ctx.fillStyle = '#ffe08a'; ctx.font = r.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('GATE 1', (G.x0 + G.x1) / 2, G.y1 - 14);
   },
-  paintJet(r, x, y, ang) {
-    const ctx = r.ctx;
-    ctx.save(); ctx.translate(x, y); ctx.rotate(ang);
-    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(4, 8, 88, 22, 0, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(-30, -84); ctx.lineTo(-56, -84); ctx.lineTo(-36, 0); ctx.lineTo(-56, 84); ctx.lineTo(-30, 84); ctx.closePath(); ctx.fill();
+  // the passenger jet from above at the origin, nose +x (its vehicle art); `shadow` false when it is in the air
+  paintJet(r, g, v, shadow) {
+    const ctx = r.ctx, run = v && (v.lift > 0 || (g.driving && g.vehicle === v) || (this.rt && this.rt.roll && this.rt.roll.plane === v));
+    if (shadow) { ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(4, 8, 88, 22, 0, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(-30, -84); ctx.lineTo(-56, -84); ctx.lineTo(-36, 0); ctx.lineTo(-56, 84); ctx.lineTo(-30, 84); ctx.closePath(); ctx.fill(); }
     // swept wings with engines, the tailplane and the fin
     ctx.fillStyle = '#e6e9ee'; ctx.beginPath(); ctx.moveTo(14, -6); ctx.lineTo(-30, -86); ctx.lineTo(-54, -86); ctx.lineTo(-34, -6); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(14, 6); ctx.lineTo(-30, 86); ctx.lineTo(-54, 86); ctx.lineTo(-34, 6); ctx.closePath(); ctx.fill();
     ctx.fillStyle = 'rgba(0,0,0,0.1)'; ctx.beginPath(); ctx.moveTo(-34, -6); ctx.lineTo(-54, -86); ctx.lineTo(-50, -86); ctx.lineTo(-30, -6); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(-34, 6); ctx.lineTo(-54, 86); ctx.lineTo(-50, 86); ctx.lineTo(-30, 6); ctx.closePath(); ctx.fill();
-    for (const sy of [-1, 1]) { ctx.fillStyle = '#5c6670'; U.roundRect(ctx, -22, sy * 44 - 8, 34, 16, 6); ctx.fill(); ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.ellipse(12, sy * 44, 4, 7, 0, 0, Math.PI * 2); ctx.fill(); }
+    for (const sy of [-1, 1]) {
+      ctx.fillStyle = '#5c6670'; U.roundRect(ctx, -22, sy * 44 - 8, 34, 16, 6); ctx.fill(); ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.ellipse(12, sy * 44, 4, 7, 0, 0, Math.PI * 2); ctx.fill();
+      if (run) { ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1.5; const a = g.time * 30; ctx.beginPath(); ctx.moveTo(12, sy * 44 + Math.sin(a) * 6); ctx.lineTo(12, sy * 44 - Math.sin(a) * 6); ctx.stroke(); }   // the fans spinning
+    }
     ctx.fillStyle = '#e6e9ee'; ctx.beginPath(); ctx.moveTo(-66, -5); ctx.lineTo(-86, -40); ctx.lineTo(-96, -40); ctx.lineTo(-88, -5); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(-66, 5); ctx.lineTo(-86, 40); ctx.lineTo(-96, 40); ctx.lineTo(-88, 5); ctx.closePath(); ctx.fill();
     // fuselage with a blue cheat line, cockpit and a row of windows; the fin seen from above carries the pizza
     ctx.fillStyle = '#f7f8fa'; U.roundRect(ctx, -92, -13, 184, 26, 13); ctx.fill();
@@ -726,7 +824,6 @@ const AirfieldExt = {
     ctx.fillStyle = '#9fd8ff'; for (let wx = 52; wx > -70; wx -= 12) { ctx.fillRect(wx, -11, 5, 4); ctx.fillRect(wx, 7, 5, 4); }
     ctx.fillStyle = '#2b1d14'; ctx.fillRect(-64, -13, 8, 5);   // the door the jet-bridge reaches
     ctx.fillStyle = '#e4572e'; U.roundRect(ctx, -98, -4, 34, 8, 3); ctx.fill(); r.drawPizza(-80, 0, 6);
-    ctx.restore();
   },
   // ---------- Cloud Harbor ----------
   paint: {
@@ -1034,7 +1131,7 @@ const AirfieldExt = {
   entities(r, g, items) {
     const rt = this.rt; if (!rt) return;
     if (g.area === 'town') {
-      const v = rt.plane; items.push({ y: v.y + 12, draw: () => this.drawPlaneTop(r, g, v) });
+      for (const v of rt.planes) if (!v.away) items.push({ y: v.y + 12, draw: () => this.drawPlaneTop(r, g, v) });
       const T = CFG.AIRFIELD.TOWER; items.push({ y: T.y + 14, draw: () => this.drawTower(r, g, T.x, T.y) });
       if (rt.cafe.cocoa > 0 && !g.driving) items.push({ y: g.player.y + 1, draw: () => this.drawCocoa(r, g) });
       if (!this.flyingHeli(g)) items.push({ y: rt.heli.y + 12, draw: () => this.drawHeli(r, g) });
@@ -1057,10 +1154,16 @@ const AirfieldExt = {
     ctx.save(); ctx.translate(0, -v.lift); r.drawSiteVehicle(g, v, 18); ctx.restore();
   },
   drawPlaneTop(r, g, v) {
-    const ctx = r.ctx;
-    if (!(v.lift > 0)) { r.drawSiteVehicle(g, v, 30); return; }
-    ctx.save(); ctx.translate(v.x + v.lift * 0.5, v.y + v.lift * 1.3); ctx.rotate(v.angle); ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(0, 0, 36, 14, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-    ctx.save(); ctx.translate(0, -v.lift); r.drawSiteVehicle(g, v, 30); ctx.restore();
+    const ctx = r.ctx, jet = v.kind === 'jet';
+    if (v.lift > 0) { ctx.save(); ctx.translate(v.x + v.lift * 0.5, v.y + v.lift * 1.3); ctx.rotate(v.angle); ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(0, 0, jet ? 92 : 36, jet ? 30 : 14, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
+    ctx.save(); ctx.translate(0, -(v.lift || 0));
+    if (!jet) r.drawSiteVehicle(g, v, 30);
+    else {   // the jet: the chef sits up front in the cockpit
+      ctx.save(); ctx.translate(v.x, v.y); ctx.rotate(v.angle); r.drawVehicle('jet', g, null, v);
+      if (g.driving && g.vehicle === v) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(70, 0, 8, 10, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(73, 0, 5.5, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(71, 0, 5, 0, Math.PI * 2); ctx.fill(); }
+      ctx.restore(); r.drawRidingExtras(g, v, 30);
+    }
+    ctx.restore();
   },
   drawTower(r, g, x, y) {
     const ctx = r.ctx, t = g.time;
@@ -1175,8 +1278,10 @@ const AirfieldExt = {
       ctx.beginPath(); ctx.moveTo(-40, 0); ctx.lineTo(40, 0); ctx.moveTo(0, -40); ctx.lineTo(0, 40); ctx.stroke(); ctx.restore();
       if (spin > 0.3) { ctx.fillStyle = `rgba(255,255,255,${(spin - 0.3) * 0.3})`; ctx.beginPath(); ctx.arc(0, 0, 40, 0, Math.PI * 2); ctx.fill(); }
     },
+    // the passenger jet (its art lives in paintJet)
+    jet(r, g, color, v, h) { AirfieldExt.paintJet(r, g, v, !(v && v.lift > 0)); },
     plane(r, g, color, v, h) {
-      const ctx = r.ctx, c = color || '#f2b134', t = g.time, spinning = v && (v.lift > 0 || (g.driving && g.vehicle === v) || (AirfieldExt.rt && AirfieldExt.rt.roll && AirfieldExt.rt.roll.plane === v));
+      const ctx = r.ctx, c = (v && v.color) || color || '#f2b134', t = g.time, spinning = v && (v.lift > 0 || (g.driving && g.vehicle === v) || (AirfieldExt.rt && AirfieldExt.rt.roll && AirfieldExt.rt.roll.plane === v));
       if (!(v && v.lift > 0)) { ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.beginPath(); ctx.ellipse(2, 5, 36, 12, 0, 0, Math.PI * 2); ctx.fill(); U.roundRect(ctx, -4, -42, 22, 94, 6); ctx.fill(); }
       // wings
       ctx.fillStyle = c; U.roundRect(ctx, -6, -46, 22, 92, 6); ctx.fill();
@@ -1248,10 +1353,11 @@ const AirfieldExt = {
       { const q = ((t * 0.09) % 1.4), bx = W * 1.1 - q * W * 1.2, by = H * 0.2 + Math.sin(t) * 10; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; for (let i = 0; i < 5; i++) { const x = bx - Math.abs(i - 2) * 22, y = by + Math.abs(i - 2) * 12, flap = Math.sin(t * 9 + i) * 4; ctx.beginPath(); ctx.moveTo(x - 9, y + flap); ctx.quadraticCurveTo(x - 4, y - 4, x, y); ctx.quadraticCurveTo(x + 4, y - 4, x + 9, y + flap); ctx.stroke(); } }
       // near clouds whipping past below the plane
       layer(1.1, 300, (x, i) => cloud(x, H * (0.78 + E.hash(i + 7) * 0.2) - (1 - alt) * H * 0.6, 1.5 + E.hash(i + 11) * 0.8, 0.95));
-      // the plane, with contrail puffs behind it
-      const sc = Math.min(1.1, W / 720), px = W * 0.42, py = H * 0.5 + Math.sin(t * 2) * 4 - climb * H * 0.04;
-      for (let i = 0; i < 9; i++) { const age = ((t * 1.6 + i * 0.45) % 4) / 4; ctx.fillStyle = `rgba(255,255,255,${0.7 * (1 - age)})`; ctx.beginPath(); ctx.arc(px - 100 * sc - age * 320, py + 8 * sc + Math.sin(i) * 6 + age * 40 * (climb - descent), (5 + age * 20) * sc, 0, Math.PI * 2); ctx.fill(); }
-      E.drawPlaneSide(r, g, px, py, sc, pitch, t, r.paintColor(g.s.paint.plane, g) || '#f2b134');
+      // the plane you took (its colour; the jet as a jet), with contrail puffs behind it
+      const f = E.rt.flown, jet = f.kind === 'jet', sc = Math.min(1.1, W / 720) * (jet ? 0.85 : 1), px = W * 0.42, py = H * 0.5 + Math.sin(t * 2) * 4 - climb * H * 0.04;
+      for (let i = 0; i < 9; i++) { const age = ((t * 1.6 + i * 0.45) % 4) / 4; ctx.fillStyle = `rgba(255,255,255,${0.7 * (1 - age)})`; ctx.beginPath(); ctx.arc(px - (jet ? 160 : 100) * sc - age * 320, py + 8 * sc + Math.sin(i) * 6 + age * 40 * (climb - descent), (5 + age * 20) * sc, 0, Math.PI * 2); ctx.fill(); }
+      if (jet) E.drawJetSide(r, g, px, py, sc, pitch, t);
+      else E.drawPlaneSide(r, g, px, py, sc, pitch, t, f.color || r.paintColor(g.s.paint.plane, g) || '#f2b134');
       if (home) ctx.restore();
       // banner and progress bar, like the train ride
       const msg = home ? '✈️ Next stop: home! 🍕' : '✈️ Next stop: Cloud Harbor! ☁️';
@@ -1302,6 +1408,45 @@ const AirfieldExt = {
     ctx.fillStyle = '#a8763e'; U.roundRect(ctx, x - 12, y + 50, 24, 16, 3); ctx.fill();
     ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(x, y + 48, 5, 0, Math.PI * 2); ctx.fill();
     ctx.save(); ctx.translate(x + 12, y + 38); ctx.rotate(Math.sin(t * 6) * 0.3); ctx.font = Render.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('👋', 0, 0); ctx.restore();   // the chef waving: a 👋, no arm
+  },
+  // the passenger jet seen from the side, flying to the right: swept wing and engine, a row of windows, the pizza on
+  // its tail, the chef waving from the cockpit window
+  drawJetSide(r, g, x, y, s, pitch, t) {
+    const ctx = r.ctx;
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, s); ctx.rotate(pitch);
+    // far wing and engine peeking above the fuselage, the tailplane behind
+    ctx.fillStyle = '#c9ced6'; ctx.beginPath(); ctx.moveTo(20, -14); ctx.lineTo(-40, -14); ctx.lineTo(-74, -34); ctx.lineTo(-56, -34); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#c9ced6'; U.roundRect(ctx, -170, -14, 56, 9, 4); ctx.fill();
+    // the fin with the pizza
+    ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.moveTo(-118, -18); ctx.lineTo(-154, -92); ctx.lineTo(-132, -92); ctx.lineTo(-84, -18); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.beginPath(); ctx.moveTo(-122, -26); ctx.lineTo(-148, -84); ctx.lineTo(-142, -84); ctx.lineTo(-114, -26); ctx.closePath(); ctx.fill();
+    r.drawPizza(-130, -58, 11);
+    // fuselage: white, a grey belly, the blue cheat line, a long row of windows and the door
+    ctx.fillStyle = '#f7f8fa'; ctx.beginPath(); ctx.moveTo(150, 4); ctx.quadraticCurveTo(148, -20, 112, -24); ctx.lineTo(-110, -24); ctx.quadraticCurveTo(-150, -22, -168, -4); ctx.lineTo(-166, 6); ctx.quadraticCurveTo(-140, 22, -100, 24); ctx.lineTo(110, 24); ctx.quadraticCurveTo(146, 22, 150, 4); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(90,100,120,0.18)'; ctx.beginPath(); ctx.moveTo(146, 10); ctx.lineTo(-150, 8); ctx.quadraticCurveTo(-136, 22, -100, 24); ctx.lineTo(110, 24); ctx.quadraticCurveTo(140, 22, 146, 10); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#3b7dd8'; ctx.fillRect(-150, 2, 286, 5);
+    ctx.fillStyle = '#9fd8ff'; for (let wx = 84; wx > -110; wx -= 14) { ctx.beginPath(); ctx.ellipse(wx, -8, 3.5, 4.5, 0, 0, Math.PI * 2); ctx.fill(); }
+    ctx.strokeStyle = 'rgba(43,29,20,0.35)'; ctx.lineWidth = 1.5; U.roundRect(ctx, 96, -18, 12, 26, 3); ctx.stroke();
+    // the cockpit window with the chef (head and hat only) and a wave
+    ctx.fillStyle = '#2d3a4a'; ctx.beginPath(); ctx.moveTo(118, -20); ctx.lineTo(140, -20); ctx.quadraticCurveTo(148, -12, 147, -6); ctx.lineTo(118, -6); ctx.closePath(); ctx.fill();
+    ctx.save(); ctx.beginPath(); ctx.moveTo(118, -20); ctx.lineTo(140, -20); ctx.quadraticCurveTo(148, -12, 147, -6); ctx.lineTo(118, -6); ctx.closePath(); ctx.clip();
+    ctx.fillStyle = '#9fd8ff'; ctx.fillRect(116, -22, 34, 18);
+    ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(130, -9, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#2b1d14'; ctx.fillRect(131, -11, 1.6, 1.6); ctx.fillRect(134, -11, 1.6, 1.6);
+    ctx.restore();
+    ctx.fillStyle = '#fff'; U.roundRect(ctx, 123, -27, 14, 7, 3); ctx.fill(); ctx.beginPath(); ctx.arc(127, -28, 4.5, 0, Math.PI * 2); ctx.arc(133, -28, 4.5, 0, Math.PI * 2); ctx.fill();   // the chef's hat pokes up
+    ctx.save(); ctx.translate(156, -24); ctx.rotate(Math.sin(t * 7) * 0.3); ctx.font = r.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('👋', 0, 0); ctx.restore();   // waving: a 👋, no arm
+    // near wing, swept back and down towards us, with its engine underneath
+    ctx.fillStyle = '#e6e9ee'; ctx.beginPath(); ctx.moveTo(34, 10); ctx.lineTo(-36, 10); ctx.lineTo(-86, 44); ctx.lineTo(-62, 44); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.1)'; ctx.beginPath(); ctx.moveTo(-36, 10); ctx.lineTo(-86, 44); ctx.lineTo(-80, 44); ctx.lineTo(-30, 10); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#5c6670'; U.roundRect(ctx, -12, 22, 52, 20, 9); ctx.fill();
+    ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.ellipse(40, 32, 5, 10, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 2; const fa = Math.sin(t * 40) * 8; ctx.beginPath(); ctx.moveTo(40, 32 - fa); ctx.lineTo(40, 32 + fa); ctx.stroke();   // the fan spinning
+    ctx.fillStyle = 'rgba(255,255,255,0.3)'; U.roundRect(ctx, -6, 24, 40, 4, 2); ctx.fill();
+    // wheels down
+    ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(110, 24); ctx.lineTo(110, 36); ctx.moveTo(-40, 24); ctx.lineTo(-40, 38); ctx.stroke();
+    ctx.fillStyle = '#1e1e1e'; ctx.beginPath(); ctx.arc(110, 38, 5, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(-44, 40, 6, 0, Math.PI * 2); ctx.arc(-34, 40, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
   },
   // the little plane seen from the side, flying to the right, the chef at the controls
   drawPlaneSide(r, g, x, y, s, pitch, t, c) {

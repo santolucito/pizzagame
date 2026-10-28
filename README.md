@@ -12,7 +12,7 @@ it is built so a five‑year‑old can play it:
 - **Nothing ever resets.** There is no prestige, no "next city", no wiping the shop to start over.
   Everything you buy stays bought.
 - **No ads, no purchases, no timers to pay away, no dark patterns.** Money only comes from serving
-  pizza and finding coins outside.
+  pizza (and a little from the shops and deliveries).
 - **No menus.** Everything is bought by standing still on a glowing circle placed where the thing lives:
   the oven upgrade is by the oven, the cashier by the register, each decoration where it will appear.
 - **A cosy world to explore**, a tiny town with a park, a dog, ducks, a fountain, houses to deliver to,
@@ -60,7 +60,7 @@ No build step, no dependencies: plain HTML5 Canvas + vanilla JavaScript.
 7. Grayed-out **decorations** (plants, posters, string lights, neon sign, jukebox) show where
    they will go; buy them to bring more, and more patient, customers.
 8. Walk out of the door to explore the **tiny town**: a park with a pond and fountain, a street loop, a
-   parking lot, four houses, a fire station, and an ice cream shop next door. Coins respawn outside and a
+   parking lot, four houses, a fire station, and an ice cream shop next door. A
    dog follows you around.
 9. Houses order pizza now and then. Carry pizzas out, hop into the **delivery car** in the parking lot or
    onto the quicker, nimbler **scooter** by the door (button or `E`) and drive to their door; delivered

@@ -205,4 +205,17 @@ module.exports = async (t) => {
   await t.shot('all-found');
   await t.ev(() => T.step(400));
   t.expect(await t.ev(() => PizzaCoinsExt.rt.confetti.length === 0), 'the confetti settles');
+
+  // ---- the reset button in the panel: one tap asks, a second tap puts every coin back
+  await t.ev(() => { PizzaCoinsExt.openPanel(Game); T.step(1); });
+  await t.wait(200);
+  const r1 = await t.ev(() => { const b = PizzaCoinsExt.dom.reset; b.click(); return { label: b.textContent, n: PizzaCoinsExt.count(Game) }; });
+  t.expect(/Tap again/.test(r1.label) && r1.n === N, `the first tap only asks (${r1.label}, ${r1.n})`);
+  await t.shot('reset-confirm');
+  const r2 = await t.ev(() => { PizzaCoinsExt.dom.reset.click(); T.step(1); const st = Game.s.pizzacoins; return { n: PizzaCoinsExt.count(Game), seen: Object.keys(st.seen).length, first: st.first, all: st.all, label: PizzaCoinsExt.dom.reset.textContent, text: PizzaCoinsExt.dom.totalEl.textContent }; });
+  t.expect(r2.n === 0 && !r2.first && !r2.all && /Start the hunt/.test(r2.label), `the second tap resets the hunt (${JSON.stringify(r2)})`);
+  t.expect(/found 0 of/.test(r2.text), `the panel shows 0 found (${r2.text})`);
+  const r3 = await t.ev(() => { const s = CFG.PIZZACOINS.SPOTS.find((q) => q.id === 'farm-scarecrow'); T.tp(s.x, s.y, 'town'); T.step(2); return { n: PizzaCoinsExt.count(Game), saved: !!Game.s.pizzacoins.got['farm-scarecrow'] }; });
+  t.expect(r3.n === 1 && r3.saved, 'coins can be collected again after the reset');
+  await t.ev(() => PizzaCoinsExt.closePanel());
 };

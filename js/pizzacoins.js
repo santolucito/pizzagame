@@ -321,6 +321,8 @@ const PizzaCoinsExt = {
       .pc-row.pc-unseen { opacity: 0.6; }
       @media (max-width: 700px), (max-height: 520px) { .pc-body { flex: 1; } .pc-row { font-size: 16px; padding: 10px 12px; } }
       @media (max-width: 420px) { .pc-list { grid-template-columns: 1fr; } }
+      .pc-reset { margin-top: 12px; align-self: center; border: 2px solid #efdcc0; background: #fff; color: #8a6a4a; border-radius: 12px; padding: 10px 16px; font: inherit; font-weight: 800; font-size: 14px; cursor: pointer; min-height: 44px; }
+      .pc-reset.pc-sure { background: #e4572e; border-color: #b8401c; color: #fff; }
     `;
     document.head.appendChild(style);
     const badge = document.createElement('button');
@@ -336,16 +338,27 @@ const PizzaCoinsExt = {
           <div class="pc-total"></div>
           <div class="pc-bar"><i></i></div>
           <div class="pc-list"></div>
+          <button class="pc-reset" type="button">🔄 Start the hunt again</button>
         </div>
       </div>`;
     host.appendChild(modal);
     this.dom = {
       badge, icon: badge.querySelector('canvas'), num: badge.querySelector('.pc-n'), modal,
       hero: modal.querySelector('.pc-hero'), totalEl: modal.querySelector('.pc-total'), bar: modal.querySelector('.pc-bar i'), list: modal.querySelector('.pc-list'),
-      close: modal.querySelector('.pc-close'),
+      close: modal.querySelector('.pc-close'), reset: modal.querySelector('.pc-reset'),
     };
     badge.addEventListener('click', () => this.openPanel(Game));
     this.dom.close.addEventListener('click', () => this.closePanel());
+    // reset asks once more first (a second tap within 4 s), so a stray tap never wipes the hunt
+    this.dom.reset.addEventListener('click', () => {
+      const b = this.dom.reset;
+      if (!b.classList.contains('pc-sure')) {
+        b.classList.add('pc-sure'); b.textContent = '⚠️ Tap again to put all the coins back';
+        clearTimeout(this.resetT); this.resetT = setTimeout(() => this.disarmReset(), 4000);
+        return;
+      }
+      this.resetHunt(Game);
+    });
     modal.addEventListener('click', (e) => { if (e.target === modal) this.closePanel(); });
     this.drawIcon(0);
   },
@@ -356,6 +369,17 @@ const PizzaCoinsExt = {
     this.drawChest(ctx, 40, 34, this.rt ? this.rt.t : 0, hop);
   },
   isOpen() { return typeof UI !== 'undefined' && UI.open === 'pizzacoins'; },
+  disarmReset() { const b = this.dom && this.dom.reset; if (b) { b.classList.remove('pc-sure'); b.textContent = '🔄 Start the hunt again'; } },
+  // every coin goes back to its hiding place; places become ??? again and the first-coin / all-found toasts can play again
+  resetHunt(g) {
+    const st = this.save(g);
+    st.got = {}; st.seen = {}; st.first = false; st.all = false;
+    this.home();
+    clearTimeout(this.resetT); this.disarmReset();
+    if (g.save) g.save();
+    if (this.isOpen()) this.refreshPanel(g);
+    Sfx.drop(); Haptics.tap();
+  },
   openPanel(g) {
     if (!this.dom || typeof UI === 'undefined') return;
     UI.els.pizzacoins = this.dom.modal;

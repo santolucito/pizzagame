@@ -25,10 +25,10 @@ CFG.PIZZACOINS = {
     { id: 'city-gardens-west', area: 'city', x: 4630, y: 1080, note: 'west end of Riverside Gardens' },
     { id: 'city-square-tree', area: 'city', x: 5510, y: 445, note: 'by a tree in Pizza Square' },
     { id: 'city-car-lot', area: 'city', x: 5125, y: 705, note: 'in the corner of the sports car lot' },
-    // ---- the Islands (the jet ski reaches the little ones)
-    { id: 'isle-coconut', area: 'islands', x: 3720, y: 1560, note: 'behind the Coconut Hut' },
-    { id: 'isle-lighthouse', area: 'islands', x: 4370, y: 1695, note: 'below the lighthouse' },
-    { id: 'isle-treasure', area: 'islands', x: 3650, y: 2350, note: 'on Treasure Isle' },
+    // ---- hidden in the island buildings (the jet ski or a sailboat reaches the huts on the little islands)
+    { id: 'isle-crabshack', area: 'crabshack', x: 7256, y: 4128, note: 'in the Crab Shack, in the nook between the crab tank and the counter' },
+    { id: 'isle-coconuthut', area: 'coconuthut', x: 8110, y: 4214, note: 'in the Coconut Hut, between the two hammocks' },
+    { id: 'isle-missionctl', area: 'missionctl', x: 9300, y: 4128, note: 'in Mission Control, under the big screen' },
     // ---- Cloud Harbor and the Sky Café
     { id: 'cloud-glider', area: 'cloud', x: 8535, y: -105, note: 'far corner of Glider Cloud' },
     { id: 'skycafe', area: 'skycafe', x: 7850, y: 1795, note: 'in the far corner of the Sky Café' },
@@ -49,6 +49,7 @@ CFG.PIZZACOINS = {
   // friendly names for the list in the panel, in the order they are listed
   PLACES: {
     town: ['🏡', 'Home Town'], site: ['🏗️', 'Construction Town'], city: ['🏙️', 'City'], islands: ['🏝️', 'Islands'],
+    lighthouse: ['🗼', 'Lighthouse'], crabshack: ['🦀', 'Crab Shack'], coconuthut: ['🥥', 'Coconut Hut'], missionctl: ['🛰️', 'Mission Control'], beachhut: ['🌴', 'Beach Hut'],
     cloud: ['☁️', 'Cloud Harbor'], skycafe: ['🌤️', 'Sky Café'], subway: ['🚇', 'Subway'], campus: ['🎓', 'Columbia Campus'],
     lowlibrary: ['🏛️', 'Low Library'], barnardhall: ['🐻', 'Barnard Hall'], cabin: ['🌲', 'Secret Cabin'],
     upstairs: ['🛏️', 'Bedroom'], pizzarain: ['🌧️', 'Pizza Rain Room'], barn: ['🐐', 'Barn'], firestation: ['🧯', 'Fire Station'],

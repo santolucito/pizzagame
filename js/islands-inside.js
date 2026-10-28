@@ -9,7 +9,10 @@
 //  - the Coconut Hut: two hammocks to lie in (they sway, Zzz), a $3 coconut drink, tiki masks whose eyes follow you
 //    and a ukulele that plays a chord each press;
 //  - Mission Control on Rocket Island: a big screen showing the rocket being built, two consoles with workers in
-//    headsets, and a big red button that starts a countdown… "Not yet! 🚧".
+//    headsets, and a big red button that starts a countdown… "Not yet! 🚧";
+//  - the Beach Hut on Sunny Beach: a bed with a coconut-print blanket under a mosquito net ('😴 Sleep': the screen goes
+//    to a starry night over the waves, Zzz, then "Good morning! 🌅" and a fresh day), a hammock, a window onto the sea
+//    with rolling waves, a ceiling fan and seashells everywhere.
 // The huts still order pizza: their doors are the delivery spots, and delivering happens on the doorstep as before.
 // Reads its door spots from CFG.ISLANDS (js/islands.js, loaded first). The telescope uses the City's shared telescope
 // helpers (CityExt.scopeStart / scopeUpdate / scopeBegin / scopeEnd).
@@ -63,6 +66,20 @@ CFG.ISLE_IN = {
       MODEL: { x: 9522, y: 4300 }, COOLER: { x: 9070, y: 4296 },
       COUNT_T: 3.8,
     },
+    beachhut: {
+      name: 'Beach Hut', toast: '🌴 Welcome to the Beach Hut!',
+      WORLD: { x0: 10000, y0: 4000, x1: 10600, y1: 4400 }, ROOM: { x0: 10060, y0: 4110, x1: 10540, y1: 4340 }, BACK_TOP: 4020,
+      EXIT: { x: 10300, y: 4322 },
+      BED: { x0: 10074, y0: 4112, x1: 10194, y1: 4240 },           // the head against the back wall
+      SLEEP: { x: 10226, y: 4198 }, NAP: { x: 10134, y: 4178 },     // stand here beside the bed; lie here (feet), head on the pillow
+      LAMP: { x: 10224, y: 4126 },                                   // the bedside table with a coconut lamp
+      HAMMOCKS: [{ x: 10440, y: 4262, cols: ['#3b7dd8', '#fff', '#4dd0e1'] }], HALF: 62,
+      WINDOW: { x0: 10392, y0: 4034, x1: 10512, y1: 4092 },
+      FAN: { x: 10312, y: 4150, r: 56 },
+      BASKET: { x: 10512, y: 4140 }, PALM: { x: 10084, y: 4314 },
+      SHELLS: [[10100, 4268, '#ffd1dc'], [10214, 4318, '#fff3e0'], [10390, 4318, '#ffe0b2'], [10522, 4300, '#ffd1dc'], [10330, 4140, '#fff3e0']],
+      NAP_T: { hop: 0.45, sleep: 3.2, wake: 0.9 },
+    },
   },
 };
 for (const k of Object.keys(CFG.ISLE_IN.ROOMS)) CFG.AREAS[k] = { WORLD: CFG.ISLE_IN.ROOMS[k].WORLD };
@@ -76,6 +93,7 @@ CFG.ISLE_IN.DOORS = (() => {
   const cr = isle('crab'); out.push({ room: 'crabshack', x: cr.hut.x, y: cr.hut.y + 54, hut: 'crab', text: 'Go inside the Crab Shack! 🦀' });
   const co = isle('coconut'); out.push({ room: 'coconuthut', x: co.hut.x, y: co.hut.y + 54, hut: 'coconut', text: 'Go inside the Coconut Hut! 🥥' });
   out.push({ room: 'missionctl', x: M.x, y: M.y + M.h / 2 + 20, text: 'Go inside Mission Control! 🛰️' });
+  const bh = I.BEACHHUT.door; out.push({ room: 'beachhut', x: bh.x, y: bh.y, text: 'Go inside the beach hut! 🌴' });
   return out;
 })();
 
@@ -85,7 +103,7 @@ const LH_SCOPE_COMPASS = [[-0.12, 'W'], [0.2, 'SW'], [0.5, 'S'], [0.8, 'SE'], [1
 
 const IslandsInsideExt = {
   name: 'islandsInside',
-  defaults: { isleIn: { seen: {}, hellos: 0, pets: 0, climbs: 0, looks: 0, waves: 0, cookies: 0, songs: 0, naps: 0, drinks: 0, strums: 0, presses: 0 } },
+  defaults: { isleIn: { seen: {}, hellos: 0, pets: 0, climbs: 0, looks: 0, waves: 0, cookies: 0, songs: 0, naps: 0, drinks: 0, strums: 0, presses: 0, sleeps: 0, swings: 0 } },
   st: null,
 
   // ---------- state ----------
@@ -105,6 +123,8 @@ const IslandsInsideExt = {
       lie: null, strum: 0, strumN: 0,
       // mission control: the countdown on the big screen
       count: null,
+      // beach hut: asleep in the bed { phase: 'hop' | 'sleep' | 'wake', t, from }
+      nap: null,
       obs: {},
     };
     for (const k of Object.keys(CFG.ISLE_IN.ROOMS)) this.st.obs[k] = this.roomObstacles(k, false);
@@ -138,6 +158,13 @@ const IslandsInsideExt = {
       for (const h of R.HAMMOCKS) box(h.x - R.HALF - 6, h.y - 10, h.x + R.HALF + 6, h.y + 8);
       box(B.x0, A.y0, B.x1, B.y1); box(U2.x - 16, U2.y - 16, U2.x + 16, U2.y + 18);
       for (const p of R.PLANTS) box(p.x - 14, p.y - 14, p.x + 14, p.y + 12);
+    } else if (k === 'beachhut') {
+      const B = R.BED, L = R.LAMP;
+      box(B.x0, A.y0, B.x1, B.y1);                                                    // the bed
+      box(L.x - 15, A.y0, L.x + 15, L.y + 14);                                        // the bedside table
+      for (const h of R.HAMMOCKS) box(h.x - R.HALF - 6, h.y - 10, h.x + R.HALF + 6, h.y + 8);
+      box(R.BASKET.x - 17, R.BASKET.y - 14, R.BASKET.x + 17, R.BASKET.y + 14);        // the basket of shells
+      box(R.PALM.x - 14, R.PALM.y - 14, R.PALM.x + 14, R.PALM.y + 12);                // a potted palm
     } else if (k === 'missionctl') {
       for (const d of R.DESKS) box(d.x - R.DESK_W / 2, A.y0, d.x + R.DESK_W / 2, d.y + 16);
       const B = R.BUTTON; box(B.x - 18, B.y - 14, B.x + 18, B.y + 14);
@@ -165,7 +192,7 @@ const IslandsInsideExt = {
     if (!d.hut || g.player.carry <= 0 || typeof IslandsExt === 'undefined' || !IslandsExt.rt) return false;
     const h = IslandsExt.rt.huts.find((q) => q.key === d.hut); return !!(h && h.order);
   },
-  busy() { const st = this.st; return !!(st.climb || st.viewing || st.lie); },
+  busy() { const st = this.st; return !!(st.climb || st.viewing || st.lie || st.nap); },
 
   // ---------- game hooks ----------
   obstacles(g) { return this.curObs(g); },
@@ -176,7 +203,7 @@ const IslandsInsideExt = {
     if (di >= 0) return { label: '🚪 Go inside', run: (gg) => this.enter(gg, di) };
     const k = this.room(g); if (!k || !this.onFoot(g)) return null;
     const R = CFG.ISLE_IN.ROOMS[k];
-    if (st.climb) return null;
+    if (st.climb || st.nap) return null;
     if (st.viewing) return { label: '🚶 Done looking', run: () => { st.viewing = null; Haptics.tap(); } };
     if (st.lie) return { label: '🚶 Get up', run: (gg) => this.getUp(gg) };
     if (!(k === 'lighthouse' && st.up) && this.near(g, R.EXIT, CFG.ISLE_IN.DOOR_R)) return { label: '🚪 Go outside', run: (gg) => this.leave(gg) };
@@ -194,6 +221,10 @@ const IslandsInsideExt = {
       if (this.near(g, R.UKE_SPOT, 40)) return { label: '🎶 Play the ukulele', run: (gg) => this.strum(gg) };
     } else if (k === 'missionctl') {
       if (this.near(g, R.BTN_SPOT, 40) && !st.count) return { label: '🔴 Press the big red button', run: (gg) => this.pressButton(gg) };
+    } else if (k === 'beachhut') {
+      if (this.near(g, R.SLEEP, 40)) return { label: '😴 Sleep', run: (gg) => this.startSleep(gg) };
+      const hi = R.HAMMOCKS.findIndex((h) => U.dist(p.x, p.y, h.x, h.y + 28) < 44);
+      if (hi >= 0) return { label: '🌴 Lie in the hammock', run: (gg) => this.lieDown(gg, hi) };
     }
     return null;
   },
@@ -210,7 +241,7 @@ const IslandsInsideExt = {
     g.area = 'islands'; p.x = d.x; p.y = d.y; p.moving = false; p.facing = 1; p.hasMoved = true; g.cameraSnap = true;
     st.fade = CFG.ISLE_IN.FADE; this.resetRoom(); Sfx.drop();
   },
-  resetRoom() { const st = this.st; st.up = false; st.climb = null; st.viewing = null; st.lie = null; st.count = null; st.keeper = null; st.juke = 0; st.strum = 0; },
+  resetRoom() { const st = this.st; st.up = false; st.climb = null; st.viewing = null; st.lie = null; st.count = null; st.keeper = null; st.juke = 0; st.strum = 0; st.nap = null; },
   home(g) { if (!this.st) return; this.resetRoom(); this.st.fade = 0; this.st.from = -1; this.st.notes = []; },
   // a save or a push that left the chef in a wall or inside the furniture goes back onto the door mat (or the stair top)
   rescue(g) {
@@ -249,10 +280,10 @@ const IslandsInsideExt = {
     notes.forEach((f, i) => setTimeout(() => { if (typeof Sfx.tone === 'function') Sfx.tone(f, 0.22, 'triangle', 0.05); }, i * 260));
     Haptics.tap();
   },
-  // ---------- the coconut hut ----------
-  lieDown(g, i) { this.st.lie = { i, t: 0 }; g.player.moving = false; g.s.isleIn.naps++; Sfx.pickup(); Haptics.tap(); },
+  // ---------- the coconut hut (and the beach hut's hammock) ----------
+  lieDown(g, i) { this.st.lie = { i, t: 0 }; g.player.moving = false; if (g.area === 'beachhut') g.s.isleIn.swings++; else g.s.isleIn.naps++; Sfx.pickup(); Haptics.tap(); },
   getUp(g) {
-    const st = this.st, R = CFG.ISLE_IN.ROOMS.coconuthut; if (!st.lie) return;
+    const st = this.st, R = CFG.ISLE_IN.ROOMS[this.room(g)]; if (!st.lie || !R || !R.HAMMOCKS) { st.lie = null; return; }
     const h = R.HAMMOCKS[st.lie.i], p = g.player; st.lie = null;
     p.x = h.x; p.y = h.y + 28; p.moving = false; Sfx.drop();
   },
@@ -263,6 +294,38 @@ const IslandsInsideExt = {
     for (let k = 0; k < 3; k++) st.notes.push({ x: R.UKE.x + U.rand(-16, 16), y: R.UKE.y - 30, ch: U.pick(['♪', '♫', '♩']), t: -k * 0.15 });
     g.floats.push({ x: R.UKE.x, y: R.UKE.y - 60, text: ['Strum! 🎶', 'Aloha! 🌺', 'Plink plonk! 🎵', 'Hula time! 🌴'][(st.strumN - 1) % 4], color: '#ffe08a', t: 0, dur: 1.3, big: true });
     Haptics.tap();
+  },
+  // ---------- the beach hut: a good night's sleep ----------
+  startSleep(g) {
+    const p = g.player;
+    this.st.nap = { phase: 'hop', t: 0, from: { x: p.x, y: p.y } };
+    p.moving = false; p.facing = -1; Sfx.pickup(); Haptics.tap();
+  },
+  // how dark the night is over the screen (0..1), and how strong the sunrise glow after it
+  nightAlpha() { const n = this.st && this.st.nap, N = CFG.ISLE_IN.ROOMS.beachhut.NAP_T; if (!n || n.phase !== 'sleep') return 0; return U.clamp(Math.min(n.t / 0.6, (N.sleep - n.t) / 0.5 + 0.35), 0, 1); },
+  dawnAlpha() { const n = this.st && this.st.nap, N = CFG.ISLE_IN.ROOMS.beachhut.NAP_T; if (!n || n.phase !== 'wake') return 0; return U.clamp(1 - n.t / N.wake, 0, 1); },
+  updateNap(g, dt, R) {
+    const st = this.st, n = st.nap, p = g.player, N = R.NAP_T;
+    n.t += dt; p.moving = false;
+    const arc = (a, b, k) => { p.x = U.lerp(a.x, b.x, k); p.y = U.lerp(a.y, b.y, k) - Math.sin(k * Math.PI) * 24; };
+    if (n.phase === 'hop') {
+      const k = Math.min(1, n.t / N.hop); arc(n.from, R.NAP, k);
+      if (k >= 1) { n.phase = 'sleep'; n.t = 0; Sfx.drop(); }
+    } else if (n.phase === 'sleep') {
+      p.x = R.NAP.x; p.y = R.NAP.y; p.facing = 1;
+      if (Math.floor(n.t / 0.9) !== Math.floor((n.t - dt) / 0.9)) g.floats.push({ x: p.x + 16, y: p.y - 52, text: 'z', color: '#9ad0ff', t: 0, dur: 1.4 });
+      if (n.t >= N.sleep) {
+        n.phase = 'wake'; n.t = 0; n.from = { x: p.x, y: p.y };
+        // a fresh new morning (the same as the bedroom nap: the day/night clock jumps to day)
+        if (typeof AtmosphereExt !== 'undefined' && AtmosphereExt.force) AtmosphereExt.force({ phase: 'day' });
+        g.s.isleIn.sleeps++;
+        g.floats.push({ x: p.x + 30, y: p.y - 70, text: 'Good morning! 🌅', color: '#ffe08a', t: 0, dur: 2, big: true });
+        Sfx.ding(); Haptics.success();
+      }
+    } else {
+      const k = Math.min(1, n.t / (N.wake * 0.6)); arc(R.NAP, R.SLEEP, k);
+      if (n.t >= N.wake) { st.nap = null; p.x = R.SLEEP.x; p.y = R.SLEEP.y; p.facing = -1; }
+    }
   },
   // ---------- mission control ----------
   pressButton(g) { this.st.count = { t: 0 }; g.s.isleIn.presses++; Sfx.ding(); Haptics.tap(); },
@@ -298,6 +361,7 @@ const IslandsInsideExt = {
     if (k === 'lighthouse') this.updateLighthouse(g, dt, R);
     else if (k === 'crabshack') this.updateCrab(g, dt, R);
     else if (k === 'coconuthut') this.updateCoconut(g, dt, R);
+    else if (k === 'beachhut') { if (st.nap) this.updateNap(g, dt, R); else this.updateLie(g, dt, R); }
     else if (k === 'missionctl' && st.count) {
       const c = st.count, prev = c.t; c.t += dt;
       if (prev < 2.4 && c.t >= 2.4) { g.floats.push({ x: p.x, y: p.y - 70, text: 'Not yet! Coming soon! 🚧', color: '#ffe08a', t: 0, dur: 1.8, big: true }); Haptics.success(); }
@@ -344,8 +408,12 @@ const IslandsInsideExt = {
     }
   },
   updateCoconut(g, dt, R) {
+    this.st.strum = Math.max(0, this.st.strum - dt);
+    this.updateLie(g, dt, R);
+  },
+  // lying in a hammock: it sways the chef gently, with a z now and then
+  updateLie(g, dt, R) {
     const st = this.st, p = g.player;
-    st.strum = Math.max(0, st.strum - dt);
     if (st.lie) {
       const h = R.HAMMOCKS[st.lie.i]; st.lie.t += dt;
       p.x = h.x + Math.sin(st.lie.t * 1.6) * 5; p.y = h.y + 6; p.moving = false; p.facing = 1;
@@ -399,6 +467,15 @@ const IslandsInsideExt = {
       if (tr && tr.kind === 'coconut') return { text: 'Slurp! Coconut drink 🥥', target: null };
       return { text: 'Aloha! 🌺', target: null };
     }
+    if (k === 'beachhut') {
+      if (st.nap) return { text: st.nap.phase === 'wake' ? 'Good morning! 🌅' : 'Zzz… 😴', target: null };
+      if (st.lie) return { text: 'Swing, swing… Press the button to get up', target: null };
+      if (this.near(g, R.SLEEP, 40)) return { text: 'Hop into bed for a sleep 😴', target: null };
+      if (!s.sleeps) return { text: 'Have a sleep in the cosy bed! 😴', target: R.SLEEP };
+      const h = R.HAMMOCKS[0];
+      if (!s.swings) return { text: 'Swing in the hammock! 🌴', target: { x: h.x, y: h.y + 28 } };
+      return { text: 'Listen to the waves 🌊', target: null };
+    }
     if (k === 'missionctl') {
       if (st.count) return { text: st.count.t < 2.4 ? 'Countdown! 🚀' : 'Not yet! The rocket is still being built 🚧', target: null };
       if (this.near(g, R.BTN_SPOT, 40)) return { text: 'Press the big red button! 🔴', target: null };
@@ -414,6 +491,7 @@ const IslandsInsideExt = {
     crabshack(r, g) { IslandsInsideExt.paintCrab(r, g); },
     coconuthut(r, g) { IslandsInsideExt.paintCoconut(r, g); },
     missionctl(r, g) { IslandsInsideExt.paintMission(r, g); },
+    beachhut(r, g) { IslandsInsideExt.paintBeach(r, g); },
   },
   // backdrop, floor, the tall back wall, side and bottom walls, the exit door with its mat and the name plate
   shell(r, k, o) {
@@ -629,20 +707,232 @@ const IslandsInsideExt = {
     ctx.fillStyle = '#ffd166'; for (let y = R.BUTTON.y + 20; y < R.ROOM.y1 - 4; y += 16) ctx.fillRect(R.BUTTON.x - 3, y, 6, 9);
   },
 
+  // ---------- the beach hut ----------
+  paintBeach(r, g) {
+    const R = CFG.ISLE_IN.ROOMS.beachhut, E = this, W = R.WINDOW;
+    this.shell(r, 'beachhut', {
+      out: '#2e6f8e', back: '#e8cf8f', wall: '#b8923f', title: '🌴 BEACH HUT 🌴', mat: '#4dd0e1',
+      floor: (ctx, A) => {   // pale driftwood planks with a little sand blown in
+        E.planks('#ead7ae', 'rgba(141,90,43,0.14)')(ctx, A);
+        ctx.fillStyle = 'rgba(214,180,110,0.35)'; for (let i = 0; i < 70; i++) { const x = A.x0 + ((i * 197) % (A.x1 - A.x0)), y = A.y0 + ((i * 89) % (A.y1 - A.y0)); ctx.beginPath(); ctx.ellipse(x, y, 3, 1.5, 0, 0, Math.PI * 2); ctx.fill(); }
+      },
+      backArt: (ctx, A) => {
+        // a woven palm wall with a frond trim along the top
+        ctx.strokeStyle = 'rgba(141,90,43,0.18)'; ctx.lineWidth = 2;
+        for (let x = A.x0 - 120; x < A.x1 + 40; x += 16) { ctx.beginPath(); ctx.moveTo(x, R.BACK_TOP); ctx.lineTo(x + 90, A.y0); ctx.moveTo(x + 90, R.BACK_TOP); ctx.lineTo(x, A.y0); ctx.stroke(); }
+        for (let x = A.x0 - 24, i = 0; x < A.x1 + 24; x += 14, i++) { ctx.fillStyle = i % 2 ? '#3f9a4a' : '#56b862'; ctx.beginPath(); ctx.moveTo(x, R.BACK_TOP); ctx.lineTo(x + 14, R.BACK_TOP); ctx.lineTo(x + 7, R.BACK_TOP + 12 + (i % 3) * 3); ctx.closePath(); ctx.fill(); }
+        // the bamboo headboard behind the bed
+        const B = R.BED;
+        ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, B.x0 - 4, 4064, B.x1 - B.x0 + 8, 50, 12); ctx.fill();
+        for (let x = B.x0 + 4, i = 0; x < B.x1 - 4; x += 12, i++) { ctx.fillStyle = i % 2 ? '#c9a24a' : '#dcb95e'; U.roundRect(ctx, x, 4070, 10, 44, 4); ctx.fill(); ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(x, 4088, 10, 2); }
+        // a hoop on the ceiling for the mosquito net
+        ctx.strokeStyle = '#8d5a2b'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo((B.x0 + B.x1) / 2, R.BACK_TOP); ctx.lineTo((B.x0 + B.x1) / 2, 4036); ctx.stroke();
+        ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse((B.x0 + B.x1) / 2, 4040, 26, 6, 0, 0, Math.PI * 2); ctx.stroke();
+        // a sunset picture, a starfish and a string of shells (a wind chime) by the window
+        ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, 10266, 4040, 58, 40, 4); ctx.fill();
+        const sk = ctx.createLinearGradient(0, 4044, 0, 4076); sk.addColorStop(0, '#ff9f43'); sk.addColorStop(0.55, '#ffd166'); sk.addColorStop(0.56, '#3b7dd8'); sk.addColorStop(1, '#2d5a8a'); ctx.fillStyle = sk; ctx.fillRect(10270, 4044, 50, 32);
+        ctx.fillStyle = '#fff3b0'; ctx.beginPath(); ctx.arc(10295, 4062, 7, Math.PI, 0); ctx.fill();
+        if (typeof IslandsExt !== 'undefined') IslandsExt.drawStar(ctx, 10350, 4052, 11, '#ff9f43');
+        ctx.strokeStyle = '#d9b27c'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(10372, R.BACK_TOP + 6); ctx.lineTo(10372, 4082); ctx.stroke();
+        for (let k = 0; k < 5; k++) E.drawShell(ctx, 10372, 4040 + k * 10, ['#ffd1dc', '#fff3e0', '#ffe0b2'][k % 3], 0.6);
+        // the window's bamboo frame and its sill of shells (the sea itself rolls by live), pareo curtains tied back
+        ctx.fillStyle = '#a66a2c'; U.roundRect(ctx, W.x0 - 6, W.y0 - 6, W.x1 - W.x0 + 12, W.y1 - W.y0 + 12, 6); ctx.fill();
+        ctx.fillStyle = '#c9a24a'; ctx.fillRect(W.x0 - 8, W.y1 + 2, W.x1 - W.x0 + 16, 7);
+        for (const [dx, c] of [[16, '#ffd1dc'], [36, '#fff3e0'], [86, '#ffe0b2'], [104, '#ffd1dc']]) E.drawShell(ctx, W.x0 + dx, W.y1 + 3, c, 0.7);
+        for (const [x0, d] of [[W.x0 - 12, 1], [W.x1 + 12, -1]]) {
+          ctx.fillStyle = '#ff8fab'; ctx.beginPath(); ctx.moveTo(x0 - d * 4, W.y0 - 8); ctx.lineTo(x0 + d * 14, W.y0 - 8); ctx.quadraticCurveTo(x0 + d * 4, W.y0 + 26, x0 + d * 10, W.y1 + 4); ctx.lineTo(x0 - d * 4, W.y1 + 4); ctx.closePath(); ctx.fill();
+          ctx.fillStyle = '#fff'; for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.arc(x0 + d * 3, W.y0 + k * 18, 2.5, 0, Math.PI * 2); ctx.fill(); }
+          ctx.fillStyle = '#ffd166'; ctx.fillRect(d > 0 ? x0 - 4 : x0 - 10, W.y0 + 26, 14, 4);
+        }
+      },
+    });
+    const ctx = r.ctx, B = R.BED, L = R.LAMP;
+    // a round woven rug with a turtle on it
+    ctx.fillStyle = '#d9b55a'; ctx.beginPath(); ctx.ellipse(10320, 4252, 74, 36, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#b8923f'; ctx.lineWidth = 3; for (const k of [0.75, 0.5]) { ctx.beginPath(); ctx.ellipse(10320, 4252, 74 * k, 36 * k, 0, 0, Math.PI * 2); ctx.stroke(); }
+    ctx.fillStyle = '#41b883'; ctx.beginPath(); ctx.ellipse(10320, 4252, 15, 10, 0, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(10338, 4250, 5, 0, Math.PI * 2); ctx.fill();
+    for (const [dx, dy] of [[-10, -9], [10, -9], [-10, 9], [10, 9]]) { ctx.beginPath(); ctx.ellipse(10320 + dx, 4252 + dy, 4, 2.5, 0, 0, Math.PI * 2); ctx.fill(); }
+    ctx.fillStyle = '#2e8b57'; ctx.beginPath(); ctx.ellipse(10320, 4252, 9, 6, 0, 0, Math.PI * 2); ctx.fill();
+    // the bed: a bamboo frame, a fat pillow and the coconut-print blanket
+    ctx.fillStyle = 'rgba(0,0,0,0.18)'; U.roundRect(ctx, B.x0 + 4, B.y0 + 6, B.x1 - B.x0, B.y1 - B.y0, 8); ctx.fill();
+    ctx.fillStyle = '#a66a2c'; U.roundRect(ctx, B.x0, B.y0, B.x1 - B.x0, B.y1 - B.y0, 8); ctx.fill();
+    ctx.fillStyle = '#fff8ee'; U.roundRect(ctx, B.x0 + 5, B.y0 + 3, B.x1 - B.x0 - 10, B.y1 - B.y0 - 10, 6); ctx.fill();
+    ctx.fillStyle = '#fff'; U.roundRect(ctx, B.x0 + 18, B.y0 + 6, B.x1 - B.x0 - 36, 24, 10); ctx.fill(); ctx.strokeStyle = 'rgba(43,29,20,0.12)'; ctx.lineWidth = 1.5; U.roundRect(ctx, B.x0 + 18, B.y0 + 6, B.x1 - B.x0 - 36, 24, 10); ctx.stroke();
+    this.blanket(ctx, B.x0 + 4, B.y0 + 40, B.x1 - 4, B.y1 - 6);
+    // the bedside table and its coconut lamp (the glow is live)
+    ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(L.x - 14, L.y + 10, 32, 6);
+    ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, L.x - 15, L.y - 4, 30, 18, 3); ctx.fill(); ctx.fillStyle = '#a66a2c'; ctx.fillRect(L.x - 15, L.y - 6, 30, 5);
+    ctx.fillStyle = '#6b4a2b'; ctx.beginPath(); ctx.arc(L.x, L.y - 14, 10, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ffe08a'; for (const [dx, dy] of [[-4, -16], [3, -18], [0, -10], [5, -11], [-5, -9]]) { ctx.beginPath(); ctx.arc(L.x + dx, L.y + dy, 1.6, 0, Math.PI * 2); ctx.fill(); }
+    // the hammock's posts (the cloth sways live), the basket of shells, the potted palm, shells on the floor
+    for (const h of R.HAMMOCKS) for (const d of [-1, 1]) {
+      const px = h.x + d * R.HALF;
+      ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(px + 2, h.y + 4, 8, 3, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#8d5a2b'; ctx.fillRect(px - 4, h.y - 40, 8, 44); ctx.fillStyle = '#a66a2c'; ctx.fillRect(px - 4, h.y - 40, 3, 44);
+    }
+    const Bk = R.BASKET;
+    ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(Bk.x + 2, Bk.y + 12, 18, 5, 0, 0, Math.PI * 2); ctx.fill();
+    for (const [dx, c, sc] of [[-8, '#ffd1dc', 0.9], [6, '#fff3e0', 1], [-1, '#ffe0b2', 0.8]]) this.drawShell(ctx, Bk.x + dx, Bk.y - 8, c, sc);
+    ctx.fillStyle = '#c99a62'; U.roundRect(ctx, Bk.x - 16, Bk.y - 8, 32, 20, 6); ctx.fill();
+    ctx.strokeStyle = 'rgba(107,74,43,0.5)'; ctx.lineWidth = 1.5; for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.moveTo(Bk.x - 16, Bk.y - 3 + k * 6); ctx.lineTo(Bk.x + 16, Bk.y - 3 + k * 6); ctx.stroke(); }
+    this.drawPlant(ctx, R.PALM.x, R.PALM.y);
+    for (const [x, y, c] of R.SHELLS) this.drawShell(ctx, x, y, c, 1);
+    if (typeof IslandsExt !== 'undefined') IslandsExt.drawStar(ctx, 10160, 4318, 7, '#e4572e');
+  },
+  // a scallop shell: a fan with ridges
+  drawShell(ctx, x, y, col, s) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+    ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(0, 5); ctx.arc(0, 5, 9, Math.PI * 1.1, Math.PI * 1.9); ctx.closePath(); ctx.fill();
+    ctx.fillRect(-3, 4, 6, 3);
+    ctx.strokeStyle = 'rgba(141,90,43,0.35)'; ctx.lineWidth = 1; for (let k = -2; k <= 2; k++) { ctx.beginPath(); ctx.moveTo(0, 5); ctx.lineTo(k * 3.6, -2.5 + Math.abs(k) * 0.8); ctx.stroke(); }
+    ctx.restore();
+  },
+  // the coconut-print blanket: cream with brown coconuts (some cut open) and little palm leaves, a folded-over top
+  blanket(ctx, x0, y0, x1, y1) {
+    ctx.fillStyle = '#ffe9b0'; U.roundRect(ctx, x0, y0, x1 - x0, y1 - y0, 6); ctx.fill();
+    ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, x1 - x0, y1 - y0); ctx.clip();
+    for (let y = y0 + 16, j = 0; y < y1 + 10; y += 26, j++) for (let x = x0 + 14 + (j % 2) * 18, i = 0; x < x1 + 10; x += 36, i++) {
+      ctx.fillStyle = '#41b883'; ctx.beginPath(); ctx.ellipse(x + 9, y - 6, 7, 3, -0.6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#6b4a2b'; ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.fill();
+      if ((i + j) % 2) { ctx.fillStyle = '#fff8ee'; ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill(); }
+      else { ctx.fillStyle = '#4a2d12'; for (const [dx, dy] of [[-2, -1.5], [2, -1.5], [0, 1.8]]) { ctx.beginPath(); ctx.arc(x + dx, y + dy, 1, 0, Math.PI * 2); ctx.fill(); } }
+    }
+    ctx.restore();
+    ctx.fillStyle = '#41b883'; U.roundRect(ctx, x0, y0, x1 - x0, 9, 4); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(x0 + 4, y0 + 2, x1 - x0 - 8, 2);
+  },
+  // live bits of the beach hut: the window onto the sea (sky, sun, a sailboat going by, waves rolling in to the
+  // beach), the coconut lamp's glow and the ceiling fan's shadow turning on the floor
+  drawBeachLive(r, g, R) {
+    const ctx = r.ctx, W = R.WINDOW, t = g.time, w = W.x1 - W.x0, h = W.y1 - W.y0, hz = W.y0 + h * 0.45;
+    ctx.save(); ctx.beginPath(); ctx.rect(W.x0, W.y0, w, h); ctx.clip();
+    const sk = ctx.createLinearGradient(0, W.y0, 0, hz); sk.addColorStop(0, '#79c6f2'); sk.addColorStop(1, '#d9f0ff'); ctx.fillStyle = sk; ctx.fillRect(W.x0, W.y0, w, hz - W.y0);
+    ctx.fillStyle = '#fff7c2'; ctx.beginPath(); ctx.arc(W.x0 + w * 0.78, W.y0 + 10, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.9)'; const cx = W.x0 + ((t * 6) % (w + 40)) - 20; ctx.beginPath(); ctx.arc(cx, W.y0 + 12, 5, 0, Math.PI * 2); ctx.arc(cx + 7, W.y0 + 9, 6, 0, Math.PI * 2); ctx.arc(cx + 14, W.y0 + 12, 5, 0, Math.PI * 2); ctx.fill();
+    const sea = ctx.createLinearGradient(0, hz, 0, W.y1); sea.addColorStop(0, '#3390cf'); sea.addColorStop(1, '#5cb8ea'); ctx.fillStyle = sea; ctx.fillRect(W.x0, hz, w, W.y1 - hz);
+    // a sailboat bobbing along the horizon
+    const bx = W.x0 + ((t * 9) % (w + 30)) - 15, by = hz + 1 + Math.sin(t * 2) * 0.8;
+    ctx.fillStyle = '#fff8ee'; ctx.fillRect(bx - 6, by - 2, 12, 3); ctx.fillStyle = '#ff8fab'; ctx.beginPath(); ctx.moveTo(bx, by - 3); ctx.lineTo(bx, by - 13); ctx.lineTo(bx + 6, by - 3); ctx.closePath(); ctx.fill();
+    // three rows of waves rolling toward the hut, the front one breaking white onto the sand
+    for (let row = 0; row < 3; row++) {
+      const y = hz + 6 + row * 7, sp = 10 + row * 6;
+      ctx.strokeStyle = `rgba(255,255,255,${(0.45 + row * 0.15).toFixed(2)})`; ctx.lineWidth = 1.5 + row * 0.5;
+      for (let x = W.x0 - 20 + ((t * sp + row * 9) % 22); x < W.x1 + 10; x += 22) { ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + 5, y - 3, x + 10, y); ctx.stroke(); }
+    }
+    const surf = W.y1 - 7 + Math.sin(t * 1.3) * 2;
+    ctx.fillStyle = '#f2dea2'; ctx.fillRect(W.x0, surf + 3, w, 10);
+    ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.beginPath(); ctx.moveTo(W.x0, surf + 4);
+    for (let x = W.x0; x <= W.x1; x += 8) ctx.lineTo(x, surf + 1 + Math.sin(x * 0.3 + t * 3) * 1.5);
+    ctx.lineTo(W.x1, surf + 5); ctx.lineTo(W.x0, surf + 5); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = '#a66a2c'; ctx.fillRect((W.x0 + W.x1) / 2 - 2, W.y0, 4, h);   // the middle bar
+    // the coconut lamp's warm glow and the fan's shadow turning on the floor
+    const L = R.LAMP; ctx.fillStyle = `rgba(255,224,138,${(0.16 + Math.sin(t * 2) * 0.03).toFixed(3)})`; ctx.beginPath(); ctx.arc(L.x, L.y - 14, 26, 0, Math.PI * 2); ctx.fill();
+    const F = R.FAN, a = t * 3.2;
+    ctx.fillStyle = 'rgba(0,0,0,0.06)';
+    for (let k = 0; k < 5; k++) { const q = a + (k / 5) * Math.PI * 2; ctx.save(); ctx.translate(F.x + 6, F.y + 96); ctx.scale(1, 0.45); ctx.rotate(q); ctx.beginPath(); ctx.ellipse(F.r * 0.55, 0, F.r * 0.45, 9, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
+  },
+  // the ceiling fan, high up: five rattan blades turning round a wooden hub
+  drawFan(r, g, R) {
+    const ctx = r.ctx, F = R.FAN, a = g.time * 3.2;
+    ctx.save(); ctx.globalAlpha = 0.92;
+    for (let k = 0; k < 5; k++) {
+      const q = a + (k / 5) * Math.PI * 2;
+      ctx.save(); ctx.translate(F.x, F.y); ctx.scale(1, 0.42); ctx.rotate(q);
+      ctx.fillStyle = k % 2 ? '#c99a62' : '#d9b27c'; ctx.beginPath(); ctx.ellipse(F.r * 0.55, 0, F.r * 0.45, 10, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(107,74,43,0.45)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(6, 0); ctx.lineTo(F.r * 0.98, 0); ctx.stroke();
+      ctx.restore();
+    }
+    ctx.fillStyle = '#6b4a2b'; ctx.beginPath(); ctx.ellipse(F.x, F.y, 10, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#8d5a2b'; ctx.fillRect(F.x - 2.5, F.y - 30, 5, 26);   // the rod up to the ceiling
+    ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.arc(F.x, F.y + 4, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  },
+  // asleep in bed: the blanket pulled up to the chin, rising with each breath, eyes closed, a nightcap on
+  drawTuckedIn(r, g, R) {
+    const ctx = r.ctx, B = R.BED, p = g.player, x = p.x, y = p.y, t = g.time, br = Math.sin(t * 2.4) * 1.2;
+    this.blanket(ctx, B.x0 + 4, y - 26 - br, B.x1 - 4, B.y1 - 6);
+    ctx.fillStyle = 'rgba(0,0,0,0.08)'; ctx.beginPath(); ctx.ellipse(x, y + 4, 18, 22, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(x, y - 38, 2.6, 0, Math.PI * 2); ctx.arc(x + 6, y - 38, 2.6, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y - 39, 2.4, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke(); ctx.beginPath(); ctx.arc(x + 6, y - 39, 2.4, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke();
+    ctx.fillStyle = '#41b883'; ctx.beginPath(); ctx.moveTo(x - 13, y - 44); ctx.lineTo(x + 13, y - 44); ctx.quadraticCurveTo(x + 14, y - 60, x + 24, y - 66); ctx.quadraticCurveTo(x + 2, y - 62, x - 13, y - 44); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#fff'; U.roundRect(ctx, x - 14, y - 47, 28, 6, 3); ctx.fill(); ctx.beginPath(); ctx.arc(x + 24, y - 66, 4, 0, Math.PI * 2); ctx.fill();
+  },
+  // the mosquito net: tied up in a bundle under its hoop by day; let down round the whole bed for the night
+  drawNet(r, g, R) {
+    const ctx = r.ctx, B = R.BED, cx = (B.x0 + B.x1) / 2, n = this.st.nap, down = n && n.phase === 'sleep' ? Math.min(1, n.t / 0.4) : 0, sway = Math.sin(g.time * 1.3) * 2;
+    ctx.save();
+    if (down > 0) {
+      const bot = 4040 + (B.y1 + 4 - 4040) * down;
+      ctx.fillStyle = 'rgba(255,255,255,0.28)'; ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(cx - 26, 4040); ctx.lineTo(B.x0 - 6 + sway, bot); ctx.quadraticCurveTo(cx, bot + 8, B.x1 + 6 + sway, bot); ctx.lineTo(cx + 26, 4040); ctx.closePath(); ctx.fill(); ctx.stroke();
+      for (let k = 1; k < 8; k++) { const q = k / 8; ctx.beginPath(); ctx.moveTo(cx - 26 + 52 * q, 4040); ctx.lineTo(B.x0 - 6 + sway + (B.x1 - B.x0 + 12) * q, bot + Math.sin(q * Math.PI) * 6); ctx.stroke(); }
+    } else {
+      // gathered: two soft swags to the bedposts and a knot hanging under the hoop
+      ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.strokeStyle = 'rgba(200,210,220,0.9)'; ctx.lineWidth = 1;
+      for (const d of [-1, 1]) { ctx.beginPath(); ctx.moveTo(cx + d * 22, 4042); ctx.quadraticCurveTo(cx + d * 40, 4070 + sway, cx + d * 60, 4104); ctx.lineTo(cx + d * 52, 4108); ctx.quadraticCurveTo(cx + d * 30, 4076 + sway, cx + d * 12, 4046); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+      ctx.beginPath(); ctx.ellipse(cx, 4052 + sway * 0.5, 10, 14, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#ff8fab'; ctx.fillRect(cx - 9, 4050 + sway * 0.5, 18, 3);
+    }
+    ctx.restore();
+  },
+  // the night of the sleep: a starry sky and a moon over a dark sea, waves rolling in, Zzz drifting up
+  drawSleepNight(r, g, W, H, a) {
+    const ctx = r.ctx, t = this.st.nap.t;
+    ctx.save(); ctx.globalAlpha = a;
+    const sky = ctx.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#0d1440'); sky.addColorStop(0.62, '#2a3a7a'); ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+    for (let i = 0; i < 46; i++) { const sx = ((i * 157) % 100) / 100 * W, sy = ((i * 83) % 100) / 100 * H * 0.6, tw = 0.5 + 0.5 * Math.sin(t * 3 + i * 1.7); ctx.fillStyle = `rgba(255,255,255,${(0.3 + 0.6 * tw).toFixed(2)})`; ctx.beginPath(); ctx.arc(sx, sy, 1 + tw * 1.4, 0, Math.PI * 2); ctx.fill(); }
+    const mx = W * 0.2, my = H * 0.22, mr = Math.min(W, H) * 0.05 + 8;
+    ctx.fillStyle = '#fff7c2'; ctx.beginPath(); ctx.arc(mx, my, mr, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#162053'; ctx.beginPath(); ctx.arc(mx - mr * 0.45, my - mr * 0.2, mr * 0.9, 0, Math.PI * 2); ctx.fill();   // the sky's colour there: a crescent
+    // the sea, the moon's glitter on it, rows of waves rolling in and a pale beach at the bottom
+    const sy = H * 0.62, sea = ctx.createLinearGradient(0, sy, 0, H); sea.addColorStop(0, '#16306a'); sea.addColorStop(1, '#24508e'); ctx.fillStyle = sea; ctx.fillRect(0, sy, W, H - sy);
+    ctx.fillStyle = 'rgba(255,247,194,0.5)'; for (let k = 0; k < 7; k++) { const gy = sy + 8 + k * 10, gw = 30 - k * 3 + Math.sin(t * 4 + k) * 6; ctx.fillRect(mx - gw / 2 + Math.sin(t * 2 + k) * 4, gy, gw, 2); }
+    for (let row = 0; row < 5; row++) {
+      const y = sy + 18 + row * ((H - sy) / 6), amp = 3 + row * 1.2, sp = 30 + row * 14;
+      ctx.strokeStyle = `rgba(200,225,255,${(0.25 + row * 0.1).toFixed(2)})`; ctx.lineWidth = 2 + row * 0.4; ctx.beginPath();
+      for (let x = -20; x <= W + 20; x += 14) { const yy = y + Math.sin((x - t * sp) * 0.03 + row) * amp; if (x === -20) ctx.moveTo(x, yy); else ctx.lineTo(x, yy); }
+      ctx.stroke();
+    }
+    const by = H - 26 + Math.sin(t * 1.4) * 4;
+    ctx.fillStyle = '#c9b98a'; ctx.fillRect(0, by + 6, W, H - by);
+    ctx.fillStyle = 'rgba(230,240,255,0.7)'; ctx.beginPath(); ctx.moveTo(0, by + 8); for (let x = 0; x <= W; x += 12) ctx.lineTo(x, by + 3 + Math.sin(x * 0.08 + t * 3) * 2); ctx.lineTo(W, by + 10); ctx.lineTo(0, by + 10); ctx.closePath(); ctx.fill();
+    // big soft Zzz floating up between the words and the sea
+    ctx.fillStyle = '#dfe8ff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let k = 0; k < 3; k++) {
+      const ph = (t * 0.45 + k / 3) % 1;
+      ctx.globalAlpha = a * Math.sin(ph * Math.PI); ctx.font = r.font(22 + k * 9);
+      ctx.fillText('Z', W * 0.5 - 30 + k * 30 + ph * 26, H * 0.58 - ph * H * 0.16 - k * 6);
+    }
+    ctx.globalAlpha = a; ctx.fillStyle = '#fff8ee'; ctx.font = r.font(Math.min(30, W / 13));
+    ctx.fillText('😴 Zzz… sleep tight!', W / 2, H * 0.3);
+    ctx.restore();
+  },
+  // morning: a warm sunrise glow that fades away as the chef hops out of bed
+  drawDawn(r, g, W, H, a) {
+    const ctx = r.ctx;
+    ctx.save(); ctx.globalAlpha = a * 0.85;
+    const gr = ctx.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#ffd166'); gr.addColorStop(0.6, '#ff9f43'); gr.addColorStop(1, '#ff8fab'); ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#fff7c2'; ctx.beginPath(); ctx.arc(W / 2, H * 0.62 + (1 - a) * 40, Math.min(W, H) * 0.12, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = a; ctx.fillStyle = '#7a3b12'; ctx.font = r.font(Math.min(32, W / 12)); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('Good morning! 🌅', W / 2, H * 0.36);
+    ctx.restore();
+  },
+
   // ---------- live art ----------
   drawOutside(r, g, col) {
     const k = this.room(g), ctx = r.ctx, W = CFG.ISLE_IN.ROOMS[k].WORLD, x0 = r.camX - 20, y0 = r.camY - 20, x1 = r.camX + r.viewW + 20, y1 = r.camY + r.viewH + 20;
     ctx.fillStyle = col;
-    if (y0 < W.y0) ctx.fillRect(x0, y0, x1 - x0, W.y0 - y0);
-    if (y1 > W.y1) ctx.fillRect(x0, W.y1, x1 - x0, y1 - W.y1);
-    if (x0 < W.x0) ctx.fillRect(x0, W.y0, W.x0 - x0, W.y1 - W.y0);
-    if (x1 > W.x1) ctx.fillRect(W.x1, W.y0, x1 - W.x1, W.y1 - W.y0);
+    // (each band reaches 2 px into the map, which is the same colour there, so no hairline shows at the seam)
+    if (y0 < W.y0) ctx.fillRect(x0, y0, x1 - x0, W.y0 - y0 + 2);
+    if (y1 > W.y1) ctx.fillRect(x0, W.y1 - 2, x1 - x0, y1 - W.y1 + 2);
+    if (x0 < W.x0) ctx.fillRect(x0, W.y0, W.x0 - x0 + 2, W.y1 - W.y0);
+    if (x1 > W.x1) ctx.fillRect(W.x1 - 2, W.y0, x1 - W.x1 + 2, W.y1 - W.y0);
   },
   dynamic(r, g) {
     if (!this.st) return;
     const k = this.room(g); if (!k) return;
     const ctx = r.ctx, t = g.time, st = this.st, R = CFG.ISLE_IN.ROOMS[k];
-    this.drawOutside(r, g, { lighthouse: st.up ? '#79c6f2' : '#2d3a4a', crabshack: '#2b4a5c', coconuthut: '#2e5a3a', missionctl: '#141a2e' }[k]);
+    this.drawOutside(r, g, { lighthouse: st.up ? '#79c6f2' : '#2d3a4a', crabshack: '#2b4a5c', coconuthut: '#2e5a3a', missionctl: '#141a2e', beachhut: '#2e6f8e' }[k]);
     if (k === 'lighthouse' && st.up) {
       // waves and a gull outside the panes
       ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 2; for (let i = 0; i < 7; i++) { const x = R.ROOM.x0 + ((i * 83 + t * 14) % (R.ROOM.x1 - R.ROOM.x0)), y = 4070 + (i % 3) * 8; ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + 5, y - 3, x + 10, y); ctx.stroke(); }
@@ -654,6 +944,7 @@ const IslandsInsideExt = {
     }
     if (k === 'crabshack') this.drawTank(r, g, R);
     if (k === 'missionctl') this.drawScreen(r, g, R);
+    if (k === 'beachhut') this.drawBeachLive(r, g, R);
   },
   // the crab tank: water, sand, seaweed, bubbles and three crabs (they wave both claws when you wave)
   drawTank(r, g, R) {
@@ -718,11 +1009,15 @@ const IslandsInsideExt = {
       for (const tb of R.TABLES) items.push({ y: tb.y + 14, draw: () => this.drawTable(r, g, tb) });
       items.push({ y: R.JUKEBOX.y1, draw: () => this.drawJukeLights(r, g, R) });
     } else if (k === 'coconuthut') {
-      R.HAMMOCKS.forEach((h, i) => items.push({ y: h.y + 8, draw: () => this.drawHammock(r, g, h, i) }));
+      R.HAMMOCKS.forEach((h, i) => items.push({ y: h.y + 8, draw: () => this.drawHammock(r, g, h, i, R) }));
       items.push({ y: R.OWNER.y, draw: () => r.drawPerson(R.OWNER.x + Math.sin(t * 0.8) * 30, R.OWNER.y, { shirt: '#ff8fab', skin: '#8d5524', hair: '#2b1d14', hairStyle: 1, facing: 1, moving: false, bob: 0, carry: 0, pants: '#41b883' }) });
       items.push({ y: R.BAR.y1, draw: () => this.drawBar(r, g, R) });
       items.push({ y: R.UKE.y + 16, draw: () => this.drawUke(r, g, R) });
       items.push({ y: R.ROOM.y0 - 30, draw: () => this.drawMasks(r, g, R) });
+    } else if (k === 'beachhut') {
+      R.HAMMOCKS.forEach((h, i) => items.push({ y: h.y + 8, draw: () => this.drawHammock(r, g, h, i, R) }));
+      if (st.nap && st.nap.phase === 'sleep') items.push({ y: R.BED.y1 + 1, draw: () => this.drawTuckedIn(r, g, R) });
+      items.push({ y: R.BED.y1 + 2, draw: () => this.drawNet(r, g, R) });
     } else if (k === 'missionctl') {
       R.DESKS.forEach((d, i) => { items.push({ y: d.y - 14, draw: () => this.drawOperator(r, g, d, i) }); items.push({ y: d.y + 16, draw: () => this.drawDesk(r, g, d, i, R) }); });
       items.push({ y: R.BUTTON.y + 14, draw: () => this.drawButton(r, g, R) });
@@ -814,8 +1109,8 @@ const IslandsInsideExt = {
     if (on) { ctx.fillStyle = `rgba(255,224,138,${(0.15 + 0.1 * Math.sin(t * 8)).toFixed(2)})`; ctx.beginPath(); ctx.arc((J.x0 + J.x1) / 2, J.y0 + 30, 44, 0, Math.PI * 2); ctx.fill(); }
   },
   // a hammock: a striped cloth sagging between the two posts; with the chef in it, it hugs him and sways
-  drawHammock(r, g, h, i) {
-    const ctx = r.ctx, R = CFG.ISLE_IN.ROOMS.coconuthut, st = this.st, lying = st.lie && st.lie.i === i, sw = lying ? Math.sin(st.lie.t * 1.6) * 5 : Math.sin(g.time * 0.9 + i) * 1.5;
+  drawHammock(r, g, h, i, R) {
+    const ctx = r.ctx, st = this.st, lying = st.lie && st.lie.i === i, sw = lying ? Math.sin(st.lie.t * 1.6) * 5 : Math.sin(g.time * 0.9 + i) * 1.5;
     const x0 = h.x - R.HALF + 16, x1 = h.x + R.HALF - 16, ytop = h.y - 36;
     // the cloth's top and bottom edges, as curves through the middle at these heights (a quadratic's control
     // point sits at twice the middle height minus the ends)
@@ -823,7 +1118,7 @@ const IslandsInsideExt = {
     ctx.strokeStyle = '#d9b27c'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x0 - 16, ytop - 6); ctx.lineTo(x0, ytop); ctx.moveTo(x1 + 16, ytop - 6); ctx.lineTo(x1, ytop); ctx.stroke();
     ctx.save();
     ctx.beginPath(); ctx.moveTo(x0, ytop); ctx.quadraticCurveTo(h.x + sw, cBot, x1, ytop); ctx.quadraticCurveTo(h.x + sw, cTop, x0, ytop); ctx.closePath(); ctx.clip();
-    const cols = i ? ['#ff8fab', '#fff', '#3b7dd8'] : ['#41b883', '#fff', '#ffd166'];
+    const cols = h.cols || (i ? ['#ff8fab', '#fff', '#3b7dd8'] : ['#41b883', '#fff', '#ffd166']);
     for (let k = 0; k < 14; k++) { ctx.fillStyle = cols[k % 3]; ctx.fillRect(x0 + k * 8, ytop - 4, 8, cBot - ytop + 8); }
     ctx.fillStyle = 'rgba(0,0,0,0.08)'; ctx.fillRect(x0, midTop + 6, x1 - x0, 60);
     ctx.restore();
@@ -909,6 +1204,7 @@ const IslandsInsideExt = {
     if (!this.st) return;
     const k = this.room(g); if (!k) return;
     const ctx = r.ctx, st = this.st, t = g.time;
+    if (k === 'beachhut') this.drawFan(r, g, CFG.ISLE_IN.ROOMS.beachhut);
     if (k === 'lighthouse' && st.up) {
       // the beams: two bright wedges sweeping round the room from the lamp
       const L = CFG.ISLE_IN.ROOMS.lighthouse.LAMP, a = t * 1.1, A = CFG.ISLE_IN.ROOMS.lighthouse.ROOM;
@@ -934,6 +1230,7 @@ const IslandsInsideExt = {
     const ctx = r.ctx, W = r.canvas.width / r.dpr, H = r.canvas.height / r.dpr, st = this.st;
     if (g.area === 'lighthouse' && st.climb) this.drawClimb(r, g, W, H);
     else if (g.area === 'lighthouse' && st.viewing) this.drawView(r, g, W, H);
+    else if (g.area === 'beachhut' && st.nap) { const n = this.nightAlpha(), d = this.dawnAlpha(); if (n > 0) this.drawSleepNight(r, g, W, H, n); if (d > 0) this.drawDawn(r, g, W, H, d); }
     if (st.fade > 0) { ctx.fillStyle = `rgba(20,12,6,${(st.fade / CFG.ISLE_IN.FADE).toFixed(3)})`; ctx.fillRect(0, 0, W, H); }
   },
   // climbing the spiral: a cut-away of the tower with the chef going round and round, up or down

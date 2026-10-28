@@ -46,7 +46,10 @@ module.exports = async (t) => {
   console.log('   pizza coins per map: ' + JSON.stringify(spots.per));
   t.expectEq(spots.bad.length, 0, `every pizza coin on free floor:\n     ${spots.bad.join('\n     ')}`);
   t.expect(spots.n >= 20 && spots.n <= 30, `20–30 coins (${spots.n})`);
-  for (const a of ['town', 'site', 'city', 'islands']) t.expect(spots.per[a] >= 3 && spots.per[a] <= 6, `3–6 coins in ${a} (${spots.per[a]})`);
+  for (const a of ['town', 'site', 'city']) t.expect(spots.per[a] >= 3 && spots.per[a] <= 6, `3–6 coins in ${a} (${spots.per[a]})`);
+  // the Islands' three coins are hidden inside island buildings, none lie out on the Islands map itself
+  t.expect(['crabshack', 'coconuthut', 'missionctl'].every((a) => spots.per[a] === 1) && !spots.per.islands, `one coin in each of three island buildings, none outside (${JSON.stringify(spots.per)})`);
+  t.expect(await t.ev(() => ['crabshack', 'coconuthut', 'missionctl'].every((a) => !!CFG.PIZZACOINS.PLACES[a])), 'the island buildings have friendly names in the panel');
   t.expect(Object.keys(spots.per).length >= 15, `spread over many places (${Object.keys(spots.per).length})`);
 
   // ---- the badge: under the cash pill, clear of the cash, the shop name and the hint, at phone widths too
@@ -148,7 +151,7 @@ module.exports = async (t) => {
   const row = (a) => (panel.rows.find((r) => r.area === a) || {}).text;
   t.expect(/Bakery/.test(row('bakery')) && /✅ 1 \/ 1/.test(row('bakery')), `bakery row: ${row('bakery')}`);
   t.expect(/City/.test(row('city')) && / 1 \/ 3$/.test(row('city')), `city row: ${row('city')}`);
-  t.expect(/^❔ \?\?\? 0 \/ \d+$/.test(row('islands')), `unvisited islands row is ???: ${row('islands')}`);
+  t.expect(/^❔ \?\?\? 0 \/ \d+$/.test(row('crabshack')), `unvisited Crab Shack row is ???: ${row('crabshack')}`);
   await t.shot('panel');
   await t.page.setViewportSize({ width: 390, height: 844 });
   await t.wait(300);

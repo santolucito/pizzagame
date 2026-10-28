@@ -3,7 +3,8 @@
 // pier to Treasure Isle and Rocket Island on foot (a flood fill over the map's obstacles), volleyball, the shaved-ice
 // kiosk, the tide pools; Rocket Island's workers and the ask-about-the-rocket bubble with its countdown; every
 // interior (door label and hint, inside, the main thing to do, out again, a rescue from a wall, Take-me-home); the
-// huts still take pizza deliveries at their doors. Screenshots at desktop and phone size.
+// huts still take pizza deliveries at their doors. The marina's sailboats can be sailed (water only, docking only by
+// the shore) and the beach hut on Sunny Beach has a bed to sleep in. Screenshots at desktop and phone size.
 module.exports = async (t) => {
   await t.boot();
   // until the coordinator wires the new files into index.html, load them into the booted page (after js/islands.js)
@@ -17,7 +18,7 @@ module.exports = async (t) => {
   await t.ev(() => T.step(2));
   const reg = await t.ev(() => ({
     inside: typeof IslandsInsideExt !== 'undefined', rocket: typeof RocketExt !== 'undefined',
-    areas: ['lighthouse', 'crabshack', 'coconuthut', 'missionctl'].every((a) => !!CFG.AREAS[a]),
+    areas: ['lighthouse', 'crabshack', 'coconuthut', 'missionctl', 'beachhut'].every((a) => !!CFG.AREAS[a]),
     order: Game.ext.indexOf(IslandsInsideExt) < Game.ext.indexOf(CityExt) && Game.ext.indexOf(RocketExt) < Game.ext.indexOf(CityExt) && Game.ext.indexOf(IslandsInsideExt) < Game.ext.indexOf(IslandsExt),
     render: Render.ext.includes(IslandsInsideExt) && Render.ext.includes(RocketExt),
     world: CFG.AREAS.islands.WORLD,
@@ -26,7 +27,7 @@ module.exports = async (t) => {
   t.expect(reg.order, 'the interiors and the rocket answer before the City and the islands');
   t.expect(reg.world.x0 >= 2600 && reg.world.x1 <= 4600 && reg.world.y1 > 2600 && reg.world.y1 <= 2950, `the Islands map grew south within its limits ${JSON.stringify(reg.world)}`);
   const rects = await t.ev(() => Object.keys(CFG.ISLE_IN.ROOMS).map((k) => [k, CFG.AREAS[k].WORLD]));
-  const want = { lighthouse: 6000, crabshack: 7000, coconuthut: 8000, missionctl: 9000 };
+  const want = { lighthouse: 6000, crabshack: 7000, coconuthut: 8000, missionctl: 9000, beachhut: 10000 };
   for (const [k, W] of rects) t.expect(W.x0 === want[k] && W.x1 - W.x0 === 600 && W.y0 === 4000 && W.y1 === 4400, `${k} sits in its reserved rectangle`);
 
   // ---- the ferry over
@@ -53,7 +54,7 @@ module.exports = async (t) => {
     const spots = {
       start: A, sunny: mid(isle('sunny')), cove: { x: 3550, y: 2730 }, rocket: { x: 4000, y: 2760 }, treasure: { x: 3640, y: 2340 },
       court: I.SUNNY.PLAYERS[0], kiosk: I.SUNNY.PAD, pool: { x: I.COVE.POOLS[0].x, y: I.COVE.POOLS[0].y + I.COVE.POOLS[0].ry + 20 },
-      ask: R.ASK, missionDoor: { x: M.x, y: M.y + M.h / 2 + 20 },
+      ask: R.ASK, missionDoor: { x: M.x, y: M.y + M.h / 2 + 20 }, beachHutDoor: I.BEACHHUT.door,
     };
     const out = {}; for (const [k, s] of Object.entries(spots)) out[k] = reach(s.x, s.y);
     out.crabDoorNeedsJetski = !reach(isle('crab').hut.x, isle('crab').hut.y + 54);
@@ -119,36 +120,73 @@ module.exports = async (t) => {
   t.expect(pool.peek && pool.floats.includes('A starfish! ⭐'), 'a starfish pops up in the pool');
   await t.shot('cove');
 
-  // ---- Rocket Island: workers at work, the ask-about-the-rocket bubble and its countdown
-  const rk = await t.ev(() => {
-    const A = CFG.ISLANDS.ROCKET.ASK; T.tp(A.x - 150, A.y, 'islands'); T.step(2);
-    const far = T.hint();
-    const before = RocketExt.st.workers.map((w) => [w.x, w.y, w.z]);
-    T.step(150);
-    const after = RocketExt.st.workers.map((w) => [w.x, w.y, w.z]);
-    const moved = before.filter((b, i) => Math.hypot(b[0] - after[i][0], b[1] - after[i][1], b[2] - after[i][2]) > 4).length;
-    const climber = RocketExt.st.workers.find((w) => w.role === 'climb'); T.until(() => climber.z > 40, 600);
-    const welding = RocketExt.st.workers.some((w) => w.weld) ? (T.step(10), RocketExt.st.sparks.length) : -1;
-    T.tp(A.x, A.y, 'islands'); T.step(2);
-    const label = T.label(), hint = T.hint();
-    T.act(); const line1 = RocketExt.st.ask && RocketExt.st.ask.line, who = !!(RocketExt.st.ask && RocketExt.st.ask.who);
-    const floats = []; for (let i = 0; i < 200; i++) { T.step(1); for (const f of Game.floats) if (!floats.includes(f.text)) floats.push(f.text); }
-    T.act(); const line2 = RocketExt.st.ask && RocketExt.st.ask.line;
-    return { far, moved, climbed: climber.z, welding, label, hint, line1, who, floats, line2, sparks: RocketExt.st.sparks.length };
+  // ---- the marina's sailboats: board from the pier, sail (only ever on water), docking refused at sea, allowed by the pier
+  const board = await t.ev(() => {
+    const b = IslandsExt.rt.boats[0], L = CFG.ISLANDS.LINKS.find((l) => l.key === 'pier');
+    T.tp((L.x0 + L.x1) / 2, b.y, 'islands'); T.step(2);
+    const out = { hint: T.hint(), near: Game.nearVehicle === b, label: CFG.VEHICLES.sailboat.label, exit: CFG.VEHICLES.sailboat.exit, inList: Game.vehicles().includes(b), spec: CFG.VEHICLES.sailboat };
+    out.btn = (document.querySelector('#btn-car') || {}).textContent;
+    Game.enterCar(); T.step(1);
+    out.driving = Game.driving && Game.vehicle === b; out.btn2 = (document.querySelector('#btn-car') || {}).textContent;
+    return out;
   });
-  t.expectEq(rk.far, 'A real rocket! 🚀', 'the rocket hint near the pad');
-  t.expect(rk.moved >= 2, `the workers walk and climb (${rk.moved} moved)`);
-  t.expect(rk.climbed > 40, 'a worker climbed the scaffold ladder');
-  t.expect(rk.welding !== 0, 'welding throws sparks');
-  t.expectEq(rk.label, '🚀 Ask about the rocket', 'ask label in front of the rocket');
-  t.expectEq(rk.hint, 'Ask the workers about the rocket! 🚀', 'ask hint in front of the rocket');
-  t.expect(rk.line1 === 'Almost ready!' && rk.who, 'a worker answers in a bubble');
-  t.expect(rk.floats.includes('3…') && rk.floats.includes('1…') && rk.floats.includes('🚧 Not yet! Coming soon!'), `the countdown float runs and nothing launches: ${JSON.stringify(rk.floats)}`);
-  t.expectEq(rk.line2, 'Blast-off soon!', 'the next answer is a different line');
-  t.expect(await t.ev(() => Game.area === 'islands' && !Game.travel), 'no new place to travel to: still on the Islands');
-  const wave = await t.ev(() => { const b = RocketExt.st.workers.find((w) => w.role === 'boss'); b.waveCd = 0; T.tp(b.x + 40, b.y + 30, 'islands'); T.step(2); return b.wave > 0; });
-  t.expect(wave, 'a worker waves when the chef walks by');
+  t.expectEq(board.hint, 'Go sailing! ⛵', 'hint by a moored sailboat');
+  t.expect(board.near && board.inList, 'the moored sailboat is a vehicle the chef can board from the pier');
+  t.expect(board.label === '⛵ Sail' && board.exit === '⚓ Dock' && board.spec.speed >= 150 && board.spec.speed <= 210 && board.spec.radius >= 20 && !board.spec.flies, `sailboat spec ${JSON.stringify(board.spec)}`);
+  t.expect(board.driving, 'aboard the sailboat');
+  const sail = await t.ev(() => {
+    const b = IslandsExt.rt.boats[0], I = CFG.ISLANDS;
+    const onLand = () => I.ISLANDS.some((s) => b.x > s.x0 + 8 && b.x < s.x1 - 8 && b.y > s.y0 + 8 && b.y < s.y1 - 8) || I.LINKS.some((L) => b.x > L.x0 && b.x < L.x1 && b.y > L.y0 && b.y < L.y1);
+    const x0 = b.x, y0 = b.y; let land = 0, maxFill = 0, maxLean = 0, far = 0;
+    // west along the channel, then wiggle about (turning leans the sail), then try to sail straight onto Sunny Beach and Starfish Cove
+    const legs = [[-1, 0, 100], [-0.7, -0.7, 40], [0.7, -0.7, 40], [-1, 0.2, 60], [0, 1, 120], [1, 0, 120], [0, -1, 60], [1, 0.3, 140]];
+    const path = [];
+    for (const [ax, ay, n] of legs) { T.steer(ax, ay); for (let i = 0; i < n; i++) { T.step(1); if (onLand()) land++; far = Math.max(far, Math.hypot(b.x - x0, b.y - y0)); maxFill = Math.max(maxFill, b.fill); maxLean = Math.max(maxLean, Math.abs(b.lean)); } path.push([Math.round(b.x), Math.round(b.y)]); }
+    T.unsteer(); T.step(20);
+    return { moved: far, land, maxFill, maxLean, path, wake: IslandsExt.rt.wake.length, driving: Game.driving && Game.vehicle === b, hint: T.hint() };
+  });
+  t.expect(sail.driving && sail.moved > 150, `the sailboat sails across the water (${Math.round(sail.moved)} px out from the marina: ${JSON.stringify(sail.path)})`);
+  t.expectEq(sail.land, 0, 'the sailboat never goes onto land');
+  t.expect(sail.maxFill > 0.8 && sail.maxLean > 0.15, `the sail fills (${sail.maxFill.toFixed(2)}) and leans in the turns (${sail.maxLean.toFixed(2)})`);
+  // out in the open water: '⚓ Dock' is refused and the chef stays aboard
+  const atSea = await t.ev(() => {
+    const b = IslandsExt.rt.boats[0]; b.x = 3330; b.y = 2520; b.vx = 0; b.vy = 0; Game.player.x = b.x; Game.player.y = b.y; T.step(12);
+    const hint = T.hint();
+    UI.toggleCar(); T.step(2);
+    return { hint, aboard: Game.driving && Game.vehicle === b, at: Math.hypot(Game.player.x - b.x, Game.player.y - b.y), floats: Game.floats.map((f) => f.text) };
+  });
+  t.expectEq(atSea.hint, 'Sailing! ⛵ Sail to a beach or the pier', 'sailing hint at sea');
+  t.expect(atSea.aboard && atSea.at < 1, 'docking at sea is refused: still aboard');
+  t.expect(atSea.floats.includes('Sail to the shore to get off! ⛵'), 'refusal float');
+  await t.ev(() => { Render.setZoom(1.3); const b = IslandsExt.rt.boats[0]; T.steer(1, -0.25); T.step(40); T.unsteer(); T.step(2); Game.cameraSnap = true; });
+  await t.shot('sailing');
+  await t.page.setViewportSize({ width: 390, height: 844 });
+  await t.ev(() => { Render.resize(); T.steer(1, 0.2); T.step(20); T.unsteer(); T.step(4); });
+  await t.shot('sailing-phone');
+  await t.page.setViewportSize({ width: 1100, height: 720 });
+  await t.ev(() => { Render.resize(); Render.setZoom(1); T.step(1); });
+  // sail back to the pier: now docking is allowed, the chef steps onto free ground and the boat stays where it was left
+  const docked = await t.ev(() => {
+    const b = IslandsExt.rt.boats[0], L = CFG.ISLANDS.LINKS.find((l) => l.key === 'pier');
+    b.x = L.x0 - 140; b.y = 2520; b.vx = 0; b.vy = 0;
+    T.steer(1, 0); T.until(() => b.vx === 0 && b.x > L.x0 - 40, 300); T.unsteer(); T.step(20);
+    const hint = T.hint();
+    UI.toggleCar(); T.step(2);
+    const p = Game.player, free = !Game.obstacles().some((o) => Game.hitRect(p.x, p.y, 12, o));
+    const onPier = p.x > L.x0 && p.x < L.x1 && p.y > L.y0 && p.y < L.y1;
+    const at = { x: b.x, y: b.y }; T.step(90);
+    return { hint, off: !Game.driving, free, onPier, stayed: Math.hypot(b.x - at.x, b.y - at.y) < 1, againNear: Game.nearVehicle === b, bx: Math.round(b.x) };
+  });
+  t.expectEq(docked.hint, 'Press ⚓ Dock to hop off here', 'docking hint beside the pier');
+  t.expect(docked.off && docked.free && docked.onPier, `docked at the pier: the chef is on the planks ${JSON.stringify(docked)}`);
+  t.expect(docked.stayed && docked.againNear, 'the boat stays where it was docked, ready to sail again');
+  // the cruising sailboat is still scenery, and the jet ski still swims you ashore
+  t.expect(await t.ev(() => Game.vehicles().filter((v) => v.kind === 'sailboat').length === 2), 'two rideable sailboats (the cruiser stays scenery)');
+
+  // ---- Rocket Island (its rocket, workers, visits and launch are js/rocket.js's, checked in tests/cases/43-rocket.js):
+  // here only that it is there to look at
   await t.ev(() => { const A = CFG.ISLANDS.ROCKET.ASK; T.tp(A.x - 60, A.y + 20, 'islands'); T.step(40); });
+  t.expect(await t.ev(() => Game.area === 'islands' && !Game.travel), 'on Rocket Island');
   await t.shot('rocket');
   await t.page.setViewportSize({ width: 390, height: 844 });
   await t.ev(() => { Render.resize(); const A = CFG.ISLANDS.ROCKET.ASK; T.tp(A.x - 20, A.y, 'islands'); T.step(30); });
@@ -162,7 +200,7 @@ module.exports = async (t) => {
 
   // ---- the interiors, one by one
   const doors = await t.ev(() => CFG.ISLE_IN.DOORS.map((d) => ({ room: d.room, x: d.x, y: d.y, text: d.text })));
-  t.expectEq(doors.length, 5, 'five doors on the Islands (lighthouse tower and cottage, crab shack, coconut hut, mission control)');
+  t.expectEq(doors.length, 6, 'six doors on the Islands (lighthouse tower and cottage, crab shack, coconut hut, mission control, beach hut)');
   const doorCheck = async (i) => t.ev((i) => {
     const d = CFG.ISLE_IN.DOORS[i], R = CFG.ISLE_IN.ROOMS[d.room];
     T.tp(d.x, d.y + 50, 'islands'); T.step(2);
@@ -343,7 +381,7 @@ module.exports = async (t) => {
   await t.ev(() => { const R = CFG.ISLE_IN.ROOMS.missionctl; T.tp(R.BTN_SPOT.x - 60, R.BTN_SPOT.y, 'missionctl'); IslandsInsideExt.pressButton(Game); T.step(30); });
   await t.shot('mission');
   await t.page.setViewportSize({ width: 390, height: 844 });
-  for (const room of ['lighthouse', 'crabshack', 'coconuthut', 'missionctl']) {
+  for (const room of ['lighthouse', 'crabshack', 'coconuthut', 'missionctl', 'beachhut']) {
     await t.ev((room) => { Render.resize(); const R = CFG.ISLE_IN.ROOMS[room]; T.tp(R.EXIT.x, R.EXIT.y - 60, room); T.step(20); }, room);
     await t.shot(room + '-phone');
   }
@@ -352,6 +390,65 @@ module.exports = async (t) => {
   t.expect((await rescueHome('missionctl')).rescued, 'mission control: pushed into the wall, rescued onto the mat');
   const mcOut = await goOut(4);
   t.expect(mcOut.area === 'islands' && mcOut.atDoor, 'out of Mission Control at its door');
+
+  // -- the beach hut on Sunny Beach: a sleep in the bed (a starry night, Zzz, then a fresh morning), the hammock
+  const bh = await doorCheck(5); checkDoor(5, bh);
+  t.expectEq(bh.hint, 'Have a sleep in the cosy bed! 😴', 'first beach hut hint');
+  await t.shot('beachhut');
+  const sleep = await t.ev(() => {
+    const R = CFG.ISLE_IN.ROOMS.beachhut, out = {};
+    if (typeof AtmosphereExt !== 'undefined' && AtmosphereExt.force) AtmosphereExt.force({ phase: 'dusk' });
+    T.tp(R.SLEEP.x, R.SLEEP.y, 'beachhut'); out.label = T.label(); out.hint = T.hint();
+    T.act(); T.step(60);
+    const n = IslandsInsideExt.st.nap; out.phase = n && n.phase; out.during = T.label(); out.zzz = T.hint(); out.night = IslandsInsideExt.nightAlpha();
+    T.steer(1, 0); T.step(20); T.unsteer(); out.stayed = Math.hypot(Game.player.x - R.NAP.x, Game.player.y - R.NAP.y) < 1;
+    return out;
+  });
+  t.expectEq(sleep.label, '😴 Sleep', 'sleep label beside the bed');
+  t.expectEq(sleep.hint, 'Hop into bed for a sleep 😴', 'sleep hint beside the bed');
+  t.expect(sleep.phase === 'sleep' && sleep.during === null && sleep.zzz === 'Zzz… 😴' && sleep.night > 0.9, `asleep: night falls, no button ${JSON.stringify(sleep)}`);
+  t.expect(sleep.stayed, 'the chef stays tucked in while asleep');
+  await t.shot('beachhut-sleeping');
+  // the same moment without the night over the screen: tucked in under the coconut blanket, the net let down
+  await t.ev(() => { window.nightA = IslandsInsideExt.nightAlpha; IslandsInsideExt.nightAlpha = () => 0; T.step(2); });
+  await t.shot('beachhut-tucked');
+  const wake = await t.ev(() => {
+    IslandsInsideExt.nightAlpha = window.nightA;
+    const R = CFG.ISLE_IN.ROOMS.beachhut, floats = [];
+    const n = T.until(() => { for (const f of Game.floats) if (!floats.includes(f.text)) floats.push(f.text); return !IslandsInsideExt.st.nap; }, 600);
+    const atmo = typeof AtmosphereExt !== 'undefined' && AtmosphereExt.st ? AtmosphereExt.st.phase || AtmosphereExt.phase : 'none';
+    const back = Math.hypot(Game.player.x - R.SLEEP.x, Game.player.y - R.SLEEP.y) < 1, label = T.label();
+    T.tp(R.EXIT.x + 20, R.EXIT.y - 60, 'beachhut');
+    return { n, floats, sleeps: Game.s.isleIn.sleeps, back, label, hint: T.hint(), atmo };
+  });
+  t.expect(wake.n > 100 && wake.n < 400, `the night lasts a few seconds (${wake.n} steps)`);
+  t.expect(wake.floats.includes('Good morning! 🌅') && wake.sleeps === 1, `good morning: ${JSON.stringify(wake.floats)}`);
+  t.expect(wake.back && wake.label === '😴 Sleep', 'out of bed again beside it');
+  t.expectEq(wake.hint, 'Swing in the hammock! 🌴', 'next hint: the hammock');
+  const swing = await t.ev(() => {
+    const R = CFG.ISLE_IN.ROOMS.beachhut, h = R.HAMMOCKS[0]; T.tp(h.x, h.y + 28, 'beachhut');
+    const label = T.label(); T.act(); T.step(40); const lying = !!IslandsInsideExt.st.lie, getUp = T.label(), hint = T.hint();
+    T.act(); return { label, lying, getUp, hint, up: !IslandsInsideExt.st.lie && Math.hypot(Game.player.x - h.x, Game.player.y - (h.y + 28)) < 2, swings: Game.s.isleIn.swings, naps: Game.s.isleIn.naps };
+  });
+  t.expect(swing.label === '🌴 Lie in the hammock' && swing.lying && swing.getUp === '🚶 Get up' && swing.up, `the beach hut hammock ${JSON.stringify(swing)}`);
+  t.expect(swing.swings === 1, 'the hammock swing is counted');
+  await t.ev(() => { const R = CFG.ISLE_IN.ROOMS.beachhut; T.tp(R.EXIT.x + 40, R.EXIT.y - 70, 'beachhut'); T.step(20); });
+  t.expect((await rescueHome('beachhut')).rescued, 'beach hut: pushed into the wall, rescued onto the mat');
+  const rescueBed = await t.ev(() => { const R = CFG.ISLE_IN.ROOMS.beachhut, B = R.BED; T.tp((B.x0 + B.x1) / 2, (B.y0 + B.y1) / 2, 'beachhut'); T.step(3); return Math.hypot(Game.player.x - R.EXIT.x, Game.player.y - (R.EXIT.y - 8)) < 2; });
+  t.expect(rescueBed, 'beach hut: a save made in the bed wakes up on the mat');
+  const bhOut = await goOut(5);
+  t.expect(bhOut.label === '🚪 Go outside' && bhOut.area === 'islands' && bhOut.atDoor && bhOut.again === '🚪 Go inside', `out of the beach hut at its door ${JSON.stringify(bhOut)}`);
+  t.expect(await t.ev(() => T.toasts.filter((m) => m === '🌴 Welcome to the Beach Hut!').length === 1), 'the beach hut welcome toast shows once');
+  await t.ev(() => { const d = CFG.ISLANDS.BEACHHUT.door; T.tp(d.x - 30, d.y + 50, 'islands'); Render.setZoom(1.3); T.step(20); });
+  await t.shot('beachhut-outside');
+  await t.page.setViewportSize({ width: 390, height: 844 });
+  await t.ev(() => { Render.resize(); const d = CFG.ISLANDS.BEACHHUT.door; T.tp(d.x, d.y + 40, 'islands'); T.step(20); });
+  await t.shot('beachhut-outside-phone');
+  await t.ev(() => { const R = CFG.ISLE_IN.ROOMS.beachhut; T.tp(R.SLEEP.x, R.SLEEP.y, 'beachhut'); T.act(); T.step(80); });
+  await t.shot('beachhut-sleeping-phone');
+  await t.ev(() => { T.until(() => !IslandsInsideExt.st.nap, 600); Render.setZoom(1); T.step(1); });
+  await t.page.setViewportSize({ width: 1100, height: 720 });
+  await t.ev(() => { Render.resize(); T.step(1); });
 
   // ---- a save made inside a wall, reloaded: rescued onto the mat
   await t.ev(() => { const R = CFG.ISLE_IN.ROOMS.crabshack; Game.area = 'crabshack'; Game.player.x = R.TANK.x0 + 20; Game.player.y = R.TANK.y0 + 20; Game.save(); });
@@ -381,6 +478,13 @@ module.exports = async (t) => {
     return { up, after: IslandsInsideExt.st.up, area: Game.area };
   });
   t.expect(home2.up && !home2.after && home2.area === 'town', 'Take-me-home from the lamp room clears the top floor');
+
+  const home3 = await t.ev(() => {
+    const R = CFG.ISLE_IN.ROOMS.beachhut; T.tp(R.SLEEP.x, R.SLEEP.y, 'beachhut'); T.act(); T.step(60);
+    const asleep = !!IslandsInsideExt.st.nap; Game.goHome(); T.step(2);
+    return { asleep, nap: IslandsInsideExt.st.nap, area: Game.area, hint: IslandsInsideExt.hint(Game) };
+  });
+  t.expect(home3.asleep && !home3.nap && home3.area === 'town' && home3.hint === undefined, 'Take-me-home from the beach hut bed: home, awake');
 
   // ---- the huts still order pizza, and delivering at the door still works
   const del = await t.ev(() => {

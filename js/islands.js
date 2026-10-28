@@ -12,9 +12,13 @@
 // Starfish Cove (tide pools to peek into, a little marina whose pier reaches Treasure Isle) and another rope bridge to
 // Rocket Island (js/rocket.js: a rocket under construction). The huts, the lighthouse and the rocket's mission control
 // can be entered (js/islands-inside.js); both files read their spots from CFG.ISLANDS and load after this one.
+// The two sailboats moored at the marina can be sailed ('⛵ Sail'): they stay on the water, the sail fills and leans as
+// they turn, and '⚓ Dock' only lets the chef off beside a beach or a pier ("Sail to the shore to get off! ⛵"); they stay
+// wherever they were docked (not saved). On Sunny Beach a palm-thatched beach hut with a bed to sleep in (inside: js/islands-inside.js).
 
 CFG.AREAS.islands = { WORLD: { x0: 2600, y0: 1400, x1: 4600, y1: 2950 } };   // y 3000+ belongs to the City's interiors
 CFG.VEHICLES.jetski = { speed: 420, radius: 16, label: '🚤 Ride', exit: '🚶 Hop off' };
+CFG.VEHICLES.sailboat = { speed: 180, radius: 24, label: '⛵ Sail', exit: '⚓ Dock' };
 CFG.ISLANDS = {
   WORLD: CFG.AREAS.islands.WORLD,
   // ---- in town: the river across the whole south edge, the dock behind River House
@@ -52,7 +56,7 @@ CFG.ISLANDS = {
     COURT: { x0: 2740, y0: 2680, x1: 2960, y1: 2810 }, NET: { x: 2850, y0: 2684, y1: 2806 },
     PLAYERS: [{ x: 2786, y: 2745 }, { x: 2914, y: 2745 }], ASIDE: { x: 2770, y: 2836 },   // the left player steps aside here when the chef plays
     KIOSK: { x: 3140, y: 2808, w: 120 }, PAD: { x: 3140, y: 2862 }, PRICE: 3,
-    UMBRELLAS: [[3062, 2640, '#3b7dd8'], [3148, 2630, '#ff8fab']], TOWELS: [[3040, 2662, '#ffd166'], [3124, 2654, '#41b883']],
+    UMBRELLAS: [[2806, 2632, '#3b7dd8'], [3058, 2650, '#ff8fab']], TOWELS: [[2784, 2656, '#ffd166'], [3036, 2672, '#41b883']],
     CASTLE: { x: 2960, y: 2872 }, FLIGHT: 1.05,
   },
   // Starfish Cove: rock-ringed tide pools with things living in them, a marina with two sailboats along the pier
@@ -61,7 +65,10 @@ CFG.ISLANDS = {
     CRITTERS: [['A starfish! ⭐', '⭐'], ['A hermit crab! 🐚', '🐚'], ['A little fish! 🐟', '🐟'], ['A sea snail! 🐌', '🐌'], ['An octopus! 🐙', '🐙']],
     BOATS: [{ x: 3566, y: 2520, hull: '#3b7dd8', sail: '#fff8ee', flag: '#e4572e' }, { x: 3680, y: 2528, hull: '#e4572e', sail: '#ffe08a', flag: '#3b7dd8' }],
     SAIL_LOOP: { x: 2990, y: 1640, rx: 250, ry: 120, period: 70 },   // a sailboat cruising round the open water up north
+    DOCK_R: [40, 52, 64, 76],                                          // how far from a sailboat the chef may step ashore
   },
+  // Sunny Beach's beach hut: (x, y) is the middle of its porch's front edge; the back stands over the shallows
+  BEACHHUT: { x: 3130, y: 2600, door: { x: 3130, y: 2622 } },
   // Rocket Island (js/rocket.js paints and animates it; js/islands-inside.js owns mission control's inside)
   ROCKET: {
     PAD: { x0: 4060, y0: 2630, x1: 4300, y1: 2850 },
@@ -92,7 +99,7 @@ CFG.COINS.push({ x: 2790, y: 2300 }, { x: CFG.ISLANDS.ISLANDS[4].chest.x, y: CFG
 const IslandsExt = {
   name: 'islands',
   defaults: { islands: { standOwned: false, pile: 0, dockPizzas: 0, seen: {}, rally: 0, peeks: 0, snacks: 0 } },
-  rt: null,   // runtime (not saved): huts, jet ski, crabs, dolphin, wake, timers, the volleyball, the tide pools, a treat in hand
+  rt: null,   // runtime (not saved): huts, jet ski, sailboats, crabs, dolphin, wake, timers, the volleyball, the tide pools, a treat in hand
 
   // ======================= game hooks =======================
   build(g) {
@@ -107,7 +114,9 @@ const IslandsExt = {
     this.rt = {
       huts,
       jetski: { kind: 'jetski', x: I.JETSKI.x, y: I.JETSKI.y, angle: -Math.PI / 2, vx: 0, vy: 0 },
-      bakeT: 0, orderT: I.FIRST_ORDER, wasDriving: false, wakeT: 0, wake: [],
+      // the marina's sailboats: rideable, they stay wherever they were docked until the game reloads
+      boats: I.COVE.BOATS.map((B) => ({ kind: 'sailboat', x: B.x, y: B.y, angle: -Math.PI / 2, vx: 0, vy: 0, B, fill: 0, lean: 0, side: 1, pa: -Math.PI / 2 })),
+      bakeT: 0, orderT: I.FIRST_ORDER, lastVeh: null, wakeT: 0, wake: [], dockT: 0, canDock: false,
       crabs: I.CRABS.map(([x0, x1, y], i) => ({ x: U.rand(x0, x1), y, x0, x1, dir: i % 2 ? 1 : -1, t: U.rand(0, 2), pause: 0, step: 0 })),
       dolphin: { t: -U.rand(3, 7), x: 3000, y: 1600, dir: 1 },
       water: null, carObs: null, statics: null, river: null,
@@ -150,12 +159,12 @@ const IslandsExt = {
       if (s.tower) statics.push({ x: s.tower.x - 16, y: s.tower.y - 16, w: 32, h: 22 });
       if (s.chest) statics.push({ x: s.chest.x - 14, y: s.chest.y - 4, w: 28, h: 4 });
     }
-    // Sunny Beach: the net and its posts, the kiosk; Starfish Cove: the tide pools; the moored sailboats
-    const SU = I.SUNNY, K = SU.KIOSK, N = SU.NET;
+    // Sunny Beach: the net and its posts, the kiosk, the beach hut; Starfish Cove: the tide pools
+    const SU = I.SUNNY, K = SU.KIOSK, N = SU.NET, BH = I.BEACHHUT;
     statics.push({ x: N.x - 4, y: N.y0, w: 8, h: N.y1 - N.y0 });
     statics.push({ x: K.x - K.w / 2, y: K.y - 38, w: K.w, h: 60 });
+    statics.push({ x: BH.x - 60, y: BH.y - 110, w: 120, h: 114 });
     for (const P of I.COVE.POOLS) statics.push({ x: P.x - P.rx * 0.8, y: P.y - P.ry * 0.7, w: P.rx * 1.6, h: P.ry * 1.4 });
-    for (const B of I.COVE.BOATS) statics.push({ x: B.x - 14, y: B.y - 36, w: 28, h: 72 });
     rt.statics = statics;
     const S = I.STAND;
     rt.standObs = [{ x: S.x - 58, y: S.y - 46, w: 116, h: 66 }, { x: S.oven.x - 22, y: S.oven.y - 22, w: 44, h: 36 }];
@@ -163,8 +172,20 @@ const IslandsExt = {
     rt.carObs = I.ISLANDS.map((s) => ({ x: s.x0 + 20, y: s.y0 + 20, w: s.x1 - s.x0 - 40, h: s.y1 - s.y0 - 40 }));
     rt.carObs.push({ x: I.DOCK.x0, y: I.DOCK.y0, w: I.DOCK.x1 - I.DOCK.x0, h: I.DOCK.y1 - I.DOCK.y0 });
     rt.carObs.push({ x: I.FERRY.x - 60, y: I.FERRY.y - 24, w: 120, h: 48 });
-    for (const B of I.COVE.BOATS) rt.carObs.push({ x: B.x - 14, y: B.y - 36, w: 28, h: 72 });
+    const hutObs = { x: BH.x - 70, y: BH.y - 112, w: 140, h: 118 };
+    rt.carObs.push(hutObs);
+    // a sailboat stays on the water: every bit of land (as the chef walks it), the sandbar, bridges and pier, the ferry
+    rt.sailObs = land.map((l) => ({ x: l.x0, y: l.y0, w: l.x1 - l.x0, h: l.y1 - l.y0 }));
+    rt.sailObs.push({ x: I.FERRY.x - 60, y: I.FERRY.y - 24, w: 120, h: 48 }, hutObs);
   },
+  // the other boats (and the jet ski) bump a vehicle that is not themselves
+  boatObs(g, self) {
+    const rt = this.rt, out = [];
+    for (const b of rt.boats) if (b !== self) out.push({ x: b.x - 20, y: b.y - 20, w: 40, h: 40 });
+    if (self && self !== rt.jetski) out.push({ x: rt.jetski.x - 16, y: rt.jetski.y - 16, w: 32, h: 32 });
+    return out;
+  },
+  isSail(v) { return !!(v && v.kind === 'sailboat' && this.rt && this.rt.boats.includes(v)); },
 
   // Wide rectangles cut into pieces no wider than `max`: the core pushes a thing that overlaps a
   // rectangle out to its nearest side, so a short piece can never fling it far.
@@ -191,11 +212,11 @@ const IslandsExt = {
       return forCar ? this.rt.river.car : this.rt.river.foot;
     }
     if (g.area !== 'islands' || !this.rt) return [];
-    if (forCar) return this.rt.carObs;
+    if (forCar) { const v = g.driving ? g.vehicle : null; return (this.isSail(v) ? this.rt.sailObs : this.rt.carObs).concat(this.boatObs(g, v)); }
     return g.s.islands.standOwned ? this.rt.water.concat(this.rt.statics, this.rt.standObs) : this.rt.water.concat(this.rt.statics);
   },
 
-  vehicles(g) { return this.rt ? [this.rt.jetski] : []; },
+  vehicles(g) { return this.rt ? [this.rt.jetski].concat(this.rt.boats) : []; },
 
   pads(g) {
     const S = CFG.ISLANDS.STAND, SU = CFG.ISLANDS.SUNNY, out = [], p = g.player;
@@ -384,18 +405,20 @@ const IslandsExt = {
         if (h.order.have >= h.order.want) { h.order = null; h.happy = 3; s.stats.delivered++; g.floats.push({ x: h.door.x, y: h.door.y - 56, text: 'Thank you!', color: '#ff6b8a', t: 0, dur: 1.5, big: true }); Haptics.success(); }
       }
     }
-    // the jet ski's wake
-    const js = rt.jetski, riding = g.driving && g.vehicle === js;
+    // the wake behind the jet ski or a sailboat
+    const js = rt.jetski, veh = g.driving && (g.vehicle === js || this.isSail(g.vehicle)) ? g.vehicle : null;
     for (const w of rt.wake) w.t += dt;
     rt.wake = rt.wake.filter((w) => w.t < 1.1);
-    if (riding) {
-      const speed = Math.hypot(js.vx, js.vy);
+    if (veh) {
+      const speed = Math.hypot(veh.vx, veh.vy), sail = veh !== js, back = sail ? 32 : 24;
       rt.wakeT -= dt;
-      if (speed > 60 && rt.wakeT <= 0) { rt.wakeT = 0.06; rt.wake.push({ x: js.x - Math.cos(js.angle) * 24, y: js.y - Math.sin(js.angle) * 24, t: 0 }); if (rt.wake.length > 40) rt.wake.shift(); }
+      if (speed > (sail ? 40 : 60) && rt.wakeT <= 0) { rt.wakeT = sail ? 0.09 : 0.06; rt.wake.push({ x: veh.x - Math.cos(veh.angle) * back, y: veh.y - Math.sin(veh.angle) * back, t: 0, big: sail }); if (rt.wake.length > 40) rt.wake.shift(); }
     }
-    // hopping off in open water: swim to the nearest beach
-    if (rt.wasDriving && !g.driving && g.area === 'islands') this.swimToShore(g);
-    rt.wasDriving = g.driving;
+    this.updateBoats(g, dt);
+    // stepping off: off the jet ski in open water the chef swims to the nearest beach; a sailboat only docks by the shore
+    const left = rt.lastVeh;
+    if (left && !g.driving && g.area === 'islands') { if (this.isSail(left)) this.afterDock(g, left); else this.swimToShore(g); }
+    rt.lastVeh = g.driving && (g.vehicle === js || this.isSail(g.vehicle)) ? g.vehicle : null;
     if (rt.treat) { rt.treat.t -= dt; if (rt.treat.t <= 0) rt.treat = null; }
     if (!inIslands) return;
     // the first time the chef sets foot on one of the new islands, a friendly welcome
@@ -415,6 +438,45 @@ const IslandsExt = {
     // a dolphin jumps somewhere in open water now and then
     const d = rt.dolphin; d.t += dt;
     if (d.t > 1.6) { d.t = -U.rand(5, 12); const sp = U.pick(I.DOLPHIN_SPOTS); d.x = sp[0]; d.y = sp[1]; d.dir = Math.random() < 0.5 ? -1 : 1; }
+  },
+  // the sails fill with speed and the boat leans into a turn; while sailing, now and then check for a place to step ashore
+  updateBoats(g, dt) {
+    const rt = this.rt;
+    for (const b of rt.boats) {
+      const sailing = g.driving && g.vehicle === b, sp = Math.hypot(b.vx, b.vy);
+      let d = b.angle - b.pa; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2;
+      b.pa = b.angle;
+      const turn = dt > 0 ? d / dt : 0, k = Math.min(1, dt * 4);
+      b.fill = U.lerp(b.fill, sailing ? U.clamp(sp / CFG.VEHICLES.sailboat.speed, 0, 1) : 0, Math.min(1, dt * 2.5));
+      b.lean = U.lerp(b.lean, sailing ? U.clamp(-turn * 0.35, -0.7, 0.7) : 0, k);
+      if (Math.abs(b.lean) > 0.18) b.side = b.lean > 0 ? 1 : -1;
+    }
+    rt.dockT -= dt;
+    if (this.isSail(g.vehicle) && g.driving && rt.dockT <= 0) { rt.dockT = 0.15; rt.canDock = !!this.dockSpot(g, g.vehicle, null); }
+  },
+  // where the chef can step ashore from a sailboat: free ground (not water, not a hut) a short hop from the hull
+  dockSpot(g, b, prefer) {
+    const W = g.bounds(), obs = g.obstacles();
+    const ok = (x, y) => x > W.x0 + 16 && x < W.x1 - 16 && y > W.y0 + 16 && y < W.y1 - 16 && !obs.some((o) => g.hitRect(x, y, 12, o));
+    if (prefer && U.dist(prefer.x, prefer.y, b.x, b.y) < 60 && ok(prefer.x, prefer.y)) return { x: prefer.x, y: prefer.y };
+    for (const d of CFG.ISLANDS.COVE.DOCK_R) {
+      for (let i = 0; i < 16; i++) {
+        const a = b.angle + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * (Math.PI / 8), x = b.x + Math.cos(a) * d, y = b.y + Math.sin(a) * d;
+        if (ok(x, y)) return { x, y };
+      }
+    }
+    return null;
+  },
+  // the core has just let the chef off the sailboat: onto the shore beside it, or (no shore here) straight back aboard
+  afterDock(g, b) {
+    const p = g.player;
+    if (U.dist(p.x, p.y, b.x, b.y) > 60) return;   // moved somewhere else entirely (Take-me-home, a ride): nothing to do
+    const spot = this.dockSpot(g, b, { x: p.x, y: p.y });
+    b.vx = 0; b.vy = 0;
+    if (spot) { p.x = spot.x; p.y = spot.y; p.moving = false; p.facing = spot.x < b.x ? -1 : 1; return; }
+    g.vehicle = b; g.driving = true; p.x = b.x; p.y = b.y;
+    g.floats.push({ x: b.x, y: b.y - 84, text: 'Sail to the shore to get off! ⛵', color: '#ffe08a', t: 0, dur: 1.6, big: true });
+    Sfx.error(); Haptics.tap();
   },
   swimToShore(g) {
     const p = g.player, rt = this.rt;
@@ -446,6 +508,10 @@ const IslandsExt = {
     if (g.area !== 'islands') return undefined;
     const order = rt.huts.find((h) => h.order), js = rt.jetski;
     if (g.driving) {
+      if (this.isSail(g.vehicle)) {
+        if (order && p.carry > 0) return { text: `Sail to ${order.name}! ⛵`, target: order.door };
+        return rt.canDock ? { text: 'Press ⚓ Dock to hop off here', target: null } : { text: 'Sailing! ⛵ Sail to a beach or the pier', target: null };
+      }
       if (order && p.carry > 0) return { text: `Deliver to ${order.name}!`, target: order.door };
       if (p.carry === 0 && st.pile > 0) return { text: 'Park at the beach and grab pizzas', target: I.STAND.pile };
       return { text: 'Zoom! Ride around the islands', target: null };
@@ -476,6 +542,7 @@ const IslandsExt = {
     }
     if (this.nearPool(g) >= 0) return { text: 'Peek in the tide pool! ⭐', target: null };
     for (const P of I.COVE.POOLS) if (U.dist(p.x, p.y, P.x, P.y) < 110) return { text: 'Peek in the tide pools! ⭐', target: { x: P.x, y: P.y + P.ry + 14 } };
+    if (rt.boats.some((b) => U.dist(p.x, p.y, b.x, b.y) < 70)) return { text: 'Go sailing! ⛵', target: null };
     return null;
   },
 
@@ -586,6 +653,7 @@ const IslandsExt = {
       // the way south: sandbar, rope bridges, the marina pier; then what is on Sunny Beach and Starfish Cove
       for (const L of I.LINKS) E.paintLink(r, L);
       E.paintSunny(r, g);
+      E.paintBeachHut(r);
       E.paintCove(r, g);
       E.signpost(r, 2928, 2408, '🏖️ SUNNY BEACH', 'walk across the sand ↓');
       E.signpost(r, 3226, 2694, '⭐ STARFISH COVE', 'over the bridge →');
@@ -652,6 +720,46 @@ const IslandsExt = {
     for (let i = 0; i < 10; i++) { ctx.fillStyle = i % 2 ? '#fff' : '#ff8fab'; const x = K.x - K.w / 2 - 4 + i * (K.w + 8) / 10; ctx.fillRect(x, K.y - 44, (K.w + 8) / 10, 8); ctx.beginPath(); ctx.arc(x + (K.w + 8) / 20, K.y - 36, (K.w + 8) / 20, 0, Math.PI); ctx.fill(); }
     ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, K.x - 50, K.y - 96, 100, 20, 6); ctx.fill();
     ctx.fillStyle = '#ffe08a'; ctx.font = r.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🍧 SHAVED ICE', K.x, K.y - 86);
+  },
+  // Sunny Beach's beach hut: a bamboo bungalow on short stilts with a shaggy palm-thatch roof, its back over the shallows,
+  // a porch with two steps down to the sand, shuttered windows, a flower garland over the door and a surfboard
+  paintBeachHut(r) {
+    const ctx = r.ctx, H = CFG.ISLANDS.BEACHHUT, x = H.x, y = H.y;
+    // stilts in the water at the back corners, with ripples, and the hut's shadow
+    for (const dx of [-58, 58]) { ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(x + dx, y - 92, 10, 4, 0, 0, Math.PI * 2); ctx.stroke(); ctx.fillStyle = '#6b4a2b'; ctx.fillRect(x + dx - 4, y - 104, 8, 14); }
+    ctx.fillStyle = 'rgba(0,0,0,0.18)'; U.roundRect(ctx, x - 60, y - 100, 132, 112, 16); ctx.fill();
+    // the porch: planks on posts, two steps in the middle
+    ctx.fillStyle = '#6b4a2b'; for (const dx of [-54, -20, 20, 54]) ctx.fillRect(x + dx - 3, y - 2, 6, 10);
+    ctx.fillStyle = '#b98a55'; ctx.fillRect(x - 60, y - 14, 120, 14); ctx.fillStyle = 'rgba(0,0,0,0.14)'; for (let xx = x - 60; xx < x + 60; xx += 12) ctx.fillRect(xx, y - 14, 1.5, 14);
+    ctx.fillStyle = '#8d5a2b'; ctx.fillRect(x - 60, y - 2, 120, 3);
+    ctx.fillStyle = '#c99a62'; ctx.fillRect(x - 16, y, 32, 6); ctx.fillStyle = '#d9b27c'; ctx.fillRect(x - 16, y + 6, 32, 6); ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(x - 16, y + 5, 32, 1.5);
+    // the bamboo front wall
+    for (let xx = x - 50, i = 0; xx < x + 50; xx += 8, i++) { ctx.fillStyle = i % 2 ? '#c9a24a' : '#dcb95e'; ctx.fillRect(xx, y - 58, 8, 44); ctx.fillStyle = 'rgba(0,0,0,0.13)'; ctx.fillRect(xx, y - 44 + (i % 2) * 6, 8, 2); ctx.fillRect(xx + 7, y - 58, 1, 44); }
+    // shuttered windows with the sea-blue inside, and the door with a shell knob and a flower garland
+    for (const dx of [-36, 36]) {
+      ctx.fillStyle = '#5b3a1a'; ctx.fillRect(x + dx - 11, y - 50, 22, 18); ctx.fillStyle = '#9fe0ff'; ctx.fillRect(x + dx - 8, y - 47, 16, 12);
+      ctx.fillStyle = '#41b883'; ctx.fillRect(x + dx - 18, y - 51, 7, 20); ctx.fillRect(x + dx + 11, y - 51, 7, 20);
+      ctx.fillStyle = 'rgba(0,0,0,0.15)'; for (let k = 0; k < 4; k++) { ctx.fillRect(x + dx - 18, y - 48 + k * 5, 7, 1.5); ctx.fillRect(x + dx + 11, y - 48 + k * 5, 7, 1.5); }
+    }
+    ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, x - 11, y - 50, 22, 36, 4); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.15)'; for (let k = 0; k < 5; k++) ctx.fillRect(x - 11, y - 46 + k * 7, 22, 2);
+    ctx.fillStyle = '#ff9fb6'; ctx.beginPath(); ctx.arc(x + 6, y - 31, 2.5, 0, Math.PI * 2); ctx.fill();
+    ['#ff8fab', '#ffd166', '#fff', '#ff8fab', '#e4572e', '#ffd166', '#fff'].forEach((c, k) => { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x - 15 + k * 5, y - 53 + Math.sin((k / 6) * Math.PI) * 4, 3, 0, Math.PI * 2); ctx.fill(); });
+    // the roof: a big rounded thatch with a shaggy fringe, palm fronds laid over the ridge, a little sign
+    ctx.fillStyle = '#b8923f'; U.roundRect(ctx, x - 70, y - 118, 140, 66, 22); ctx.fill();
+    ctx.fillStyle = '#d9b55a'; U.roundRect(ctx, x - 66, y - 122, 132, 60, 20); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.1)'; for (let yy = y - 112; yy < y - 66; yy += 9) ctx.fillRect(x - 62, yy, 124, 2);
+    for (let i = 0; i < 18; i++) { const fx = x - 68 + i * 8; ctx.fillStyle = i % 2 ? '#c9a24a' : '#b8923f'; ctx.beginPath(); ctx.moveTo(fx, y - 64); ctx.lineTo(fx + 8, y - 64); ctx.lineTo(fx + 4, y - 52 - (i % 3) * 2); ctx.closePath(); ctx.fill(); }
+    for (const [dx, dy, ang, c] of [[-34, -104, -0.5, '#56b862'], [-10, -112, -0.1, '#3f9a4a'], [18, -108, 0.3, '#56b862'], [42, -100, 0.6, '#3f9a4a'], [0, -96, 0.05, '#41b883']]) {
+      ctx.save(); ctx.translate(x + dx, y + dy); ctx.rotate(ang); ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(0, 0, 30, 7, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.15)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(-28, 0); ctx.lineTo(28, 0); ctx.stroke(); ctx.restore();
+    }
+    ctx.fillStyle = '#6b4a2b'; for (const [dx, dy] of [[-4, -118], [5, -116]]) { ctx.beginPath(); ctx.arc(x + dx, y + dy, 4.5, 0, Math.PI * 2); ctx.fill(); }   // two coconuts on the ridge
+    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, x - 38, y - 80, 76, 15, 4); ctx.fill();
+    ctx.fillStyle = '#ffe08a'; ctx.font = r.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🌴 BEACH HUT', x, y - 72);
+    // a surfboard against the wall and a starfish on the porch
+    ctx.save(); ctx.translate(x + 62, y - 30); ctx.rotate(0.12); ctx.fillStyle = '#ff8fab'; ctx.beginPath(); ctx.ellipse(0, 0, 6, 26, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(-6, -2, 12, 4); ctx.restore();
+    this.drawStar(ctx, x - 44, y - 7, 5, '#ff9f43');
   },
   // the kiosk's counter front with the syrup bottles, drawn over the seller's legs
   drawKioskFront(r, g) {
@@ -826,7 +934,7 @@ const IslandsExt = {
     }
     ctx.globalAlpha = 1;
     // the jet ski's wake
-    for (const w of rt.wake) { const k = w.t / 1.1; ctx.fillStyle = `rgba(255,255,255,${0.55 * (1 - k)})`; ctx.beginPath(); ctx.arc(w.x, w.y, 4 + k * 11, 0, Math.PI * 2); ctx.fill(); }
+    for (const w of rt.wake) { const k = w.t / 1.1; ctx.fillStyle = `rgba(255,255,255,${0.55 * (1 - k)})`; ctx.beginPath(); ctx.arc(w.x, w.y, (w.big ? 6 : 4) + k * (w.big ? 16 : 11), 0, Math.PI * 2); ctx.fill(); }
     this.drawFerryTop(r, g, I.FERRY.x, I.FERRY.y, 1, 1.3);
     // buoy bobbing
     const B = I.BUOY, bob = Math.sin(t * 2) * 2, tilt = Math.sin(t * 1.4) * 0.12;
@@ -888,6 +996,17 @@ const IslandsExt = {
   // a sailboat seen from above with its sail standing up: angle is the heading
   drawSailboat(r, g, x, y, angle, B, phase) {
     const ctx = r.ctx, t = g.time + phase, bob = Math.sin(t * 1.7) * 1.5;
+    this.drawHull(ctx, x, y, angle, B, bob);
+    // the mast and sail stand up off the deck, flapping a little
+    const mx = x + Math.cos(angle) * 6, my = y + bob + Math.sin(angle) * 6, sw = Math.sin(t * 2.3) * 3;
+    ctx.fillStyle = '#5b3a1a'; ctx.fillRect(mx - 1.5, my - 62, 3, 62);
+    ctx.fillStyle = B.sail; ctx.strokeStyle = 'rgba(43,29,20,0.3)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(mx + 2, my - 60); ctx.quadraticCurveTo(mx + 22 + sw, my - 32, mx + 28, my - 6); ctx.lineTo(mx + 2, my - 6); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(mx - 2, my - 50); ctx.quadraticCurveTo(mx - 14 + sw * 0.5, my - 30, mx - 16, my - 10); ctx.lineTo(mx - 2, my - 10); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = B.flag; ctx.beginPath(); ctx.moveTo(mx, my - 62); ctx.lineTo(mx + 12, my - 59 + sw * 0.5); ctx.lineTo(mx, my - 56); ctx.closePath(); ctx.fill();
+  },
+  // the hull seen from above: foam, shadow, painted hull, wooden deck and a little white hatch at the stern
+  drawHull(ctx, x, y, angle, B, bob) {
     ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.beginPath(); ctx.ellipse(x, y + 4, 22, 22, 0, 0, Math.PI * 2); ctx.fill();
     ctx.save(); ctx.translate(x, y + bob); ctx.rotate(angle);
     ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(3, 4, 34, 13, 0, 0, Math.PI * 2); ctx.fill();
@@ -896,13 +1015,50 @@ const IslandsExt = {
     ctx.fillStyle = 'rgba(0,0,0,0.12)'; for (let k = -20; k < 24; k += 7) ctx.fillRect(k, -7, 1.5, 14);
     ctx.fillStyle = '#fff'; U.roundRect(ctx, -24, -5, 12, 10, 3); ctx.fill();
     ctx.restore();
-    // the mast and sail stand up off the deck, flapping a little
-    const mx = x + Math.cos(angle) * 6, my = y + bob + Math.sin(angle) * 6, sw = Math.sin(t * 2.3) * 3;
-    ctx.fillStyle = '#5b3a1a'; ctx.fillRect(mx - 1.5, my - 62, 3, 62);
-    ctx.fillStyle = B.sail; ctx.strokeStyle = 'rgba(43,29,20,0.3)'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(mx + 2, my - 60); ctx.quadraticCurveTo(mx + 22 + sw, my - 32, mx + 28, my - 6); ctx.lineTo(mx + 2, my - 6); ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(mx - 2, my - 50); ctx.quadraticCurveTo(mx - 14 + sw * 0.5, my - 30, mx - 16, my - 10); ctx.lineTo(mx - 2, my - 10); ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = B.flag; ctx.beginPath(); ctx.moveTo(mx, my - 62); ctx.lineTo(mx + 12, my - 59 + sw * 0.5); ctx.lineTo(mx, my - 56); ctx.closePath(); ctx.fill();
+  },
+  // A rideable sailboat (moored or sailing). The mainsail hangs from the mast along a boom that swings out to one side;
+  // it billows as the boat speeds up (b.fill) and the mast heels over in a turn (b.lean). The chef stands at the tiller.
+  drawBoat(r, g, b, phase) {
+    const ctx = r.ctx, t = g.time + phase, B = b.B, a = b.angle, ca = Math.cos(a), sa = Math.sin(a);
+    const riding = g.driving && g.vehicle === b, bob = Math.sin(t * (riding ? 3 : 1.7)) * (riding ? 2 : 1.5);
+    this.drawHull(ctx, b.x, b.y, a, B, bob);
+    const mx = b.x + ca * 6, my = b.y + bob + sa * 6, heel = b.lean * 16, top = { x: mx + heel, y: my - 64 };
+    // the boom swings out to one side; slack sails flap a little
+    const flap = (1 - b.fill) * Math.sin(t * 5) * 0.12, ba = a + Math.PI + b.side * (0.7 + 0.2 * (1 - b.fill)) + flap;
+    const foot = { x: mx, y: my - 8 }, clew = { x: mx + Math.cos(ba) * 36 + heel * 0.3, y: my + Math.sin(ba) * 36 - 10 };
+    const bow = { x: b.x + ca * 34, y: b.y + bob + sa * 34 - 4 }, jibTop = { x: mx + heel * 0.85, y: my - 52 };
+    const jibClew = { x: mx + Math.cos(ba) * 12 + ca * 8, y: my + Math.sin(ba) * 12 + sa * 8 - 8 };
+    // a sail: a triangle whose free edge bellies out away from the luff by `belly`
+    const sail = (p0, p1, p2, belly, col) => {
+      const mxp = (p1.x + p2.x) / 2, myp = (p1.y + p2.y) / 2, dx = p2.x - p1.x, dy = p2.y - p1.y, len = Math.hypot(dx, dy) || 1;
+      let nx = dy / len, ny = -dx / len; if ((mxp - p0.x) * nx + (myp - p0.y) * ny < 0) { nx = -nx; ny = -ny; }
+      ctx.fillStyle = col; ctx.strokeStyle = 'rgba(43,29,20,0.3)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.quadraticCurveTo(mxp + nx * belly, myp + ny * belly, p2.x, p2.y); ctx.closePath(); ctx.fill(); ctx.stroke();
+    };
+    const stern = { x: b.x - ca * 18, y: b.y + bob - sa * 18 };
+    const chef = () => {
+      if (!riding) return;
+      ctx.save(); ctx.translate(stern.x, stern.y); ctx.scale(0.64, 0.64);
+      r.drawPerson(0, 0, { shirt: '#fff', apron: '#e4572e', skin: '#f1c27d', hat: 'chef', facing: ca < -0.2 ? -1 : 1, moving: false, bob: 0, carry: 0, pants: '#2d3a4a' });
+      ctx.restore();
+    };
+    if (stern.y < my) chef();
+    const rig = () => {
+      ctx.strokeStyle = '#5b3a1a'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(top.x, top.y); ctx.stroke();                    // mast
+      ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(foot.x, foot.y); ctx.lineTo(clew.x, clew.y); ctx.stroke();   // boom
+      ctx.strokeStyle = 'rgba(43,29,20,0.45)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(top.x, top.y); ctx.lineTo(bow.x, bow.y); ctx.stroke();   // forestay
+    };
+    const main = () => sail(foot, top, clew, 3 + b.fill * 13, B.sail);
+    const jib = () => sail(jibClew, jibTop, bow, 2 + b.fill * 8, B.sail);
+    // whichever sail is further away is drawn first
+    if (sa > 0) { rig(); main(); jib(); } else { jib(); rig(); main(); }
+    ctx.lineCap = 'butt';
+    // a stripe on the mainsail and the flag at the masthead, streaming back
+    ctx.fillStyle = B.flag; const fw = Math.sin(t * 7) * 2;
+    ctx.beginPath(); ctx.moveTo(top.x, top.y); ctx.lineTo(top.x - ca * 13 + 2, top.y + 3 + fw); ctx.lineTo(top.x, top.y + 6); ctx.closePath(); ctx.fill();
+    if (stern.y >= my) chef();
+    r.drawRidingExtras(g, b, 30);
   },
   // a sailboat cruising round the open water up north, with a little wake
   drawCruiser(r, g) {
@@ -1014,7 +1170,7 @@ const IslandsExt = {
     items.push({ y: SU.NET.y0, draw: () => this.drawNet(r, g) });
     items.push({ y: K.y + 4, draw: () => r.drawPerson(K.x + Math.sin(g.time * 0.7) * 18, K.y + 4, { shirt: '#4dd0e1', skin: '#c68642', hair: '#2b1d14', hairStyle: 1, facing: 1, moving: false, bob: 0, carry: 0, pants: '#3a3f5c', apron: '#fff' }) });
     items.push({ y: K.y + 22, draw: () => this.drawKioskFront(r, g) });
-    for (const B of CFG.ISLANDS.COVE.BOATS) items.push({ y: B.y + 36, draw: () => this.drawSailboat(r, g, B.x, B.y, -Math.PI / 2, B, 0.5) });
+    this.rt.boats.forEach((b, i) => items.push({ y: b.y + 20, draw: () => this.drawBoat(r, g, b, 0.5 + i * 1.3) }));
     items.push({ y: js.y + 8, draw: () => r.drawSiteVehicle(g, js, 24) });
     for (const s of CFG.ISLANDS.ISLANDS) {
       if (s.palms) for (const [px, py] of s.palms) items.push({ y: py, draw: () => this.drawPalm(r, g, px, py) });
@@ -1070,8 +1226,9 @@ const IslandsExt = {
     }
   },
 
-  // ---- the jet ski, nose +x
+  // ---- the jet ski, nose +x (and a sailboat's hull, in case anything draws one with Render.drawVehicle)
   vehicleArt: {
+    sailboat(r, g, color, v) { IslandsExt.drawHull(r.ctx, 0, 0, 0, (v && v.B) || CFG.ISLANDS.COVE.BOATS[0], 0); },
     jetski(r, g, color, v, helpers) {
       const ctx = r.ctx, c = color || '#ff5a5f';
       ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.beginPath(); ctx.ellipse(-2, 2, 32, 15, 0, 0, Math.PI * 2); ctx.fill();

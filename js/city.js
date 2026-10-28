@@ -701,7 +701,7 @@ const CityExt = {
     items.push({ y: st.cityBus.y + 20, draw: () => this.drawBus(r, g, st.cityBus, !st.boarding && !g.driving ? 'Hop on to go home!' : null) });
     items.push({ y: st.taxi.y + 10, draw: () => r.drawSiteVehicle(g, st.taxi, 30) });
     for (const t of st.taxis) items.push({ y: t.y + 10, draw: () => this.drawTaxi(r, g, t) });
-    if (st.cab && st.cab.phase === 'coming') items.push({ y: g.player.y + 1, draw: () => { const ctx = r.ctx, p = g.player, lift = Math.sin(g.time * 10) * 4; ctx.strokeStyle = '#f1c27d'; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(p.x + 12, p.y - 20); ctx.lineTo(p.x + 20, p.y - 44 + lift); ctx.stroke(); ctx.lineCap = 'butt'; ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(p.x + 21, p.y - 46 + lift, 4, 0, Math.PI * 2); ctx.fill(); } });   // waving for the taxi
+    if (st.cab && st.cab.phase === 'coming') items.push({ y: g.player.y + 1, draw: () => { const ctx = r.ctx, p = g.player, f = p.facing || 1; ctx.save(); ctx.translate(p.x + f * 22, p.y - 50); ctx.rotate(Math.sin(g.time * 10) * 0.3); ctx.font = r.font(16); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('👋', 0, 0); ctx.restore(); } });   // waving for the taxi: a 👋 beside the chef's head (no raised arm)
     for (const p of st.peds) items.push({ y: p.y, draw: () => r.drawPerson(p.x, p.y, p) });
     const M = C.MUSICIAN;
     items.push({ y: M.y, draw: () => {
@@ -1332,10 +1332,11 @@ const CityExt = {
       // passengers: a few round heads, and the chef waving in the third window
       const heads = [['#2b1d14', 0], ['#d9a066', 1], ['#8c3b2f', 4], ['#1a1a1a', 5]];
       for (const [hair, w] of heads) { const hx = -111 + w * 34; ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(hx, -68, 8, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = hair; ctx.beginPath(); ctx.arc(hx, -70, 8.5, Math.PI, 0); ctx.fill(); }
-      const chx = -111 + 2 * 34, wave = Math.sin(g.time * 8) * 6;
-      ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(chx, -68, 8, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(chx + 12, -80 + wave, 4, 0, Math.PI * 2); ctx.fill();
+      const chx = -111 + 2 * 34;
+      ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(chx, -68, 8, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#fff'; U.roundRect(ctx, chx - 8, -84, 16, 8, 3); ctx.fill(); ctx.beginPath(); ctx.arc(chx - 4, -86, 5, 0, Math.PI * 2); ctx.arc(chx + 4, -86, 5, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.ellipse(chx - 2, -64, 2.5, 1.2, 0, 0, Math.PI * 2); ctx.ellipse(chx + 3, -64, 2.5, 1.2, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.save(); ctx.translate(chx + 11, -70); ctx.rotate(Math.sin(g.time * 8) * 0.3); ctx.font = r.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('👋', 0, 0); ctx.restore();   // waving: a 👋, no arm
       ctx.fillStyle = '#fff6b0'; ctx.beginPath(); ctx.arc(136, -42, 6, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#ff5252'; ctx.beginPath(); ctx.arc(-136, -42, 5, 0, Math.PI * 2); ctx.fill();
       const wheel = (x) => { ctx.fillStyle = '#1e1e1e'; ctx.beginPath(); ctx.arc(x, 0, 20, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#9aa0a8'; ctx.beginPath(); ctx.arc(x, 0, 11, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#5c6670'; ctx.lineWidth = 3; const a = dist / 20; for (let s = 0; s < 3; s++) { ctx.beginPath(); ctx.moveTo(x + Math.cos(a + s) * 11, Math.sin(a + s) * 11); ctx.lineTo(x - Math.cos(a + s) * 11, -Math.sin(a + s) * 11); ctx.stroke(); } };
       wheel(-92); wheel(92);

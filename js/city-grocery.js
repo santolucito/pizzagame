@@ -479,9 +479,11 @@ const GroceryExt = {
   },
   drawCashier(r, g) {
     const ctx = r.ctx, C = CFG.GROCERY.CASHIER, st = this.st, t = g.time, p = g.player;
-    const facing = p.x < C.x ? -1 : 1;
-    r.drawPerson(C.x, C.y, { shirt: '#fff', skin: '#8d5524', hair: '#2b1d14', hairStyle: 2, facing, moving: false, bob: 0, carry: 0, pants: '#2d3a4a', apron: '#7cb342', hat: 'cap', capColor: '#7cb342' });
-    if (st.cashier.wave > 0) { const a = Math.sin(t * 12) * 0.5; ctx.save(); ctx.translate(C.x + 14, C.y - 16); ctx.rotate(-0.9 + a); ctx.fillStyle = '#8d5524'; U.roundRect(ctx, -2, -16, 4, 16, 2); ctx.fill(); ctx.beginPath(); ctx.arc(0, -17, 3.5, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
+    const facing = p.x < C.x ? -1 : 1, waving = st.cashier.wave > 0;
+    // the thank-you wave: a happy hop and a 👋 beside the head (no arm reaching up)
+    const y = C.y - (waving ? Math.abs(Math.sin(t * 7)) * 3 : 0);
+    r.drawPerson(C.x, y, { shirt: '#fff', skin: '#8d5524', hair: '#2b1d14', hairStyle: 2, facing, moving: false, bob: 0, carry: 0, pants: '#2d3a4a', apron: '#7cb342', hat: 'cap', capColor: '#7cb342' });
+    if (waving) { ctx.save(); ctx.translate(C.x + 22, y - 46); ctx.rotate(Math.sin(t * 10) * 0.3); ctx.font = r.font(15); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('👋', 0, 0); ctx.restore(); }
     else if (st.scan) { ctx.fillStyle = '#8d5524'; ctx.beginPath(); ctx.arc(C.x - 18 + Math.sin(t * 9) * 3, C.y - 10, 3.5, 0, Math.PI * 2); ctx.fill(); }
   },
   drawCat(r, g) {

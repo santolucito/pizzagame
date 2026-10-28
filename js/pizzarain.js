@@ -613,11 +613,12 @@ const PizzaRainExt = {
     ctx.restore();
     if (left < 1) { ctx.fillStyle = '#d98a3c'; for (const [dx, dy] of [[-12, 5], [-9, -4], [10, 5], [-14, 0], [6, -6]]) { ctx.beginPath(); ctx.arc(P.x + dx, P.y + dy, 1.1, 0, Math.PI * 2); ctx.fill(); } }   // crumbs on the plate
   },
-  // the delivery person: a red cap, a pizza box held in front (opened at the table), a wave goodbye
+  // the delivery person: a red cap, a pizza box held in front (opened at the table), a wave goodbye (a hop and a 👋 bubble)
   drawCourier(r, ctx, g, d) {
     const D = CFG.PIZZARAIN.DELIVERY, P = CFG.PIZZARAIN.TABLE.plate, f = d.facing;
-    r.drawPerson(d.x, d.y, { shirt: '#3b7dd8', pants: '#2d3a4a', skin: '#c68642', hat: 'cap', capColor: '#d62828', facing: f, moving: d.moving, bob: d.bob, carry: 0, stripes: false });
-    const bob = d.moving ? Math.sin(d.bob) * 2 : 0, bx = d.x + f * 19, by = d.y - 17 + bob, k = d.lid;   // held out to the side, clear of the face
+    const hop = d.phase === 'wave' ? Math.abs(Math.sin(d.t * 9)) * 3 : 0;
+    r.drawPerson(d.x, d.y - hop, { shirt: '#3b7dd8', pants: '#2d3a4a', skin: '#c68642', hat: 'cap', capColor: '#d62828', facing: f, moving: d.moving, bob: d.bob, carry: 0, stripes: false });
+    const bob = (d.moving ? Math.sin(d.bob) * 2 : 0) - hop, bx = d.x + f * 19, by = d.y - 17 + bob, k = d.lid;   // held out to the side, clear of the face
     // the box: its front side, then either the closed lid or the open box with its lid standing up behind
     ctx.fillStyle = '#d9b98a'; ctx.fillRect(bx - 15, by + 5, 30, 4);
     if (k <= 0.02) {
@@ -636,9 +637,8 @@ const PizzaRainExt = {
         ctx.save(); ctx.translate(x, y); ctx.scale(1, 0.78); r.drawPizza(0, 0, 10); ctx.restore();
       }
     }
-    // the hands holding the box, or one waving goodbye
+    // the hands holding the box (waving goodbye is the "Bye-bye! 👋" bubble and a little hop, no arm)
     ctx.fillStyle = '#c68642';
-    if (d.phase === 'wave') { const w = Math.sin(d.t * 16) * 4; ctx.beginPath(); ctx.arc(d.x - f * 17 + w, d.y - 50, 4, 0, Math.PI * 2); ctx.fill(); ctx.fillRect(d.x - f * 15 - 1.5, d.y - 46, 3, 14); }
     ctx.beginPath(); ctx.arc(bx - f * 14, by + 3, 3.2, 0, Math.PI * 2); ctx.arc(bx + f * 8, by + 6, 3.2, 0, Math.PI * 2); ctx.fill();
   },
   // crumbs flying off a bite (world space, over everything)

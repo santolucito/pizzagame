@@ -491,13 +491,13 @@ const SchoolExt = {
   },
   drawKid(r, g, i) {
     const ctx = r.ctx, K = CFG.SCHOOL.KIDS[i], k = this.st.kids[i], t = g.time;
+    // waving at the chef is a happy hop and a 👋 beside the head (no arm reaching up)
+    const hop = k.wave > 0 ? Math.abs(Math.sin(t * 8)) * 5 * k.wave : 0;
     ctx.save(); ctx.translate(k.x, k.y); ctx.scale(0.72, 0.72);
-    r.drawPerson(0, 0, { shirt: K.shirt, skin: K.skin, hair: K.hair, hairStyle: K.hairStyle, facing: k.facing, moving: k.moving, bob: k.bob, carry: 0, pants: '#3a3f5c', stripes: i === 1 });
+    r.drawPerson(0, -hop, { shirt: K.shirt, skin: K.skin, hair: K.hair, hairStyle: K.hairStyle, facing: k.facing, moving: k.moving, bob: k.bob, carry: 0, pants: '#3a3f5c', stripes: i === 1 });
     if (k.wave > 0) {
-      // a waving arm up above the shoulder
-      const f = k.facing, ax = f * 13, ay = -16, hx = f * 20, hy = -34 - Math.abs(Math.sin(t * 8)) * 8 * k.wave;
-      ctx.strokeStyle = K.shirt; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(U.lerp(ax, hx, k.wave), U.lerp(ay, hy, k.wave)); ctx.stroke();
-      ctx.fillStyle = K.skin; ctx.beginPath(); ctx.arc(U.lerp(ax, hx, k.wave), U.lerp(ay, hy, k.wave), 4, 0, Math.PI * 2); ctx.fill();
+      ctx.save(); ctx.globalAlpha = Math.min(1, k.wave); ctx.translate(k.facing * 24, -48 - hop); ctx.rotate(Math.sin(t * 10) * 0.3);
+      ctx.font = r.font(18); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('👋', 0, 0); ctx.restore();
     }
     ctx.restore();
   },

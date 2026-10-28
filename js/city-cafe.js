@@ -519,8 +519,10 @@ const CafeExt = {
   },
   drawBarista(r, g) {
     const ctx = r.ctx, B = CFG.CAFE.BARISTA, st = this.st, t = g.time, wave = st.thank > 0, clap = st.clap > 0;
-    r.drawPerson(B.x, B.y, { shirt: '#fff', skin: '#e0ac69', hair: '#6b3e1e', hairStyle: 1, facing: 1, moving: false, bob: 0, carry: 0, pants: '#2d3a4a', apron: '#b8401c' });
-    if (wave) { const a = Math.sin(t * 12) * 0.5; ctx.fillStyle = '#e0ac69'; ctx.beginPath(); ctx.arc(B.x + 18 + a * 4, B.y - 44 + Math.cos(t * 12) * 2, 4, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(B.x + 13, B.y - 20); ctx.lineTo(B.x + 18 + a * 4, B.y - 42); ctx.stroke(); }
+    // the thank-you wave: a happy hop and a 👋 beside the head (no arm reaching up)
+    const hop = wave ? Math.abs(Math.sin(t * 7)) * 3 : 0;
+    r.drawPerson(B.x, B.y - hop, { shirt: '#fff', skin: '#e0ac69', hair: '#6b3e1e', hairStyle: 1, facing: 1, moving: false, bob: 0, carry: 0, pants: '#2d3a4a', apron: '#b8401c' });
+    if (wave) { ctx.save(); ctx.translate(B.x + 22, B.y - 46 - hop); ctx.rotate(Math.sin(t * 10) * 0.3); ctx.font = r.font(15); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('👋', 0, 0); ctx.restore(); }
     if (clap) this.drawClap(ctx, B.x, B.y - 20, t);
   },
   drawClap(ctx, x, y, t) {

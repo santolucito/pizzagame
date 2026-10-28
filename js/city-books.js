@@ -529,7 +529,7 @@ const BooksExt = {
       ctx.fillStyle = '#e4572e'; ctx.fillRect(30, 10, 70, 50); ctx.fillStyle = '#8d5a2b'; ctx.beginPath(); ctx.moveTo(22, 12); ctx.lineTo(65, -24); ctx.lineTo(108, 12); ctx.closePath(); ctx.fill();
       ctx.fillStyle = '#ffd166'; ctx.fillRect(42, 24, 16, 14); ctx.fillStyle = '#5b3a1a'; ctx.fillRect(72, 30, 16, 30);
       r.drawPerson(-30, 88, { shirt: '#fff', apron: '#e4572e', skin: '#f1c27d', hat: 'chef', facing: 1, moving: false, bob: 0, carry: 0, pants: '#2d3a4a' });
-      ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(-13 + Math.sin(t * 6) * 2, 58 - Math.abs(Math.sin(t * 6)) * 6, 4, 0, Math.PI * 2); ctx.fill();   // the waving hand
+      ctx.save(); ctx.translate(-8, 46); ctx.rotate(Math.sin(t * 6) * 0.3); ctx.font = r.font(15); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('👋', 0, 0); ctx.restore();   // waving: a 👋, no arm
       ctx.fillStyle = '#fff'; for (let k = 0; k < 5; k++) { ctx.fillStyle = ['#ff8fab', '#ffd166', '#fff', '#9ad0ff', '#ff6b6b'][k]; ctx.beginPath(); ctx.arc(-120 + k * 55, 120 + Math.sin(k) * 8, 5, 0, Math.PI * 2); ctx.fill(); }
     } else if (page === 1) {
       // the storyteller cat chasing a butterfly through the flowers

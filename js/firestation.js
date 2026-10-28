@@ -154,7 +154,7 @@ const FireStationExt = {
     this.st.spray = { t: 0 }; this.st.splashed = false; p.x = F.SPRAY.x; p.y = F.SPRAY.y; p.moving = false; p.facing = 1;
     g.s.firestation.sprays++; Sfx.clean(); Haptics.tap();
   },
-  // the poster's lesson, acted out: stop (hands up), drop to the floor, roll over twice, up again
+  // the poster's lesson, acted out: stop (✋), drop to the floor, roll over twice, up again
   stopDropRoll(g) {
     const F = CFG.FIRESTATION, p = g.player;
     this.st.roll = { t: 0, said: 0 }; p.x = F.POSTER_SPOT.x; p.y = F.POSTER_SPOT.y; p.moving = false; p.facing = 1;
@@ -707,10 +707,11 @@ const FireStationExt = {
     const ctx = r.ctx, F = CFG.FIRESTATION, S = F.POSTER_SPOT, ro = this.st.roll; if (!ro) return;
     const t = ro.t, look = { shirt: '#fff', apron: '#e4572e', skin: '#f1c27d', hat: 'chef', facing: 1, moving: false, bob: 0, carry: 0, pants: '#2d3a4a' };
     if (t < 0.5) {
-      // STOP: hands up (the core draws the chef standing; add the raised arms)
+      // STOP: the core draws the chef standing still; a ✋ on each side of him (no raised arms), with the "Stop! ✋" float
       const k = Math.min(1, t / 0.25);
-      ctx.strokeStyle = '#f1c27d'; ctx.lineWidth = 5; ctx.lineCap = 'round';
-      for (const d of [-1, 1]) { ctx.beginPath(); ctx.moveTo(S.x + d * 13, S.y - 18); ctx.lineTo(S.x + d * (16 + 2 * k), S.y - 18 - 22 * k); ctx.stroke(); }
+      ctx.save(); ctx.globalAlpha = k; ctx.font = r.font(15); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14';
+      for (const d of [-1, 1]) ctx.fillText('✋', S.x + d * 26, S.y - 40);
+      ctx.restore();
       return;
     }
     this.paintFloor(ctx, F.ROOM.x0, F.ROOM.y0, S.x + 60, S.y + 46);   // cover the core's standing chef

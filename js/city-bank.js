@@ -438,14 +438,14 @@ const BankExt = {
     ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, lx - 11, ly + 2, 22, 8, 2); ctx.fill(); ctx.fillStyle = '#ffe08a'; ctx.font = r.font(6); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('FREE', lx, ly + 6);
   },
   drawTeller(r, g) {
-    const ctx = r.ctx, T = CFG.BANK.TELLER, st = this.st, t = g.time;
-    r.drawPerson(T.x, T.y, { shirt: '#fff', skin: '#e0ac69', hair: '#5b3a1a', hairStyle: 2, facing: 1, moving: false, bob: 0, carry: 0, pants: '#2d3a4a', bowtie: '#3b7dd8' });
-    // a wide smile and a waving hand when the chef comes to the window
-    ctx.strokeStyle = '#8d5a2b'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(T.x + 2, T.y - 40, 3.5, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
-    if (st.teller.wave > 0) {
-      const k = st.teller.wave, wy = T.y - 44 - k * 10, wx = T.x + 16 + Math.sin(t * 9) * 3 * k;
-      ctx.fillStyle = '#e0ac69'; ctx.beginPath(); ctx.arc(wx, wy, 4, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(T.x + 11, T.y - 30); ctx.lineTo(wx, wy + 3); ctx.stroke();
+    const ctx = r.ctx, T = CFG.BANK.TELLER, st = this.st, t = g.time, k = st.teller.wave;
+    // a wide smile, a happy hop and a 👋 beside the head (no arm reaching up) when the chef comes to the window
+    const hop = k > 0 ? Math.abs(Math.sin(t * 7)) * 3 * k : 0, y = T.y - hop;
+    r.drawPerson(T.x, y, { shirt: '#fff', skin: '#e0ac69', hair: '#5b3a1a', hairStyle: 2, facing: 1, moving: false, bob: 0, carry: 0, pants: '#2d3a4a', bowtie: '#3b7dd8' });
+    ctx.strokeStyle = '#8d5a2b'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(T.x + 2, y - 40, 3.5, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+    if (k > 0) {
+      ctx.save(); ctx.globalAlpha = k; ctx.translate(T.x + 22, y - 46); ctx.rotate(Math.sin(t * 9) * 0.3);
+      ctx.font = r.font(14); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('👋', 0, 0); ctx.restore();
       if (k >= 1) r.drawBubble(T.x, T.y - 70, () => { ctx.font = r.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('Hello! 😊', 0, 0); }, 62);
     }
   },

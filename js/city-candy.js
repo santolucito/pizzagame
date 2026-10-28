@@ -414,18 +414,15 @@ const CandyExt = {
     ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x - 3, y - 2); ctx.lineTo(x - 3, y - 38); ctx.stroke();
   },
   drawKeeper(r, g) {
-    const ctx = r.ctx, K = CFG.CANDY.KEEPER, p = g.player, t = g.time, f = p.x < K.x ? -1 : 1, x = K.x, y = K.y;
+    const ctx = r.ctx, K = CFG.CANDY.KEEPER, p = g.player, t = g.time, f = p.x < K.x ? -1 : 1, x = K.x;
+    // waves when the chef comes near: a happy hop and a 👋 beside the head (no arm reaching up)
+    const near = U.dist(p.x, p.y, K.x, K.y) < 110, y = K.y - (near ? Math.abs(Math.sin(t * 7)) * 3 : 0);
     r.drawPerson(x, y, { shirt: '#ff8fab', stripes: true, skin: '#c68642', hat: 'cap', capColor: '#ffd166', facing: f, moving: false, bob: 0, carry: 0, pants: '#4a4a4a', apron: '#fff8ee' });
     // a very big smile over the little one
     ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x + f * 2, y - 35, 5.5, Math.PI * 0.08, Math.PI * 0.92); ctx.closePath(); ctx.fill();
     ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x + f * 2, y - 35, 5.5, Math.PI * 0.08, Math.PI * 0.92); ctx.closePath(); ctx.stroke();
     ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.arc(x + f * 2, y - 32, 2.2, 0, Math.PI); ctx.fill();
-    // waves when the chef comes near
-    if (U.dist(p.x, p.y, x, y) < 110) {
-      const wy = y - 34 + Math.sin(t * 9) * 3;
-      ctx.strokeStyle = '#c68642'; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x + f * 13, y - 18); ctx.lineTo(x + f * 21, wy); ctx.stroke();
-      ctx.fillStyle = '#c68642'; ctx.beginPath(); ctx.arc(x + f * 22, wy - 2, 3.5, 0, Math.PI * 2); ctx.fill();
-    }
+    if (near) { ctx.save(); ctx.translate(x + f * 22, y - 46); ctx.rotate(Math.sin(t * 9) * 0.3); ctx.font = r.font(15); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('👋', 0, 0); ctx.restore(); }
   },
   drawCotton(r, g) {
     // the pink cloud on a stick in the chef's hand

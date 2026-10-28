@@ -473,7 +473,7 @@ const AquariumExt = {
     ctx.restore();
   },
   drawDiver(r, g) {
-    const ctx = r.ctx, dv = this.st.diver, t = g.time, f = dv.facing, bob = dv.moving ? Math.sin(dv.bob) * 2 : 0, x = dv.x, y = dv.y;
+    const ctx = r.ctx, dv = this.st.diver, t = g.time, f = dv.facing, bob = dv.moving ? Math.sin(dv.bob) * 2 : 0, x = dv.x, y = dv.y - (dv.wave > 0 ? Math.abs(Math.sin(t * 7)) * 3 : 0);   // a happy hop while waving
     r.drawPerson(x, y, { shirt: '#1b4f72', skin: '#e0ac69', hat: 'cap', capColor: '#1b4f72', facing: f, moving: dv.moving, bob: dv.bob, carry: 0, pants: '#1b4f72', belt: true });
     // flippers over the shoes, a mask over the eyes, a snorkel and an air tank on the back
     ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.ellipse(x - 6 + f * 3, y + 5, 8, 2.5, 0, 0, Math.PI * 2); ctx.ellipse(x + 6 + f * 3, y + 5, 8, 2.5, 0, 0, Math.PI * 2); ctx.fill();
@@ -481,7 +481,7 @@ const AquariumExt = {
     ctx.fillStyle = 'rgba(154,208,255,0.75)'; U.roundRect(ctx, x - 9, y - 43 + bob, 18, 9, 4); ctx.fill(); ctx.strokeStyle = '#263238'; ctx.lineWidth = 1.5; U.roundRect(ctx, x - 9, y - 43 + bob, 18, 9, 4); ctx.stroke();
     ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.arc(x + f * 3 - 3, y - 38.5 + bob, 1.2, 0, Math.PI * 2); ctx.arc(x + f * 3 + 3, y - 38.5 + bob, 1.2, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = '#ff7043'; ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x + f * 9, y - 40 + bob); ctx.lineTo(x + f * 13, y - 40 + bob); ctx.lineTo(x + f * 13, y - 54 + bob); ctx.stroke();
-    if (dv.wave > 0) { const wv = Math.sin(t * 10) * 5; ctx.fillStyle = '#e0ac69'; ctx.beginPath(); ctx.arc(x + f * 20 + wv * 0.3, y - 42 + bob + wv * 0.4, 4, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#1b4f72'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(x + f * 13, y - 20 + bob); ctx.lineTo(x + f * 19 + wv * 0.3, y - 38 + bob + wv * 0.4); ctx.stroke(); }
+    if (dv.wave > 0) { ctx.save(); ctx.translate(x + f * 24, y - 50 + bob); ctx.rotate(Math.sin(t * 10) * 0.3); ctx.font = r.font(15); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('👋', 0, 0); ctx.restore(); }   // waving: a 👋 by the mask, no arm reaching up
   },
   drawPlush(r, g) {
     const ctx = r.ctx, p = g.player, f = p.facing || 1, x = p.x + f * 17, y = p.y - 20 + (p.moving ? Math.sin(p.bob || 0) * 2 : 0), t = g.time, wag = Math.sin(t * 6) * 2;

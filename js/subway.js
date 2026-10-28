@@ -1342,16 +1342,17 @@ const SubwayExt = {
   },
   barnardEntities(r, g, items) {
     const st = this.st, K = CFG.SUBWAY.BARNARD, B = st.bc, ctx = r.ctx, t = g.time, BR = K.BEAR, CF = K.CAFE;
-    // Millie the bear on her plinth, one paw up for a high five
+    // Millie the bear on her plinth, a ✋ by her head for a high five
     items.push({ y: BR.y, draw: () => {
-      const x = BR.x, y = BR.y - 8, br = '#7a5230', dk = '#5b3a1a', lift = B.paw > 0 ? Math.sin(B.paw * 12) * 4 : Math.sin(t * 2) * 1.5;
+      const x = BR.x, br = '#7a5230', dk = '#5b3a1a', hop = B.paw > 0 ? Math.abs(Math.sin(B.paw * 12)) * 4 : 0, y = BR.y - 8 - hop;
       ctx.fillStyle = br; U.roundRect(ctx, x - 13, y - 44, 26, 32, 10); ctx.fill();
       ctx.fillStyle = '#c9a16b'; ctx.beginPath(); ctx.ellipse(x, y - 24, 8, 9, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = br; ctx.beginPath(); ctx.arc(x, y - 52, 11, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(x - 9, y - 60, 4.5, 0, Math.PI * 2); ctx.arc(x + 9, y - 60, 4.5, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#c9a16b'; ctx.beginPath(); ctx.ellipse(x, y - 48, 5, 3.5, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.arc(x - 4, y - 54, 1.5, 0, Math.PI * 2); ctx.arc(x + 4, y - 54, 1.5, 0, Math.PI * 2); ctx.arc(x, y - 49, 1.8, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = br; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x - 12, y - 38); ctx.lineTo(x - 22, y - 30); ctx.moveTo(x + 12, y - 38); ctx.lineTo(x + 22, y - 54 - lift); ctx.stroke(); ctx.lineCap = 'butt';
-      ctx.fillStyle = '#c9a16b'; ctx.beginPath(); ctx.arc(x + 23, y - 56 - lift, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = br; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x - 12, y - 38); ctx.lineTo(x - 22, y - 30); ctx.moveTo(x + 12, y - 38); ctx.lineTo(x + 22, y - 30); ctx.stroke(); ctx.lineCap = 'butt';
+      // the high five: a ✋ beside her head (no paw stretched up), bigger and with a hop when it lands
+      { const big = B.paw > 0; ctx.save(); ctx.translate(x + 27, y - 50 + (big ? 0 : Math.sin(t * 2) * 1.5)); ctx.rotate(big ? Math.sin(B.paw * 12) * 0.25 : 0); ctx.font = r.font(big ? 17 : 13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('✋', 0, 0); ctx.restore(); }
       ctx.fillStyle = dk; ctx.fillRect(x - 11, y - 16, 8, 6); ctx.fillRect(x + 3, y - 16, 8, 6);
       ctx.fillStyle = CFG.SUBWAY.BC_BLUE; ctx.beginPath(); ctx.moveTo(x - 6, y - 42); ctx.lineTo(x, y - 36); ctx.lineTo(x + 6, y - 42); ctx.lineTo(x, y - 46); ctx.closePath(); ctx.fill();   // a little blue bow
       if (B.paw > 0) { ctx.fillStyle = '#ffd166'; ctx.font = r.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('✨', x + 32, y - 66); }
@@ -1379,8 +1380,8 @@ const SubwayExt = {
   },
   stationEntities(r, g, items) {
     const st = this.st, S = CFG.SUBWAY.STATION, ctx = r.ctx, t = g.time;
-    // the clerk waving from the booth, the vendor at the snack stand
-    items.push({ y: S.booth.clerk.y, draw: () => { const c = S.booth.clerk; r.drawPerson(c.x, c.y, { shirt: '#1f4e9a', skin: '#c68642', hat: 'cap', capColor: '#1f4e9a', facing: 1, moving: false, bob: 0, carry: 0, pants: '#2d3a4a' }); const w = Math.sin(t * 6) * 5; ctx.fillStyle = '#c68642'; ctx.beginPath(); ctx.arc(c.x + 18, c.y - 34 + w, 4, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#8d5a2b'; ctx.fillRect(S.booth.x0 - 4, S.booth.y1 - 14, S.booth.x1 - S.booth.x0 + 8, 14); } });
+    // the clerk waving from the booth (a 👋, no arm), the vendor at the snack stand
+    items.push({ y: S.booth.clerk.y, draw: () => { const c = S.booth.clerk; r.drawPerson(c.x, c.y, { shirt: '#1f4e9a', skin: '#c68642', hat: 'cap', capColor: '#1f4e9a', facing: 1, moving: false, bob: 0, carry: 0, pants: '#2d3a4a' }); ctx.save(); ctx.translate(c.x + 22, c.y - 46); ctx.rotate(Math.sin(t * 6) * 0.3); ctx.font = r.font(14); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('👋', 0, 0); ctx.restore(); ctx.fillStyle = '#8d5a2b'; ctx.fillRect(S.booth.x0 - 4, S.booth.y1 - 14, S.booth.x1 - S.booth.x0 + 8, 14); } });
     items.push({ y: S.snack.vendor.y, draw: () => { const v = S.snack.vendor; r.drawPerson(v.x, v.y, { shirt: '#e4572e', apron: '#fff', skin: '#f1c27d', hat: 'cap', capColor: '#e4572e', facing: -1, moving: false, bob: 0, carry: 0, pants: '#2d3a4a' }); ctx.fillStyle = '#8d5a2b'; ctx.fillRect(S.snack.x0 - 4, S.snack.y1 - 14, S.snack.x1 - S.snack.x0 + 8, 14); r.drawPizza(S.snack.x1 - 14, S.snack.y1 - 6, 10); } });
     for (const c of st.commuters) if (!c.hidden) items.push({ y: c.y, draw: () => { this.drawStudent(r, c); if (c.paper && !c.moving) { ctx.fillStyle = '#fff'; ctx.fillRect(c.x - 12, c.y - 26, 24, 14); ctx.fillStyle = 'rgba(0,0,0,0.5)'; for (let k = 0; k < 3; k++) ctx.fillRect(c.x - 9, c.y - 23 + k * 4, 18, 1.5); } } });
     for (const q of st.riders) items.push({ y: q.y, draw: () => this.drawStudent(r, q) });
@@ -1587,7 +1588,7 @@ const SubwayExt = {
         if (P.extra === 'student') { ctx.fillStyle = '#2f9e44'; ctx.fillRect(-7, -22, 16, 10); ctx.fillStyle = '#fff8ee'; ctx.fillRect(-5, -20, 5, 6); ctx.fillRect(2, -20, 5, 6); }
         if (P.extra === 'grandma') { ctx.fillStyle = '#c9975f'; ctx.fillRect(16, -20, 18, 22); ctx.fillStyle = '#8d5a2b'; ctx.fillRect(18, -24, 14, 4); ctx.fillStyle = '#f2b134'; ctx.fillRect(22, -34, 5, 14); ctx.fillStyle = '#56b862'; ctx.beginPath(); ctx.arc(28, -30, 5, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#2b1d14'; ctx.fillRect(-6, -44, 12, 2); ctx.beginPath(); ctx.arc(-4, -41, 3, 0, Math.PI * 2); ctx.arc(4, -41, 3, 0, Math.PI * 2); ctx.stroke(); }
         if (P.extra === 'kid') { const bx = 18 + Math.sin(t * 1.7) * 4 - dx * 0.3, by = -80 + Math.sin(t * 2.2) * 3; ctx.strokeStyle = 'rgba(43,29,20,0.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(14, -16); ctx.quadraticCurveTo(bx, by + 30, bx, by + 12); ctx.stroke(); ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.ellipse(bx, by, 10, 12, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.beginPath(); ctx.ellipse(bx - 3, by - 4, 3, 4, 0, 0, Math.PI * 2); ctx.fill(); }
-        if (P.extra === 'chef') { const w = Math.sin(t * 7) * 4; ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(20, -36 + w, 4, 0, Math.PI * 2); ctx.fill(); }
+        if (P.extra === 'chef') { ctx.save(); ctx.translate(22, -46); ctx.rotate(Math.sin(t * 7) * 0.3); ctx.font = r.font(15); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('👋', 0, 0); ctx.restore(); }
         ctx.restore();
       }
       ctx.restore();

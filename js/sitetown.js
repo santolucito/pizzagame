@@ -768,9 +768,11 @@ const SiteTownExt = {
   },
   drawKeeper(r, g) {
     const ctx = r.ctx, k = this.st.keeper, t = g.time;
-    r.drawPerson(k.x, k.y, { shirt: '#fff', skin: '#c68642', hair: '#2b1d14', hairStyle: 1, facing: k.facing, moving: false, bob: 0, carry: 0, pants: '#2d3a4a', apron: '#ff7a1a', cap: null });
-    ctx.fillStyle = '#2b1d14'; ctx.font = r.font(7); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('STAFF', k.x, k.y - 18);
-    if (k.wave > 0) { const a = Math.sin(t * 9) * 0.5; ctx.save(); ctx.translate(k.x + 14 * k.facing, k.y - 16); ctx.rotate(-k.facing * (0.8 + a)); ctx.strokeStyle = '#c68642'; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -16); ctx.stroke(); ctx.restore(); }
+    // waving hello is a happy hop and a 👋 beside the head (no arm reaching up)
+    const y = k.y - (k.wave > 0 ? Math.abs(Math.sin(t * 7)) * 3 : 0);
+    r.drawPerson(k.x, y, { shirt: '#fff', skin: '#c68642', hair: '#2b1d14', hairStyle: 1, facing: k.facing, moving: false, bob: 0, carry: 0, pants: '#2d3a4a', apron: '#ff7a1a', cap: null });
+    ctx.fillStyle = '#2b1d14'; ctx.font = r.font(7); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('STAFF', k.x, y - 18);
+    if (k.wave > 0) { ctx.save(); ctx.translate(k.x + k.facing * 22, y - 46); ctx.rotate(Math.sin(t * 9) * 0.3); ctx.font = r.font(15); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('👋', 0, 0); ctx.restore(); }
     if (k.wave > 0 && k.wave < 2.5) r.drawBubble(k.x, k.y - 72, () => { ctx.font = r.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('Hi there! 🔧', 0, 0); }, 70);
   },
   overlay(r, g) {

@@ -413,14 +413,11 @@ const FireDeptExt = {
     const ctx = r.ctx, f = c.facing || 1, bob = c.moving ? Math.sin(c.bob || 0) * 2 : 0;
     r.drawPerson(c.x, c.y, { shirt: '#2d3a4a', pants: '#2d3a4a', skin: c.skin || '#e0ac69', hair: '#2b1d14', hairStyle: 0, facing: f, moving: c.moving, bob: c.bob, carry: 0, belt: true });
     ctx.fillStyle = '#ffd166'; ctx.fillRect(c.x - 12, c.y - 25 + bob, 24, 2.5); ctx.fillRect(c.x - 12, c.y - 19 + bob, 24, 2.5);   // reflective stripes
-    if (salute > 0) {
-      // the near arm swings up to the brim of the helmet
-      const k = U.easeOut(salute);
-      ctx.strokeStyle = '#e0ac69'; ctx.lineWidth = 5; ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.moveTo(c.x + f * 13, c.y - 22 + bob); ctx.lineTo(c.x + f * (13 + 6 * (1 - k)), c.y - 22 - 18 * k + bob); ctx.lineTo(c.x + f * (12 - 6 * k), c.y - 22 - 22 * k + bob); ctx.stroke();
-      ctx.strokeStyle = '#2d3a4a'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(c.x + f * 13, c.y - 24 + bob); ctx.lineTo(c.x + f * (13 + 6 * (1 - k)), c.y - 24 - 14 * k + bob); ctx.stroke();
-    }
     this.drawHelmet(ctx, c.x, c.y - 42 + bob, f, 13, c.helmet || '#d32f2f');
+    if (salute > 0) {
+      // a salute is a 🫡 beside the helmet, on the far side from the chef (no arm swinging up)
+      ctx.save(); ctx.globalAlpha = Math.min(1, salute); ctx.font = r.font(15); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('🫡', c.x - f * 24, c.y - 48 + bob); ctx.restore();
+    }
   },
   drawChefHelmet(r, g) {
     const ctx = r.ctx, p = g.player, f = p.facing || 1, bob = p.moving ? Math.sin(p.bob || 0) * 2 : 0;

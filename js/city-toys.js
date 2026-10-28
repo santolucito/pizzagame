@@ -366,14 +366,12 @@ const ToysExt = {
     ctx.fillStyle = '#fff'; ctx.strokeStyle = 'rgba(43,29,20,0.4)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y - 28, 2.6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
   },
   drawKeeper(r, g) {
-    const st = this.st, K = CFG.TOYSHOP.KEEPER, ctx = r.ctx, x = K.x, y = K.y, waving = st.wave > 0;
+    const st = this.st, K = CFG.TOYSHOP.KEEPER, ctx = r.ctx, x = K.x, waving = st.wave > 0, t = g.time;
+    // waving hello is a happy hop and a 👋 beside the head (no arm reaching up)
+    const y = K.y - (waving ? Math.abs(Math.sin(t * 7)) * 3 : 0);
     r.drawPerson(x, y, { shirt: '#ffd740', skin: '#e0ac69', hat: 'cap', capColor: '#e4572e', facing: 1, moving: false, bob: 0, carry: 0, apron: '#ff8fab', pants: '#3b7dd8' });
-    if (waving) {
-      const hx = x + 22 + Math.sin(st.wave) * 6, hy = y - 46 + Math.cos(st.wave) * 3;
-      ctx.strokeStyle = '#ffd740'; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x + 11, y - 24); ctx.lineTo(hx, hy); ctx.stroke();
-      ctx.fillStyle = '#e0ac69'; ctx.beginPath(); ctx.arc(hx, hy, 3.8, 0, Math.PI * 2); ctx.fill();
-    }
-    if (st.hi > 0 && st.hi < 2.6) r.drawBubble(x + 4, y - 68 + Math.sin(g.time * 4) * 2, () => { ctx.font = r.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('👋 Hi there!', 0, 0); }, 86);
+    if (waving) { ctx.save(); ctx.translate(x + 23, y - 44); ctx.rotate(Math.sin(t * 10) * 0.3); ctx.font = r.font(15); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('👋', 0, 0); ctx.restore(); }
+    if (st.hi > 0 && st.hi < 2.6) r.drawBubble(x + 4, K.y - 68 + Math.sin(g.time * 4) * 2, () => { ctx.font = r.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('👋 Hi there!', 0, 0); }, 86);
   },
   drawTrain(r, g) {
     const T = CFG.TOYSHOP.TABLE, K = CFG.TOYSHOP.TRACK, ctx = r.ctx, cx = (T.x0 + T.x1) / 2, cy = (T.y0 + T.y1) / 2;

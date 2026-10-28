@@ -4,7 +4,7 @@
 // See js/EXTENSIONS.md.
 //
 // The hot dog cart on Bus Street (CFG.CITY.HOTDOG, its obstacle is the City's) gets a friendly vendor in a striped
-// apron and a paper hat, who waves when the chef comes close. Stand in front of the cart and press the button: the
+// apron and a paper hat, who waves (a hop and a 👋) when the chef comes close. Stand in front of the cart and press the button: the
 // vendor hands over a hot dog in a bun with a mustard zigzag ($3, or on the house when the chef is broke). The chef
 // carries it for two seconds, then flips it up over his head (it spins once), it drops straight into his mouth:
 // CHOMP! A mustard sparkle, a happy little head bob, "Yum! 😋". No arm waving for the chef: the hot dog does the work.
@@ -167,6 +167,9 @@ const HotdogExt = {
     const ctx = r.ctx, V = this.vendor(), p = g.player, st = this.st, t = g.time, x = V.x, y = V.y;
     const near = g.area === 'city' && this.visible(g) && U.dist(p.x, p.y, this.cart().x, this.cart().y) < CFG.HOTDOG.WAVE;
     const f = p.x < x ? -1 : 1, giving = st.dog && st.dog.phase === 'give';
+    // waving hello is a happy little hop and a 👋 beside the head (no arm reaching up)
+    const hop = near && !giving ? Math.abs(Math.sin(t * 7)) * 3 : 0;
+    ctx.save(); ctx.translate(0, -hop);
     r.drawPerson(x, y, { shirt: '#fff', skin: '#c68642', hair: '#2b1d14', hairStyle: 0, facing: f, moving: false, bob: 0, carry: 0, apron: '#fff', pants: '#2d3a4a' });
     // stripes on the apron
     ctx.fillStyle = '#e53935'; for (let k = 0; k < 3; k++) ctx.fillRect(x - 7 + k * 5.5, y - 24, 2.5, 17);
@@ -175,17 +178,11 @@ const HotdogExt = {
     ctx.fillStyle = '#fff'; ctx.strokeStyle = 'rgba(43,29,20,0.45)'; ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.moveTo(x - 12, y - 44); ctx.lineTo(x + 12, y - 44); ctx.lineTo(x + 7, y - 55); ctx.lineTo(x - 7, y - 55); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#e53935'; ctx.fillRect(x - 11, y - 48, 22, 3);
-    // a smile and a friendly wave (or reaching out with the hot dog)
-    ctx.strokeStyle = '#c68642'; ctx.lineWidth = 5; ctx.lineCap = 'round';
-    if (giving) {
-      ctx.beginPath(); ctx.moveTo(x - 12, y - 20); ctx.lineTo(x - 18, y - 26); ctx.stroke();
-      ctx.fillStyle = '#c68642'; ctx.beginPath(); ctx.arc(x - 18, y - 26, 4, 0, Math.PI * 2); ctx.fill();
-    } else if (near) {
-      const hx = x - 24, hy = y - 50 + Math.sin(t * 12) * 5;
-      ctx.beginPath(); ctx.moveTo(x - 12, y - 20); ctx.lineTo(x - 20, y - 34); ctx.lineTo(hx, hy); ctx.stroke();
-      ctx.fillStyle = '#c68642'; ctx.beginPath(); ctx.arc(hx, hy, 4.5, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    if (near && !giving) {
+      ctx.save(); ctx.translate(x - 22, y - 48 - hop); ctx.rotate(Math.sin(t * 10) * 0.3);
+      ctx.font = r.font(15); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('👋', 0, 0); ctx.restore();
     }
-    ctx.lineCap = 'butt';
   },
   drawCart(r, g) {
     const ctx = r.ctx, H = this.cart(), t = g.time, x = H.x, y = H.y;

@@ -332,7 +332,7 @@ const BakeryExt = {
     ctx.fillStyle = `rgba(255,236,120,${glow.toFixed(3)})`; U.roundRect(ctx, O.win.x - O.win.w / 2, O.win.y - O.win.h / 2, O.win.w, O.win.h, 6); ctx.fill();
     ctx.fillStyle = `rgba(255,159,28,${(0.08 + glow * 0.15).toFixed(3)})`; ctx.beginPath(); ctx.ellipse(O.win.x, O.y1 + 10, 70, 22, 0, 0, Math.PI * 2); ctx.fill();   // warm light on the floor
     for (let i = 0; i < 4; i++) { const age = (t * 0.45 + i * 0.25) % 1; ctx.fillStyle = `rgba(255,255,255,${(0.55 * (1 - age)).toFixed(3)})`; ctx.beginPath(); ctx.arc(O.vent.x - 4 + i * 3 + Math.sin(age * 5 + i) * 6, O.vent.y - age * 34, 3 + age * 7, 0, Math.PI * 2); ctx.fill(); }
-    // the dough: squashed flat each time a hand comes down
+    // the dough: squashed flat each time the baker kneads it
     const D = K.DOUGH, sq = Math.max(0, Math.sin(t * 6)) * 0.35;
     ctx.fillStyle = '#f6e7cf'; ctx.beginPath(); ctx.ellipse(D.x, D.y, 11 + sq * 8, 7 - sq * 3, 0, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = 'rgba(43,29,20,0.3)'; ctx.lineWidth = 1; ctx.stroke();
     // the bell: a gold dome on a dark base, wobbling when rung
@@ -363,7 +363,9 @@ const BakeryExt = {
   },
   drawBaker(r, g) {
     const ctx = r.ctx, K = CFG.BAKERY, B = K.BAKER, D = K.DOUGH, p = g.player, st = this.st, t = g.time, d = U.dist(p.x, p.y, B.x, B.y);
-    const f = p.x < B.x ? -1 : 1, x = B.x, y = B.y;
+    const f = p.x < B.x ? -1 : 1, x = B.x, waving = st.wave > 0;
+    // no arms reaching out: waving is a happy hop and a 👋; kneading is a little dip each time the dough squashes
+    const dip = waving ? -Math.abs(Math.sin(t * 7)) * 3 : Math.max(0, Math.sin(t * 6)) * 2.5, y = B.y + dip;
     r.drawPerson(x, y, { shirt: '#fff', skin: '#e0ac69', hat: 'none', hair: '#e0ac69', hairStyle: 3, facing: f, moving: false, bob: 0, carry: 0, apron: '#f6c453', pants: '#6d4c41' });
     // the tall white toque
     ctx.fillStyle = '#fff'; ctx.strokeStyle = 'rgba(43,29,20,0.45)'; ctx.lineWidth = 1.5;
@@ -371,22 +373,15 @@ const BakeryExt = {
     U.roundRect(ctx, x - 8, y - 80, 16, 28, 3); ctx.fill(); ctx.stroke();
     ctx.beginPath(); ctx.arc(x - 6, y - 80, 7, 0, Math.PI * 2); ctx.arc(x + 6, y - 80, 7, 0, Math.PI * 2); ctx.arc(x, y - 85, 7.5, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.ellipse(x + f * 1 - 3, y - 33, 3, 1.4, 0, 0, Math.PI * 2); ctx.ellipse(x + f * 1 + 3, y - 33, 3, 1.4, 0, 0, Math.PI * 2); ctx.fill();   // mustache
-    ctx.strokeStyle = '#e0ac69'; ctx.lineWidth = 5; ctx.lineCap = 'round';
-    if (st.wave > 0) {
-      // one arm up, waving hello; the other rests on the counter
-      const hx = x + 24, hy = y - 46 + Math.sin(t * 14) * 5;
-      ctx.beginPath(); ctx.moveTo(x + 12, y - 18); ctx.lineTo(x + 20, y - 32); ctx.lineTo(hx, hy); ctx.stroke();
-      ctx.fillStyle = '#e0ac69'; ctx.beginPath(); ctx.arc(hx, hy, 4.5, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(x - 12, y - 18); ctx.lineTo(x - 18, y - 2); ctx.stroke(); ctx.beginPath(); ctx.arc(x - 18, y - 2, 4, 0, Math.PI * 2); ctx.fill();
-      r.drawBubble(x, y - 100 + Math.sin(t * 4) * 3, () => { ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('Hello! 👋', 0, 0); }, 84);
+    if (waving) {
+      ctx.save(); ctx.translate(x + 24, y - 46); ctx.rotate(Math.sin(t * 10) * 0.3);
+      ctx.font = r.font(15); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('👋', 0, 0); ctx.restore();
+      r.drawBubble(x, B.y - 100 + Math.sin(t * 4) * 3, () => { ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('Hello! 👋', 0, 0); }, 84);
     } else {
-      // kneading: the two hands take turns pressing the dough
-      const u1 = Math.max(0, Math.sin(t * 6)) * 10, u2 = Math.max(0, Math.sin(t * 6 + Math.PI)) * 10;
-      for (const [sx, hx, up] of [[x - 12, D.x - 7, u1], [x + 12, D.x + 7, u2]]) { ctx.beginPath(); ctx.moveTo(sx, y - 18); ctx.lineTo(hx, D.y - 6 - up); ctx.stroke(); ctx.fillStyle = '#e0ac69'; ctx.beginPath(); ctx.arc(hx, D.y - 6 - up, 4.5, 0, Math.PI * 2); ctx.fill(); }
-      if (u1 > 9.6 || u2 > 9.6) { ctx.fillStyle = 'rgba(255,255,255,0.7)'; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(D.x - 10 + i * 10, D.y - 12, 1.5, 0, Math.PI * 2); ctx.fill(); } }
-      if (d < 120 && g.area === 'bakery') r.drawBubble(x, y - 100 + Math.sin(t * 4) * 3, () => { ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('Fresh today! 🥐', 0, 0); }, 110);
+      // kneading: a puff of flour each time the dough is pressed flat
+      if (Math.sin(t * 6) > 0.96) { ctx.fillStyle = 'rgba(255,255,255,0.7)'; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(D.x - 10 + i * 10, D.y - 12, 1.5, 0, Math.PI * 2); ctx.fill(); } }
+      if (d < 120 && g.area === 'bakery') r.drawBubble(x, B.y - 100 + Math.sin(t * 4) * 3, () => { ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('Fresh today! 🥐', 0, 0); }, 110);
     }
-    ctx.lineCap = 'butt';
   },
   drawCat(r, g) {
     const ctx = r.ctx, C = CFG.BAKERY.CAT, t = g.time, br = Math.sin(t * 1.6) * 0.8, x = C.x, y = C.y;

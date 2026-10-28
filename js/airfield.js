@@ -842,7 +842,7 @@ const AirfieldExt = {
   drawBarista(r, g) {
     const ctx = r.ctx, B = CFG.SKYCAFE.BARISTA, p = g.player, d = U.dist(p.x, p.y, B.x, B.y), t = g.time;
     r.drawPerson(B.x, B.y, { shirt: '#2d3a4a', skin: '#c68642', hat: 'cap', capColor: '#1f2a38', facing: p.x < B.x ? -1 : 1, moving: false, bob: 0, carry: 0, apron: '#e4572e', pants: '#2d3a4a' });
-    if (d < 150) { ctx.fillStyle = '#c68642'; ctx.beginPath(); ctx.arc(B.x + 18, B.y - 34 + Math.sin(t * 7) * 5, 3.5, 0, Math.PI * 2); ctx.fill(); }
+    if (d < 150) { ctx.save(); ctx.translate(B.x + 22, B.y - 46); ctx.rotate(Math.sin(t * 7) * 0.3); ctx.font = r.font(15); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('👋', 0, 0); ctx.restore(); }   // waving: a 👋, no arm
     if (d < 110) r.drawBubble(B.x, B.y - 66 + Math.sin(t * 4) * 3, () => { ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('Cocoa? ☕', 0, 0); }, 80);
   },
   // the steaming mug the chef carries after a Cloud Cocoa
@@ -1090,7 +1090,7 @@ const AirfieldExt = {
     const ctx = r.ctx, P = CFG.CLOUD.PILOT, p = g.player, d = U.dist(p.x, p.y, P.x, P.y), t = g.time;
     r.drawPerson(P.x, P.y, { shirt: '#2d3a4a', skin: '#c68642', hat: 'cap', capColor: '#1f2a38', facing: -1, moving: false, bob: 0, carry: 0, pants: '#2d3a4a' });
     ctx.fillStyle = '#ffd166'; ctx.fillRect(P.x - 9, P.y - 25, 6, 2); ctx.fillRect(P.x - 11, P.y - 21, 8, 2);   // wings badge
-    if (d < 150) { ctx.fillStyle = '#c68642'; ctx.beginPath(); ctx.arc(P.x - 18, P.y - 34 + Math.sin(t * 7) * 5, 3.5, 0, Math.PI * 2); ctx.fill(); }   // waving
+    if (d < 150) { ctx.save(); ctx.translate(P.x - 22, P.y - 46); ctx.rotate(Math.sin(t * 7) * 0.3); ctx.font = r.font(15); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('👋', 0, 0); ctx.restore(); }   // waving: a 👋, no arm
     if (d < 90) r.drawBubble(P.x, P.y - 66 + Math.sin(t * 4) * 3, () => { ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('Hi, Chef! ✈️', 0, 0); }, 92);
   },
   drawGliderWing(r) {
@@ -1300,7 +1300,8 @@ const AirfieldExt = {
     ctx.fillStyle = '#3b7dd8'; ctx.beginPath(); ctx.ellipse(x, y, 36, 42, 0, 0, Math.PI * 2); ctx.fill();
     ctx.save(); ctx.beginPath(); ctx.ellipse(x, y, 36, 42, 0, 0, Math.PI * 2); ctx.clip(); ctx.fillStyle = '#ffd166'; ctx.fillRect(x - 10, y - 50, 20, 100); ctx.fillStyle = '#fff8ee'; ctx.fillRect(x - 30, y - 50, 8, 100); ctx.fillRect(x + 22, y - 50, 8, 100); ctx.restore();
     ctx.fillStyle = '#a8763e'; U.roundRect(ctx, x - 12, y + 50, 24, 16, 3); ctx.fill();
-    ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(x, y + 48, 5, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(x + 12, y + 36 + Math.sin(t * 6) * 3, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(x, y + 48, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.save(); ctx.translate(x + 12, y + 38); ctx.rotate(Math.sin(t * 6) * 0.3); ctx.font = Render.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('👋', 0, 0); ctx.restore();   // the chef waving: a 👋, no arm
   },
   // the little plane seen from the side, flying to the right, the chef at the controls
   drawPlaneSide(r, g, x, y, s, pitch, t, c) {
@@ -1321,7 +1322,7 @@ const AirfieldExt = {
     ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(26, -26, 8, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#fff'; U.roundRect(ctx, 18, -42, 16, 8, 3); ctx.fill(); ctx.beginPath(); ctx.arc(22, -44, 5, 0, Math.PI * 2); ctx.arc(30, -44, 5, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#2b1d14'; ctx.fillRect(28, -28, 2, 2); ctx.fillRect(32, -28, 2, 2); ctx.beginPath(); ctx.ellipse(30, -22, 3, 1.3, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(40, -34 + Math.sin(t * 7) * 3, 3.5, 0, Math.PI * 2); ctx.fill();   // waving
+    ctx.save(); ctx.translate(41, -32); ctx.rotate(Math.sin(t * 7) * 0.3); ctx.font = r.font(10); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('👋', 0, 0); ctx.restore();   // waving: a 👋, no arm
     // near wing with a strut
     ctx.fillStyle = c; U.roundRect(ctx, -14, -2, 70, 12, 6); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(-10, 0, 62, 3);
     ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(14, 10); ctx.lineTo(4, 22); ctx.stroke();

@@ -41,6 +41,7 @@ CFG.AIRFIELD = {
   JET_TURN_X: 2155,                                      // where the jet turns between its gate and the lane (clear of the stands)
   JET_TURN: 1.3,                                         // how fast the jet can turn (rad/s): a big turning circle
   GATE: { x0: 2400, y0: 528, x1: 2460, y1: 608 },        // the gate pier; a jet-bridge reaches out towards the jet
+  JET_DOOR: { x: -60, y: -13 },                          // the jet's passenger door in its own frame (nose +x): the one the jet-bridge reaches (boarding: js/jetinside.js)
   RADAR: { x: 2400, y: 1000 },
   HEDGE: { x0: 1560, y0: 106, x1: 2440, y1: 118 },
   BENCH: { x: 2200, y: 920 },
@@ -124,6 +125,12 @@ const AirfieldExt = {
     const rt = this.rt; if (!rt) return null;
     if (g.area === 'town') return g.driving && rt.planes.includes(g.vehicle) ? g.vehicle : rt.plane;
     return g.area === 'cloud' ? rt.cloudPlane : null;
+  },
+  // the jet's passenger door in world coordinates for the jet's current pose, `out` px out from the fuselage side
+  // (the spot where you stand to board it lives in js/jetinside.js)
+  jetDoor(v, out = 0) {
+    const D = CFG.AIRFIELD.JET_DOOR, c = Math.cos(v.angle), s = Math.sin(v.angle), lx = D.x, ly = D.y - out;
+    return { x: v.x + lx * c - ly * s, y: v.y + lx * s + ly * c };
   },
   wrap(d) { while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d; },
   // a path ready to roll along: the heading on each leg (a point marked `back` is reached rolling backwards) and the length

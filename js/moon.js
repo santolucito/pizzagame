@@ -36,7 +36,7 @@ CFG.MOON = {
   TREAT: 30,                                   // seconds the moon pizza is carried
   BOING: { dur: 1.0, h: 84 },
 };
-CFG.AREAS.moon = { WORLD: CFG.MOON.WORLD };
+CFG.AREAS.moon = { WORLD: CFG.MOON.WORLD, noSky: true };
 CFG.VEHICLES.buggy = { speed: 250, radius: 22, label: '🚙 Drive', exit: '🚶 Hop out' };
 
 const MoonExt = {

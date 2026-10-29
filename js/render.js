@@ -150,7 +150,8 @@ const Render = {
 
   // Sky and mountains above the top edge of the map: seen when the camera lifts for a train ride.
   drawSkyline(g, W) {
-    if (this.camY >= W.y0 || W.y1 - W.y0 < 700) return;   // only the big outdoor maps have the mountains and sky above them
+    const A = CFG.AREAS[g.area];
+    if (this.camY >= W.y0 || W.y1 - W.y0 < 700 || (A && A.noSky)) return;   // only the big outdoor maps have the mountains and sky above them
     const ctx = this.ctx, x0 = this.camX - 10, x1 = this.camX + this.viewW + 10, top = this.camY - 10, base = W.y0 + 1;
     const sky = ctx.createLinearGradient(0, top, 0, base); sky.addColorStop(0, '#79c6f2'); sky.addColorStop(1, '#d9f0ff');
     ctx.fillStyle = sky; ctx.fillRect(x0, top, x1 - x0, base - top);

@@ -274,6 +274,7 @@ const IslandsInsideExt = {
   },
   playJuke(g) {
     const st = this.st; st.juke = CFG.ISLE_IN.ROOMS.crabshack.JUKE_T; g.s.isleIn.songs++;
+    { const J = CFG.ISLE_IN.ROOMS.crabshack.JUKEBOX; st.notes.push({ x: (J.x0 + J.x1) / 2, y: J.y0 - 30, ch: '♪', t: 0 }); }   // the first note right away
     g.floats.push({ x: g.player.x, y: g.player.y - 64, text: 'Dance time! 🎵', color: '#ffe08a', t: 0, dur: 1.4, big: true });
     // a little sea-shanty jingle
     const notes = [392, 440, 494, 392, 523, 494, 440, 392];

@@ -45,7 +45,10 @@ CFG.AIRFIELD = {
   RADAR: { x: 2400, y: 1000 },
   HEDGE: { x0: 1560, y0: 106, x1: 2440, y1: 118 },
   BENCH: { x: 2200, y: 920 },
-  SIGNS: [[2250, 926, '🔭 PLANE SPOTTING'], [1566, 530, '✈️ AIRFIELD'], [1660, 880, '🅿️ CAR PARK'], [2300, 362, '🔧 WORKSHOP'], [2430, 300, '⛽ FUEL FARM']],   // all walk-through
+  SIGNS: [[2250, 926, '🔭 PLANE SPOTTING'], [1566, 530, '✈️ AIRFIELD'], [1660, 880, '🅿️ CAR PARK'], [2300, 398, '🔧 WORKSHOP'], [2430, 300, '⛽ FUEL FARM']],   // all walk-through (the workshop's stands clear of its door)
+  // where you stand to go inside the buildings (the interiors live in js/airfield-inside.js): the terminal's south door
+  // (clear of the arrivals corridor), the small door between the hangar's two bays, the tower's door, the workshop's sliding door
+  DOORS: { terminal: { x: 1650, y: 686 }, hangar: { x: 2010, y: 436 }, tower: { x: 1640, y: 428 }, workshop: { x: 2300, y: 336 } },
   CONES: [[1750, 132], [1892, 132], [1750, 1268], [1892, 1268], [1895, 418], [1895, 572], [2210, 850], [2320, 850], [2440, 850], [2205, 320]],
   RUNUP: 1.2,                                           // seconds the plane races down the runway before it lifts off
   FLIGHT: 8,                                            // seconds the flight takes

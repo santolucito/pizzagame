@@ -2,7 +2,9 @@
 // Pizza Moon: where the finished rocket from Rocket Island flies (js/rocket.js owns the rocket, its launch, landing
 // and the flight cut-scene; this file is the place itself). A cheese-yellow moon covered in craters, with
 // pepperoni-red rocks, a black starry sky along the top edge and the Earth hanging in it.
-//   - The rocket lands on its pad; standing at its hatch offers '🚀 Fly home' (back to Rocket Island).
+//   - The rocket lands on its pad; standing at its hatch offers '🚪 Go inside the rocket' (the same three decks as on
+//     Rocket Island, js/rocketinside.js; its flight deck's '🚀 Fly home' flies back to Rocket Island). Without that file
+//     the hatch offers '🚀 Fly home' straight away.
 //   - Craters: walk into one and the chef bounces right up out of it, "Boing!" (the button bounces again).
 //   - A flag kit on a little hill: '🚩 Plant the flag' (saved; it waves there from then on).
 //   - A friendly little alien by its parked saucer waves (a hop and a 👋 bubble) and hands out a free moon pizza
@@ -73,7 +75,10 @@ const MoonExt = {
   vehicles(g) { return this.st ? [this.st.buggy] : []; },
   action(g) {
     if (!this.st || g.area !== 'moon' || !this.onFoot(g)) return null;
-    if (this.nearDoor(g)) return { label: '🚀 Fly home', run: (gg) => RocketExt.startLaunch(gg, CFG.MOON.BASE, 'islands') };
+    if (this.nearDoor(g)) {
+      if (RocketExt.hasInside()) return { label: '🚪 Go inside the rocket', run: (gg) => RocketInsideExt.enter(gg, 'moon') };
+      return { label: '🚀 Fly home', run: (gg) => RocketExt.startLaunch(gg, CFG.MOON.BASE, 'islands') };
+    }
     if (!g.s.moon.flag && this.nearFlag(g)) return { label: '🚩 Plant the flag', run: (gg) => this.plantFlag(gg) };
     if (this.nearAlien(g)) return this.st.treat ? { label: '👋 Say hi', run: (gg) => this.sayHi(gg) } : { label: '🍕 Moon pizza, please!', run: (gg) => this.getPizza(gg) };
     const c = this.craterAt(g.player.x, g.player.y);
@@ -127,7 +132,7 @@ const MoonExt = {
     const p = g.player, M = CFG.MOON, st = this.st, a = st.alien, s = g.s.moon;
     if (g.driving) return g.vehicle && g.vehicle.kind === 'buggy' ? { text: 'Vroom! Drive the moon buggy 🚙', target: null } : null;
     if (st.boing) return { text: 'Boing! 🌕', target: null };
-    if (this.nearDoor(g)) return { text: 'Press the button to fly home! 🚀', target: null };
+    if (this.nearDoor(g)) return { text: RocketExt.hasInside() ? 'Go inside the rocket to fly home! 🚀' : 'Press the button to fly home! 🚀', target: null };
     if (!s.flag && this.nearFlag(g)) return { text: 'Plant the flag on the moon! 🚩', target: null };
     if (this.nearAlien(g)) return st.treat ? { text: 'Yum! A moon pizza 🍕', target: null } : { text: 'Ask the alien for a moon pizza! 👽', target: null };
     if (this.craterAt(p.x, p.y) >= 0) return { text: 'Press the button to bounce! 🌕', target: null };

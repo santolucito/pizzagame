@@ -61,6 +61,12 @@ Useful core state and helpers:
 - `Game.enterCar()/exitCar()` are driven by the vehicle button; vehicles you return from `vehicles()` work with it automatically (speed/radius/labels from `CFG.VEHICLES[kind]`, painted color from `g.s.paint[kind]`).
 - The core keeps simulating the pizza town while the player is elsewhere; do not pause it.
 
+Other core helpers worth knowing: `Game.walkTop()` is the highest y the chef (and ground vehicles) may reach in the
+current map (`WORLD.walkY0`, set for town and Construction Town just below the railway); `Game.trafficSpawnX(road)`
+gives an x just off the left of the camera on a road, so cars never appear out of the woods; `CFG.AREAS[name].noSky`
+keeps the mountain skyline off a map; `js/towercrane.js` (`TowerCrane.create({...})`) makes a rideable tower crane
+with the simple hook controls in any map.
+
 ## Interiors ("go inside" a building)
 
 A building interior is just another map: register `CFG.AREAS.<name> = { WORLD: {...} }` in a free rectangle (see the

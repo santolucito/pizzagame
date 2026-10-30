@@ -24,7 +24,7 @@ module.exports = async (t) => {
   t.expect(called >= 0 && called <= 540, `waiting at the stop brings the bus within 9 s (took ${called} steps)`);
   t.expectEq(await t.ev(() => T.label()), '🚌 Ride the bus', 'bus can be boarded from beside the bench');
   // the stop zone covers the sign, the sidewalk behind the shelter and the kerb along the whole bus
-  const zone = await t.ev(() => [[380, -30], [500, -70], [340, -130], [600, -20], [560, 30], [420, 10]].map(([x, y]) => { T.tp(x, y); T.step(1); return T.label() === '🚌 Ride the bus'; }));
+  const zone = await t.ev(() => [[380, -30], [500, -70], [340, -104], [600, -20], [560, 30], [420, 10]].map(([x, y]) => { T.tp(x, y); T.step(1); return T.label() === '🚌 Ride the bus'; }));
   t.expect(zone.every(Boolean), `bus can be boarded from all around the stop (${zone.join('/')})`);
   await t.ev(() => { CityExt.st.bus.state = 'away'; CityExt.st.bus.timer = 999; });
 
@@ -158,4 +158,71 @@ module.exports = async (t) => {
     return times;
   });
   t.expect(Math.max(...repaint) < 1000, `unlocking things repaints the town quickly (${repaint.join(' / ')} ms)`);
+
+  // the railway is the edge of the map: walking (or driving) north stops just below the rails, in town and in Construction Town
+  await t.boot({ viewport: { width: 1100, height: 720 } });
+  const top = await t.ev(() => {
+    const out = [];
+    for (const [area, x, y] of [['town', -730, -84], ['town', 500, -40], ['town', 2000, 60], ['town', -1200, 40], ['site', 2990, -84], ['site', 3700, 20]]) {
+      T.tp(x, y, area); T.steer(0.2, -1); T.step(150); T.unsteer();
+      out.push({ area, x, y: Math.round(Game.player.y), top: Game.walkTop(), rails: Game.station().trackY + 18 });
+    }
+    Game.s.vehicles.car = true; Game.car.x = 300; Game.car.y = 0; T.tp(300, 40, 'town'); Game.enterCar(); T.steer(0, -1); T.step(120); T.unsteer();
+    out.push({ area: 'car', y: Math.round(Game.car.y), rails: CFG.STATION.trackY + 18, driving: Game.driving }); Game.exitCar();
+    return out;
+  });
+  for (const r of top) t.expect(r.y > r.rails && (r.area === 'car' ? r.driving : r.y >= r.top), `nobody gets onto the rails: ${JSON.stringify(r)}`);
+  t.expectEq(await t.ev(() => { const S = CFG.STATION; T.tp(S.stopX + S.boardDx, -60, 'town'); T.steer(0, -1); T.step(90); T.unsteer(); const p = Game.player, P = S.platform; return p.y > P.y0 && p.y < P.y1; }), true, 'the platform itself is still walkable');
+  await t.shot('top-edge-station');
+  await t.boot({ viewport: { width: 390, height: 844 } });
+  await t.ev(() => { Game.s.unlocked.station = true; T.tp(-700, -60, 'town'); T.steer(0, -1); T.step(60); T.unsteer(); Game.cameraSnap = true; });
+  await t.shot('top-edge-station-phone');
+
+  // waiting by the platform for about 5 s calls the train (once the station is fixed); walking away does not
+  await t.boot({ viewport: { width: 1100, height: 720 } });
+  const call = await t.ev(() => {
+    const tr = Game.train, S = CFG.STATION;
+    tr.state = 'away'; tr.timer = 200; tr.warned = false;
+    T.tp(S.stopX + S.boardDx, S.platform.y1 - 12, 'town'); T.step(400);
+    const broken = tr.timer > 100;   // the old station is not fixed yet: nothing comes
+    Game.s.unlocked.station = true; tr.timer = 200; Game.floats.length = 0;
+    const early = T.until(() => tr.timer < 10, 4 * 60), steps = T.until(() => tr.timer < 10, 90);
+    const float = Game.floats.some((f) => /Here comes the train/.test(f.text));
+    const arrived = T.until(() => tr.state === 'stopped', 1500); T.step(1); const label = T.label();
+    tr.state = 'away'; tr.timer = 200; T.tp(540, 430, 'town'); T.step(600);
+    return { broken, early, steps, float, arrived, label, away: tr.timer > 100 };
+  });
+  t.expect(call.broken && call.early === -1 && call.steps >= 0 && call.float, `standing on the platform for 5 s calls the train (${JSON.stringify(call)})`);
+  t.expect(call.arrived >= 0 && call.label === '🚂 Ride the train', `the called train pulls in and can be boarded (${JSON.stringify(call)})`);
+  t.expect(call.away, 'nobody on the platform: the train keeps its timetable');
+  const siteCall = await t.ev(() => {
+    const tr = Game.siteTrain, S = CFG.SITE.STATION;
+    tr.state = 'away'; tr.x = CFG.SITE.WORLD.x1 + 600; T.tp(S.stopX + S.boardDx, S.platform.y1 - 12, 'site');
+    const early = T.until(() => tr.state !== 'away', 4 * 60), arrived = T.until(() => tr.state === 'stopped', 900); T.step(1);
+    return { early, arrived, label: T.label() };
+  });
+  t.expect(siteCall.early === -1 && siteCall.arrived >= 0 && siteCall.label === '🚂 Ride the train', `waiting on the Construction Town platform brings its train (${JSON.stringify(siteCall)})`);
+
+  // drive-thru traffic (pizza and ice cream) only ever drives on real roads: never out of the woods, over grass or buildings
+  await t.boot();
+  const traffic = await t.ev(() => {
+    Game.s.iceCream.owned = true; Game.s.icDrive.owned = true; Game.s.unlocked.driveThru = true;
+    const onRoad = (x, y) => CFG.ROADS.some((R) => x >= R.x0 && x <= R.x1 && y >= R.y0 && y <= R.y1) || (x > CFG.WORLD.x1 && y >= CFG.ROADS[0].y0 && y <= CFG.ROADS[0].y1);
+    const bad = [], seen = new Set(); let ic = 0, pz = 0;
+    // watch from the shop, from the ice cream shop, and from the farm end of town (where the roads meet the woods)
+    for (const [x, y] of [[540, 430], [1150, 650], [-760, 960], [-900, 60]]) {
+      T.tp(x, y, 'town');
+      for (let i = 0; i < 60 * 70; i++) {
+        Game.s.piles.dt = 20; Game.update(1 / 60); if (i % 4 === 0) Render.draw(Game);
+        for (const c of IceCreamDriveThruExt.cars) { if (!seen.has(c)) { seen.add(c); ic++; } if (!onRoad(c.x, c.y)) bad.push(['ice cream', Math.round(c.x), Math.round(c.y), c.state]); }
+        for (const c of Game.cars) { if (!seen.has(c)) { seen.add(c); pz++; } const F = CFG.FIRE_STATION, bay = c.kind === 'firetruck' && c.x > F.x0 - 30 && c.x < F.x1 && c.y > F.y0 && c.y < F.y1;   // the fire truck backs home into its bay
+        if (!onRoad(c.x, c.y) && !bay) bad.push(['pizza', Math.round(c.x), Math.round(c.y), c.state]); }
+      }
+    }
+    return { bad: bad.slice(0, 6), nbad: bad.length, ic, pz, served: Game.s.icDrive.served, pizzas: Game.s.stats.served };
+  });
+  t.expect(traffic.nbad === 0, `drive-thru cars stay on the roads (${JSON.stringify(traffic)})`);
+  t.expect(traffic.ic >= 4 && traffic.pz >= 6 && traffic.served >= 3 && traffic.pizzas >= 3, `both drive-thrus still get cars and serve them (${JSON.stringify(traffic)})`);
+  await t.ev(() => { Render.setZoom(0.1); T.tp(1100, 700, 'town'); Render.draw(Game); IceCreamDriveThruExt.cars = []; IceCreamDriveThruExt.spawnT = 0.01; T.until(() => { Render.draw(Game); return IceCreamDriveThruExt.cars.some((c) => c.state === 'approach' && c.x > 1150); }, 3000); });
+  await t.shot('icecream-drivethru-route');
 };

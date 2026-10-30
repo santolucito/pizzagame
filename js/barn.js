@@ -4,8 +4,8 @@
 // poster, a sleeping cat, swallows under the roof and dust in the sunbeam. Extension module (see js/EXTENSIONS.md).
 CFG.AREAS.barn = { WORLD: { x0: 0, y0: 4000, x1: 600, y1: 4400 } };
 CFG.BARN = {
-  // where you stand on the farm to go in: by the big door on the barn's right wall (the silo takes the spot right in front)
-  DOOR_OUT: { x: -786, y: 280 },
+  // where you stand on the farm to go in: on the grass right in front of the big door on the barn's right wall
+  DOOR_OUT: { x: -774, y: 232 },
   room: { x0: 48, y0: 4130, x1: 552, y1: 4364 }, wall: 22,     // the floor; the back wall carries the hayloft
   loft: { x0: 48, y0: 4040, x1: 552, y1: 4108, walk: { x0: 70, y0: 4050, x1: 530, y1: 4100 } },
   roof: { y0: 4000, y1: 4040 },                               // the back wall up under the rafters (window, poster, swallows)
@@ -471,7 +471,7 @@ const BarnExt = {
     if (this.st.fade <= 0) return;
     ctx.fillStyle = `rgba(20,12,6,${(this.st.fade / 0.45).toFixed(3)})`; ctx.fillRect(0, 0, W, H);
   },
-  // the farm seen from the hayloft window: fields, the cow pen, the silo, the woods, the tractor and a few birds
+  // the farm seen from the hayloft window: fields, the cow pen, the woods, the tractor and a few birds
   drawView(r, g, W, H) {
     const ctx = r.ctx, t = g.time, K = CFG.BARN, k = this.st.view / K.VIEW, a = k > 0.85 ? (1 - k) / 0.15 : k < 0.15 ? k / 0.15 : 1;
     const pw = Math.min(W - 32, 520), ph = Math.min(H - 150, 300), px = W / 2 - pw / 2, py = Math.max(70, H / 2 - ph / 2);
@@ -493,7 +493,7 @@ const BarnExt = {
     soil(60, 190, 150, 70); soil(250, 190, 170, 70);
     for (let i = 0; i < 12; i++) { const x = 74 + (i % 6) * 24, y = 200 + Math.floor(i / 6) * 32; ctx.fillStyle = '#5db04a'; ctx.beginPath(); ctx.ellipse(x, y + 8, 8, 5, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#e53935'; ctx.beginPath(); ctx.arc(x - 3, y + 2, 3.5, 0, Math.PI * 2); ctx.arc(x + 4, y + 5, 3, 0, Math.PI * 2); ctx.fill(); }
     for (let i = 0; i < 14; i++) { const x = 262 + (i % 7) * 23, y = 196 + Math.floor(i / 7) * 32, sw = Math.sin(t * 1.5 + i) * 2; ctx.strokeStyle = '#d4a017'; ctx.lineWidth = 2; for (let k2 = -1; k2 <= 1; k2++) { ctx.beginPath(); ctx.moveTo(x + k2 * 5, y + 22); ctx.lineTo(x + k2 * 5 + sw, y + 4); ctx.stroke(); } ctx.fillStyle = '#f2c94c'; for (let k2 = -1; k2 <= 1; k2++) { ctx.beginPath(); ctx.ellipse(x + k2 * 5 + sw, y + 3, 2.5, 5, 0, 0, Math.PI * 2); ctx.fill(); } }
-    // the cow pen and the cow, the silo beside the barn's own shadow, fences and the scarecrow
+    // the cow pen and the cow, fences and the scarecrow
     const fence = (x0, y, len) => { ctx.fillStyle = '#d7b98a'; ctx.fillRect(x0, y, len, 3); ctx.fillRect(x0, y + 7, len, 3); for (let x = x0; x <= x0 + len; x += 22) ctx.fillRect(x - 1.5, y - 5, 4, 18); };
     fence(300, 150, 170); fence(0, 268, 520);
     ctx.fillStyle = '#6b4a2b'; ctx.fillRect(318, 160, 134, 16);
@@ -501,7 +501,6 @@ const BarnExt = {
     ctx.fillStyle = '#2b1d14'; ctx.fillRect(cx - 10, cy, 3, 7); ctx.fillRect(cx + 7, cy, 3, 7);
     ctx.fillStyle = '#fff'; U.roundRect(ctx, cx - 14, cy - 14, 28, 15, 6); ctx.fill(); ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.ellipse(cx - 4, cy - 8, 5, 4, 0.4, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#fff'; U.roundRect(ctx, cx + 10, cy - 18, 12, 11, 4); ctx.fill(); ctx.fillStyle = '#f8c8dc'; ctx.fillRect(cx + 15, cy - 12, 7, 4);
-    ctx.fillStyle = '#cfd3d8'; U.roundRect(ctx, 470, 120, 30, 60, 14); ctx.fill(); ctx.fillStyle = '#9aa0a8'; for (let y = 130; y < 175; y += 11) ctx.fillRect(470, y, 30, 2); ctx.fillStyle = '#b23a3a'; ctx.beginPath(); ctx.ellipse(485, 120, 15, 7, 0, 0, Math.PI * 2); ctx.fill();
     const sx = 230, sy = 232;
     ctx.fillStyle = '#8d5a2b'; ctx.fillRect(sx - 1.5, sy - 30, 3, 36); ctx.fillRect(sx - 14, sy - 18, 28, 3);
     ctx.fillStyle = '#3b7dd8'; U.roundRect(ctx, sx - 8, sy - 21, 16, 17, 3); ctx.fill(); ctx.fillStyle = '#e0b44c'; ctx.beginPath(); ctx.arc(sx, sy - 27, 6, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#8d5a2b'; ctx.fillRect(sx - 9, sy - 33, 18, 3);

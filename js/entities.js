@@ -136,7 +136,7 @@ class Customer {
 class Car {
   constructor(id, want, kind = 'car') {
     this.id = id; this.kind = kind;
-    this.x = CFG.WORLD.x0 - 110; this.y = (CFG.ROAD.y1 + CFG.ROAD.y2) / 2;
+    this.x = CFG.ROADS[0].x0 + 70; this.y = (CFG.ROAD.y1 + CFG.ROAD.y2) / 2;   // on Main Street; the spawner moves it just out of sight (Game.trafficSpawnX)
     this.angle = 0; this.exitPath = null; this.onDone = null;
     this.state = 'arriving';
     this.want = want; this.have = 0;
@@ -198,6 +198,12 @@ class Train {
   get leavesIn() { return this.state === 'stopped' ? Math.max(0, this.unload + (this.hurrying ? this.hold : 0) + this.toDrop * 0.55) : 0; }
   // bring the train in right now (arriving with a rider from the other town)
   summon() { this.state = 'arriving'; this.x = this.bounds.x0 - 420; this.speed = 320; this.warned = true; this.smoke = []; }
+  // the chef is on foot on (or right by) this train's platform, in its map
+  chefWaiting(g) {
+    const p = g.player, P = this.st.platform;
+    if (g.area !== (this.remote ? 'site' : 'town') || g.driving || g.onTrain || g.travel || g.ride) return false;
+    return p.x > P.x0 - 50 && p.x < P.x1 + 50 && p.y < P.y1 + 60;
+  }
   update(dt, g) {
     const S = this.st, W = this.bounds, home = !this.remote && g.area === 'town';
     // chugga chugga while it rolls, when it is near enough to see (or you are aboard)
@@ -207,6 +213,14 @@ class Train {
       if (near && this.chug <= 0) { Sfx.chuff(g.onTrain ? 1 : 0.7); this.chug = this.speed > 220 ? 0.2 : 0.32; }
     }
     for (const p of this.smoke) { p.t += dt; p.y -= 18 * dt; p.x += 8 * dt; } this.smoke = this.smoke.filter((p) => p.t < 1.6);
+    // waiting by the platform calls the train (like the City bus): a few seconds there and it is on its way
+    const waiting = this.state === 'away' && (this.remote || g.isUnlocked('station')) && this.chefWaiting(g);
+    this.callWait = waiting ? (this.callWait || 0) + dt : 0;
+    const called = waiting && this.callWait >= (S.callAfter || CFG.STATION.callAfter);
+    if (called && (this.remote || this.timer > (S.callIn || 3))) {
+      g.floats.push({ x: g.player.x, y: g.player.y - 70, text: 'Here comes the train! 🚂', color: '#ffe08a', t: 0, dur: 1.6, big: true });
+      if (this.remote) this.summon(); else { this.timer = S.callIn || 3; this.warned = true; }
+    }
     if (this.state === 'away') {
       if (this.remote || !g.isUnlocked('station')) return;   // no trains until the old station is repaired
       this.timer -= dt;

@@ -4,7 +4,9 @@ module.exports = async (t) => {
   await t.boot();
 
   // ---- train to Construction Town and back
-  await t.ev(() => { Game.s.unlocked.station = true; Game.train.summon(); T.until(() => Game.train.state === 'stopped', 1500); const S = CFG.STATION; T.tp(S.stopX + S.boardDx, S.platform.y1 - 12); });
+  // (no timetable wait: standing on the platform for a few seconds calls the train)
+  const called = await t.ev(() => { Game.s.unlocked.station = true; const S = CFG.STATION; T.tp(S.stopX + S.boardDx, S.platform.y1 - 12); return T.until(() => Game.train.state === 'stopped', 1500); });
+  t.expect(called > 5 * 60 && called < 20 * 60, `waiting on the platform brings the train (${called} steps)`);
   t.expectEq(await t.ev(() => T.label()), '🚂 Ride the train', 'train boarding label on the platform');
   await t.ev(() => { T.act(); T.until(() => Game.area === 'site' && Game.siteTrain.state === 'stopped' && !Game.travel, 3000); });
   t.expectEq(await t.ev(() => Game.area), 'site', 'arrived at Construction Town by train');

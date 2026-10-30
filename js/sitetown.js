@@ -5,7 +5,10 @@
 // a toy toolbox and a hard hat), three little houses with gardens (one with a barking dog), a park with a pond and a
 // duck, a playground slide, a bus shelter, a mailbox, a water tower, a DINER with a neon sign and a picnic table, a
 // dirt bike track loop for the site machines, and the CONCRETE FACTORY in the south-east corner: silos, a conveyor,
-// a mixing plant with a turning drum and a puffing chimney, and two rideable concrete mixers that pour puddles.
+// a mixing plant with a turning drum and a puffing chimney, and two rideable concrete mixers (the '🪣 Pour!' button swings
+// out a telescoping chute at the back and pours a stream of concrete into a puddle under its tip). In the site block, by
+// the excavator, a rideable CRANE TRUCK with a steel beam pile: the hook hangs in front of the cab ('🪝 Lift a beam' near
+// the beams, '⬇️ Put it down' anywhere: on the half-built house's walls it clicks into place with a sparkle).
 // Extension module: registered with Game.ext (first, so its door beats the core) and Render.ext (see js/EXTENSIONS.md).
 CFG.SITETOWN = {
   EAST: { x0: 4000, y0: -170, x1: 4500, y1: 1300 },           // the east strip
@@ -42,6 +45,13 @@ CFG.SITETOWN = {
   },
   MIXERS: [{ x: 4210, y: 1200, angle: -Math.PI / 2 }, { x: 4340, y: 1200, angle: -Math.PI / 2 }],
   PUDDLE: 20,                                                 // seconds a poured puddle stays
+  // the mixer's pour: the chute swings out and extends (OUT s), the stream pours (FLOW s), the chute folds back (FOLD s)
+  POUR: { OUT: 0.5, FLOW: 1.5, FOLD: 0.5, PIVOT: -56, SWING: 0.7, SEGS: [20, 20, 18], DROP: 30 },
+  // the crane truck in the site block, near the excavator: the hook hangs HOOK px in front of it, a steel beam pile under it
+  CRANETRUCK: { x: 3440, y: 690, angle: Math.PI },
+  HOOK: 95, BEAM_PILE: { x: 3345, y: 700 }, BEAM_PILE_BOX: { x0: 3311, y0: 687, x1: 3379, y1: 713 },
+  LOOSE_BEAMS: [[3535, 600, 1.3], [2650, 470, 1.45]],          // a couple of beams lying around (x, y, angle)
+  BEAM_LEN: 70, LIFT_REACH: 95, TRUCK_REACH: 125, FRAME_PAD: 44, LIFT_T: 1.4, DROP_T: 1.4,
   // the south strip: the dirt track, the diner and a park
   TRACK: { x: 2950, y: 1160, rx: 310, ry: 118, rxi: 200, ryi: 54 },
   DINER: { x0: 3400, y0: 1040, x1: 3660, y1: 1170, door: { x: 3530 } },
@@ -63,6 +73,7 @@ CFG.SITETOWN = {
 };
 CFG.AREAS.hardware = { WORLD: CFG.SITETOWN.WORLD };
 CFG.VEHICLES.mixer = { speed: 240, radius: 22, label: '🚛 Drive the mixer', exit: '🚶 Hop out' };
+CFG.VEHICLES.cranetruck = { speed: 260, radius: 24, label: '🏗️ Drive the crane', exit: '🚶 Get out' };
 
 const SiteTownExt = {
   name: 'sitetown',
@@ -74,9 +85,13 @@ const SiteTownExt = {
   build(g) {
     const S = CFG.SITETOWN;
     if (!g.s.sitetown) g.s.sitetown = JSON.parse(JSON.stringify(this.defaults.sitetown));
-    this.mixers = S.MIXERS.map((m) => ({ kind: 'mixer', x: m.x, y: m.y, angle: m.angle, vx: 0, vy: 0, drum: 0 }));
+    this.mixers = S.MIXERS.map((m) => ({ kind: 'mixer', x: m.x, y: m.y, angle: m.angle, vx: 0, vy: 0, drum: 0, pour: null }));
+    const C = S.CRANETRUCK;
+    this.crane = { kind: 'cranetruck', x: C.x, y: C.y, angle: C.angle, vx: 0, vy: 0, out: 0, boom: 0, carry: null, anim: null };
+    this.rides = this.mixers.concat([this.crane]);
     this.st = {
-      fade: 0, puddles: [], pourT: 0, smoke: [], smokeT: 0,
+      fade: 0, puddles: [], smoke: [], smokeT: 0,
+      beams: S.LOOSE_BEAMS.map(([x, y, a]) => ({ x, y, a })), frameBeams: [], placed: 0,   // steel beams (not saved)
       seat: null, slide: null, slideCd: 0, shake: 0, toolbox: 0, hat: 0,
       dog: { x: S.DOG.home.x, y: S.DOG.home.y, facing: 1, moving: false, bob: 0, wag: 0, happy: 0, target: null, timer: 0, barkT: 0 },
       duck: { a: 0, x: S.POND.x, y: S.POND.y, facing: 1, quackT: 0 }, duck2: { a: 2, x: S.POND2.x, y: S.POND2.y, facing: 1, quackT: 0 },
@@ -96,6 +111,7 @@ const SiteTownExt = {
     for (const [x, y] of S.TREES) o.push({ x: x - 9, y: y - 8, w: 18, h: 14 });
     o.push(box(S.FACTORY.SILO_BOX), box(S.FACTORY.PLANT), box(S.FACTORY.PILE_BOX));
     o.push(box(S.DINER));
+    o.push(box(S.BEAM_PILE_BOX));   // the steel beam pile in the site block
     o.push({ x: S.TABLE.x - 32, y: S.TABLE.y - 11, w: 64, h: 22 });
     this.st.siteObs = o;
     // inside: the room's walls, the back counter, the paint shaker, the aisle shelves, the workbench, the counter, a plant
@@ -113,7 +129,7 @@ const SiteTownExt = {
     if (g.area === 'hardware') return this.st.roomObs;
     return [];
   },
-  vehicles(g) { if (!this.mixers) this.build(g); return this.mixers; },
+  vehicles(g) { if (!this.rides) this.build(g); return this.rides; },
   free(x, y) {
     const R = CFG.SITETOWN.ROOM, r = 12;
     if (x < R.x0 + r || x > R.x1 - r || y < R.y0 + r || y > R.y1 - r) return false;
@@ -122,6 +138,7 @@ const SiteTownExt = {
   },
   onFoot(g) { return !g.driving && !g.onTrain && !g.ride && !g.travel && !g.fishing && !(typeof CityExt !== 'undefined' && (CityExt.floor || (CityExt.st && (CityExt.st.cab || CityExt.st.boarding)))); },
   inMixer(g) { return g.driving && this.mixers && this.mixers.includes(g.vehicle); },
+  inCrane(g) { return g.driving && !!this.crane && g.vehicle === this.crane; },
   atDoor(g) { const D = CFG.SITETOWN.DOOR_OUT, p = g.player; return g.area === 'site' && this.onFoot(g) && U.dist(p.x, p.y, D.x, D.y) < 30; },
   nearSpot(g, s, d = 26) { const p = g.player; return U.dist(p.x, p.y, s.x, s.y) < d; },
 
@@ -130,7 +147,14 @@ const SiteTownExt = {
     if (!this.st) this.build(g);
     const S = CFG.SITETOWN, st = this.st;
     if (g.area === 'site') {
-      if (this.inMixer(g)) return { label: '🪣 Pour!', run: (gg) => this.pour(gg) };
+      if (this.inMixer(g)) return { label: '🪣 Pour!', run: (gg) => this.pour(gg) };   // pressing again while it pours does nothing
+      if (this.inCrane(g)) {
+        const v = this.crane;
+        if (v.anim) return null;
+        if (v.carry) return { label: '⬇️ Put it down', run: (gg) => this.dropBeam(gg) };
+        if (this.liftSource(g)) return { label: '🪝 Lift a beam', run: (gg) => this.liftBeam(gg) };
+        return null;
+      }
       if (!this.onFoot(g)) return null;
       if (st.seat) return { label: '🚶 Stand up', run: (gg) => this.standUp(gg) };
       if (this.atDoor(g)) return { label: '🚪 Go inside', run: (gg) => this.enter(gg) };
@@ -156,15 +180,150 @@ const SiteTownExt = {
     g.area = 'site'; p.x = S.DOOR_OUT.x; p.y = S.DOOR_OUT.y; p.moving = false; p.facing = 1; p.hasMoved = true; g.cameraSnap = true;
     this.st.key = null; this.st.mix = null; this.st.fade = 0.45; Sfx.drop();
   },
+  // ---------- the concrete mixer's pour: the chute swings out and telescopes, a stream pours from its tip, it folds back
   pour(g) {
-    const v = g.vehicle, st = this.st, a = v.angle;
-    const x = v.x - Math.cos(a) * 60, y = v.y - Math.sin(a) * 60;
-    st.puddles.push({ x, y, t: 0, r: 16 + Math.random() * 6 });
-    if (st.puddles.length > 24) st.puddles.shift();
-    st.pourT = 1.2; g.s.sitetown.pours++;
-    g.floats.push({ x, y: y - 30, text: 'Splosh!', color: '#ffe08a', t: 0, dur: 1.2, big: true });
-    for (let i = 0; i < 6; i++) g.fx.push({ kind: 'dirt', x0: x, y0: y - 6, x1: x + U.rand(-22, 22), y1: y + U.rand(-10, 12), t: -i * 0.03, dur: 0.4 });
-    Sfx.drop(); Haptics.tap();
+    const v = g.vehicle;
+    if (!v || v.kind !== 'mixer' || v.pour) return;
+    v.pour = { t: 0, lock: { x: v.x, y: v.y, angle: v.angle }, puddle: null };
+    v.vx = 0; v.vy = 0; g.s.sitetown.pours++;
+    Sfx.pickup(); Haptics.tap();
+  },
+  pourDur() { const P = CFG.SITETOWN.POUR; return P.OUT + P.FLOW + P.FOLD; },
+  // the chute's shape for a mixer right now: its angle (vehicle frame), the three segment lengths, and the tip (local + world)
+  chute(v) {
+    const P = CFG.SITETOWN.POUR, cl = (x) => U.clamp(x, 0, 1), ease = (x) => x * x * (3 - 2 * x);
+    let swing = 0, l2 = 0, l3 = 0, flowing = false;
+    const t = v && v.pour ? v.pour.t : -1;
+    if (t >= 0) {
+      if (t < P.OUT) { swing = ease(cl(t / 0.25)); l2 = P.SEGS[1] * ease(cl((t - 0.15) / 0.2)); l3 = P.SEGS[2] * ease(cl((t - 0.3) / 0.2)); }
+      else if (t < P.OUT + P.FLOW) { swing = 1; l2 = P.SEGS[1]; l3 = P.SEGS[2]; flowing = true; }
+      else { const u = t - P.OUT - P.FLOW; l3 = P.SEGS[2] * (1 - ease(cl(u / 0.2))); l2 = P.SEGS[1] * (1 - ease(cl((u - 0.15) / 0.2))); swing = 1 - ease(cl((u - 0.3) / 0.2)); }
+    }
+    const ang = Math.PI - P.SWING * swing, len = P.SEGS[0] + l2 + l3;
+    const lx = P.PIVOT + Math.cos(ang) * len, ly = Math.sin(ang) * len;
+    const a = v ? v.angle : 0, ca = Math.cos(a), sa = Math.sin(a);
+    const tip = v ? { x: v.x + lx * ca - ly * sa, y: v.y + lx * sa + ly * ca } : { x: lx, y: ly };
+    return { ang, segs: [P.SEGS[0], l2, l3], swing, local: { x: lx, y: ly }, tip, flowing, t };
+  },
+  stepPour(g, m, dt) {
+    const P = CFG.SITETOWN.POUR, st = this.st, p = m.pour;
+    p.t += dt; this.lockVehicle(g, m, p.lock);
+    if (p.t >= P.OUT && !p.puddle) {
+      // the stream reaches the ground under the chute's tip: a puddle starts growing there
+      const tip = this.chute(m).tip, x = tip.x, y = tip.y + P.DROP;
+      p.puddle = { x, y, t: 0, r: 22 + Math.random() * 6, grow: P.FLOW };
+      st.puddles.push(p.puddle); if (st.puddles.length > 24) st.puddles.shift();
+      g.floats.push({ x, y: y - 44, text: 'Splosh!', color: '#ffe08a', t: 0, dur: 1.4, big: true });
+      for (let i = 0; i < 6; i++) g.fx.push({ kind: 'dirt', x0: x, y0: y - 4, x1: x + U.rand(-22, 22), y1: y + U.rand(-8, 10), t: -i * 0.05, dur: 0.4 });
+      Sfx.drop();
+    }
+    if (p.t >= this.pourDur()) m.pour = null;
+  },
+  // hold a vehicle still (outriggers down, chute out): the joystick does nothing until it is done
+  lockVehicle(g, v, L) {
+    v.x = L.x; v.y = L.y; v.angle = L.angle; v.vx = 0; v.vy = 0;
+    if (g.driving && g.vehicle === v) { g.player.x = v.x; g.player.y = v.y; g.player.moving = false; }
+  },
+
+  // ---------- the crane truck: the hook hangs in front of the cab; lift a steel beam and put it down where the hook is
+  hookPos(v) { const H = CFG.SITETOWN.HOOK; v = v || this.crane; return { x: v.x + Math.cos(v.angle) * H, y: v.y + Math.sin(v.angle) * H }; },
+  beamSources() {
+    const P = CFG.SITETOWN.BEAM_PILE;
+    return [{ kind: 'pile', x: P.x, y: P.y - 14, a: 0 }].concat(this.st.beams.map((b) => ({ kind: 'loose', b, x: b.x, y: b.y, a: b.a })));
+  },
+  // the beam the hook can reach (generous: near the hook, or near the truck), nearest the hook first
+  liftSource(g) {
+    const S = CFG.SITETOWN, v = this.crane, h = this.hookPos(v);
+    let best = null, bd = Infinity;
+    for (const s of this.beamSources()) {
+      const dh = U.dist(h.x, h.y, s.x, s.y), dv = U.dist(v.x, v.y, s.x, s.y);
+      if ((dh < S.LIFT_REACH || dv < S.TRUCK_REACH) && dh < bd) { bd = dh; best = s; }
+    }
+    return best;
+  },
+  // where a beam lowered at (x, y) lands on the half-built house's walls (null when the hook is not over the house)
+  frameSpot(x, y, anywhere) {
+    const S = CFG.SITETOWN, B = CFG.SITE.BUILDING, pad = S.FRAME_PAD, w = 7, half = S.BEAM_LEN / 2;
+    if (!anywhere && (x < B.x0 - pad || x > B.x1 + pad || y < B.y0 - pad || y > B.y1 + pad)) return null;
+    const dl = B.door.x - B.door.half, dr = B.door.x + B.door.half;
+    const segs = [[B.x0, B.x1, B.y0 + w, 1], [B.x0, dl, B.y1 - w, 1], [dr, B.x1, B.y1 - w, 1], [B.y0, B.y1, B.x0 + w, 0], [B.y0, B.y1, B.x1 - w, 0]];
+    let best = null, bd = Infinity;
+    for (const [a0, a1, c, horiz] of segs) {
+      const lo = a0 + half - 4, hi = Math.max(lo, a1 - half + 4);
+      const q = horiz ? { x: U.clamp(x, lo, hi), y: c, a: 0 } : { x: c, y: U.clamp(y, lo, hi), a: Math.PI / 2 };
+      const d = U.dist(x, y, q.x, q.y); if (d < bd) { bd = d; best = q; }
+    }
+    best.lev = this.st.frameBeams.filter((b) => b.a === best.a && U.dist(b.x, b.y, best.x, best.y) < 26).length;
+    return best;
+  },
+  carryAngle(v) { return v.angle + Math.PI / 2; },
+  boomH(b) { return 30 + 44 * b; },   // how high the boom's tip is (screen px) for a boom raise of 0..1
+  liftBeam(g) {
+    const v = this.crane; if (v.anim || v.carry) return;
+    const src = this.liftSource(g); if (!src) return;
+    if (src.kind === 'loose') this.st.beams = this.st.beams.filter((b) => b !== src.b);
+    v.anim = { kind: 'lift', t: 0, lock: { x: v.x, y: v.y, angle: v.angle }, from: { x: src.x, y: src.y, a: src.a } };
+    v.vx = 0; v.vy = 0;
+    Sfx.pickup(); Haptics.tap();
+  },
+  dropBeam(g) {
+    const v = this.crane; if (v.anim || !v.carry) return;
+    const h = this.hookPos(v), f = this.frameSpot(h.x, h.y);
+    const to = f ? { x: f.x, y: f.y, a: f.a, lev: f.lev, frame: true } : { x: h.x, y: h.y, a: this.carryAngle(v), lev: 0, frame: false };
+    v.carry = null; v.vx = 0; v.vy = 0;
+    v.anim = { kind: 'drop', t: 0, lock: { x: v.x, y: v.y, angle: v.angle }, to, placed: false };
+    Haptics.tap();
+  },
+  placeBeam(g, to) {
+    const st = this.st;
+    if (to.frame) {
+      st.frameBeams.push({ x: to.x, y: to.y, a: to.a, lev: to.lev }); if (st.frameBeams.length > 30) st.frameBeams.shift();
+      st.placed++;
+      const y = to.y - to.lev * 6;
+      for (let i = 0; i < 7; i++) g.fx.push({ kind: 'sparkle', x0: to.x + U.rand(-30, 30) * (to.a ? 0.3 : 1), y0: y + U.rand(-30, 30) * (to.a ? 1 : 0.3) - 6, x1: 0, y1: 0, t: -i * 0.05, dur: 0.6 });
+      g.floats.push({ x: to.x, y: y - 40, text: 'Click! ✨', color: '#ffe08a', t: 0, dur: 1.4, big: true });
+      Sfx.ding(); Haptics.success();
+    } else {
+      st.beams.push({ x: to.x, y: to.y, a: to.a }); if (st.beams.length > 12) st.beams.shift();
+      g.floats.push({ x: to.x, y: to.y - 34, text: 'Clunk!', color: '#fff8ee', t: 0, dur: 1, big: false });
+      Sfx.drop(); Haptics.tap();
+    }
+  },
+  stepCrane(g, dt) {
+    const S = CFG.SITETOWN, v = this.crane, a = v.anim;
+    if (!a) { v.out = Math.max(0, v.out - dt * 4); v.boom = v.carry ? 1 : 0; return; }
+    a.t += dt; this.lockVehicle(g, v, a.lock);
+    const T = a.kind === 'lift' ? S.LIFT_T : S.DROP_T, k = U.clamp((a.t - 0.3) / 0.8, 0, 1), e = k * k * (3 - 2 * k);
+    v.out = a.t < 0.3 ? a.t / 0.3 : a.t > T - 0.3 ? Math.max(0, (T - a.t) / 0.3) : 1;   // the outriggers drop, then tuck back in
+    v.boom = a.kind === 'lift' ? e : 1 - e;
+    if (a.kind === 'drop' && !a.placed && a.t >= 1.1) { a.placed = true; this.placeBeam(g, a.to); }
+    if (a.t >= T) { if (a.kind === 'lift') v.carry = { t: 0 }; v.anim = null; v.out = 0; v.boom = v.carry ? 1 : 0; }
+  },
+  // the beam in the air right now (lifting, carried or lowering): {x, y (ground), h (height), a}, or null
+  beamNow(v) {
+    v = v || this.crane;
+    const a = v.anim, hook = this.hookPos(v), ch = this.boomH(1) - 26, ca = this.carryAngle(v);
+    const lerpA = (a0, a1, k) => { let d = a1 - a0; while (d > Math.PI / 2) d -= Math.PI; while (d < -Math.PI / 2) d += Math.PI; return a0 + d * k; };
+    if (a) {
+      const k0 = U.clamp((a.t - 0.3) / 0.8, 0, 1), k = k0 * k0 * (3 - 2 * k0);
+      if (a.kind === 'lift') return { x: U.lerp(a.from.x, hook.x, k), y: U.lerp(a.from.y, hook.y, k), h: U.lerp(0, ch, k), a: lerpA(a.from.a, ca, k) };
+      if (a.placed) return null;
+      return { x: U.lerp(hook.x, a.to.x, k), y: U.lerp(hook.y, a.to.y, k), h: U.lerp(ch, a.to.lev * 6, k), a: lerpA(ca, a.to.a, k) };
+    }
+    if (v.carry) return { x: hook.x, y: hook.y, h: ch, a: ca };
+    return null;
+  },
+  craneHint(g) {
+    const v = this.crane, h = this.hookPos(v);
+    if (v.anim) return { text: v.anim.kind === 'lift' ? 'Up it goes! 🪝' : 'Down it goes! ⬇️', target: null };
+    if (v.carry) {
+      if (this.frameSpot(h.x, h.y)) return { text: 'Press the big button to put the beam on the house! 🏠', target: null };
+      const f = this.frameSpot(h.x, h.y, true);
+      return { text: 'Bring the beam to the house! 🏠', target: { x: f.x, y: f.y } };
+    }
+    if (this.liftSource(g)) return { text: 'Press the big button to lift a beam! 🪝', target: null };
+    const s = this.beamSources().sort((a, b) => U.dist(h.x, h.y, a.x, a.y) - U.dist(h.x, h.y, b.x, b.y))[0];
+    return { text: 'Drive the hook to the steel beams! 🪝', target: { x: s.x, y: s.y } };
   },
   sitDown(g) {
     const S = CFG.SITETOWN, p = g.player;
@@ -191,7 +350,9 @@ const SiteTownExt = {
   home(g) {
     if (!this.st) return;
     const st = this.st, S = CFG.SITETOWN;
-    st.seat = null; st.slide = null; st.key = null; st.mix = null; st.fade = 0; st.pourT = 0;
+    st.seat = null; st.slide = null; st.key = null; st.mix = null; st.fade = 0;
+    for (const m of this.mixers) m.pour = null;
+    const v = this.crane; v.anim = null; v.carry = null; v.out = 0; v.boom = 0;
     st.keeper.x = S.KEEPER_HOME.x; st.keeper.y = S.KEEPER_HOME.y; st.keeper.wave = 0;
   },
   // a save or a push that left the chef in a wall or in the shelves goes back onto the door mat
@@ -207,8 +368,9 @@ const SiteTownExt = {
     const st = this.st, S = CFG.SITETOWN, p = g.player;
     st.fade = Math.max(0, st.fade - dt);
     st.toolbox = Math.max(0, st.toolbox - dt); st.hat = Math.max(0, st.hat - dt); st.shake = Math.max(0, st.shake - dt);
-    st.pourT = Math.max(0, st.pourT - dt); st.slideCd = Math.max(0, st.slideCd - dt);
-    for (const m of this.mixers) m.drum += dt * (g.driving && g.vehicle === m ? (st.pourT > 0 ? 9 : 3.5) : 0.8);
+    st.slideCd = Math.max(0, st.slideCd - dt);
+    for (const m of this.mixers) { m.drum += dt * (m.pour ? 14 : g.driving && g.vehicle === m ? 3.5 : 0.8); if (m.pour) this.stepPour(g, m, dt); }
+    this.stepCrane(g, dt);
     for (const q of st.puddles) q.t += dt; st.puddles = st.puddles.filter((q) => q.t < S.PUDDLE);
     if (g.area === 'site') this.updateSite(g, dt);
     else { if (st.seat) st.seat = null; if (st.slide) st.slide = null; }
@@ -297,11 +459,15 @@ const SiteTownExt = {
     const S = CFG.SITETOWN, st = this.st, p = g.player, s = g.s.sitetown;
     if (g.area === 'site') {
       if (g.travel || g.onTrain || g.ride || g.fishing) return undefined;
-      if (g.driving) return this.inMixer(g) ? { text: st.pourT > 0 ? 'Splosh! Fresh concrete 🪣' : 'Press the big button to pour concrete! 🪣', target: null } : undefined;
+      if (g.driving) {
+        if (this.inMixer(g)) return { text: g.vehicle.pour ? 'Splosh! Fresh concrete 🪣' : 'Press the big button to pour concrete! 🪣', target: null };
+        return this.inCrane(g) ? this.craneHint(g) : undefined;
+      }
       if (st.seat) return { text: st.shake > 0 ? 'Mmm, milkshake! 🥤' : 'Enjoy the sunshine! Press the button to stand up', target: null };
       if (st.slide) return { text: 'Wheee! 🛝', target: null };
       const dd = U.dist(p.x, p.y, S.DOOR_OUT.x, S.DOOR_OUT.y);
       if (dd < 70) return { text: 'Go into the hardware store! 🔧', target: dd < 30 ? null : S.DOOR_OUT };
+      if (U.dist(p.x, p.y, this.crane.x, this.crane.y) < 110) return { text: 'Drive the crane truck! 🏗️', target: this.crane };
       const m = this.mixers.slice().sort((a, b) => U.dist(p.x, p.y, a.x, a.y) - U.dist(p.x, p.y, b.x, b.y))[0];
       if (U.dist(p.x, p.y, m.x, m.y) < 160) return { text: 'Drive the concrete mixer! 🚛', target: m };
       if (U.dist(p.x, p.y, S.SEAT.x, S.SEAT.y) < 70) return { text: s.shakes || g.s.cash < 3 ? 'Sit at the picnic table! 🪑' : 'Buy a milkshake at the diner! 🥤', target: s.shakes || g.s.cash < 3 ? S.SEAT : S.PADS.shake };
@@ -620,9 +786,21 @@ const SiteTownExt = {
     if (g.area === 'site') {
       // poured concrete puddles (fade out at the end)
       for (const q of st.puddles) {
-        const k = Math.min(1, q.t * 4), a = q.t > S.PUDDLE - 2 ? (S.PUDDLE - q.t) / 2 : 1;
+        const k = q.grow ? 0.25 + 0.75 * Math.sqrt(Math.min(1, q.t / q.grow)) : Math.min(1, q.t * 4), a = q.t > S.PUDDLE - 2 ? (S.PUDDLE - q.t) / 2 : 1;
         ctx.globalAlpha = a; ctx.fillStyle = '#8a8d93'; ctx.beginPath(); ctx.ellipse(q.x, q.y, q.r * k, q.r * 0.55 * k, 0, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = '#a3a6ab'; ctx.beginPath(); ctx.ellipse(q.x - q.r * 0.2, q.y - q.r * 0.15, q.r * 0.5 * k, q.r * 0.25 * k, 0, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+      }
+      // steel beams lying on the ground and the ones set on the half-built house's walls
+      for (const b of st.beams) this.drawBeam(ctx, b.x, b.y, b.a, 0, true);
+      for (const b of st.frameBeams) this.drawBeam(ctx, b.x, b.y, b.a, b.lev * 6, true);
+      // driving the crane truck: the hook's ring on the ground (green when there is something to lift or the house to build)
+      if (this.inCrane(g) && !this.crane.anim) {
+        const v = this.crane, h = this.hookPos(v), f = v.carry ? this.frameSpot(h.x, h.y) : null, ok = v.carry ? !!f : !!this.liftSource(g);
+        if (f) { ctx.globalAlpha = 0.35 + 0.15 * Math.sin(t * 6); this.drawBeam(ctx, f.x, f.y, f.a, f.lev * 6, false); ctx.globalAlpha = 1; }
+        const pr = 1 + Math.sin(t * 5) * 0.08;
+        ctx.strokeStyle = ok ? '#41b883' : '#ffe08a'; ctx.lineWidth = 4; ctx.setLineDash([8, 6]);
+        ctx.beginPath(); ctx.ellipse(h.x, h.y, 24 * pr, 12 * pr, 0, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = ok ? 'rgba(65,184,131,0.22)' : 'rgba(255,224,138,0.18)'; ctx.beginPath(); ctx.ellipse(h.x, h.y, 24 * pr, 12 * pr, 0, 0, Math.PI * 2); ctx.fill();
       }
       // the conveyor belt: moving stripes and gravel lumps
       const F = CFG.SITETOWN.FACTORY, B = F.BELT, L = Math.hypot(B.x1 - B.x0, B.y1 - B.y0), ang = Math.atan2(B.y1 - B.y0, B.x1 - B.x0);
@@ -675,7 +853,9 @@ const SiteTownExt = {
       if (st.shake > 0) items.push({ y: p.y + 1, draw: () => this.drawShake(r, g) });
     }
     if (g.area === 'site') {
-      for (const v of this.mixers) items.push({ y: v.y + 12, draw: () => r.drawSiteVehicle(g, v, 30) });
+      for (const v of this.mixers) items.push({ y: v.y + 12, draw: () => { r.drawSiteVehicle(g, v, 30); this.drawStream(r, g, v); } });
+      items.push({ y: this.crane.y + 12, draw: () => this.drawCrane(r, g, this.crane) });
+      items.push({ y: S.BEAM_PILE_BOX.y1, draw: () => this.drawBeamPile(r, g) });
       items.push({ y: st.dog.y, draw: () => r.drawDog(st.dog, g) });
       items.push({ y: S.TOWER.y + 2, draw: () => this.drawTower(r, g) });
       items.push({ y: S.FACTORY.SILO_BOX.y1 + 1, draw: () => this.drawSilos(r, g) });
@@ -684,6 +864,78 @@ const SiteTownExt = {
     } else if (g.area === 'hardware') {
       items.push({ y: st.keeper.y, draw: () => this.drawKeeper(r, g) });
     }
+  },
+  // a red steel I-beam seen from above, `h` px off the ground
+  drawBeam(ctx, x, y, a, h, shadow) {
+    const L = CFG.SITETOWN.BEAM_LEN;
+    if (shadow) { ctx.save(); ctx.translate(x + 3, y + 4); ctx.rotate(a); ctx.fillStyle = 'rgba(0,0,0,0.2)'; U.roundRect(ctx, -L / 2, -6, L, 12, 3); ctx.fill(); ctx.restore(); }
+    ctx.save(); ctx.translate(x, y - (h || 0)); ctx.rotate(a);
+    ctx.fillStyle = '#c7442a'; U.roundRect(ctx, -L / 2, -7, L, 14, 2); ctx.fill();
+    ctx.fillStyle = '#ef6a45'; ctx.fillRect(-L / 2, -7, L, 4);
+    ctx.fillStyle = '#9a3220'; ctx.fillRect(-L / 2, 3, L, 4); ctx.fillRect(-L / 2, -1, L, 2);
+    ctx.fillStyle = '#4a1a10'; for (const ex of [-L / 2 + 6, L / 2 - 6]) { ctx.beginPath(); ctx.arc(ex, -4.5, 1.4, 0, Math.PI * 2); ctx.arc(ex, 4.5, 1.4, 0, Math.PI * 2); ctx.fill(); }
+    ctx.restore();
+  },
+  drawBeamPile(r, g) {
+    const ctx = r.ctx, P = CFG.SITETOWN.BEAM_PILE, B = CFG.SITETOWN.BEAM_PILE_BOX;
+    ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(B.x0 + 4, B.y0 + 4, B.x1 - B.x0, B.y1 - B.y0);
+    ctx.fillStyle = '#8d5a2b'; ctx.fillRect(P.x - 26, B.y0 - 2, 10, B.y1 - B.y0 + 4); ctx.fillRect(P.x + 16, B.y0 - 2, 10, B.y1 - B.y0 + 4);   // wooden blocks
+    for (let i = 0; i < 3; i++) this.drawBeam(ctx, P.x, P.y - 10 + i * 9, 0, 4, false);
+    for (let i = 0; i < 2; i++) this.drawBeam(ctx, P.x + 3, P.y - 6 + i * 9, 0, 14, false);
+    this.drawBeam(ctx, P.x - 2, P.y - 2, 0, 24, false);
+    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, P.x - 26, B.y1 + 2, 52, 13, 3); ctx.fill();
+    ctx.fillStyle = '#ffe08a'; ctx.font = r.font(8); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🏗️ STEEL', P.x, B.y1 + 9);
+  },
+  // the crane truck: the truck itself (outriggers, turntable) turned with it, then the boom, the cable, the hook and any beam
+  // drawn in world space so the boom can rise towards the camera
+  drawCrane(r, g, v) {
+    const ctx = r.ctx, riding = g.driving && g.vehicle === v;
+    ctx.save(); ctx.translate(v.x, v.y); ctx.rotate(v.angle);
+    r.drawVehicle(v.kind, g, g.s.paint[v.kind], v);
+    if (riding) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(-26, -9, 7, 8, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(-23, -9, 5, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-25, -9, 4.5, 0, Math.PI * 2); ctx.fill(); }
+    ctx.restore();
+    const ca = Math.cos(v.angle), sa = Math.sin(v.angle), px = v.x + (-22) * ca - 8 * sa, py = v.y + (-22) * sa + 8 * ca;
+    const hk = this.hookPos(v), th = this.boomH(v.boom), tx = hk.x, ty = hk.y - th, bx0 = px, by0 = py - 16;
+    const col = r.paintColor(g.s.paint[v.kind] || '#f2b705', g);
+    // the boom's shadow on the ground, then the boom: a thick yellow lattice arm from the turntable to the tip
+    ctx.strokeStyle = 'rgba(0,0,0,0.16)'; ctx.lineWidth = 9; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(px + 6, py + 6); ctx.lineTo(hk.x + 6 + v.boom * 10, hk.y + 6); ctx.stroke();
+    const bw = 10 + v.boom * 3, L = Math.hypot(tx - bx0, ty - by0), ang = Math.atan2(ty - by0, tx - bx0);
+    ctx.save(); ctx.translate(bx0, by0); ctx.rotate(ang);
+    ctx.fillStyle = '#8a6a00'; U.roundRect(ctx, -6, -bw / 2 - 1, L + 10, bw + 2, 4); ctx.fill();
+    ctx.fillStyle = col; U.roundRect(ctx, -5, -bw / 2, L + 8, bw, 4); ctx.fill();
+    ctx.strokeStyle = 'rgba(43,29,20,0.45)'; ctx.lineWidth = 1.5; ctx.beginPath();
+    for (let x = 4; x < L - 4; x += 10) { ctx.moveTo(x, -bw / 2 + 2); ctx.lineTo(x + 5, bw / 2 - 2); ctx.moveTo(x + 5, bw / 2 - 2); ctx.lineTo(x + 10, -bw / 2 + 2); }
+    ctx.stroke();
+    ctx.fillStyle = '#5c6670'; ctx.beginPath(); ctx.arc(L, 0, bw / 2 + 1, 0, Math.PI * 2); ctx.fill();   // the pulley at the tip
+    ctx.fillStyle = '#2d3a4a'; ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    // the cable and the hook, with the beam on a two-rope sling when there is one
+    const beam = this.beamNow(v);
+    const hookX = beam ? beam.x : tx, hookY = beam ? beam.y - beam.h - 16 : ty + 20;
+    ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(hookX, hookY); ctx.stroke();
+    if (beam) {
+      ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(beam.x + 2, beam.y + 3, 30, 9, 0, 0, Math.PI * 2); ctx.fill();
+      const ex = Math.cos(beam.a) * 22, ey = Math.sin(beam.a) * 22, by = beam.y - beam.h;
+      this.drawBeam(ctx, beam.x, beam.y, beam.a, beam.h, false);
+      ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(hookX, hookY); ctx.lineTo(beam.x + ex, by + ey); ctx.moveTo(hookX, hookY); ctx.lineTo(beam.x - ex, by - ey); ctx.stroke();
+    }
+    ctx.fillStyle = '#f2b705'; U.roundRect(ctx, hookX - 5, hookY - 8, 10, 7, 2); ctx.fill();
+    ctx.strokeStyle = '#5c6670'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(hookX, hookY + 3, 4, -Math.PI / 2, Math.PI * 0.9); ctx.stroke();
+    r.drawRidingExtras(g, v, 30);
+  },
+  // the mixer's concrete stream: from the chute's tip straight down to the puddle, thick and wobbly, with a few drops
+  drawStream(r, g, v) {
+    if (!v.pour) return;
+    const ch = this.chute(v); if (!ch.flowing) return;
+    const ctx = r.ctx, P = CFG.SITETOWN.POUR, t = g.time, u = ch.t - P.OUT, x = ch.tip.x, y0 = ch.tip.y, y1 = y0 + P.DROP;
+    const front = Math.min(1, u / 0.15), thin = Math.min(1, (P.FLOW - u) / 0.2), w = 6 + 6 * thin;
+    const yb = y0 + (y1 - y0) * front, wob = Math.sin(t * 30) * 1.4;
+    const body = () => { ctx.beginPath(); ctx.moveTo(x - w / 2, y0); ctx.quadraticCurveTo(x - w / 2 + wob, (y0 + yb) / 2, x - w / 2 - 1.5, yb); ctx.lineTo(x + w / 2 + 1.5, yb); ctx.quadraticCurveTo(x + w / 2 + wob, (y0 + yb) / 2, x + w / 2, y0); ctx.closePath(); };
+    ctx.fillStyle = '#5d6168'; body(); ctx.fill(); ctx.strokeStyle = '#3f4248'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = '#9da1a8'; ctx.fillRect(x - 1.5 + wob * 0.5, y0 + 1, 3, Math.max(0, yb - y0 - 2));
+    ctx.fillStyle = '#6b6e75';
+    for (let i = 0; i < 5; i++) { const k = (t * 2.2 + i * 0.2) % 1, dx = (i % 2 ? 1 : -1) * (w / 2 + 3 + k * 6); ctx.beginPath(); ctx.arc(x + dx, y0 + (y1 - y0) * k * front, 2 + (i % 2), 0, Math.PI * 2); ctx.fill(); }
+    if (front >= 1) { ctx.strokeStyle = 'rgba(163,166,171,0.9)'; ctx.lineWidth = 2; const s = (t * 3) % 1; ctx.beginPath(); ctx.ellipse(x, y1, 8 + s * 10, 3 + s * 4, 0, 0, Math.PI * 2); ctx.stroke(); }
   },
   drawHardHat(r, g) {
     const ctx = r.ctx, p = g.player, bob = p.moving ? Math.sin(p.bob || 0) * 2 : 0, x = p.x, y = p.y - 60 + bob;
@@ -787,6 +1039,34 @@ const SiteTownExt = {
 
   // ---------- the concrete mixer, nose +x: an orange cab, a big striped drum that turns, a chute at the back
   vehicleArt: {
+    // the crane truck, nose +x: a yellow carrier with four outriggers that fold out, a cab, a turntable with the
+    // operator's little cab (the boom, cable and hook are drawn in world space by drawCrane)
+    cranetruck(r, g, color, v, h) {
+      const ctx = r.ctx, c = color || '#f2b705', out = v ? v.out || 0 : 0, t = g.time;
+      h.shadow(112, 24);
+      for (const ox of [-42, 30]) for (const sy of [-1, 1]) {
+        const reach = 20 + out * 22;
+        ctx.fillStyle = '#5c6670'; ctx.fillRect(ox - 4, sy < 0 ? -reach : 0, 8, reach);
+        ctx.fillStyle = '#2b1d14'; for (let k = 6; k < reach - 4; k += 8) ctx.fillRect(ox - 4, sy < 0 ? -k - 3 : k, 8, 3);
+        if (out > 0.05) { ctx.fillStyle = '#2b2b2b'; U.roundRect(ctx, ox - 9, sy * reach - 5, 18, 10, 3); ctx.fill(); ctx.fillStyle = '#9aa0a8'; ctx.fillRect(ox - 6, sy * reach - 2, 12, 4); }
+      }
+      h.wheels([-30, -8, 38], 15, 10, 24);
+      ctx.fillStyle = '#5c6670'; U.roundRect(ctx, -56, -20, 112, 40, 6); ctx.fill();          // chassis
+      ctx.fillStyle = c; U.roundRect(ctx, -56, -22, 78, 44, 6); ctx.fill();                   // carrier deck
+      ctx.fillStyle = '#2b1d14'; for (let k = 0; k < 4; k++) ctx.fillRect(-56, -20 + k * 11, 6, 6);   // hazard stripes at the back
+      ctx.fillStyle = c; U.roundRect(ctx, 26, -22, 30, 44, 7); ctx.fill();                     // cab
+      ctx.fillStyle = '#bfe3ff'; U.roundRect(ctx, 44, -17, 9, 34, 3); ctx.fill(); U.roundRect(ctx, 29, -17, 7, 34, 3); ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(26, -3, 30, 6);
+      // the turntable and the operator's cab on it
+      ctx.fillStyle = '#2d3a4a'; ctx.beginPath(); ctx.arc(-22, 0, 19, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = c; ctx.beginPath(); ctx.arc(-22, 0, 16, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.arc(-22, 0, 16, Math.PI * 0.5, Math.PI * 1.5); ctx.fill();
+      ctx.fillStyle = '#e0a800'; U.roundRect(ctx, -34, -18, 18, 16, 3); ctx.fill(); ctx.fillStyle = '#bfe3ff'; U.roundRect(ctx, -26, -16, 8, 12, 2); ctx.fill();
+      ctx.fillStyle = '#5c6670'; U.roundRect(ctx, -30, 2, 16, 12, 3); ctx.fill();               // the boom's foot
+      if (!v) { ctx.fillStyle = c; U.roundRect(ctx, -24, 4, 84, 8, 3); ctx.fill(); ctx.fillStyle = '#5c6670'; ctx.beginPath(); ctx.arc(60, 8, 4, 0, Math.PI * 2); ctx.fill(); }   // a stowed boom when drawn on its own
+      h.lights(112, 24);
+      ctx.fillStyle = Math.floor(t * 3) % 2 ? '#ffb300' : '#ffe08a'; ctx.beginPath(); ctx.arc(34, -24, 3, 0, Math.PI * 2); ctx.fill();   // roof beacon
+    },
     mixer(r, g, color, v, h) {
       const ctx = r.ctx, c = color || '#ff7a1a', t = g.time, spin = v && v.drum !== undefined ? v.drum : t * 0.8;
       h.shadow(110, 24);
@@ -805,10 +1085,19 @@ const SiteTownExt = {
       ctx.restore();
       ctx.strokeStyle = '#5c6670'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(-12, 0, 38, 20, 0, 0, Math.PI * 2); ctx.stroke();
       ctx.fillStyle = '#5c6670'; U.roundRect(ctx, 18, -8, 10, 16, 3); ctx.fill();                          // drum's front bearing
-      // the chute at the back, grey, with a drip while pouring
-      ctx.fillStyle = '#9aa0a8'; ctx.beginPath(); ctx.moveTo(-50, -7); ctx.lineTo(-50, 7); ctx.lineTo(-66, 10); ctx.lineTo(-66, -10); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = '#5c6670'; U.roundRect(ctx, -54, -5, 8, 10, 2); ctx.fill();
-      if (v && SiteTownExt.st && SiteTownExt.st.pourT > 0 && g.vehicle === v) { ctx.fillStyle = '#8a8d93'; ctx.beginPath(); ctx.ellipse(-70, 0, 5, 7, 0, 0, Math.PI * 2); ctx.fill(); }
+      // the chute at the back: three telescoping grey channels that swing out and slide open to pour
+      const ch = SiteTownExt.chute(v), P = CFG.SITETOWN.POUR;
+      ctx.save(); ctx.translate(P.PIVOT, 0); ctx.rotate(ch.ang);
+      const [l1, l2, l3] = ch.segs, chan = (x0, len, half, open) => {
+        ctx.fillStyle = '#5c6670'; U.roundRect(ctx, x0 - 1, -half - 1, len + 2, half * 2 + 2, 3); ctx.fill();
+        ctx.fillStyle = '#b7bcc4'; U.roundRect(ctx, x0, -half, len, half * 2, 3); ctx.fill();
+        ctx.fillStyle = open ? '#8a8d93' : '#7c838d'; ctx.fillRect(x0 + 2, -half + 2.5, Math.max(0, len - 4), half * 2 - 5);
+      };
+      if (l3 > 0.5) chan(l1 + l2 - 4, l3 + 4, 4.5, ch.flowing);
+      if (l2 > 0.5) chan(l1 - 4, l2 + 4, 5.5, ch.flowing);
+      chan(0, l1, 6.5, ch.flowing);
+      ctx.restore();
+      ctx.fillStyle = '#5c6670'; ctx.beginPath(); ctx.arc(P.PIVOT, 0, 5, 0, Math.PI * 2); ctx.fill();
       h.lights(110, 24);
       ctx.fillStyle = Math.floor(t * 3) % 2 ? '#ffb300' : '#ffe08a'; ctx.beginPath(); ctx.arc(30, -24, 3, 0, Math.PI * 2); ctx.fill();   // roof beacon
     },

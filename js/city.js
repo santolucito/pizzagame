@@ -232,7 +232,9 @@ const CityExt = {
       if (b.dwell <= 0 && !st.boarding) { b.state = 'leaving'; b.speed = 0; }
     } else if (b.state === 'leaving') {
       b.speed = Math.min(B.speed, b.speed + 200 * dt); b.x -= b.speed * dt;
-      if (b.x < CFG.WORLD.x0 - 250) { b.state = 'away'; b.timer = U.rand(B.every[0], B.every[1]); }
+      // gone once it is off the left of the screen (or at the end of the road), never driving on into the woods
+      const offLeft = g.area === 'town' && typeof Render !== 'undefined' && b.x < Render.camX - 200;
+      if (b.x < -950 || offLeft) { b.state = 'away'; b.timer = U.rand(B.every[0], B.every[1]); }
     }
   },
 
@@ -1141,7 +1143,7 @@ const CityExt = {
     { const ox = sx(0.14, K1), oy = hz - Rv * 0.05, s2 = S * 0.72; ctx.save(); ctx.globalAlpha = 0.82; ctx.translate(ox, oy); ctx.scale(s2, s2);
       ctx.fillStyle = '#8bc34a'; ctx.beginPath(); ctx.ellipse(0, 6, 190, 22, 0, Math.PI, 0); ctx.fill();
       ctx.fillStyle = '#6b4a2b'; for (const dx of [-170, -140, 70, 100, 150]) { ctx.fillRect(dx - 2, -14, 4, 14); ctx.fillStyle = '#3f9a4a'; ctx.beginPath(); ctx.arc(dx, -18, 9, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#6b4a2b'; }
-      ctx.fillStyle = '#b23a48'; ctx.fillRect(-122, -24, 30, 24); ctx.fillStyle = '#8a2a36'; ctx.beginPath(); ctx.moveTo(-125, -24); ctx.lineTo(-107, -36); ctx.lineTo(-89, -24); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#9aa0a8'; ctx.fillRect(-88, -40, 10, 40); ctx.beginPath(); ctx.arc(-83, -40, 5, Math.PI, 0); ctx.fill();   // barn + silo
+      ctx.fillStyle = '#b23a48'; ctx.fillRect(-122, -24, 30, 24); ctx.fillStyle = '#8a2a36'; ctx.beginPath(); ctx.moveTo(-125, -24); ctx.lineTo(-107, -36); ctx.lineTo(-89, -24); ctx.closePath(); ctx.fill();   // the barn
       ctx.fillStyle = '#c98a4b'; ctx.fillRect(-62, -18, 28, 18); ctx.fillStyle = '#8a5527'; ctx.fillRect(-64, -22, 32, 5); ctx.fillStyle = '#2d3a4a'; ctx.fillRect(-70, -6, 70, 3); ctx.fillStyle = '#c62828'; ctx.fillRect(-54 + ((t * 20) % 70), -12, 14, 6); ctx.fillStyle = '#2d8a5a'; ctx.fillRect(-70 + ((t * 20) % 70), -12, 14, 6);   // the station and a passing train
       ctx.fillStyle = '#f2c94c'; ctx.fillRect(-18, -30, 44, 30); ctx.fillStyle = '#c62828'; ctx.fillRect(-20, -36, 48, 6); ctx.fillStyle = '#9fe0ff'; ctx.fillRect(-12, -22, 10, 8); ctx.fillRect(8, -22, 10, 8); ctx.fillStyle = '#5b3a1a'; ctx.fillRect(-1, -12, 8, 12);
       ctx.fillStyle = '#fff'; ctx.fillRect(-14, -48, 36, 12); ctx.fillStyle = '#e4572e'; ctx.font = r.font(8); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('PIZZA', 4, -42); r.drawPizza(24, -42, 5);   // the pizzeria and its sign

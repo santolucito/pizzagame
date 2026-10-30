@@ -19,6 +19,12 @@ module.exports = async (t) => {
   // ---- the door spot on the farm is free ground; label and hint there
   const spot = await t.ev(() => { const D = CFG.BARN.DOOR_OUT; return { blocked: Game.obstacles().some((o) => Game.hitRect(D.x, D.y, 12, o)), D }; });
   t.expect(!spot.blocked, `the door spot ${JSON.stringify(spot.D)} is clear of obstacles`);
+  // right in front of the big door (drawn on the barn's right wall, y0+50..y0+110), with grass between the barn and the cow pen
+  const yard = await t.ev(() => { const D = CFG.BARN.DOOR_OUT, B = CFG.FARM.barn, P = CFG.FARM.pen; return { front: D.x > B.x1 && D.x < B.x1 + 40 && D.y > B.y0 + 50 && D.y < B.y0 + 110, gap: P.x0 - B.x1, silo: 'silo' in CFG.FARM, penClear: D.x + 12 < P.x0 - 4 }; });
+  t.expect(yard.front && yard.gap >= 100 && !yard.silo && yard.penClear, `the barn door spot is in front of the door, well clear of the cow pen (${JSON.stringify(yard)})`);
+  // the secret gap in the west fence behind the barn still leads into the woods
+  const secret = await t.ev(() => { const F = CFG.FARM, B = F.barn; T.tp(B.x0 + 12, B.y1 + 30, 'town'); T.steer(0, -1); T.step(30); T.steer(-1, 0); T.step(60); T.unsteer(); return { x: Math.round(Game.player.x), fence: CFG.FARM.x0 }; });
+  t.expect(secret.x < secret.fence - 10, `the slot behind the barn leads through the hidden fence gap (${JSON.stringify(secret)})`);
   await t.ev(() => { const D = CFG.BARN.DOOR_OUT; T.tp(D.x + 70, D.y + 40, 'town'); T.step(1); });
   t.expectEq(await t.ev(() => T.hint()), 'Go into the barn! 🐐', 'barn hint near the door');
   t.expect(await t.ev(() => Game.hint.target && Game.hint.target.x === CFG.BARN.DOOR_OUT.x), 'the hint points at the door spot');

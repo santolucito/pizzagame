@@ -3,11 +3,12 @@
 // (0..960, 98..646); the world extends beyond it so the player can wander outside.
 const CFG = {
   W: 960, H: 640,                                   // reference viewport used for zoom rules
-  WORLD: { x0: -1320, y0: -170, x1: 2460, y1: 1330 },   // walkable world bounds (the whole tiny town, farm included; the east strip past x 1540 is the airfield)
+  WORLD: { x0: -1320, y0: -170, x1: 2460, y1: 1330, walkY0: -106 },   // world bounds (the whole tiny town, farm included; the east strip past x 1540 is the airfield).
+  // walkY0: the chef (and anything driving on the ground) stops here, just below the railway along the top: the platform stays walkable, the rails do not
   BUILDING: { x0: 0, y0: 98, x1: 966, y1: 646 },    // outer wall rectangle
   DOOR: { y0: 572, y1: 638 },                        // gap in the right wall
   SAVE_KEY: 'pizza-rush-save-v1',
-  VERSION: 107,                                      // shown in the help panel; bump with the service worker cache (sw.js)
+  VERSION: 108,                                      // shown in the help panel; bump with the service worker cache (sw.js)
 
   PLAYER_START: { x: 540, y: 430 }, // open floor in front of the counter, away from every circle
   ENTRANCE: { x: 925, y: 605 },          // just inside the door
@@ -83,12 +84,11 @@ const CFG = {
   FARM: {
     x0: -1000, y0: 120, x1: -500, y1: 900,
     barn: { x0: -980, y0: 150, x1: -800, y1: 300 },
-    silo: { x: -770, y: 225 },
-    pen: { x0: -740, y0: 150, x1: -520, y1: 300 },
-    cowHome: { x: -630, y: 235 },
+    pen: { x0: -690, y0: 150, x1: -520, y1: 300 },   // well clear of the barn: the grass between them is the barn's front yard
+    cowHome: { x: -605, y: 235 },
     gate: { x: -500, y: 420, half: 44 },        // opening in the east fence
     secretGate: { y: 225, half: 40 },            // a gap in the west fence hidden behind the barn
-    penGate: { x: -630, half: 34 },               // opening in the pen's bottom fence
+    penGate: { x: -605, half: 34 },               // opening in the pen's bottom fence
     tractor: { x: -600, y: 760 },
     plots: [
       { kind: 'tomato', x: -940, y: 370 }, { kind: 'tomato', x: -890, y: 370 }, { kind: 'tomato', x: -840, y: 370 },
@@ -122,6 +122,7 @@ const CFG = {
     first: [50, 80], every: [180, 300],     // seconds until the first / next train
     dwell: 16, passengers: [5, 8],         // seconds the train waits at the platform
     warn: 20, hold: 12,                     // heads-up before it appears; extra wait while you are hurrying onto the platform
+    callAfter: 5, callIn: 3,                // waiting by the platform this long calls the train: it pulls in this many seconds later
     // passengers walk along the far sidewalk, down the shop's side path, and in through the door
     route: [{ x: -700, y: -30 }, { x: 990, y: -30 }, { x: 990, y: 560 }],
     overflow: { x: 990, y: 520, dy: -44 },  // where extra customers queue outside the door
@@ -131,8 +132,8 @@ const CFG = {
   // It shares the world's coordinate space (so nothing in town can reach it) but has its own bounds,
   // background and train. The train ride between the two plays as a little mountain journey.
   SITE: {
-    WORLD: { x0: 2600, y0: -170, x1: 4500, y1: 1300 },   // Construction Town: the site block is 2600..4000 × -170..900; east of x 4000 and south of y 900 is the rest of the town (js/sitetown.js)
-    STATION: { trackY: -140, platform: { x0: 2820, y0: -118, x1: 3160, y1: -72 }, house: { x0: 2830, y0: -118, x1: 2930, y1: -72 }, stopX: 3320, boardDx: -330, name: 'CONSTRUCTION TOWN' },
+    WORLD: { x0: 2600, y0: -170, x1: 4500, y1: 1300, walkY0: -106 },   // Construction Town (walkY0: nobody walks onto the railway, see CFG.WORLD): the site block is 2600..4000 × -170..900; east of x 4000 and south of y 900 is the rest of the town (js/sitetown.js)
+    STATION: { trackY: -140, platform: { x0: 2820, y0: -118, x1: 3160, y1: -72 }, house: { x0: 2830, y0: -118, x1: 2930, y1: -72 }, stopX: 3320, boardDx: -330, name: 'CONSTRUCTION TOWN', callAfter: 5 },
     ROAD: { x0: 2600, y0: 40, x1: 4500, y1: 120 },            // gravel road along the top, on past the site into the rest of the town
     BUILDING: { x0: 2720, y0: 330, x1: 3020, y1: 560, door: { x: 2870, half: 40 } },  // the half-built house
     CRANE: { x: 3560, y: 330 },

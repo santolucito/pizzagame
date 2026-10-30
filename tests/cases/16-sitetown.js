@@ -1,7 +1,9 @@
 'use strict';
 // The rest of Construction Town: the new streets east and south of the site block are walkable without traps, the
-// concrete mixers at the factory can be driven (and pour puddles), the hardware store's door, interior, every
-// interaction, rescue, Take-me-home and the way back out, the diner's picnic table and milkshake, and the slide.
+// concrete mixers at the factory can be driven (the chute swings out and telescopes, a stream pours from its tip into a
+// puddle under it, the chute folds back, no double pour), the crane truck in the site block (drive, lift a steel beam
+// from the pile, set it on the half-built house with a click, put one down elsewhere), the hardware store's door,
+// interior, every interaction, rescue, Take-me-home and the way back out, the diner's picnic table and milkshake, the slide.
 module.exports = async (t) => {
   await t.boot();
   // until the coordinator wires js/sitetown.js into index.html, load it into the booted page
@@ -17,7 +19,8 @@ module.exports = async (t) => {
     const hit = (x, y) => Game.obstacles().some((o) => Game.hitRect(x, y, 12, o));
     const stuck = [], flung = []; let sampled = 0, solid = 0;
     const rects = [CFG.SITETOWN.EAST, CFG.SITETOWN.SOUTH];
-    for (const R of rects) for (let y = R.y0 + 30; y < R.y1 - 30; y += 40) for (let x = R.x0 + 30; x < R.x1 - 30; x += 40) {
+    const top = Game.walkTop ? Game.walkTop() + 4 : -140;   // the railway along the top is not walkable
+    for (const R of rects) for (let y = Math.max(R.y0 + 30, top); y < R.y1 - 30; y += 40) for (let x = R.x0 + 30; x < R.x1 - 30; x += 40) {
       if (hit(x, y)) { solid++; continue; }
       sampled++;
       let best = 0, worst = 0;
@@ -36,8 +39,8 @@ module.exports = async (t) => {
   t.expectEq(walk.stuck.length, 0, `no stuck spots in the new districts: ${JSON.stringify(walk.stuck.slice(0, 8))}`);
   t.expectEq(walk.flung.length, 0, `no spots that fling the chef: ${JSON.stringify(walk.flung.slice(0, 8))}`);
   // the old site block, the station and the train are untouched by the new obstacles
-  const siteBlock = await t.ev(() => { const core = new Set(Game.siteObstacles().map((o) => JSON.stringify(o))); return Game.obstacles().filter((o) => o.x + o.w > 2600 && o.x < 3984 && o.y + o.h > -170 && o.y < 900 && !core.has(JSON.stringify(o))).length; });
-  t.expectEq(siteBlock, 0, 'no new obstacle inside the site block');
+  const siteBlock = await t.ev(() => { const core = new Set(Game.siteObstacles().map((o) => JSON.stringify(o))), B = CFG.SITETOWN.BEAM_PILE_BOX, own = (o) => o.x === B.x0 && o.y === B.y0; return Game.obstacles().filter((o) => o.x + o.w > 2600 && o.x < 3984 && o.y + o.h > -170 && o.y < 900 && !core.has(JSON.stringify(o)) && !own(o) && SiteTownExt.st.siteObs.includes(o)).length; });
+  t.expectEq(siteBlock, 0, 'no new obstacle of ours inside the site block (besides the steel beam pile)');
   const sitePos = await t.ev(() => { const S = CFG.SITE.STATION; T.tp(S.stopX + S.boardDx, S.platform.y1 - 12, 'site'); Game.siteTrain.summon(); T.until(() => Game.siteTrain.state === 'stopped', 1500); T.step(2); return T.label(); });
   t.expectEq(sitePos, '🚂 Ride the train', 'the train still stops at the site platform');
   await t.ev(() => { Game.siteTrain.state = 'away'; Game.siteTrain.x = CFG.SITE.WORLD.x0 - 500; });
@@ -49,7 +52,7 @@ module.exports = async (t) => {
     const m = SiteTownExt.mixers[0]; T.tp(m.x, m.y + 50, 'site'); T.step(2);
     const hint = SiteTownExt.hint(Game);
     Game.enterCar(); T.step(1);
-    return { hint: hint && hint.text, kind: Game.vehicle && Game.vehicle.kind, driving: Game.driving, same: Game.vehicle === m, exit: CFG.VEHICLES[Game.vehicle.kind].exit, label: CFG.VEHICLES.mixer.label, n: SiteTownExt.vehicles(Game).length, inList: Game.vehicles().includes(m) };
+    return { hint: hint && hint.text, kind: Game.vehicle && Game.vehicle.kind, driving: Game.driving, same: Game.vehicle === m, exit: CFG.VEHICLES[Game.vehicle.kind].exit, label: CFG.VEHICLES.mixer.label, n: SiteTownExt.vehicles(Game).filter((x) => x.kind === 'mixer').length, inList: Game.vehicles().includes(m) };
   });
   t.expectEq(mix.hint, 'Drive the concrete mixer! 🚛', 'mixer hint by the parked mixers');
   t.expect(mix.n === 2 && mix.inList, 'two mixers listed among the vehicles');
@@ -67,11 +70,60 @@ module.exports = async (t) => {
   t.expect(drove.drum > 3, 'the drum turned while driving');
   t.expectEq(drove.label, '🪣 Pour!', 'pour button while driving the mixer');
   t.expectEq(drove.hint, 'Press the big button to pour concrete! 🪣', 'pour hint while driving the mixer');
-  const pour = await t.ev(() => { T.act(); T.step(5); return { puddles: SiteTownExt.st.puddles.length, floats: Game.floats.map((f) => f.text), pours: Game.s.sitetown.pours, pourT: SiteTownExt.st.pourT }; });
-  t.expectEq(pour.puddles, 1, 'a puddle on the ground');
+  await t.ev(() => { T.steer(0, -1); T.step(40); T.unsteer(); T.step(10); });   // up towards the street, clear of the map's bottom edge
+  // the pour: the chute swings out and extends in two segments (~0.5 s), a stream pours from its tip for ~1.5 s into a
+  // puddle growing under the tip, then the chute folds back; the truck holds still meanwhile; a second press does nothing
+  const pour = await t.ev(() => {
+    const v = Game.vehicle, P = CFG.SITETOWN.POUR, d0 = v.drum, n0 = SiteTownExt.st.puddles.length;
+    const stowed = SiteTownExt.chute(v);
+    T.act();
+    const x0 = v.x, y0 = v.y;
+    T.steer(1, 1); T.step(14); T.unsteer();
+    const early = SiteTownExt.chute(v);
+    T.step(12);
+    const late = SiteTownExt.chute(v);
+    T.step(20);   // ~0.8 s in: pouring
+    const ch = SiteTownExt.chute(v), q = SiteTownExt.st.puddles[SiteTownExt.st.puddles.length - 1];
+    const behind = { x: v.x - Math.cos(v.angle) * 60, y: v.y - Math.sin(v.angle) * 60 };
+    const label = T.label(); T.act();
+    return {
+      stowed: { segs: stowed.segs, swing: stowed.swing, flowing: stowed.flowing },
+      early: { segs: early.segs, swing: early.swing, flowing: early.flowing }, late: { segs: late.segs, flowing: late.flowing },
+      flowing: ch.flowing, segs: ch.segs, tip: ch.tip, tipFar: Math.hypot(ch.tip.x - v.x, ch.tip.y - v.y),
+      puddles: SiteTownExt.st.puddles.length - n0, puddle: q && { x: q.x, y: q.y }, behindD: q && Math.hypot(q.x - behind.x, q.y - behind.y),
+      held: Math.hypot(v.x - x0, v.y - y0), drum: v.drum - d0, floats: Game.floats.map((f) => f.text), drop: P.DROP,
+      label, pours: Game.s.sitetown.pours, stillT: v.pour && v.pour.t,
+    };
+  });
+  t.expect(pour.stowed.swing === 0 && pour.stowed.segs[1] === 0 && pour.stowed.segs[2] === 0 && !pour.stowed.flowing, 'the chute starts folded');
+  t.expect(pour.early.swing > 0.8 && pour.early.segs[1] > 0 && pour.early.segs[2] === 0 && !pour.early.flowing, `0.25 s: the chute has swung out and its second segment slides open (${JSON.stringify(pour.early)})`);
+  t.expect(pour.late.segs[1] === 20 && pour.late.segs[2] > 0 && !pour.late.flowing, `0.45 s: the third segment slides open (${JSON.stringify(pour.late)})`);
+  t.expect(pour.flowing && pour.segs[2] === 18 && pour.tipFar > 90, `pouring from the extended chute's tip (${Math.round(pour.tipFar)} px from the truck)`);
+  t.expectEq(pour.puddles, 1, 'one puddle on the ground');
+  t.expect(Math.abs(pour.puddle.x - pour.tip.x) < 2 && Math.abs(pour.puddle.y - (pour.tip.y + pour.drop)) < 2, `the puddle grows right under the chute's tip (${JSON.stringify(pour.puddle)} vs ${JSON.stringify(pour.tip)})`);
+  t.expect(pour.behindD > 30, 'not behind the truck centre any more');
   t.expect(pour.floats.includes('Splosh!'), 'the Splosh float');
-  t.expectEq(pour.pours, 1, 'pour counted');
-  t.expect(pour.pourT > 0, 'the drum spins fast after a pour');
+  t.expect(pour.held < 1, `the truck holds still while it pours (${pour.held.toFixed(1)} px)`);
+  t.expect(pour.drum > 6, `the drum spins fast while pouring (${pour.drum.toFixed(1)} in 0.8 s)`);
+  t.expectEq(pour.label, '🪣 Pour!', 'the button stays while pouring');
+  t.expect(pour.pours === 1 && pour.stillT > 0.7, 'pressing again during the pour does nothing: one pour, still the same one');
+  await t.ev(() => { Render.setZoom(1.6); Game.cameraSnap = true; T.step(2); });
+  await t.shot('mixer-pour');
+  await t.page.setViewportSize({ width: 390, height: 844 });
+  await t.ev(() => { Render.resize(); Render.setZoom(1.6); Game.cameraSnap = true; T.step(2); });
+  await t.shot('mixer-pour-phone');
+  await t.page.setViewportSize({ width: 1100, height: 720 });
+  await t.ev(() => { Render.resize(); T.step(1); });
+  const folded = await t.ev(() => {
+    const v = Game.vehicle, mid = T.until(() => v.pour && v.pour.t > 2.2, 200), half = SiteTownExt.chute(v), n = T.until(() => !v.pour, 200), ch = SiteTownExt.chute(v), q = SiteTownExt.st.puddles[SiteTownExt.st.puddles.length - 1];
+    const puddles = SiteTownExt.st.puddles.length, x0 = v.x, y0 = v.y; T.steer(0, -1); T.step(30); T.unsteer();
+    return { mid, half: { segs: half.segs, flowing: half.flowing }, n, swing: ch.swing, segs: ch.segs, grown: q.t >= q.grow, moved: Math.hypot(v.x - x0, v.y - y0), puddles, hint: SiteTownExt.hint(Game).text, pours: Game.s.sitetown.pours };
+  });
+  t.expect(folded.mid >= 0 && !folded.half.flowing && folded.half.segs[2] < 18, `the stream stops and the chute starts folding (${JSON.stringify(folded.half)})`);
+  t.expect(folded.n >= 0 && folded.swing === 0 && folded.segs[1] === 0 && folded.segs[2] === 0, `the chute folds back after the pour (${JSON.stringify(folded)})`);
+  t.expect(folded.grown && folded.puddles === 1 && folded.pours === 1, 'the puddle stays, fully grown; still one pour');
+  t.expect(folded.moved > 40, `the chef drives on after the pour (${Math.round(folded.moved)} px)`);
+  t.expectEq(folded.hint, 'Press the big button to pour concrete! 🪣', 'ready to pour again');
   await t.ev(() => { Render.setZoom(1.2); Game.cameraSnap = true; T.step(2); });
   await t.shot('mixer');
   const puddleLife = await t.ev(() => { T.step(60 * 21); return SiteTownExt.st.puddles.length; });
@@ -82,6 +134,100 @@ module.exports = async (t) => {
   // the site vehicles can drive the dirt track loop: nothing solid on it
   const track = await t.ev(() => { const Tk = CFG.SITETOWN.TRACK, obs = Game.townObstacles(true); let bad = 0; for (let a = 0; a < Math.PI * 2; a += 0.2) { const rr = (Tk.rx + Tk.rxi) / 2, x = Tk.x + Math.cos(a) * rr, y = Tk.y + Math.sin(a) * rr * Tk.ry / Tk.rx; if (obs.some((o) => Game.hitRect(x, y, 22, o))) bad++; } return bad; });
   t.expectEq(track, 0, 'the dirt track loop is clear for vehicles');
+
+  // ---- the crane truck in the site block: parked on free ground by the other machines, drive it, lift a steel beam,
+  // set it on the half-built house (click + sparkle), put another down on open ground, hop out
+  const park = await t.ev(() => {
+    const v = SiteTownExt.crane, C = CFG.SITETOWN.CRANETRUCK, P = CFG.SITETOWN.BEAM_PILE_BOX, obs = Game.townObstacles(true);
+    T.tp(v.x, v.y + 60, 'site');
+    const inTower = (x, y) => x > 3050 && x < 3320 && y > 220 && y < 520;   // the tower crane's corner (another feature)
+    return {
+      spec: CFG.VEHICLES.cranetruck, listed: SiteTownExt.vehicles(Game).includes(v) && Game.vehicles().includes(v), kind: v.kind,
+      at: v.x === C.x && v.y === C.y, inBlock: v.x > 2630 && v.x < 3970 && v.y > -140 && v.y < 870, free: !obs.some((o) => o.w && Game.hitRect(v.x, v.y, 24, o)),
+      nearExc: Math.hypot(v.x - Game.excavator.x, v.y - Game.excavator.y), notTower: !inTower(v.x, v.y) && !inTower(P.x0, P.y0) && !inTower(P.x1, P.y1),
+      pileInBlock: P.x0 > 2600 && P.x1 < 3984 && P.y1 < 900, hint: SiteTownExt.hint(Game),
+    };
+  });
+  t.expect(park.spec && park.spec.radius === 24 && park.spec.label === '🏗️ Drive the crane', `the crane truck's spec (${JSON.stringify(park.spec)})`);
+  t.expect(park.listed && park.kind === 'cranetruck', 'the crane truck is a rideable vehicle');
+  t.expect(park.at && park.inBlock && park.free, 'parked on free ground inside the site block');
+  t.expect(park.nearExc < 300, `next to the excavator (${Math.round(park.nearExc)} px)`);
+  t.expect(park.notTower && park.pileInBlock, 'the truck and the beam pile keep clear of the tower crane corner');
+  t.expect(park.hint && park.hint.text === 'Drive the crane truck! 🏗️', 'hint by the parked crane truck');
+  const crIn = await t.ev(() => {
+    Game.enterCar(); T.step(1); const v = Game.vehicle, x0 = v.x, y0 = v.y;
+    const label0 = T.label(), hint0 = T.hint();
+    T.steer(0, 1); T.step(25); T.unsteer(); T.step(10);
+    const moved = Math.hypot(v.x - x0, v.y - y0);
+    T.steer(0, -1); T.step(25); T.unsteer(); T.step(10);
+    T.steer(-1, 0); T.step(4); T.unsteer(); T.step(10);
+    return { crane: v === SiteTownExt.crane, label0, hint0, moved, label: T.label(), hint: T.hint(), btn: document.getElementById('btn-car').textContent };
+  });
+  t.expect(crIn.crane, 'climbed into the crane truck');
+  t.expectEq(crIn.label0, '🪝 Lift a beam', 'parked with its hook by the steel beam pile: Lift a beam');
+  t.expectEq(crIn.hint0, 'Press the big button to lift a beam! 🪝', 'lift hint');
+  t.expect(crIn.moved > 60, `the joystick drives it (${Math.round(crIn.moved)} px)`);
+  t.expectEq(crIn.label, '🪝 Lift a beam', 'back by the pile');
+  const far = await t.ev(() => { const v = Game.vehicle, s = { x: v.x, y: v.y, a: v.angle }; v.x = 3700; v.y = 400; v.angle = 0; T.step(1); const r = { label: T.label(), hint: T.hint(), target: Game.hint && Game.hint.target }; v.x = s.x; v.y = s.y; v.angle = s.a; T.step(1); return r; });
+  t.expect(far.label === null && far.hint === 'Drive the hook to the steel beams! 🪝' && !!far.target, `away from the beams: no button, the hint points at them (${JSON.stringify(far)})`);
+  const lift = await t.ev(() => {
+    const v = Game.vehicle; T.act();
+    const x0 = v.x, y0 = v.y; T.steer(1, 0); T.step(12); T.unsteer();
+    const a = { out: v.out, boom: v.boom, label: T.label(), hint: T.hint(), held: Math.hypot(v.x - x0, v.y - y0) };
+    T.step(30); const b = { out: v.out, boom: v.boom, beam: SiteTownExt.beamNow(v) };
+    T.step(50); return { a, b, carry: !!v.carry, anim: !!v.anim, out: v.out, boom: v.boom, label: T.label(), hint: T.hint(), target: Game.hint && Game.hint.target };
+  });
+  t.expect(lift.a.out > 0.5 && lift.a.held < 1 && lift.a.label === null && lift.a.hint === 'Up it goes! 🪝', `lifting: the outriggers drop and the truck holds still (${JSON.stringify(lift.a)})`);
+  t.expect(lift.b.boom > 0.4 && lift.b.beam && lift.b.beam.h > 10, `the boom raises the beam (${JSON.stringify(lift.b)})`);
+  await t.ev(() => { const v = Game.vehicle; v.carry = null; const C = CFG.SITETOWN.CRANETRUCK; v.anim = { kind: 'lift', t: 0.75, lock: { x: C.x, y: C.y, angle: C.angle }, from: { x: CFG.SITETOWN.BEAM_PILE.x, y: CFG.SITETOWN.BEAM_PILE.y - 14, a: 0 } }; Render.setZoom(1.5); Game.cameraSnap = true; T.step(2); });
+  await t.shot('crane-lift');
+  await t.ev(() => { T.step(60); });
+  t.expect(lift.carry && !lift.anim && lift.out === 0 && lift.boom === 1, 'the beam hangs from the hook, outriggers tucked in');
+  t.expectEq(lift.label, '⬇️ Put it down', 'Put it down button while carrying');
+  t.expect(lift.hint === 'Bring the beam to the house! 🏠' && !!lift.target, 'the hint points at the house');
+  const frame = await t.ev(() => {
+    const v = Game.vehicle, B = CFG.SITE.BUILDING;
+    v.x = 3120; v.y = 485; v.angle = Math.PI; T.step(1);   // drove round to the house's east wall: the hook hangs over it
+    const hook = SiteTownExt.hookPos(v), label = T.label(), hint = T.hint(), spot = SiteTownExt.frameSpot(hook.x, hook.y), n0 = SiteTownExt.st.frameBeams.length;
+    T.act(); T.step(30);
+    const mid = { beam: SiteTownExt.beamNow(v), label: T.label(), hint: T.hint() };
+    T.step(40);
+    const fb = SiteTownExt.st.frameBeams[SiteTownExt.st.frameBeams.length - 1];
+    const res = { label, hint, spot, mid, placed: SiteTownExt.st.frameBeams.length - n0, fb, floats: Game.floats.map((f) => f.text), sparkles: Game.fx.filter((f) => f.kind === 'sparkle').length, B };
+    T.step(20); res.after = { anim: !!v.anim, carry: !!v.carry, label: T.label() };
+    return res;
+  });
+  t.expectEq(frame.label, '⬇️ Put it down', 'Put it down over the house');
+  t.expectEq(frame.hint, 'Press the big button to put the beam on the house! 🏠', 'hint over the house');
+  t.expect(!!frame.spot && frame.spot.a === Math.PI / 2 && Math.abs(frame.spot.x - (frame.B.x1 - 7)) < 1, `the beam lines up with the east wall (${JSON.stringify(frame.spot)})`);
+  t.expect(frame.mid.beam && frame.mid.hint === 'Down it goes! ⬇️' && frame.mid.label === null, 'lowering the beam');
+  t.expect(frame.placed === 1 && frame.fb.x === frame.spot.x && frame.fb.a === frame.spot.a, 'the beam clicks onto the house frame');
+  t.expect(frame.floats.includes('Click! ✨') && frame.sparkles > 0, 'Click! and a sparkle');
+  t.expect(!frame.after.anim && !frame.after.carry && frame.after.label === null, 'done: nothing on the hook');
+  await t.ev(() => { const v = Game.vehicle; v.carry = { t: 0 }; v.anim = null; T.step(1); T.act(); T.step(48); Render.setZoom(1.4); Game.cameraSnap = true; T.step(1); });
+  await t.shot('crane-place');
+  await t.page.setViewportSize({ width: 390, height: 844 });
+  await t.ev(() => { Render.resize(); Render.setZoom(1.4); Game.cameraSnap = true; T.step(2); });
+  await t.shot('crane-place-phone');
+  await t.page.setViewportSize({ width: 1100, height: 720 });
+  await t.ev(() => { Render.resize(); T.step(40); });
+  const ground = await t.ev(() => {
+    const v = Game.vehicle, C = CFG.SITETOWN.CRANETRUCK;
+    v.x = C.x; v.y = C.y; v.angle = C.angle; T.step(1); T.act(); T.step(90);
+    const carry = !!v.carry;
+    v.x = 3560; v.y = 560; v.angle = 0; T.step(1);   // open ground east of the excavator
+    const hook = SiteTownExt.hookPos(v), n0 = SiteTownExt.st.beams.length, f0 = SiteTownExt.st.frameBeams.length, label = T.label();
+    T.act(); T.step(90);
+    const b = SiteTownExt.st.beams[SiteTownExt.st.beams.length - 1];
+    return { carry, label, loose: SiteTownExt.st.beams.length - n0, frame: SiteTownExt.st.frameBeams.length - f0, d: Math.hypot(b.x - hook.x, b.y - hook.y), floats: Game.floats.map((f) => f.text), again: T.label() };
+  });
+  t.expect(ground.carry && ground.label === '⬇️ Put it down', 'lifted another beam from the pile');
+  t.expect(ground.loose === 1 && ground.frame === 0 && ground.d < 2, `elsewhere the beam just lies on the ground under the hook (${JSON.stringify(ground)})`);
+  t.expect(ground.floats.includes('Clunk!'), 'Clunk!');
+  t.expectEq(ground.again, '🪝 Lift a beam', 'a beam lying on the ground can be lifted again');
+  const crOut = await t.ev(() => { const v = Game.vehicle; Game.exitCar(); T.step(3); const p = Game.player; return { driving: Game.driving, d: Math.hypot(p.x - v.x, p.y - v.y), free: !Game.obstacles().some((o) => Game.hitRect(p.x, p.y, 12, o)), label: T.label() }; });
+  t.expect(!crOut.driving && crOut.d < 60 && crOut.free, `hopped out of the crane truck onto free ground (${JSON.stringify(crOut)})`);
+  t.expect(crOut.label !== '🪝 Lift a beam', 'no crane button on foot');
 
   // ---- the hardware store: door spot, hint, go in
   const door = await t.ev(() => {

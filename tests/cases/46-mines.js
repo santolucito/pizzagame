@@ -3,7 +3,7 @@
 // streets; the miner hands over a pickaxe; going in; floor 1 has rocks, slimes and one hidden ladder, and every rock can
 // be reached (flood fill, on every floor); mining a rock (whacks, bits, the ore float, the count saved); breaking rocks
 // until the ladder shows and going down; a floor builds the same each time; a slime bump costs a heart and bounces the
-// chef; two bonks pop a slime into goo; no hearts: a rest, waking at the entrance with every rock kept; floor 5 saves
+// chef; slimes in reach get bonked automatically (no Bonk button), two bonks pop one into goo; no hearts: a rest, waking at the entrance with every rock kept; floor 5 saves
 // the elevator and the elevator panel outside goes there; themes at 6/11/16; the chest on floor 20; selling to the
 // miner; rescues; Take-me-home from floor 3; a reload keeps the deepest floor, the elevators and the ores.
 module.exports = async (t) => {
@@ -36,7 +36,7 @@ module.exports = async (t) => {
         for (const [dx, dy] of [[0, 1], [-1, 0], [1, 0], [0, -1]]) if (seen.has((t0.c + dx) + ',' + (t0.r + dy))) return MinesExt.tileCenter(t0.c + dx, t0.r + dy);
         return null;
       },
-      freeze() { for (const s of MT.f().slimes) { s.stun = 9999; s.hop = null; s.z = 0; } },
+      freeze() { for (const s of MT.f().slimes) { s.stun = 9999; s.hop = null; s.z = 0; } MinesExt.st.bonkCd = 9999; },   // frozen slimes stay put and the chef leaves them be (no auto attack) until a test sets bonkCd back to 0
       breakRock(k) {
         const s = MT.spotBy(k); if (!s) return false;
         T.tp(s.x, s.y, 'mines'); MT.freeze();
@@ -238,29 +238,54 @@ module.exports = async (t) => {
   t.expect(bump.invuln && bump.slimeStun, 'a short safe time after a bump');
   await t.shot('hearts');
 
-  // ---- bonk a slime twice: it pops into goo
+  // ---- auto attack: a slime within reach gets bonked without pressing anything, twice and it pops into goo
   const bonk = await t.ev(() => {
-    const f = MT.f(), p = Game.player, st = MinesExt.st, s = f.slimes[0];
+    const f = MT.f(), p = Game.player, st = MinesExt.st, s = f.slimes[0], M = CFG.MINES;
     T.step(120);
     MT.freeze(); T.tp(f.arrival.x, f.arrival.y, 'mines');
-    s.hop = null; s.z = 0; s.stun = 0; s.wait = 99; s.x = p.x + 48; s.y = p.y; st.invuln = 0; T.step(1);
-    const label = T.label(), hint = T.hint(), goo0 = Game.s.mines.goo;
-    T.act();
-    return { label, hint, hp: s.hp, still: f.slimes.includes(s), floats: MT.floats(), goo0, act: MinesExt.st.act && MinesExt.st.act.kind };
+    // no pickaxe and no sword: no bonking
+    const tools = [Game.s.mines.pickaxe, Game.s.mines.sword]; Game.s.mines.pickaxe = false; Game.s.mines.sword = false;
+    s.hop = null; s.z = 0; s.stun = 0; s.wait = 99; s.x = p.x + 48; s.y = p.y; st.invuln = 0; st.bonkCd = 0; T.step(3);
+    const noTool = s.hp; Game.s.mines.pickaxe = tools[0]; Game.s.mines.sword = tools[1];
+    s.stun = 0; s.wait = 99; const hearts0 = st.hearts, goo0 = Game.s.mines.goo, labels = [];
+    T.step(1);
+    labels.push(T.label());
+    return { id: s.id, noTool, label: T.label(), hint: T.hint(), hp: s.hp, still: f.slimes.includes(s), floats: MT.floats(), goo0, hearts0, act: st.act && st.act.kind, cd: st.bonkCd, auto: M.AUTO_BONK };
   });
-  t.expectEq(bonk.label, '🗡️ Bonk', 'the big button says Bonk next to a slime');
-  t.expectEq(bonk.hint, 'Bonk the slime! 🗡️', 'hint: bonk the slime');
-  t.expect(bonk.hp === 1 && bonk.still && bonk.floats.includes('Bonk!'), 'one bonk: the slime is dizzy');
+  t.expectEq(bonk.noTool, 2, 'no pickaxe or sword: the chef does not bonk');
+  t.expect(bonk.hp === 1 && bonk.still && bonk.floats.includes('Bonk!'), 'a slime in reach gets bonked all by itself: dizzy');
   t.expectEq(bonk.act, 'sword', 'bonking with the pizza sword');
+  t.expect(bonk.auto >= 0.4 && bonk.auto <= 0.6 && bonk.cd > 0, `the next bonk comes ~${bonk.auto} s later`);
+  t.expect(bonk.label !== '🗡️ Bonk', `no Bonk button next to the slime (${bonk.label})`);
+  t.expectEq(bonk.hint, 'Walk up to the slime: bonk bonk! 🗡️', 'hint: walk up to the slime');
   await t.ev(() => { Render.setZoom(1.6); Game.cameraSnap = true; });
   await t.shot('bonk');
-  const pop = await t.ev((goo0) => {
-    const f = MT.f(), n0 = f.slimes.length, dbg = { label: T.label(), sl: f.slimes.map((s) => [Math.round(s.x - Game.player.x), Math.round(s.y - Game.player.y), s.hp]) }; T.act();
-    return { dbg, gone: f.slimes.length === n0 - 1, goo: Game.s.mines.goo - goo0, floats: MT.floats(), splats: MinesExt.st.splats.length, found: Game.s.mines.found.goo };
-  }, bonk.goo0);
-  t.expect(pop.gone && pop.goo === 1 && pop.found, `the second bonk pops the slime: +1 goo ${JSON.stringify(pop)}`);
+  await t.page.setViewportSize({ width: 390, height: 844 });
+  await t.ev(() => { Render.resize(); Render.setZoom(1.6); Game.cameraSnap = true; T.step(1); });
+  await t.shot('bonk-phone');
+  await t.page.setViewportSize({ width: 1100, height: 720 });
+  await t.ev(() => { Render.resize(); });
+  const pop = await t.ev(([goo0, id]) => {
+    const f = MT.f(), here = () => f.slimes.some((x) => x.id === id), labels = new Set();
+    for (let i = 0; i < 32 && here(); i++) { T.step(1); labels.add(T.label()); }
+    return { gone: !here(), goo: Game.s.mines.goo - goo0, floats: MT.floats(), splats: MinesExt.st.splats.length, found: Game.s.mines.found.goo, hearts: MinesExt.st.hearts, labels: [...labels] };
+  }, [bonk.goo0, bonk.id]);
+  t.expect(pop.gone && pop.goo === 1 && pop.found, `half a second later the second bonk pops the slime: +1 goo ${JSON.stringify(pop)}`);
   t.expect(pop.floats.includes('Boing!') && pop.floats.includes('+1 🟢 goo'), 'Boing! and +1 🟢 goo');
   t.expect(pop.splats > 0, 'a goo puddle');
+  t.expectEq(pop.hearts, bonk.hearts0, 'no heart lost: auto attack got it first');
+  t.expect(!pop.labels.includes('🗡️ Bonk'), `no Bonk button at any time (${JSON.stringify(pop.labels)})`);
+  // no Bonk button next to any slime on the floor; slimes hop slowly
+  const noBtn = await t.ev(() => {
+    const f = MT.f(), out = [], M = CFG.MINES, st = MinesExt.st;
+    for (const s of f.slimes) { s.stun = 9999; T.tp(s.x - 40, s.y, 'mines'); st.bonkCd = 99; out.push(T.label()); }
+    st.bonkCd = 0;
+    const s = f.slimes[0]; let dur = null;
+    if (s) { s.stun = 0; s.wait = 0; T.tp(f.arrival.x, f.arrival.y, 'mines'); for (let i = 0; i < 30 && !s.hop; i++) T.step(1); dur = s.hop && s.hop.dur; }
+    return { out, dur, hop: M.SLIME_HOP, wait: M.SLIME_WAIT };
+  });
+  t.expect(!noBtn.out.includes('🗡️ Bonk'), `no Bonk button beside any slime (${JSON.stringify(noBtn.out)})`);
+  t.expect(noBtn.hop >= 0.7 && noBtn.wait[0] >= 1 && (noBtn.dur === null || noBtn.dur === noBtn.hop), `slimes hop slowly (${JSON.stringify(noBtn)})`);
   await t.ev(() => { Render.setZoom(1); Game.cameraSnap = true; });
 
   // ---- a snack from a crate fills a heart back

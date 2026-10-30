@@ -79,7 +79,7 @@ const Game = {
     // pick up where you left off (circles stay inert until you move, so reloading onto one costs nothing)
     const pos = s.pos;
     if (pos && CFG.AREAS[pos.area]) {
-      this.area = pos.area; this.player.x = pos.x; this.player.y = pos.y;
+      this.area = pos.area; this.player.x = pos.x; this.player.y = Math.max(pos.y, this.walkTop());   // an old save up on the rails steps down onto the platform
       if (this.area === 'site') { const t = this.siteTrain, st = CFG.SITE.STATION; t.state = 'stopped'; t.x = st.stopX; t.unload = Infinity; t.departIn = Infinity; t.toDrop = 0; }
     }
     this.plots = CFG.FARM.plots.map((pl, i) => ({ i, kind: pl.kind, x: pl.x, y: pl.y, ready: true, t: 0, phase: Math.random() * 6 }));
@@ -314,6 +314,8 @@ const Game = {
   insideBuilding(x, y) { const b = CFG.BUILDING; return x > b.x0 && x < b.x1 && y > b.y0 && y < b.y1; },
   // which map the player is on: the pizza town or Construction Town down the line
   bounds() { return CFG.AREAS[this.area].WORLD; },
+  // the top of the walkable ground in this map: a map with a railway along its top (`walkY0`) ends just below the rails
+  walkTop() { const w = this.bounds(); return w.walkY0 !== undefined ? w.walkY0 : w.y0 + 16; },
   station() { return this.area === 'site' ? CFG.SITE.STATION : CFG.STATION; },
   currentTrain() { return this.area === 'site' ? this.siteTrain : this.train; },
 
@@ -433,7 +435,7 @@ const Game = {
       const obstacles = this.obstacles().filter((o) => !this.hitRect(p.x, p.y, r, o));
       p.x = U.clamp(p.x + a.x * sp * dt, w.x0 + 16, w.x1 - 16);
       for (const o of obstacles) if (this.hitRect(p.x, p.y, r, o)) p.x = a.x > 0 ? o.x - r : o.x + o.w + r;
-      p.y = U.clamp(p.y + a.y * sp * dt, w.y0 + 16, w.y1 - 16);
+      p.y = U.clamp(p.y + a.y * sp * dt, this.walkTop(), w.y1 - 16);
       for (const o of obstacles) if (this.hitRect(p.x, p.y, r, o)) p.y = a.y > 0 ? o.y - r : o.y + o.h + r;
     }
     this.checkRides();
@@ -448,7 +450,7 @@ const Game = {
     o.push({ x: B.x1 - fw, y: B.y0, w: fw, h: B.y1 - B.y0 });
     o.push({ x: B.x0, y: B.y1 - fw, w: B.door.x - B.door.half - B.x0, h: fw });
     o.push({ x: B.door.x + B.door.half, y: B.y1 - fw, w: B.x1 - (B.door.x + B.door.half), h: fw });
-    o.push({ x: S.CRANE.x - 22, y: S.CRANE.y - 22, w: 44, h: 44 });
+    if (!S.CRANE.hidden) o.push({ x: S.CRANE.x - 22, y: S.CRANE.y - 22, w: 44, h: 44 });   // an extension with its own crane sets `hidden`
     o.push({ x: S.TOILET.x - 16, y: S.TOILET.y - 30, w: 32, h: 40 });
     for (const [x, y] of S.BARRELS) o.push({ x: x - 10, y: y - 14, w: 20, h: 20 });
     for (const [x, y] of S.PALLETS) o.push({ x: x - 24, y: y - 16, w: 48, h: 30 });
@@ -499,7 +501,6 @@ const Game = {
     o.push({ x: P.x0, y: P.y0 - 4, w: P.x1 - P.x0, h: fw }, { x: P.x0 - 4, y: P.y0, w: fw, h: P.y1 - P.y0 }, { x: P.x1 - 4, y: P.y0, w: fw, h: P.y1 - P.y0 });
     o.push({ x: P.x0, y: P.y1 - 4, w: PG.x - PG.half - P.x0, h: fw }, { x: PG.x + PG.half, y: P.y1 - 4, w: P.x1 - (PG.x + PG.half), h: fw });
     const H = CFG.STATION.house; o.push({ x: H.x0, y: H.y0, w: H.x1 - H.x0, h: H.y1 - H.y0 });
-    o.push({ x: CFG.FARM.silo.x - 22, y: CFG.FARM.silo.y - 40, w: 44, h: 80 });
     if (forCar) {
       const B = CFG.BUILDING; o.push({ x: B.x0 - 6, y: B.y0, w: B.x1 - B.x0 + 6, h: B.y1 - B.y0 });
       const pd = CFG.POND; o.push({ x: pd.x - pd.rx, y: pd.y - pd.ry, w: pd.rx * 2, h: pd.ry * 2 });
@@ -666,7 +667,7 @@ const Game = {
     let spot = null;
     for (const [dx, dy] of cands) {
       const x = c.x + dx, y = c.y + dy;
-      if (x < w.x0 + 16 || x > w.x1 - 16 || y < w.y0 + 16 || y > w.y1 - 16) continue;
+      if (x < w.x0 + 16 || x > w.x1 - 16 || y < this.walkTop() || y > w.y1 - 16) continue;
       if (!obs.some((o) => this.hitRect(x, y, 12, o))) { spot = { x, y }; break; }
     }
     // a flying vehicle will not set you down in the trees or on a roof: it keeps flying until there is room to step out
@@ -691,7 +692,8 @@ const Game = {
     const r = spec.radius, w = this.bounds(), obs = spec.flies || c.free ? [] : this.townObstacles(true);   // a flying vehicle (or one taking off) passes over everything
     c.x = c.x + c.vx * dt; if (!c.free) c.x = U.clamp(c.x, w.x0 + 30, w.x1 - 30);   // `free`: a vehicle on its way off the map (a plane taking off)
     for (const o of obs) if (o.w && this.hitRect(c.x, c.y, r, o)) { c.x = c.vx > 0 ? o.x - r : o.x + o.w + r; c.vx = 0; }
-    c.y = c.y + c.vy * dt; if (!c.free) c.y = U.clamp(c.y, w.y0 + 30, w.y1 - 30);
+    const top = spec.flies ? w.y0 + 30 : Math.max(w.y0 + 30, this.walkTop() + r - 12);   // ground vehicles stay off the railway too; flying ones may pass over it
+    c.y = c.y + c.vy * dt; if (!c.free) c.y = U.clamp(c.y, top, w.y1 - 30);
     for (const o of obs) if (o.w && this.hitRect(c.x, c.y, r, o)) { c.y = c.vy > 0 ? o.y - r : o.y + o.h + r; c.vy = 0; }
     this.player.x = c.x; this.player.y = c.y; this.player.moving = speed > 15; this.player.hasMoved = true;
     const GA = CFG.GARAGE; this.inPaintBay = c.x > GA.x0 + 20 && c.x < GA.x1 - 20 && c.y > GA.y0 + 30 && c.y < GA.y1 - 20 && speed < 15;
@@ -927,11 +929,27 @@ const Game = {
       if (this.carT <= 0) {
         this.carT = this.carSpawnInterval() * U.rand(0.5, 1.6);
         if (this.cars.filter((c) => c.inLine).length < CFG.DT_SLOTS) {
-          const kind = Math.random() < CFG.FUN_CAR_CHANCE ? U.pick(CFG.FUN_CARS) : 'car';
-          this.cars.push(new Car(this.seq++, U.randInt(1, 3 + Math.floor(this.decorCount() / 4)), kind));
+          // the car turns up on Main Street just out of sight west of the camera (never out of the woods at the road's end)
+          const R = CFG.ROADS[0], x = this.trafficSpawnX(R.x0 + 70, CFG.DT_WINDOW.x - CFG.DT_SLOTS * CFG.DT_SLOT_DX - 60, R.y0, R.y1);
+          if (x === null || this.cars.some((c) => Math.abs(c.x - x) < 120 && Math.abs(c.y - (R.y0 + R.y1) / 2) < 30)) this.carT = 1;   // try again in a moment
+          else {
+            const kind = Math.random() < CFG.FUN_CAR_CHANCE ? U.pick(CFG.FUN_CARS) : 'car';
+            const car = new Car(this.seq++, U.randInt(1, 3 + Math.floor(this.decorCount() / 4)), kind); car.x = x;
+            this.cars.push(car);
+          }
         }
       }
     }
+  },
+
+  // Where traffic heading east along a town road (the band y0..y1) appears: on the road just out of sight west of the camera,
+  // at most xMax (a car's starting point further along its route) and at least xMin (the road's west end, where the woods
+  // begin). Off the town map, or with that road off screen, it is simply xMax. null: the whole stretch is on screen, wait.
+  trafficSpawnX(xMin, xMax, y0, y1) {
+    const R = typeof Render !== 'undefined' ? Render : null;
+    if (this.area !== 'town' || !R || !R.viewW || y1 < R.camY - 70 || y0 > R.camY + R.viewH + 70) return xMax;
+    const x = Math.min(xMax, R.camX - 80);   // a whole car length past the left edge of the screen
+    return x >= xMin ? x : null;
   },
 
   // Contextual hint: what should the player do next? Kept short and simple.

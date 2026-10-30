@@ -1,6 +1,6 @@
 'use strict';
 // Stuck detector: drop the chef on a grid of walkable spots in every map and make sure they can walk away
-// in at least one direction, and never get flung far. Known rides (playground, cloud rides) are skipped.
+// in at least one direction, and never get flung far (from the top of the walkable ground: town and site stop below the rails). Known rides (playground, cloud rides) are skipped.
 module.exports = async (t) => {
   await t.boot();
   const report = await t.ev(() => {
@@ -18,7 +18,7 @@ module.exports = async (t) => {
     for (const [area, R] of Object.entries(rects)) {
       const stuck = [], flung = []; let sampled = 0;
       Game.area = area;
-      for (let y = R.y0 + 30; y < R.y1 - 30; y += 48) for (let x = R.x0 + 30; x < R.x1 - 30; x += 48) {
+      for (let y = R.walkY0 !== undefined ? R.walkY0 + 2 : R.y0 + 30; y < R.y1 - 30; y += 48) for (let x = R.x0 + 30; x < R.x1 - 30; x += 48) {
         if (skip(area, x, y)) continue;
         Game.player.x = x; Game.player.y = y; Game.player.hasMoved = true; Game.player.moving = false; Game.onTrain = false; Game.ride = null; Game.fishing = null;
         if (Game.driving) Game.exitCar();

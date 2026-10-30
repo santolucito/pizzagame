@@ -705,7 +705,7 @@ const Render = {
     ctx.fillStyle = '#e53935'; U.roundRect(ctx, 1326, 560, 10, 18, 3); ctx.fill(); ctx.fillRect(1323, 566, 16, 4);
   },
 
-  // The farm: barn, silo, cow pen, four planted plots, fences, hay, scarecrow, tractor and a dirt path.
+  // The farm: barn, cow pen, four planted plots, fences, hay, scarecrow, tractor and a dirt path.
   bgFarm(g) {
     const ctx = this.ctx, F = CFG.FARM;
     // dirt path from the road to the gate, and farm soil
@@ -745,12 +745,6 @@ const Render = {
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(B.x1 - 36, B.y0 + 54); ctx.lineTo(B.x1 - 8, B.y0 + 106); ctx.moveTo(B.x1 - 8, B.y0 + 54); ctx.lineTo(B.x1 - 36, B.y0 + 106); ctx.stroke();
     ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, B.x0 + 20, B.y0 + 10, 100, 20, 4); ctx.fill();
     ctx.fillStyle = '#ffe08a'; ctx.font = this.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🐄 FARM', B.x0 + 70, B.y0 + 20);
-    // silo
-    const S = F.silo;
-    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(S.x + 4, S.y + 44, 22, 8, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#cfd3d8'; U.roundRect(ctx, S.x - 20, S.y - 40, 40, 84, 20); ctx.fill();
-    ctx.fillStyle = '#9aa0a8'; for (let y = S.y - 30; y < S.y + 40; y += 14) ctx.fillRect(S.x - 20, y, 40, 2);
-    ctx.fillStyle = '#b23a3a'; ctx.beginPath(); ctx.ellipse(S.x, S.y - 40, 20, 10, 0, 0, Math.PI * 2); ctx.fill();
     // hay bales, scarecrow, tractor
     for (const [hx, hy] of [[-560, 730], [-530, 760], [-560, 790]]) { ctx.fillStyle = '#e0b44c'; U.roundRect(ctx, hx - 16, hy - 10, 32, 20, 4); ctx.fill(); ctx.fillStyle = '#b8862c'; ctx.fillRect(hx - 16, hy - 2, 32, 3); }
     const sx = -880, sy = 500;
@@ -923,11 +917,14 @@ const Render = {
     // brick pallets
     for (const [x, y] of S.PALLETS) { ctx.fillStyle = '#8d5a2b'; ctx.fillRect(x - 24, y + 6, 48, 8); brickWall(x - 20, y - 16, 40, 24); }
     // tower crane: concrete base and the mast (the jib swings in the dynamic pass)
+    // (an extension that draws its own crane sets CFG.SITE.CRANE.hidden: then the core draws none, static or moving)
     const C = S.CRANE;
-    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(C.x - 20, C.y - 18, 48, 48);
-    ctx.fillStyle = '#9a9a9a'; ctx.fillRect(C.x - 24, C.y - 24, 48, 48);
-    ctx.fillStyle = '#f2b705'; ctx.fillRect(C.x - 12, C.y - 12, 24, 24);
-    ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(C.x - 12, C.y - 12); ctx.lineTo(C.x + 12, C.y + 12); ctx.moveTo(C.x + 12, C.y - 12); ctx.lineTo(C.x - 12, C.y + 12); ctx.stroke();
+    if (!C.hidden) {
+      ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(C.x - 20, C.y - 18, 48, 48);
+      ctx.fillStyle = '#9a9a9a'; ctx.fillRect(C.x - 24, C.y - 24, 48, 48);
+      ctx.fillStyle = '#f2b705'; ctx.fillRect(C.x - 12, C.y - 12, 24, 24);
+      ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(C.x - 12, C.y - 12); ctx.lineTo(C.x + 12, C.y + 12); ctx.moveTo(C.x + 12, C.y - 12); ctx.lineTo(C.x - 12, C.y + 12); ctx.stroke();
+    }
     // portable toilet
     const T = S.TOILET;
     ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(T.x - 12, T.y - 26, 32, 40);
@@ -963,6 +960,7 @@ const Render = {
     }
     // crane jib swinging slowly over the site, hook dangling below it
     const C = S.CRANE, a = Math.sin(g.time * 0.25) * 0.9 + 0.3, L = 230;
+    if (C.hidden) return;   // an extension draws its own crane
     ctx.save(); ctx.translate(C.x, C.y); ctx.rotate(a);
     ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(6, 10, L, 8);
     ctx.fillStyle = '#f2b705'; ctx.fillRect(-50, -6, L + 50, 12);

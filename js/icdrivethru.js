@@ -6,8 +6,10 @@
 // window on the shop's east wall, facing East Road. From then on NPC cars come up East Road's west lane from
 // the South Road junction, queue at the window (up to three, nose to tail behind it), get a cone handed
 // through, pay into the shop's money pile (the one the player already collects inside the shop), then drive
-// on north and turn east along Main Street out of town, the way the pizza drive-thru cars leave. The cars are
-// purely decorative traffic: no obstacles, nothing for the player to do but watch and collect the money.
+// on north and turn east along Main Street out of town, the way the pizza drive-thru cars leave. A new car turns up on
+// South Road just out of sight west of the camera (Game.trafficSpawnX), so nobody ever sees one drive out of the woods
+// at the road's west end. The cars are purely decorative traffic: no obstacles, nothing for the player to do but watch
+// and collect the money.
 //
 // Why the cars come from the south: they drive along the shop's wall in the lane next to it, and a queue of
 // three only fits behind the window on the long stretch of East Road south of it (north of the window there
@@ -19,9 +21,9 @@ CFG.IC_DRIVE = {
   board: { x: 1228, y: 146 },                      // menu board north of the window
   sign: { x: 1202, y: 184 },                       // "DRIVE-THRU" sign over the wall, clear of the cars
   laneX: 1264,                                     // centre of East Road's west lane (road is 1240..1320)
-  approachY: 980,                                  // cars come along South Road's south lane from the west edge of town
+  approachY: 980,                                  // cars come along South Road's south lane from the west
   spawnY: 940,                                     // where the approach ends: just north of the junction, in East Road's west lane
-  entryGap: 90,                                    // no new car while the last one is still this close to the entrance
+  entryGap: 130,                                   // no new car while the last one is still this close to where it would appear
   stopLine: 166,                                   // white bar just ahead of the first car's nose
   laneEnd: 560,                                    // dashed guide line runs from the road top down to here
   exitY: 78,                                       // the middle of Main Street's eastbound (south) lane, where the cars turn east
@@ -46,11 +48,11 @@ function IC_DRIVE_ARC(cx, cy, R, a0, a1, n = 7) { const pts = []; for (let i = 1
 function arrived0(c, ty) { return Math.abs(c.y - ty) < 24 && Math.abs(c.x - CFG.IC_DRIVE.laneX) < 4; }
 // One NPC car in the ice cream drive-thru line. States: arriving -> waiting (at the window) -> leaving -> gone.
 class IcDriveCar {
-  constructor(kind) {
+  constructor(kind, x) {
     const D = CFG.IC_DRIVE;
     this.kind = kind; this.color = U.pick(COLORS.cars); this.flavor = U.pick(D.flavors);
-    // start off the west edge on South Road, drive east, swing north into East Road, then join the queue
-    this.x = CFG.WORLD.x0 - 130; this.y = D.approachY; this.angle = 0;
+    // start on South Road (just out of sight), drive east, swing north into East Road, then join the queue
+    this.x = x; this.y = D.approachY; this.angle = 0;
     // along South Road, then a proper rounded left turn (a quarter circle) up into East Road's west lane
     this.path = [{ x: D.laneX - 64, y: D.approachY }].concat(IC_DRIVE_ARC(D.laneX - 64, D.approachY - 64, 64, Math.PI / 2, 0), [{ x: D.laneX, y: D.approachY - 64 - 20 }]);
     this.state = 'approach'; this.t = 0; this.paid = false; this.coneT = 0; this.waitT = 0; this.honked = false;
@@ -118,8 +120,10 @@ const IceCreamDriveThruExt = {
       const far = g.area !== 'town' || U.dist(g.player.x, g.player.y, W.x, W.y) > 1400;
       this.spawnT = U.rand(D.spawnEvery[0], D.spawnEvery[1]) * (far ? 2 : 1);
       const line = this.cars.filter((c) => c.inLine || c.state === 'approach');
-      const clear = !this.cars.some((c) => c.state === 'approach' && c.x < CFG.WORLD.x0 + D.entryGap);   // nobody still on the entrance
-      if (line.length < D.queueMax && clear) this.cars.push(new IcDriveCar(Math.random() < D.funChance ? U.pick(D.funKinds) : 'car'));
+      const R = CFG.ROADS[2], x = g.trafficSpawnX(R.x0 + 70, D.laneX - 64 - 60, R.y0, R.y1);   // South Road, west of the camera
+      const clear = x !== null && !this.cars.some((c) => c.state === 'approach' && Math.abs(c.x - x) < D.entryGap);   // nobody still on that spot
+      if (line.length < D.queueMax && !clear) this.spawnT = Math.min(this.spawnT, 1);   // try again in a moment
+      else if (line.length < D.queueMax) this.cars.push(new IcDriveCar(Math.random() < D.funChance ? U.pick(D.funKinds) : 'car', x));
     }
     // the cone sliding across to the car
     if (this.cone) { this.cone.t += dt; if (this.cone.t >= this.cone.dur) this.cone = null; }

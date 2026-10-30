@@ -5,8 +5,9 @@
 // Inside: twenty floors in four themes (brown earth caves, icy blue caves, glowing crystal caves, cheesy pizza caves with
 // pepperoni rocks), each one generated from its floor number (so a floor looks the same each time you go in): walls and
 // pillars, 15-30 rocks (some hold copper, iron, gold or gems), a couple of crates (sometimes with a pizza snack inside),
-// a few bouncy slimes, and one rock hides the ladder down. One button does everything: '⛏️ Mine', '🗡️ Bonk',
-// '🪜 Go down', '🛗 Elevator'. A slime bump costs a heart (5 of them, top-left); at no hearts the chef just gets sleepy and
+// a few slow, bouncy slimes, and one rock hides the ladder down. One button does everything: '⛏️ Mine', '🪜 Go down',
+// '🛗 Elevator'; slimes need no button: when one comes within reach the chef bonks it all by himself (every
+// AUTO_BONK s, two bonks pop it). A slime bump still costs a heart (5 of them, top-left); at no hearts the chef just gets sleepy and
 // wakes at the entrance with all his loot. Every fifth floor has an elevator; the one outside picks any floor reached.
 // Floor 20 has a treasure chest with the golden pizza trophy.
 // Extension module: registered with Game.ext (first, so the door beats the site's own hints) and Render.ext (see js/EXTENSIONS.md).
@@ -23,7 +24,8 @@ CFG.MINES = {
   // ---- the mine: one map, regenerated for each floor on a grid of 50 px tiles
   WORLD: { x0: 3500, y0: 5000, x1: 4700, y1: 5800 },
   TILE: 50, COLS: 24, ROWS: 16, FLOORS: 20,
-  REACH: 74, BONK_R: 66, TOUCH_R: 28, HEARTS: 5, LADDER_BY: 7,   // the 7th rock broken always shows the ladder if it hid so far
+  REACH: 74, BONK_R: 66, TOUCH_R: 28, HEARTS: 5, LADDER_BY: 7,
+  AUTO_BONK: 0.5, SLIME_HOP: 0.7, SLIME_WAIT: [1.0, 2.2], SLIME_CHASE: 0.3,   // auto attack every 0.5 s; gentle, slow slimes   // the 7th rock broken always shows the ladder if it hid so far
   ORES: {
     copper: { ico: '🟤', col: '#d9773a', hi: '#ffb37a', price: 1, hp: 2 },
     iron: { ico: '⚪', col: '#dfe4ea', hi: '#ffffff', price: 2, hp: 2 },
@@ -61,7 +63,7 @@ const MinesExt = {
     g.s.mines = s;
     this.closePanel();
     this.st = {
-      floor: null, obs: [], hearts: CFG.MINES.HEARTS, invuln: 0, blink: 0, push: null, sleep: null, fade: 0, act: null,
+      floor: null, obs: [], hearts: CFG.MINES.HEARTS, invuln: 0, blink: 0, push: null, sleep: null, fade: 0, act: null, bonkCd: 0,
       bits: [], splats: [], heartPop: null, panel: null, minerHop: 0, minerSay: null, lastTheme: -1,
     };
     // a reload inside the mine starts again at the top of the floor you were on
@@ -245,8 +247,6 @@ const MinesExt = {
     if (g.area !== 'mines') return null;
     const f = st.floor; if (!f || st.sleep) return null;
     if (f.ladder && this.near(g, f.ladder, 32)) return { label: '🪜 Go down', run: (gg) => this.goDown(gg) };
-    const sl = this.nearestSlime(g);
-    if (sl) return { label: '🗡️ Bonk', run: (gg) => this.bonk(gg, sl) };
     if (f.chest && !f.chest.open && this.near(g, f.chest, 64)) return { label: '🎁 Open the chest', run: (gg) => this.openChest(gg) };
     if (f.elevator && this.near(g, f.elevator, 30)) return { label: '🛗 Elevator', run: (gg) => this.togglePanel(gg) };
     if (this.near(g, f.up, 28)) return { label: '☀️ Go outside', run: (gg) => this.leave(gg) };
@@ -272,7 +272,7 @@ const MinesExt = {
     const f = st.floor; if (!f) return null;
     if (st.sleep) return { text: 'Time for a rest! 😴', target: null };
     if (st.panel) return { text: 'Pick a floor! 🛗', target: null };
-    if (this.nearestSlime(g, 130)) return { text: 'Bonk the slime! 🗡️', target: null };
+    if (this.nearestSlime(g, 130)) return { text: 'Walk up to the slime: bonk bonk! 🗡️', target: null };
     if (f.chest && !f.chest.open) return { text: 'Open the treasure chest! 🎁', target: f.chest.spot };
     if (f.ladder) return { text: 'Go down the ladder! 🪜', target: f.ladder };
     if (f.n >= M.FLOORS) return { text: 'You found the treasure! 🏆', target: null };
@@ -284,7 +284,7 @@ const MinesExt = {
     if (!this.st) return;
     const st = this.st;
     this.closePanel();
-    st.floor = null; st.obs = []; st.sleep = null; st.push = null; st.act = null; st.bits = []; st.splats = []; st.fade = 0; st.invuln = 0; st.blink = 0;
+    st.floor = null; st.obs = []; st.sleep = null; st.push = null; st.act = null; st.bits = []; st.splats = []; st.fade = 0; st.invuln = 0; st.blink = 0; st.bonkCd = 0;
     st.hearts = CFG.MINES.HEARTS; st.lastTheme = -1;
     if (g.s.mines) g.s.mines.cur = 0;
   },
@@ -533,6 +533,7 @@ const MinesExt = {
     for (const k of f.rocks) k.shake = Math.max(0, k.shake - dt);
     for (const k of f.crates) k.shake = Math.max(0, k.shake - dt);
     for (const sl of f.slimes) this.stepSlime(g, f, sl, dt);
+    this.autoBonk(g, dt);
     // snacks: walk over one to eat it (a heart back)
     for (const sn of f.snacks) sn.t += dt;
     const ate = f.snacks.find((sn) => sn.t > 0.4 && U.dist(p.x, p.y, sn.x, sn.y) < 28);
@@ -545,20 +546,30 @@ const MinesExt = {
     for (const sp of st.splats) sp.t += dt;
     st.splats = st.splats.filter((sp) => sp.t < 2.5);
   },
+  // auto attack: a slime within reach gets bonked on its own, every AUTO_BONK seconds (pickaxe or sword in hand)
+  autoBonk(g, dt) {
+    const st = this.st, s = g.s.mines;
+    st.bonkCd = Math.max(0, (st.bonkCd || 0) - dt);
+    if (st.bonkCd > 0 || st.sleep || !st.floor || !(s.pickaxe || s.sword) || !this.onFoot(g)) return;
+    const sl = this.nearestSlime(g);
+    if (!sl) return;
+    st.bonkCd = CFG.MINES.AUTO_BONK;
+    this.bonk(g, sl);
+  },
   stepSlime(g, f, sl, dt) {
     const p = g.player, st = this.st;
     sl.phase += dt; sl.stun = Math.max(0, sl.stun - dt); sl.squish = Math.max(0, sl.squish - dt * 2.5);
     if (sl.hop) {
       const h = sl.hop; h.t += dt; const k = Math.min(1, h.t / h.dur);
       sl.x = U.lerp(h.x0, h.x1, k); sl.y = U.lerp(h.y0, h.y1, k); sl.z = Math.sin(k * Math.PI) * 18;
-      if (k >= 1) { sl.c = h.c; sl.r = h.r; sl.hop = null; sl.z = 0; sl.squish = 0.45; sl.wait = U.rand(0.7, 1.7); }
+      if (k >= 1) { sl.c = h.c; sl.r = h.r; sl.hop = null; sl.z = 0; sl.squish = 0.45; sl.wait = U.rand(CFG.MINES.SLIME_WAIT[0], CFG.MINES.SLIME_WAIT[1]); }
     } else if (sl.stun <= 0) {
       sl.wait -= dt;
       if (sl.wait <= 0) {
         const dirs = this.DIRS.slice().sort(() => Math.random() - 0.5);
-        if (U.dist(p.x, p.y, sl.x, sl.y) < 220 && Math.random() < 0.4) dirs.sort((a, b) => U.dist(p.x, p.y, sl.x + a[0] * 50, sl.y + a[1] * 50) - U.dist(p.x, p.y, sl.x + b[0] * 50, sl.y + b[1] * 50));
+        if (U.dist(p.x, p.y, sl.x, sl.y) < 220 && Math.random() < CFG.MINES.SLIME_CHASE) dirs.sort((a, b) => U.dist(p.x, p.y, sl.x + a[0] * 50, sl.y + a[1] * 50) - U.dist(p.x, p.y, sl.x + b[0] * 50, sl.y + b[1] * 50));
         const d = dirs.find(([dx, dy]) => this.slimeTile(f, sl.c + dx, sl.r + dy));
-        if (d) { const to = this.tileCenter(sl.c + d[0], sl.r + d[1]); sl.hop = { t: 0, dur: 0.5, x0: sl.x, y0: sl.y, x1: to.x, y1: to.y, c: sl.c + d[0], r: sl.r + d[1] }; if (d[0]) sl.face = d[0]; }
+        if (d) { const to = this.tileCenter(sl.c + d[0], sl.r + d[1]); sl.hop = { t: 0, dur: CFG.MINES.SLIME_HOP, x0: sl.x, y0: sl.y, x1: to.x, y1: to.y, c: sl.c + d[0], r: sl.r + d[1] }; if (d[0]) sl.face = d[0]; }
         else sl.wait = 0.6;
       }
     }

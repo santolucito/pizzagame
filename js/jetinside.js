@@ -7,9 +7,9 @@
 // exit mat, ten rows of blue seats (2-aisle-2) with a few passengers (two reading, one asleep, a kid with a balloon),
 // oval windows along both walls looking out at the apron, overhead bins, and a lavatory at the tail.
 // Sit in a seat: the seatbelt sign dings on, the window next to you shows the apron outside, and the attendant pushes
-// the cart over with free pretzels (or a juice). Sit in the captain's seat: an instrument panel with the yoke, dials
-// and blinking lights; its buttons light the seatbelt sign (the passengers buckle up), talk to the passengers, or
-// take off for real (the chef is put in the jet as its driver and the airfield's own one-press take-off runs).
+// the cart over with free pretzels (or a juice). Sit in the captain's seat: the co-pilot gives a thumbs-up and the big
+// button says '🛫 Take off!', which takes off for real (the chef is put in the jet as its driver and the airfield's own
+// one-press take-off runs); pushing the stick stands you up again.
 // Peek into the lavatory for a little picture (sometimes it is occupied). The door mat takes you back out.
 // Extension module: registered with Game.ext (first, so the door beats the airfield's "Hop in" hint) and Render.ext.
 CFG.JETCABIN = {
@@ -41,13 +41,13 @@ CFG.JETCABIN = {
     { row: 7, side: 'top', i: 1, kind: 'sit', shirt: '#3b7dd8', skin: '#c68642', hat: 'cap', capColor: '#41b883' },
     { row: 8, side: 'bot', i: 1, kind: 'sit', shirt: '#e15759', skin: '#f1c27d', hair: '#d4a017', hairStyle: 1 },
   ],
-  SNACK: 20, CART_SPEED: 150, OFFER: 1.4, TALK: 2.8, PEEK: 2.6, FADE: 0.45,
+  SNACK: 20, CART_SPEED: 150, OFFER: 1.4, PEEK: 2.6, FADE: 0.45,
 };
 CFG.AREAS.jetcabin = { WORLD: CFG.JETCABIN.WORLD };
 
 const JetInsideExt = {
   name: 'jetinside',
-  st: null, hooked: false,
+  st: null,
   defaults: { jetcabin: { seen: false, captain: false, sat: false, snacks: 0, peeks: 0, flights: 0 } },
 
   // ---------- state ----------
@@ -66,10 +66,10 @@ const JetInsideExt = {
       captain: null,              // { t, still }: sitting at the controls
       view: 0,                    // 0..1: the window next to your seat opening up into a little view
       signOn: false, buckled: false, ding: 0,
-      talk: 0, peek: null,        // { t, occupied }
+      peek: null,                 // { t, occupied }
       snack: null,                // { kind, t }: the pretzels (or juice) you carry
       fa: { x: J.FA_HOME.x, y: J.FA_HOME.y, facing: 1, moving: false, bob: 0, state: 'home', wait: 0, offer: null, path: [] },
-      wave: 0, obs: null, btns: [],
+      wave: 0, obs: null,
     };
     this.st.obs = this.buildObstacles();
   },
@@ -124,9 +124,7 @@ const JetInsideExt = {
     const st = this.st, J = CFG.JETCABIN, p = g.player;
     if (g.area === 'town') return this.doorDist(g) < J.DOOR_R ? { label: '🚪 Board the plane', run: (gg) => this.board(gg) } : null;
     if (g.area !== 'jetcabin' || !this.onFoot(g)) return null;
-    if (st.captain) {
-      const b = this.nextButton(); return { label: b.label, run: (gg) => this.press(gg, b.key) };
-    }
+    if (st.captain) return { label: '🛫 Take off!', run: (gg) => this.takeOff(gg) };
     if (st.seat) return { label: '🚶 Stand up', run: (gg) => this.standUp(gg) };
     if (U.dist(p.x, p.y, J.EXIT.x, J.EXIT.y) < 30) return { label: '🚪 Leave the plane', run: (gg) => this.leave(gg) };
     if (p.x < J.BULKHEAD.x0 && U.dist(p.x, p.y, J.CAPT_STAND.x, J.CAPT_STAND.y) < 44) return { label: "👨‍✈️ Sit in the captain's seat", run: (gg) => this.sitCaptain(gg) };
@@ -152,12 +150,6 @@ const JetInsideExt = {
     const J = CFG.JETCABIN; let best = null, bd = Infinity;
     for (const s of this.st.seats) { if (s.folk) continue; const d = U.dist(p.x, p.y, s.x, J.AISLE.y); if (d < bd) { bd = d; best = { x: s.x, y: J.AISLE.y }; } }
     return best;
-  },
-  nextButton() {
-    const st = this.st;
-    if (!st.buckled) return { key: 'belt', label: '🔔 Seatbelt sign' };
-    if (!st.captain.talked) return { key: 'talk', label: '📢 Talk to the passengers' };
-    return { key: 'fly', label: '🛫 Take off!' };
   },
   board(g) {
     const J = CFG.JETCABIN, p = g.player, st = this.st;
@@ -200,7 +192,7 @@ const JetInsideExt = {
   standUp(g) {
     const st = this.st, p = g.player, J = CFG.JETCABIN;
     if (st.seat) { p.x = st.seat.s.x; p.y = J.AISLE.y; st.seat = null; }
-    else if (st.captain) { p.x = J.CAPT_STAND.x; p.y = J.CAPT_STAND.y; st.captain = null; st.talk = 0; }
+    else if (st.captain) { p.x = J.CAPT_STAND.x; p.y = J.CAPT_STAND.y; st.captain = null; }
     st.view = 0; p.moving = false; Sfx.drop();
   },
   clearSeats(g) {
@@ -209,32 +201,17 @@ const JetInsideExt = {
   },
   sitCaptain(g) {
     const p = g.player, st = this.st, J = CFG.JETCABIN;
-    st.captain = { t: 0, talked: false, still: 0 };
+    st.captain = { t: 0, still: 0 };
     p.x = J.CAPT.x; p.y = J.CAPT.y; p.moving = false; p.facing = -1;
     g.s.jetcabin.captain = true;
     g.floats.push({ x: J.COPILOT.x, y: J.COPILOT.y - 70, text: '👍', color: '#ffe08a', t: 0, dur: 1.6, big: true });
     Sfx.pickup(); Haptics.tap();
   },
-  // the cockpit's buttons (the big action button runs the next one; the panel's own buttons can be tapped)
-  press(g, key) {
-    const st = this.st, p = g.player, J = CFG.JETCABIN;
-    if (!st || !st.captain || g.area !== 'jetcabin') return;
-    if (key === 'belt') {
-      st.signOn = true; st.buckled = true; st.ding = 1.2;
-      g.floats.push({ x: p.x, y: p.y - 70, text: 'Ding! Seatbelts on 🔔', color: '#ffe08a', t: 0, dur: 1.5, big: true });
-      Sfx.ding(); Haptics.tap();
-    } else if (key === 'talk') {
-      st.captain.talked = true; st.talk = J.TALK;
-      g.floats.push({ x: J.COPILOT.x, y: J.COPILOT.y - 70, text: '👍', color: '#ffe08a', t: 0, dur: 1.6, big: true });
-      Sfx.chime(); Haptics.tap();
-    } else if (key === 'fly') this.takeOff(g);
-    else if (key === 'up') this.standUp(g);
-  },
   // leave the cabin with the chef at the controls of the jet itself and run the airfield's own take-off
   takeOff(g) {
     const v = this.jet(), rt = AirfieldExt.rt, p = g.player, st = this.st;
     if (!v || v.away || rt.runup || rt.roll) return;
-    this.clearSeats(g); st.signOn = false; st.buckled = false; st.talk = 0; st.peek = null; st.fade = CFG.JETCABIN.FADE;
+    this.clearSeats(g); st.signOn = false; st.buckled = false; st.peek = null; st.fade = CFG.JETCABIN.FADE;
     g.area = 'town'; p.x = v.x; p.y = v.y; p.moving = false; p.hasMoved = true;
     g.driving = true; g.vehicle = v; v.vx = 0; v.vy = 0; g.cameraSnap = true;
     g.s.jetcabin.flights++;
@@ -251,7 +228,7 @@ const JetInsideExt = {
     if (!this.st) return;
     const st = this.st;
     this.clearSeats(g);
-    st.signOn = false; st.buckled = false; st.talk = 0; st.peek = null; st.fade = 0; st.snack = null; st.ding = 0;
+    st.signOn = false; st.buckled = false; st.peek = null; st.fade = 0; st.snack = null; st.ding = 0;
     this.parkAttendant();
   },
   parkAttendant() { const fa = this.st.fa, J = CFG.JETCABIN; fa.x = J.FA_HOME.x; fa.y = J.FA_HOME.y; fa.state = 'home'; fa.offer = null; fa.path = []; fa.moving = false; fa.facing = 1; },
@@ -267,7 +244,7 @@ const JetInsideExt = {
     if (!this.st) this.build(g);
     const st = this.st, p = g.player, J = CFG.JETCABIN;
     st.wave += dt;
-    st.fade = Math.max(0, st.fade - dt); st.ding = Math.max(0, st.ding - dt); st.talk = Math.max(0, st.talk - dt);
+    st.fade = Math.max(0, st.fade - dt); st.ding = Math.max(0, st.ding - dt);
     if (st.snack) { st.snack.t -= dt; if (st.snack.t <= 0) st.snack = null; }
     if (st.peek) { st.peek.t += dt; if (st.peek.t >= J.PEEK) st.peek = null; }
     if (g.area !== 'jetcabin') {
@@ -280,7 +257,7 @@ const JetInsideExt = {
       st.view = Math.min(1, st.view + dt * 2.5);
     } else if (st.captain) {
       const c = st.captain; c.t += dt; p.x = J.CAPT.x; p.y = J.CAPT.y; p.moving = false; p.facing = -1;
-      // pushing the stick for a moment gets you up again (the panel also has a stand-up button)
+      // pushing the stick for a moment gets you up again
       const a = Input.axis(); c.still = Math.hypot(a.x, a.y) > 0.6 ? c.still + dt : 0;
       if (c.still > 0.45) this.standUp(g);
     } else {
@@ -333,7 +310,7 @@ const JetInsideExt = {
       return { text: 'Go inside the big plane! 🛫', target: d < 30 ? null : this.doorSpot(this.jet()) };
     }
     if (g.area !== 'jetcabin') return undefined;
-    if (st.captain) return { text: st.talk > 0 ? 'Everybody is listening! 📢' : 'You are the captain! Press a button 👨‍✈️', target: null };
+    if (st.captain) return { text: 'Press the button to take off! 🛫', target: null };
     if (st.seat) {
       const fa = st.fa;
       if (fa.state === 'out' || fa.state === 'offer') return { text: 'Here comes the snack cart! 🥨', target: null };
@@ -571,13 +548,12 @@ const JetInsideExt = {
   },
   overlay(r, g) {
     if (g.area !== 'jetcabin' || !this.st) return;
-    const ctx = r.ctx, st = this.st, p = g.player, J = CFG.JETCABIN, t = st.wave;
+    const ctx = r.ctx, st = this.st, J = CFG.JETCABIN, t = st.wave;
     const say = (x, y, text, w) => r.drawBubble(x, y, () => { ctx.font = r.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText(text, 0, 0); }, w);
     // the sleeper's z-z-z
     for (const s of st.seats) if (s.folk && s.folk.kind === 'sleep') { const k = (t * 0.6) % 1; ctx.globalAlpha = 1 - k; ctx.font = r.font(11 + k * 5); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('💤', s.x + 8 + k * 10, s.y - 58 - k * 18); ctx.globalAlpha = 1; }
     if (st.seat) this.drawView(r, g);
     if (st.fa.offer) say(st.fa.x, st.fa.y - 72, st.fa.offer === 'pretzels' ? 'Pretzels? 🥨' : 'Apple juice? 🧃', 104);
-    if (st.talk > 0 && st.captain) say(p.x + 20, p.y - 78, 'This is your captain speaking! 🍕', 220);
     if (st.peek) {
       // a little picture of the tiny bathroom (or its door shut tight)
       const LV = J.LAV, x = LV.door.x - 40, y = J.AISLE.y - 104, k = Math.min(1, st.peek.t * 5), w = 92 * k, h = 76 * k;
@@ -602,98 +578,11 @@ const JetInsideExt = {
       ctx.restore();
     }
   },
-  // ---------- screen space: the fade, and the instrument panel while you sit in the captain's seat ----------
+  // ---------- screen space: the fade in and out of the cabin ----------
   screen(r, g) {
-    if (!this.st) return;
-    const ctx = r.ctx, st = this.st, W = r.canvas.width / r.dpr, H = r.canvas.height / r.dpr;
-    this.hook(r);
-    st.btns = [];
-    if (g.area === 'jetcabin' && st.captain) this.drawPanel(r, g, W, H);
-    if (st.fade > 0) { ctx.fillStyle = `rgba(20,12,6,${(st.fade / CFG.JETCABIN.FADE).toFixed(3)})`; ctx.fillRect(0, 0, W, H); }
-  },
-  // the panel sits along the bottom, above the big button; on a wide screen it moves aside so the chef stays in view
-  panelRect(r, g, W, H) {
-    const ph = Math.min(240, H * 0.34), y = H - 86 - ph, p = g.player, sx = (p.x - r.camX) * r.scale, sy = (p.y - r.camY) * r.scale;
-    let w = Math.min(W - 24, 640), x = (W - w) / 2;
-    if (sy > y - 10 && sx + 50 > x && sx - 50 < x + w) {
-      if (W - sx - 62 >= 440) { x = sx + 50; w = Math.min(640, W - x - 12); } else if (sx - 62 >= 440) { w = Math.min(640, sx - 62); x = sx - 50 - w; }
-    }
-    return { x, y, w, h: ph };
-  },
-  drawPanel(r, g, W, H) {
-    const ctx = r.ctx, st = this.st, t = st.wave, P = this.panelRect(r, g, W, H), small = P.w < 480;
-    ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,0.3)'; U.roundRect(ctx, P.x + 4, P.y + 6, P.w, P.h, 18); ctx.fill();
-    ctx.fillStyle = '#2d3440'; U.roundRect(ctx, P.x, P.y, P.w, P.h, 18); ctx.fill();
-    ctx.fillStyle = '#3a4250'; U.roundRect(ctx, P.x + 6, P.y + 6, P.w - 12, P.h - 12, 14); ctx.fill();
-    // the buttons along the top
-    const keys = [['belt', small ? '🔔 Seatbelt' : '🔔 Seatbelt sign', '#ffd166'], ['talk', small ? '📢 Talk' : '📢 Talk to everyone', '#9fd8ff'], ['fly', '🛫 Take off!', '#7ee08a']];
-    const bw = (P.w - 24 - 2 * 10) / 3, bh = 44, by = P.y + 14, next = this.nextButton().key;
-    keys.forEach(([key, label, col], i) => {
-      const bx = P.x + 12 + i * (bw + 10), glow = key === next && Math.floor(t * 2) % 2 === 0;
-      ctx.fillStyle = 'rgba(0,0,0,0.35)'; U.roundRect(ctx, bx, by + 4, bw, bh, 12); ctx.fill();
-      ctx.fillStyle = col; U.roundRect(ctx, bx, by, bw, bh, 12); ctx.fill();
-      if (glow) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; U.roundRect(ctx, bx - 2, by - 2, bw + 4, bh + 4, 13); ctx.stroke(); }
-      ctx.fillStyle = '#2b1d14'; ctx.font = r.font(small ? 13 : 16); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(label, bx + bw / 2, by + bh / 2 + 1);
-      st.btns.push({ key, x: bx, y: by, w: bw, h: bh });
-    });
-    // the stand-up button sits on the panel's corner
-    const ux = P.x + P.w - 104, uy = P.y - 40;
-    ctx.fillStyle = 'rgba(0,0,0,0.3)'; U.roundRect(ctx, ux + 2, uy + 3, 100, 32, 12); ctx.fill();
-    ctx.fillStyle = '#fff8ee'; U.roundRect(ctx, ux, uy, 100, 32, 12); ctx.fill();
-    ctx.fillStyle = '#2b1d14'; ctx.font = r.font(13); ctx.fillText('🚶 Stand up', ux + 50, uy + 17);
-    st.btns.push({ key: 'up', x: ux, y: uy, w: 100, h: 32 });
-    // below: two dials, the yoke in the middle, the artificial horizon and a block of blinking lights
-    const top = by + bh + 12, bot = P.y + P.h - 10, mid = (top + bot) / 2, R = Math.max(14, Math.min(32, (bot - top) / 2 - 4, P.w / 14));
-    const dial = (x, y, a, label) => {
-      ctx.fillStyle = '#1e2733'; ctx.beginPath(); ctx.arc(x, y, R + 4, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#f7f8fa'; ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1.5; for (let i = 0; i < 10; i++) { const q = i / 10 * Math.PI * 2; ctx.beginPath(); ctx.moveTo(x + Math.cos(q) * R * 0.8, y + Math.sin(q) * R * 0.8); ctx.lineTo(x + Math.cos(q) * R * 0.95, y + Math.sin(q) * R * 0.95); ctx.stroke(); }
-      ctx.strokeStyle = '#e4572e'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * R * 0.75, y + Math.sin(a) * R * 0.75); ctx.stroke();
-      ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
-      ctx.font = r.font(Math.max(7, R * 0.3)); ctx.fillText(label, x, y + R * 0.45);
-    };
-    const cx = P.x + P.w / 2;
-    dial(P.x + 20 + R, mid, -Math.PI * 0.75 + Math.sin(t * 0.9) * 0.15, 'SPEED');
-    dial(P.x + 32 + R * 3, mid, -Math.PI * 0.2 + Math.sin(t * 0.6 + 1) * 0.2, 'HIGH');
-    // the yoke: a column and a ram's-horn wheel, rocking gently
-    ctx.fillStyle = '#1e2733'; ctx.fillRect(cx - 6, mid, 12, bot - mid);
-    ctx.save(); ctx.translate(cx, mid); ctx.rotate(Math.sin(t * 1.2) * 0.06);
-    ctx.strokeStyle = '#11161d'; ctx.lineWidth = 9; ctx.lineCap = 'round';
-    const yw = Math.min(70, P.w * 0.12);
-    ctx.beginPath(); ctx.moveTo(-yw, -16); ctx.lineTo(-yw, 6); ctx.lineTo(-yw * 0.35, 6); ctx.moveTo(yw, -16); ctx.lineTo(yw, 6); ctx.lineTo(yw * 0.35, 6); ctx.stroke();
-    ctx.fillStyle = '#11161d'; U.roundRect(ctx, -yw * 0.45, -4, yw * 0.9, 18, 6); ctx.fill();
-    ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.arc(0, 5, 6, 0, Math.PI * 2); ctx.fill(); r.drawPizza(0, 5, 5);
-    ctx.restore();
-    // the artificial horizon: blue sky over brown ground, tilting a little
-    const hx = P.x + P.w - 32 - R * 3, hy = mid;
-    ctx.save(); ctx.beginPath(); ctx.arc(hx, hy, R, 0, Math.PI * 2); ctx.clip();
-    ctx.translate(hx, hy); ctx.rotate(Math.sin(t * 0.7) * 0.12); ctx.fillStyle = '#49a8ea'; ctx.fillRect(-R, -R, 2 * R, R); ctx.fillStyle = '#a0662f'; ctx.fillRect(-R, 0, 2 * R, R);
-    ctx.fillStyle = '#fff'; ctx.fillRect(-R, -1, 2 * R, 2); ctx.restore();
-    ctx.strokeStyle = '#1e2733'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(hx, hy, R + 2, 0, Math.PI * 2); ctx.stroke();
-    ctx.fillStyle = '#ffd166'; ctx.fillRect(hx - R * 0.5, hy - 1.5, R * 0.35, 3); ctx.fillRect(hx + R * 0.15, hy - 1.5, R * 0.35, 3);
-    // the blinking lights
-    const lx = P.x + P.w - 20 - R * 1.6, cols = ['#ff5252', '#44d36a', '#ffd166', '#5ad1ff'];
-    for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) {
-      const n = i * 2 + j, on = Math.floor(t * (1.5 + n * 0.4) + n) % 2 === 0;
-      ctx.fillStyle = on ? cols[n % 4] : '#1e2733'; ctx.beginPath(); ctx.arc(lx + j * R * 0.9, mid - R * 0.7 + i * R * 0.7, Math.max(3, R * 0.18), 0, Math.PI * 2); ctx.fill();
-    }
-    // the seatbelt light on the panel
-    if (st.signOn) { ctx.fillStyle = '#ffd166'; ctx.font = r.font(Math.max(9, R * 0.4)); ctx.fillText('🔔 ON', P.x + 32 + R * 3, mid - R - 10 < top ? top + 2 : mid - R - 10); }
-    ctx.restore();
-  },
-  // taps on the panel's buttons (the canvas otherwise starts the joystick)
-  hook(r) {
-    if (this.hooked || !r.canvas) return;
-    this.hooked = true;
-    r.canvas.addEventListener('pointerdown', (e) => {
-      const st = this.st; if (!st || !st.captain || Game.area !== 'jetcabin' || !st.btns.length) return;
-      const q = Render.toScreen(e.clientX, e.clientY), b = st.btns.find((o) => q.x >= o.x && q.x <= o.x + o.w && q.y >= o.y && q.y <= o.y + o.h);
-      if (!b) return;
-      e.preventDefault(); e.stopImmediatePropagation();
-      Sfx.init(); Sfx.resume();
-      this.press(Game, b.key);
-    }, { capture: true });
+    if (!this.st || !(this.st.fade > 0)) return;
+    const ctx = r.ctx, W = r.canvas.width / r.dpr, H = r.canvas.height / r.dpr;
+    ctx.fillStyle = `rgba(20,12,6,${(this.st.fade / CFG.JETCABIN.FADE).toFixed(3)})`; ctx.fillRect(0, 0, W, H);
   },
 };
 Game.ext.unshift(JetInsideExt);   // first in line so the door's button and hint beat the airfield's "Hop in the big jet"

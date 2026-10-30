@@ -2,8 +2,8 @@
 // Inside the big jet at GATE 1: the door spot (label + hint) while it is parked, none while it is driven or away at Cloud
 // Harbor; flying it from outside still works; boarding onto the mat; a passenger seat (pinned, the window view, the
 // seatbelt sign, the snack cart bringing pretzels, carried for 20 s), standing up; the lavatory peek; the cockpit
-// (the captain's seat, the panel's buttons by tap and by the big button, the co-pilot's thumbs-up, standing up with
-// the stick) and taking off from it (the real take-off, Cloud Harbor, the flight home); leaving at the door spot that
+// (the captain's seat: no panel, the co-pilot's thumbs-up, the big button says Take off, standing up with the stick)
+// and taking off from it (the real take-off, Cloud Harbor, the flight home); leaving at the door spot that
 // follows the jet; rolling stairs when it is parked away from its gate; rescues (a wall, a save in a seat) and
 // Take-me-home from the cockpit. Screenshots desktop + phone.
 module.exports = async (t) => {
@@ -163,55 +163,50 @@ module.exports = async (t) => {
     Game.s.jetcabin.captain = false; st.signOn = false; st.buckled = false; T.step(1);
     const out = { hint: T.hint(), label: T.label() }; const nf = Game.floats.length; T.act(); T.step(2);
     const p = Game.player; out.seated = !!st.captain; out.on = Math.hypot(p.x - J.CAPT.x, p.y - J.CAPT.y); out.thumb = Game.floats.slice(nf - 1).some((f) => f.text === '👍');
-    out.next = T.label(); out.hint2 = T.hint();
+    out.next = T.label(); out.hint2 = T.hint(); out.area = Game.area;
+    out.noPanel = !('btns' in st) && !('talk' in st) && typeof JetInsideExt.drawPanel !== 'function' && typeof JetInsideExt.press !== 'function' && typeof JetInsideExt.nextButton !== 'function';
+    // watch what the real frames draw while seated
+    const ctx = Render.ctx, fill = ctx.fillText; window.__drawn = []; ctx.fillText = function (txt, ...a) { window.__drawn.push(String(txt)); return fill.call(this, txt, ...a); };
     return out;
   });
+  await t.wait(250);   // a few real frames draw the cockpit with the chef in the seat
+  Object.assign(capt, await t.ev(() => {
+    const ctx = Render.ctx; delete ctx.fillText; const drawn = window.__drawn; delete window.__drawn;
+    const dom = [...document.querySelectorAll('button, [role=button]')].filter((b) => b.id !== 'btn-make').map((b) => b.textContent).filter((x) => /Seatbelt|Talk|Stand up|Take off/.test(x));
+    return { frames: drawn.length, panelText: drawn.filter((x) => /Seatbelt|Talk|Stand up|SPEED|HIGH|Take off/.test(x)), dom, bigBtn: document.getElementById('btn-make').textContent, still: !!JetInsideExt.st.captain };
+  }));
   t.expectEq(capt.label, "👨‍✈️ Sit in the captain's seat", 'captain seat label');
-  t.expect(capt.seated && capt.on < 1, 'sitting at the controls');
+  t.expect(capt.seated && capt.on < 1 && capt.still && capt.area === 'jetcabin', 'sitting at the controls');
   t.expect(capt.thumb, 'the co-pilot gives a thumbs-up');
-  t.expectEq(capt.next, '🔔 Seatbelt sign', 'the seatbelt button first');
-  t.expectEq(capt.hint2, 'You are the captain! Press a button 👨‍✈️', 'captain hint');
+  t.expectEq(capt.next, '🛫 Take off!', 'the big button says Take off right away');
+  t.expectEq(capt.bigBtn, '🛫 Take off!', 'the big button on screen says Take off');
+  t.expectEq(capt.hint2, 'Press the button to take off! 🛫', 'captain hint');
+  t.expect(capt.noPanel && capt.frames > 0 && capt.panelText.length === 0 && capt.dom.length === 0, `no cockpit panel: no buttons, nothing drawn (${JSON.stringify(capt)})`);
   await t.ev(() => T.step(10));
-  await t.shot('cockpit-panel');
-  // tap the panel's seatbelt button for real
-  const btn = await t.ev(() => { const b = JetInsideExt.st.btns.find((o) => o.key === 'belt'); return b && { x: b.x + b.w / 2, y: b.y + b.h / 2 }; });
-  t.expect(!!btn, 'the panel shows its buttons');
-  await t.page.mouse.click(btn.x, btn.y);
-  const belt = await t.ev(() => { T.step(2); const st = JetInsideExt.st; return { on: st.signOn, buckled: st.buckled, joy: Input.joy.active, next: T.label(), still: !!st.captain }; });
-  t.expect(belt.on && belt.buckled && belt.still, 'tapping the seatbelt button lights the sign and buckles everyone');
-  t.expect(!belt.joy, 'the tap did not start the joystick');
-  t.expectEq(belt.next, '📢 Talk to the passengers', 'then the talk button');
-  const talk = await t.ev(() => { const nf = Game.floats.length; T.act(); T.step(2); const st = JetInsideExt.st; return { talk: st.talk, thumb: Game.floats.slice(nf).some((f) => f.text === '👍'), next: T.label() }; });
-  t.expect(talk.talk > 0, 'the captain talks to the passengers');
-  t.expect(talk.thumb, 'another thumbs-up from the co-pilot');
-  t.expectEq(talk.next, '🛫 Take off!', 'then the take-off button');
-  await t.shot('cockpit-talk');
+  await t.shot('cockpit-seated');
   await t.page.setViewportSize({ width: 390, height: 844 });
   await t.ev(() => { Render.resize(); Game.cameraSnap = true; T.step(2); });
   await t.shot('cockpit-phone');
-  const phone = await t.ev(() => { const st = JetInsideExt.st, W = Render.canvas.width / Render.dpr; return st.btns.every((b) => b.x >= 0 && b.x + b.w <= W); });
-  t.expect(phone, 'the panel buttons fit on a phone');
-  await t.ev(() => { JetInsideExt.press(Game, 'up'); const J = CFG.JETCABIN; T.tp(J.ROWS[3], J.AISLE.y - 6, 'jetcabin'); T.act(); T.step(40); });
+  t.expect(await t.ev(() => !!JetInsideExt.st.captain && T.label() === '🛫 Take off!'), 'seated in the cockpit on a phone, Take off on the big button');
+  await t.ev(() => { JetInsideExt.standUp(Game); const J = CFG.JETCABIN; T.tp(J.ROWS[3], J.AISLE.y - 6, 'jetcabin'); T.act(); T.step(40); });
   t.expect(await t.ev(() => Game.area === 'jetcabin' && !!JetInsideExt.st.seat), 'seated on a phone');
   await t.shot('seat-phone');
   await t.ev(() => { T.act(); const J = CFG.JETCABIN; T.tp(J.EXIT.x + 60, J.EXIT.y - 30, 'jetcabin'); T.step(2); });
   await t.shot('cabin-phone');
   await t.page.setViewportSize({ width: 1100, height: 720 });
   await t.ev(() => { Render.resize(); Game.cameraSnap = true; T.step(2); });
-  // the stick gets you up again; the panel's stand-up button too
+  // pushing the stick gets you up again
   const up = await t.ev(() => {
     const J = CFG.JETCABIN, st = JetInsideExt.st; T.tp(J.CAPT_STAND.x, J.CAPT_STAND.y, 'jetcabin'); T.act();
     const sat = !!st.captain; T.steer(1, 0); T.step(40); T.unsteer();
-    const stick = !st.captain && JetInsideExt.free(Game.player.x, Game.player.y);
-    T.tp(J.CAPT_STAND.x, J.CAPT_STAND.y, 'jetcabin'); T.act(); JetInsideExt.press(Game, 'up'); T.step(1);
-    return { sat, stick, button: !st.captain };
+    return { sat, stick: !st.captain && JetInsideExt.free(Game.player.x, Game.player.y), label: T.label(), area: Game.area };
   });
-  t.expect(up.sat && up.stick && up.button, 'stood up with the stick and with the panel button');
+  t.expect(up.sat && up.stick && up.area === 'jetcabin' && up.label !== '🛫 Take off!', `stood up with the stick (${JSON.stringify(up)})`);
 
   // ---- take off from the cockpit: the real take-off, Cloud Harbor, home again
   const off = await t.ev(() => {
     const J = CFG.JETCABIN, st = JetInsideExt.st, v = AirfieldExt.rt.jet; T.tp(J.CAPT_STAND.x, J.CAPT_STAND.y, 'jetcabin'); T.act();
-    JetInsideExt.press(Game, 'belt'); JetInsideExt.press(Game, 'talk'); const label = T.label(); T.act();
+    const label = T.label(); T.act();
     const out = { label, area: Game.area, driving: Game.driving && Game.vehicle === v, runup: !!AirfieldExt.rt.runup && AirfieldExt.rt.runup.plane === v, captain: st.captain, flights: Game.s.jetcabin.flights };
     T.step(5); out.hint = T.hint();
     return out;
@@ -272,7 +267,7 @@ module.exports = async (t) => {
 
   // ---- Take me home from the cockpit
   const gohome = await t.ev(() => {
-    const J = CFG.JETCABIN, st = JetInsideExt.st; T.tp(J.CAPT_STAND.x, J.CAPT_STAND.y, 'jetcabin'); T.act(); JetInsideExt.press(Game, 'belt');
+    const J = CFG.JETCABIN, st = JetInsideExt.st; T.tp(J.CAPT_STAND.x, J.CAPT_STAND.y, 'jetcabin'); T.act(); st.signOn = true;
     const sat = !!st.captain; Game.goHome(); T.step(2);
     return { sat, area: Game.area, captain: st.captain, seat: st.seat, sign: st.signOn, hint: JetInsideExt.hint(Game), action: JetInsideExt.action(Game) };
   });

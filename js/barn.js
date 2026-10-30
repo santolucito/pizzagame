@@ -95,7 +95,6 @@ const BarnExt = {
     if (g.area !== 'barn') return null;
     if (st.seat) return { label: '🚶 Stand up', run: (gg) => this.standUp(gg) };
     if (st.loft) {
-      if (st.view <= 0 && U.dist(p.x, p.y, K.eye.x, K.eye.y) < 40) return { label: '🪟 Look outside', run: (gg) => this.lookOut(gg) };
       return { label: '🪜 Climb down', run: (gg) => this.climbDown(gg) };
     }
     if (U.dist(p.x, p.y, K.exit.x, K.exit.y) < 30) return { label: '🚪 Go outside', run: (gg) => this.leave(gg) };
@@ -119,7 +118,7 @@ const BarnExt = {
   },
   climbUp(g) {
     const K = CFG.BARN, p = g.player, st = this.st;
-    st.loft = true; p.x = K.eye.x; p.y = K.eye.y; p.moving = false; p.facing = 1; st.fade = 0.45; st.view = K.VIEW;
+    st.loft = true; p.x = K.eye.x; p.y = K.eye.y; p.moving = false; p.facing = 1; st.fade = 0.45; st.view = 0;   // just up the ladder: no window view
     g.floats.push({ x: p.x, y: p.y - 50, text: 'Up in the hayloft! 🌾', color: '#ffe08a', t: 0, dur: 1.4, big: true });
     Sfx.pickup(); Haptics.tap();
   },
@@ -205,8 +204,6 @@ const BarnExt = {
     if (g.area !== 'barn') return undefined;
     if (st.seat) return { text: 'Comfy on the hay 🌾', target: null };
     if (st.loft) {
-      if (st.view > 0) return { text: 'What a view! 🌾', target: null };
-      if (U.dist(p.x, p.y, K.eye.x, K.eye.y) < 40) return { text: 'Look out of the window 🪟', target: null };
       return { text: 'Climb back down the ladder 🪜', target: K.ladder.top };
     }
     const egg = st.eggs[0];

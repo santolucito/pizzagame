@@ -92,13 +92,13 @@ module.exports = async (t) => {
   await t.ev(() => { T.act(); T.step(2); });
   t.expect(await t.ev(() => !BarnExt.st.seat && BarnExt.free(Game.player.x, Game.player.y)), 'stood up onto free floor');
 
-  // ---- up the ladder to the hayloft: the window view, walk about, climb back down
+  // ---- up the ladder to the hayloft (no window view any more), walk about, climb back down
   await t.ev(() => { const L = CFG.BARN.ladder.foot; T.tp(L.x, L.y, 'barn'); T.step(1); });
   t.expectEq(await t.ev(() => T.label()), '🪜 Climb up', 'climb-up label at the ladder');
   await t.ev(() => { T.act(); T.step(2); });
-  t.expect(await t.ev(() => BarnExt.st.loft && BarnExt.st.view > 0), 'in the loft with the window view showing');
-  t.expectEq(await t.ev(() => T.hint()), 'What a view! 🌾', 'view hint');
-  await t.shot('loft-view');
+  t.expect(await t.ev(() => BarnExt.st.loft && BarnExt.st.view === 0), 'in the loft, and no window view pops up');
+  t.expectEq(await t.ev(() => T.label()), '🪜 Climb down', 'climb-down label right away');
+  await t.shot('loft');
   const loft = await t.ev(() => {
     const p = Game.player, L = CFG.BARN.loft.walk;
     T.steer(0, 1); T.step(120); T.unsteer(); const yDown = p.y;
@@ -107,13 +107,9 @@ module.exports = async (t) => {
   });
   t.expect(loft.inLoft && loft.loft, `the chef stays on the loft planks (${Math.round(loft.x)},${Math.round(loft.y)})`);
   t.expect(loft.yDown < 4100, 'cannot walk off the loft edge');
-  t.expectEq(loft.view, 0, 'the view ended when the chef walked');
   t.expectEq(await t.ev(() => T.label()), '🪜 Climb down', 'climb-down label in the loft');
   await t.ev(() => { const E = CFG.BARN.eye; T.tp(E.x, E.y, 'barn'); T.step(1); });
-  t.expectEq(await t.ev(() => T.label()), '🪟 Look outside', 'look-outside label at the window');
-  await t.ev(() => { T.act(); T.step(1); });
-  t.expect(await t.ev(() => BarnExt.st.view > 0), 'looking outside again');
-  await t.ev(() => { T.steer(-1, 0); T.step(30); T.unsteer(); T.step(40); });
+  t.expectEq(await t.ev(() => T.label()), '🪜 Climb down', 'no look-outside button at the window either');
   t.expectEq(await t.ev(() => T.hint()), 'Climb back down the ladder 🪜', 'climb-down hint');
   await t.ev(() => { T.act(); T.step(2); });
   t.expect(await t.ev(() => !BarnExt.st.loft && Math.hypot(Game.player.x - CFG.BARN.ladder.foot.x, Game.player.y - CFG.BARN.ladder.foot.y) < 10 && BarnExt.free(Game.player.x, Game.player.y)), 'back on the floor at the ladder');
@@ -123,7 +119,7 @@ module.exports = async (t) => {
   await t.ev(() => { Render.resize(); T.tp(300, 4250, 'barn'); T.step(2); });
   await t.shot('phone');
   await t.ev(() => { const L = CFG.BARN.ladder.foot; T.tp(L.x, L.y, 'barn'); T.act(); T.step(2); });
-  await t.shot('loft-view-phone');
+  await t.shot('loft-phone');
   await t.ev(() => { T.act(); T.step(2); });
   await t.page.setViewportSize({ width: 1100, height: 720 });
   await t.ev(() => { Render.resize(); T.step(1); });

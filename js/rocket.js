@@ -1,7 +1,7 @@
 'use strict';
 // Rocket Island: the newest island, east of Starfish Cove over a rope bridge. A big launch pad holds a tall pizza
 // rocket that is built over three visits: scaffolding with ladders, a crane swinging panels (then the nose cone) up
-// to the top, welders throwing sparks, a fuel truck with its hose, and a mission-control hut with blinking screens
+// to the top, welders throwing sparks, a rocket fuel truck to drive, and a mission-control hut with blinking screens
 // (its inside lives in js/islands-inside.js). Little workers in hard hats carry parts, climb, weld and wave.
 //
 // Visits: every time the chef comes back onto Rocket Island's land after being away `g.s.rocket.visits` goes up by
@@ -27,13 +27,18 @@
 // chef is drawn over the scaffold art. '🪜 Climb down' from each level. `g.s.rocket.up` remembers a save made up there:
 // the reload puts the chef back on the ground at the ladder's foot.
 //
+// The rocket fuel truck ('⛽ Drive the fuel truck', parked by pad 1; sized like Construction Town's concrete mixer, it
+// keeps to Rocket Island's land, never onto the bridge or the water) has a ROCKET FUEL tank, a hose reel and a beacon:
+// near a rocket the big button says '⛽ Fuel the rocket!' and the hose reaches out to it, a fuel gauge beside the rocket
+// fills ("Glug glug ⛽") and a worker cheers 🎉; anywhere else it toots its horn.
 // The two tower cranes (the first site's, parked aside once rocket 1 is finished, and Rocket #2's) can be driven: they
 // are vehicles of kind 'crane' that never move ('🏗️ Drive the crane' on the vehicle button at the little door at the
-// foot of the mast, '🚶 Climb down' to get out). The chef sits up in the cab and the camera steps back a little; the
-// joystick swings the jib round the mast (left/right) and runs the trolley out and in (up/down), a ring on the ground
-// shows where the hook would land, and the big button lowers the hook and brings it back up: down on a pile of panels
-// it grabs one; down on a rocket the panel clicks into place (a sparkle, "Click! ✨", a worker cheers 🎉); anywhere else
-// it lands on the sand and slides back to its pile a little later. Left alone the cranes go back to their own work.
+// foot of the mast, '🚶 Climb down' to get out). The chef sits up in the cab; the joystick moves the HOOK over the
+// ground like walking (the jib turns and the trolley runs by themselves, as far as the jib reaches), a ring on the sand
+// shows where it is and the camera follows it. The one button does what fits there: '🪝 Grab a panel' by a pile,
+// '🚀 Put it on the rocket' next to a rocket while carrying (the hook lifts it up, it clicks on: a sparkle, "Click! ✨",
+// a worker cheers 🎉), '⬇️ Put it down' anywhere else (it slides back to its pile a little later). Each press is one
+// quick dip of the hook. Left alone the cranes go back to their own work.
 // Reads its spots from CFG.ISLANDS.ROCKET (js/islands.js, loaded first).
 // Extension module: registered with Game.ext (first, so its button and hint beat the islands' own) and Render.ext.
 
@@ -55,7 +60,7 @@ CFG.ROCKETISLE = {
   SITE2: { H: 300, DECKS: [{ z: 70, half: 100 }, { z: 150, half: 66 }], LADDER_R: 34, HINT_R: 70, HATCH_R: 40, CRANE_PERIOD: 13, CLIMB_SPEED: 210, PEEK: 5 },
   // visits: the bridge's last stretch counts as the island; leaving means this far clear of the island and the landing
   LANDING: 40, AWAY: 30,
-  // the cranes (bases at CFG.ISLANDS.ROCKET.CRANE and SITE2.CRANE): H the jib's height, L the jib's reach, LC the
+  // the tower cranes (js/towercrane.js; bases at CFG.ISLANDS.ROCKET.CRANE and SITE2.CRANE): H the jib's height, L the jib's reach, LC the
   // counter-jib, the pile of panels each one fetches from (the first one's own pallet, Rocket #2's SITE2.PARTS), the
   // seat (the little door at the mast's foot where the chef climbs in), the first one's parked angle once rocket 1 is
   // done, and the heights on its rocket where panels click on (the panel's middle, highest first)
@@ -63,17 +68,23 @@ CFG.ROCKETISLE = {
     { H: 330, L: 240, LC: 70, PILE: { x: 4110, y: 2592 }, SEAT: { x: 4326, y: 2642 }, PARK: -0.7, SLOTS: [200, 178, 156, 134], driver: '#e0ac69' },
     { H: 350, L: 240, LC: 56, SEAT: { x: 4516, y: 2524 }, SLOTS: [280, 258, 236], driver: '#8d5524' },
   ],
-  // riding a crane: turn speed (rad/s), trolley speed, closest trolley spot, hook speed, how near the hook must be to a
-  // rocket (to place) or a pile / a panel on the sand (to grab), how long a dropped panel lies before it slides home,
-  // the slide, and how far the camera steps back
-  CRANE: { TURN: 1.1, TROLLEY: 140, DMIN: 46, HOOK: 200, PLACE_R: 56, GRAB_R: 40, LOOSE: 6, SLIDE: 1.6, ZOOM: 0.8, NEAR: 70 },
+  // the rocket fuel truck: its parking spot (pad 1's south-west corner), how near a rocket the button fuels it, the hose
+  // reaching out, the fill, the hose winding back, how long a full gauge stays full before it slowly drains, and where
+  // each rocket's gauge stands (beside it, `z` up)
+  TRUCK: { PARK: { x: 3992, y: 2860, a: 0 }, NEAR: 70, FUEL_R: 130, HOSE: 0.5, FILL: 2.4, BACK: 0.45, HOLD: 8, DRAIN: 14, GAUGE: [{ dx: -66, z: 92 }, { dx: -122, z: 64 }] },
+  // the trucks keep their middles LAND_M inside Rocket Island's edge (its sand is drawn as a rectangle with corners
+  // rounded ISLE_R) and both ends (TRUCK_END from the middle) on the sand, so they never roll into the water
+  // and (circles TRUCK_BUMP to each side of the middle) out of everything solid
+  LAND_M: 30, ISLE_R: 56, TRUCK_END: 46, TRUCK_BUMP: 34,
 };
-CFG.VEHICLES.crane = { speed: 0, radius: 14, label: '🏗️ Drive the crane', exit: '🚶 Climb down', flies: true };   // it never moves; `flies` keeps the islands' beach walls from shoving it
+// the fuel truck is an ordinary vehicle; `flies` keeps the islands' beach walls (made for the jet ski) from shoving it: it
+// keeps to Rocket Island's land by itself (RocketExt.keepOnLand)
+CFG.VEHICLES.fueltruck = { speed: 240, radius: 22, label: '⛽ Drive the fuel truck', exit: '🚶 Hop out', flies: true };
 
 const RocketExt = {
   name: 'rocket',
   defaults: { rocket: { visits: 0, up: 0 } },
-  st: null,   // runtime only: workers, the crane's clock, sparks, bubbles, the countdown, a launch or landing, smoke
+  st: null,   // runtime only: workers, the crane's clock, sparks, bubbles, the countdown, a launch or landing, smoke, the vehicles
 
   // ---------- state ----------
   build(g) {
@@ -104,28 +115,26 @@ const RocketExt = {
       smoke: [], puff: null,                       // smoke particles, and the big cloud on the pad
       up: 0, climb: null, peek: null,              // Rocket #2's scaffold: which walkway the chef is on, a climb in progress, the hatch view
       s2: this.buildSite2(),                       // Rocket #2's workers, crane and sparks
-      cranes: this.buildCranes(),                  // the two rideable cranes (their own pose while the chef drives one)
-      ride: null, zoom0: null,                     // the crane the chef sits in, and the zoom before the camera stepped back
-      placed: [[], []], loose: [],                 // panels clicked onto rocket 1 / Rocket #2, panels dropped on the sand
+      truck: this.buildTruck(),                    // the rocket fuel truck
+      fuel: null, gauge: [0, 0], hold: [0, 0],     // a fuelling in progress, each rocket's fuel gauge and how long it stays full
+      hornCd: 0,
+      placed: [[], []],                            // panels the cranes clicked onto rocket 1 / Rocket #2
     };
     this.st.wasOn = this.onRocketLand(g) || this.stillHere(g);   // reloading on the island is not a new visit
-    const C = R.CRANE, M = R.MISSION, T = R.TRUCK, SG = R.SIGN;
+    const M = R.MISSION, SG = R.SIGN;
     this.st.obs = [
-      { x: B.x - 30, y: B.y - 32, w: S.x1 - (B.x - 30), h: 38 },          // the rocket's feet and the scaffold's legs
-      { x: C.x - 20, y: C.y - 18, w: 40, h: 36 },                          // the crane's base
-      { x: T.x - 48, y: T.y - 16, w: 96, h: 30 },                          // the fuel truck
+      { x: B.x - 30, y: B.y - 32, w: S.x1 - (B.x - 30), h: 38 },          // the rocket's feet and the scaffold's legs (the cranes' masts: js/towercrane.js)
       { x: M.x - M.w / 2, y: M.y - M.h / 2, w: M.w, h: M.h },              // mission control
       { x: SG.x - 98, y: SG.y - 6, w: 10, h: 10 }, { x: SG.x + 88, y: SG.y - 6, w: 10, h: 10 },   // the sign's posts
       { x: P.x - 34, y: P.y - 14, w: 68, h: 26 },                          // the pile of parts
     ];
     const P1 = CFG.ROCKETISLE.CRANES[0].PILE; this.st.obs.push({ x: P1.x - 34, y: P1.y - 14, w: 68, h: 26 });   // the crane's own pallet of panels
     // east of the pad: the fenced lot while the first rocket is built, then Rocket #2's site
-    const S2 = R.SITE2, L = S2.LOT, G = this.geo(), D1 = G.D[1], SH = S2.SHED, C2 = S2.CRANE, P2 = S2.PARTS, ST = S2.STACK;
+    const S2 = R.SITE2, L = S2.LOT, G = this.geo(), D1 = G.D[1], SH = S2.SHED, P2 = S2.PARTS, ST = S2.STACK;
     this.st.obsLot = this.st.obs.concat([{ x: L.x0, y: L.y0, w: L.x1 - L.x0, h: L.y1 - L.y0 }]);
     this.st.obsSite = this.st.obs.concat([
       { x: D1.x0 - 2, y: S2.PAD.y0 - 16, w: D1.x1 - D1.x0 + 4, h: G.B.y + 34 - (S2.PAD.y0 - 16) },   // the rocket and the scaffold's legs (and the pad behind them)
       { x: SH.x - SH.w / 2, y: SH.y - SH.h / 2, w: SH.w, h: SH.h },                                    // the tool shed
-      { x: C2.x - 20, y: C2.y - 18, w: 40, h: 36 },                                                     // the crane's base
       { x: P2.x - 34, y: P2.y - 14, w: 68, h: 26 },                                                     // the panels for the crane
       { x: ST.x - 34, y: ST.y - 12, w: 68, h: 24 },                                                     // the panels for the carrier
     ]);
@@ -149,14 +158,8 @@ const RocketExt = {
       crane: 4, sparks: [], sparkT: 0, cheer: null,
     };
   },
-  // the two cranes: where they stand, their settings, the vehicle that seats the chef, and the pose while driven
-  buildCranes() {
-    const R = CFG.ISLANDS.ROCKET, K = CFG.ROCKETISLE.CRANES;
-    return [R.CRANE, R.SITE2.CRANE].map((C, i) => {
-      const k = K[i], pile = i === 0 ? k.PILE : R.SITE2.PARTS;
-      return { i, C, k, pile, v: { kind: 'crane', crane: i, x: k.SEAT.x, y: k.SEAT.y, angle: 0, vx: 0, vy: 0 }, th: Math.PI, d: 100, z: k.H - 40, load: false, cyc: null, man: 0 };
-    });
-  },
+  // the rocket fuel truck, parked (it stays wherever the chef leaves it until Take-me-home)
+  buildTruck() { const v = { kind: 'fueltruck', P: CFG.ROCKETISLE.TRUCK.PARK, x: 0, y: 0, angle: 0, vx: 0, vy: 0, sway: 0 }; this.park(v); return v; },
   // Rocket #2's scaffold, worked out from its feet: the two walkways (z: height, x0..x1: the planks, yb/yf: the back
   // and front edges as drawn, walk: where the chef's feet may be), the two ladders (foot, top: where the chef stands
   // before and after the climb; x, y0, y1: the ladder as drawn), and the hatch spot on the top walkway
@@ -187,11 +190,11 @@ const RocketExt = {
     if (x > s.x0 - m && x < s.x1 + m && y > s.y0 - m && y < s.y1 + m) return true;
     return x > b.x1 - CFG.ROCKETISLE.LANDING - m && x <= s.x0 && y > b.y0 - m && y < b.y1 + m;
   },
-  // on Rocket Island's land: on foot (or up on the scaffold, or up in a crane) anywhere on it; the jet ski or a sailboat
-  // nosing up to the beach does not count until the chef steps ashore
+  // on Rocket Island's land: on foot (or up on the scaffold, or in the fuel truck or a crane truck) anywhere on it; the
+  // jet ski or a sailboat nosing up to the beach does not count until the chef steps ashore
   onRocketLand(g) {
     if (g.area !== 'islands') return false;
-    if (g.driving) return !!(g.vehicle && g.vehicle.kind === 'crane');   // up in a crane is on the island
+    if (g.driving) { const c = typeof TowerCrane === 'undefined' ? null : TowerCrane.riding(g); return !!this.myRide(g) || !!(c && c.area === 'islands'); }   // the truck and the cranes never leave the island
     return this.inZone(g.player.x, g.player.y, 0);
   },
   // inside mission control, or inside the rocket (entered from its pad here, not on the moon): still on the island
@@ -255,7 +258,7 @@ const RocketExt = {
   action(g) {
     const st = this.st;
     if (!st || st.fly || g.area !== 'islands') return null;
-    const cr = this.ridingCrane(g); if (cr) return this.craneAction(g, cr);
+    const v = this.myRide(g); if (v) return this.truckAction(g, v);
     if (!this.onFoot(g)) return null;
     if (st.climb) return null;
     if (st.up) return this.deckAction(g);
@@ -328,8 +331,8 @@ const RocketExt = {
     st.ask = null; st.count = null; st.sparks = []; st.fly = null; st.smoke = []; st.puff = null; st.cheer = null;
     st.wasOn = false;
     this.leaveScaffold(g); st.s2.sparks = []; st.s2.cheer = null;
-    this.endRide(g); st.loose = [];
-    for (const cr of st.cranes) { cr.cyc = null; cr.load = false; cr.man = 0; }
+    st.fuel = null; st.gauge = [0, 0]; st.hold = [0, 0];
+    this.park(st.truck);
   },
   flyHint() {
     const f = this.st && this.st.fly; if (!f) return undefined;
@@ -341,10 +344,10 @@ const RocketExt = {
     if (!st || g.travel) return undefined;
     if (st.fly) return this.flyHint();
     if (g.area !== 'islands') return undefined;
-    const cr = this.ridingCrane(g); if (cr) return this.craneHint(g, cr);
+    const v = this.myRide(g); if (v) return this.truckHint(g, v);
     if (!this.onFoot(g)) return undefined;
     const s2 = this.scaffoldHint(g); if (s2 !== undefined) return s2;
-    const ch = this.craneSeatHint(g); if (ch) return ch;
+    const ch = this.seatHint(g); if (ch) return ch;
     if (!this.onRocketIsle(g) || this.nearMissionDoor(g)) return undefined;
     if (g.player.carry > 0 && typeof IslandsExt !== 'undefined' && IslandsExt.rt && IslandsExt.rt.huts.some((h) => h.order)) return undefined;   // a delivery comes first
     const p = g.player, A = CFG.ISLANDS.ROCKET.ASK, d = U.dist(p.x, p.y, A.x, A.y), ready = this.canFly(g);
@@ -381,7 +384,7 @@ const RocketExt = {
     if (!this.st) this.build(g);
     const st = this.st;
     this.countVisit(g);
-    this.updateCranes(g, dt);
+    this.updateVehicles(g, dt);
     if (st.fly) this.updateFly(g, dt);
     this.updateSmoke(g, dt);
     // off the scaffold when something else moved the chef (another map, a ride, a teleport)
@@ -593,15 +596,20 @@ const RocketExt = {
     r.drawPizza(P.x0 + 44, P.y1 - 44, 16);
     // traffic cones along the edge
     for (const [x, y] of [[P.x0 + 10, P.y0 + 30], [P.x0 + 10, P.y1 - 90], [P.x1 - 10, P.y1 - 30], [P.x1 - 10, P.y0 + 90]]) this.paintCone(ctx, x, y);
-    // the fuel hose from the truck to the rocket
-    const T = R.TRUCK;
-    ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(T.x + 44, T.y - 4); ctx.bezierCurveTo(T.x + 110, T.y + 20, B.x - 90, B.y + 30, B.x - 24, B.y - 4); ctx.stroke();
-    ctx.strokeStyle = '#41b883'; ctx.lineWidth = 2; ctx.stroke();
     this.paintMission(r, g);
     this.paintSign(r, g);
-    // the crane's footing: tracks in the sand
-    const C = R.CRANE; ctx.fillStyle = 'rgba(0,0,0,0.12)'; for (let k = -2; k <= 2; k++) ctx.fillRect(C.x - 30, C.y + k * 8 + 22, 60, 3);
+    // the fuel truck's parking bay
+    this.paintBay(r, CFG.ROCKETISLE.TRUCK.PARK, '⛽');
     this.paintSite2(r, g);
+  },
+  // painted lines round a parking spot, a little sign painted on the ground at its back end
+  paintBay(r, P, ico) {
+    const ctx = r.ctx, c = Math.cos(P.a), s = Math.sin(P.a);
+    ctx.save(); ctx.translate(P.x, P.y); ctx.rotate(P.a);
+    ctx.fillStyle = 'rgba(0,0,0,0.06)'; ctx.fillRect(-64, -30, 128, 60);
+    ctx.fillStyle = 'rgba(255,209,102,0.85)'; ctx.fillRect(-64, -32, 128, 4); ctx.fillRect(-64, 28, 128, 4); ctx.fillRect(-64, -32, 4, 64);
+    ctx.restore();
+    ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.globalAlpha = 0.55; ctx.fillText(ico, P.x - c * 48, P.y - s * 48); ctx.globalAlpha = 1;
   },
   paintCone(ctx, x, y) { ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.moveTo(x - 6, y); ctx.lineTo(x + 6, y); ctx.lineTo(x, y - 16); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(x - 3.5, y - 9, 7, 3); ctx.fillStyle = '#3e424a'; ctx.fillRect(x - 8, y - 1, 16, 3); },
   // a concrete launch pad with hazard stripes round the edge and a flame trench grate under the rocket's feet B
@@ -656,12 +664,11 @@ const RocketExt = {
     }
     const P = S2.PAD;
     this.paintPad(r, P, B);
-    // the scaffold's shadow, a big "2" painted by the ladder, cones, the crane's tracks and a path of planks to the shed
+    // the scaffold's shadow, a big "2" painted by the ladder, cones
     ctx.fillStyle = 'rgba(0,0,0,0.09)'; ctx.fillRect(B.x - 104, B.y - 22, 212, 50);
     ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(P.x0 + 30, P.y1 - 26, 15, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#2b1d14'; ctx.font = r.font(16); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('2', P.x0 + 30, P.y1 - 25);
     for (const [x, y] of [[P.x1 - 10, P.y1 - 40], [P.x0 + 64, P.y1 - 12], [P.x1 - 12, P.y0 + 24]]) this.paintCone(ctx, x, y);
-    const C = S2.CRANE; ctx.fillStyle = 'rgba(0,0,0,0.12)'; for (let k = -2; k <= 2; k++) ctx.fillRect(C.x - 26, C.y + k * 8 + 22, 44, 3);
   },
   paintMission(r, g) {
     const ctx = r.ctx, M = CFG.ISLANDS.ROCKET.MISSION, x0 = M.x - M.w / 2, y0 = M.y - M.h / 2;
@@ -703,7 +710,7 @@ const RocketExt = {
   // ---------- live art ----------
   dynamic(r, g) {
     if (!this.st || g.area !== 'islands') return;
-    const ctx = r.ctx, t = g.time, M = CFG.ISLANDS.ROCKET.MISSION, T = CFG.ISLANDS.ROCKET.TRUCK;
+    const ctx = r.ctx, t = g.time, M = CFG.ISLANDS.ROCKET.MISSION;
     // mission control's screens blink and a dish on the roof turns
     for (const [i, dx] of [[0, -46], [1, 20]]) {
       ctx.fillStyle = '#2d3a4a'; U.roundRect(ctx, M.x + dx + 2, M.y + 12, 22, 14, 2); ctx.fill();
@@ -712,9 +719,6 @@ const RocketExt = {
     const da = Math.sin(t * 0.6) * 0.8, dx0 = M.x + M.w / 2 - 22, dy0 = M.y - M.h / 2 + 4;
     ctx.fillStyle = '#9aa0a8'; ctx.fillRect(dx0 - 2, dy0 - 10, 4, 12);
     ctx.save(); ctx.translate(dx0, dy0 - 12); ctx.rotate(da); ctx.fillStyle = '#f5f7fa'; ctx.beginPath(); ctx.ellipse(0, 0, 12, 5, 0, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#9aa0a8'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -10); ctx.stroke(); ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.arc(0, -10, 2, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-    // the fuel truck's light blinks
-    if (Math.floor(t * 2) % 2) { ctx.fillStyle = 'rgba(255,209,102,0.5)'; ctx.beginPath(); ctx.arc(T.x - 34, T.y - 40, 9, 0, Math.PI * 2); ctx.fill(); }
-    this.drawAim(r, g);
   },
   entities(r, g, items) {
     if (!this.st) return;
@@ -728,17 +732,17 @@ const RocketExt = {
     if (stage >= 2) this.site2Items(r, g, items);
     items.push({ y: B.y, draw: () => this.drawPadRocket(r, g, B, stage, fs) });
     items.push({ y: B.y + 1, draw: () => this.drawScaffold(r, g) });
-    items.push({ y: R.CRANE.y + 18, draw: () => this.drawCrane(r, g, 0) });
-    this.hookItem(r, g, items, 0);
     if (!fs) items.push({ y: B.y + 0.5, draw: () => this.drawPlaced(r, g, 0) });
     const P1 = CFG.ROCKETISLE.CRANES[0].PILE; items.push({ y: P1.y + 10, draw: () => this.drawPanels(r, P1.x, P1.y, 3, false) });
-    for (const q of st.loose) items.push({ y: q.y, draw: () => this.drawLoose(r, g, q) });
-    items.push({ y: R.TRUCK.y + 14, draw: () => this.drawTruck(r, g) });
+    // the fuel truck (drawn like the other site vehicles, the chef's head in the cab when riding), and its hose after both
+    // the truck and the rocket it fuels
+    items.push({ y: st.truck.y + 12, draw: () => this.drawTruck(r, g, st.truck) });
+    if (st.fuel) { const P = this.rocketBase(st.fuel.i); items.push({ y: Math.max(st.truck.y + 13, P.y + 6), draw: () => this.drawHose(r, g) }); }
     items.push({ y: R.PARTS.y + 10, draw: () => this.drawParts(r, g) });
     for (const w of st.workers) items.push({ y: w.z > 4 && (w.role === 'climb' || w.role === 'weldHigh') ? B.y + 2 : w.y, draw: () => this.drawWorker(r, g, w) });
   },
   // Rocket #2's site, y-sorted: the rocket, then the scaffold, the workers up on it, the chef up there (or on a ladder),
-  // and last the walkways' front rails, so the chef stands on the planks behind the railing; the crane, shed and panels
+  // and last the walkways' front rails, so the chef stands on the planks behind the railing; the shed and the panels
   site2Items(r, g, items) {
     const S2 = CFG.ISLANDS.ROCKET.SITE2, G = this.geo(), B = G.B, st = this.st, SH = S2.SHED;
     items.push({ y: B.y, draw: () => this.drawRocket2(r.ctx, B.x, B.y, g.time) });
@@ -747,8 +751,6 @@ const RocketExt = {
     if ((st.up || st.climb) && !g.driving && !g.onTrain) items.push({ y: B.y + 3, draw: () => r.drawPlayer(g) });
     items.push({ y: B.y + 4, draw: () => this.drawScaffold2Front(r, g) });
     items.push({ y: B.y + 0.5, draw: () => this.drawPlaced(r, g, 1) });
-    items.push({ y: S2.CRANE.y + 18, draw: () => this.drawCrane(r, g, 1) });
-    this.hookItem(r, g, items, 1);
     items.push({ y: S2.PARTS.y + 10, draw: () => this.drawPanels(r, S2.PARTS.x, S2.PARTS.y, 3, true) });
     items.push({ y: S2.STACK.y + 10, draw: () => this.drawPanels(r, S2.STACK.x, S2.STACK.y, 4, false) });
     items.push({ y: SH.y + SH.h / 2, draw: () => this.drawShed(r, g) });
@@ -804,6 +806,8 @@ const RocketExt = {
       if (st.ask.more) { const text = '🚧 ' + st.ask.more; ctx.font = r.font(14); const tw = ctx.measureText(text).width + 24; r.drawBubble(w.x, w.y - w.z - (w.hop || 0) - 102 + bob, () => { ctx.font = r.font(14); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#e4572e'; ctx.fillText(text, 0, 0); }, tw, '#ffe08a'); }
     }
     if (st.cheer && (!st.ask || st.ask.who !== st.cheer.who)) say(st.cheer.who, st.cheer.text, 0);
+    // the rockets' fuel gauges
+    this.drawGauge(r, g, 0); if (this.site2On(g)) this.drawGauge(r, g, 1);
     for (const w of st.workers) if (w.wave > 0.4 && (!st.ask || st.ask.who !== w) && (!st.cheer || st.cheer.who !== w)) r.drawBubble(w.x, w.y - w.z - (w.hop || 0) - 66, () => { ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('👋', 0, 0); }, 30);
     if (!this.site2On(g)) return;
     // Rocket #2's site: sparks, torch glows, the hammer's bang and the workers' waves
@@ -930,308 +934,267 @@ const RocketExt = {
     const done = sw > 0.99;
     ctx.fillStyle = done ? (Math.floor(g.time * 2) % 2 ? '#8ef0a0' : '#41b883') : (Math.floor(g.time * 2) % 2 ? '#ffd166' : '#b8862c'); ctx.beginPath(); ctx.arc(S.x0 + 8, top - 4, 4, 0, Math.PI * 2); ctx.fill();
   },
-  // ---------- the cranes ----------
-  // A crane's pose: the jib's angle `th` round the mast (on the ground: 0 east, PI/2 south), the trolley `d` out along it,
-  // the hook's height `z` above the sand, and what hangs on it. A ground point (x, y) at height h is drawn at (x, y - h).
-  polar(cr, x, y) { return { th: Math.atan2(y - cr.C.y, x - cr.C.x), d: U.dist(cr.C.x, cr.C.y, x, y) }; },
-  lerpA(a, b, k) { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return a + d * k; },
-  hookGround(cr, pose) { return { x: cr.C.x + Math.cos(pose.th) * pose.d, y: cr.C.y + Math.sin(pose.th) * pose.d }; },
-  // where the hook stands over a pile (just in front of it, so it is drawn over the panels) and over a rocket
-  pileSpot(cr) { return { x: cr.pile.x, y: cr.pile.y + 12 }; },
-  rocketSpot(i) { const B = i === 0 ? CFG.ISLANDS.ROCKET.BASE : CFG.ISLANDS.ROCKET.SITE2.BASE; return { x: B.x + 2, y: B.y + 10 }; },
-  // the crane working on its own: the first one fetches panels (stage 0), lifts the nose cone (stage 1), or stands
-  // parked, turned away (stage 2); Rocket #2's lifts panels round and round
-  autoPose(i, g) {
-    const st = this.st, cr = st.cranes[i], J = cr.k.H, CK = CFG.ROCKETISLE;
-    const A = this.polar(cr, this.pileSpot(cr).x, this.pileSpot(cr).y), Bt = this.polar(cr, this.rocketSpot(i).x, this.rocketSpot(i).y);
-    if (i === 0) {
-      const stage = this.stage(g);
-      if (stage >= 2) return { th: cr.k.PARK, d: 90, z: J - 40, load: false, nose: false, ph: 'parked' };
-      const nose = stage === 1, k = st.crane / CK.CRANE_PERIOD;
-      // a panel goes on high up the frame; the nose cone (hanging 76 below the hook) sits on the open top ring
-      return Object.assign(this.craneCalc(k, A, Bt, nose ? J - 12 : J - 40, nose ? 82 : 44, nose ? CK.ROCKET_H - 60 + 76 : CK.ROCKET_H - 70, nose), { nose });
-    }
-    return Object.assign(this.craneCalc(st.s2.crane / CK.SITE2.CRANE_PERIOD, A, Bt, J - 40, 44, CK.SITE2.H - 20, false), { nose: false });
-  },
-  // one round trip of a crane's hook (k 0..1): down to the pile, up, over to the rocket, lower, hold, raise, back, rest
-  craneCalc(k, A, B, rest, low, top, nose) {
-    const seg = [[0.12, 'down'], [0.24, 'up'], [0.4, 'over'], [0.5, 'lower'], [0.64, 'hold'], [0.74, 'raise'], [0.9, 'back'], [1, 'rest']];
-    let i = 0; while (i < seg.length - 1 && k > seg[i][0]) i++;
-    const a = i ? seg[i - 1][0] : 0, q = U.clamp((k - a) / (seg[i][0] - a), 0, 1), e = q * q * (3 - 2 * q), ph = seg[i][1];
-    let th = A.th, d = A.d, z = rest, load = nose;
-    const at = (P) => { th = P.th; d = P.d; }, swing = (P, Q) => { th = this.lerpA(P.th, Q.th, e); d = U.lerp(P.d, Q.d, e); };
-    if (ph === 'down') z = U.lerp(rest, low, e);
-    else if (ph === 'up') { z = U.lerp(low, rest, e); load = true; }
-    else if (ph === 'over') { swing(A, B); load = true; }
-    else if (ph === 'lower') { at(B); z = U.lerp(rest, top, e); load = true; }
-    else if (ph === 'hold') { at(B); z = top; load = true; }
-    else if (ph === 'raise') { at(B); z = U.lerp(top, rest, e); }
-    else if (ph === 'back') swing(B, A);
-    return { th, d, z, load, ph };
-  },
-  // what is drawn: the crane's own work, blended into the chef's driving while they sit in it (and back after)
-  pose(i, g) {
-    const cr = this.st.cranes[i], a = this.autoPose(i, g);
-    if (cr.man <= 0) return a;
-    const m = cr.man * cr.man * (3 - 2 * cr.man);
-    return { th: this.lerpA(a.th, cr.th, m), d: U.lerp(a.d, cr.d, m), z: U.lerp(a.z, cr.z, m), load: m > 0.5 ? cr.load : a.load, nose: m > 0.5 ? false : a.nose, ph: m >= 1 ? 'driven' : a.ph };
-  },
-  // the pose plus where its hook is drawn (x, hy: the hook's top) and its jib's height on screen
-  craneState() { return this.poseInfo(0); },
-  crane2State() { return this.poseInfo(1); },
-  poseInfo(i) { const cr = this.st.cranes[i], p = this.pose(i, Game), G = this.hookGround(cr, p); return Object.assign(p, { x: G.x, hy: G.y - p.z, jibY: cr.C.y - cr.k.H }); },
-  ridingCrane(g) { const v = g.driving && g.vehicle; return v && v.kind === 'crane' && this.st ? this.st.cranes[v.crane] || null : null; },
+  // ---------- the rocket fuel truck ----------
+  // The fuel truck is an ordinary drivable vehicle sized like the concrete mixer. Its spec says `flies` so the islands'
+  // beach walls (made for the jet ski) leave it alone; instead `keepOnLand` holds it on Rocket Island's land (never onto
+  // the rope bridge or the water) and out of the rocket, the scaffolds, the cranes, mission control, the sign and the
+  // piles. (The tower cranes are js/towercrane.js's vehicles.)
+  mine() { const st = this.st; return st ? [st.truck] : []; },
+  myVehicles(g) { return [this.st.truck]; },
+  myRide(g) { const v = g.driving && g.vehicle; return v && this.st && this.mine().includes(v) ? v : null; },
   vehicles(g) {
     const st = this.st;
     if (!st) return [];
-    if (st.ride) return [st.ride.v];
+    if (this.myRide(g)) return this.myVehicles(g);
     if (g.area !== 'islands' || st.up || st.climb || st.fly) return [];
-    return this.site2On(g) ? [st.cranes[0].v, st.cranes[1].v] : [st.cranes[0].v];
+    return this.myVehicles(g);
   },
-  // climbing in: the crane takes over from where it was working, the camera steps back so the jib's reach shows
-  startRide(g, cr) {
-    const st = this.st, p = this.pose(cr.i, g), J = cr.k.H;
-    if (st.ride) this.endRide(g);
-    st.ride = cr;
-    cr.th = p.th; cr.d = U.clamp(p.d, CFG.ROCKETISLE.CRANE.DMIN, cr.k.L - 8); cr.z = U.clamp(p.z, 40, J - 40); cr.load = !!p.load && !p.nose; cr.cyc = null;
-    if (!this.landOk(this.hookGround(cr, cr))) { const S = this.polar(cr, this.pileSpot(cr).x, this.pileSpot(cr).y); cr.th = S.th; cr.d = S.d; }
-    if (typeof Render !== 'undefined' && Render.canvas && st.zoom0 === null) { st.zoom0 = Render.zoom; Render.zoom = st.zoom0 * CFG.ROCKETISLE.CRANE.ZOOM; Render.resize(); }
-    g.floats.push({ x: cr.C.x, y: cr.C.y - J - 40, text: 'Up in the crane! 🏗️', color: '#ffe08a', t: 0, dur: 1.4, big: true });
-    g.s.rocket.cranes = (g.s.rocket.cranes || 0) + 1;
-    Haptics.tap();
+  park(v) { v.x = v.px = v.P.x; v.y = v.py = v.P.y; v.angle = v.P.a; v.vx = 0; v.vy = 0; },
+  truckObs(g) { return (this.site2On(g) ? this.st.obsSite : this.st.obsLot).concat(typeof TowerCrane === 'undefined' ? [] : TowerCrane.boxes(g, 'islands')); },
+  // how badly a truck at (x, y) facing `a` is placed: 0 when its middle is well inside Rocket Island's land (a rounded
+  // rectangle, like the sand is drawn), both its ends are on the sand and it touches nothing; more the further it pokes
+  // out or in
+  truckBad(g, x, y, a) {
+    const s = this.island(), K = CFG.ROCKETISLE, r = CFG.VEHICLES.fueltruck.radius;
+    const out = (px, py, m) => {
+      const rr = Math.max(0, K.ISLE_R - m), x0 = s.x0 + m + rr, x1 = s.x1 - m - rr, y0 = s.y0 + m + rr, y1 = s.y1 - m - rr;
+      return Math.max(0, Math.hypot(px - U.clamp(px, x0, x1), py - U.clamp(py, y0, y1)) - rr);
+    };
+    let bad = out(x, y, K.LAND_M);
+    const c = Math.cos(a), sn = Math.sin(a);
+    for (const d of [-K.TRUCK_END, K.TRUCK_END]) bad += out(x + c * d, y + sn * d, 4);
+    // three circles along the truck against the rocket, the scaffolds, mission control, the sign and the piles
+    for (const [d, rr] of [[0, r], [-K.TRUCK_BUMP, 14], [K.TRUCK_BUMP, 14]]) {
+      const px = x + c * d, py = y + sn * d;
+      for (const o of this.truckObs(g)) if (g.hitRect(px, py, rr, o)) bad += 1 + Math.min(px + rr - o.x, o.x + o.w - px + rr, py + rr - o.y, o.y + o.h - py + rr);
+    }
+    return bad;
   },
-  // climbing down (or anything else that took the chef out of the cab): the zoom comes back, the crane goes back to work
-  endRide(g) {
-    const st = this.st; if (!st) return;
-    if (st.ride) { const cr = st.ride; cr.cyc = null; st.ride = null; }
-    if (st.zoom0 !== null) { if (typeof Render !== 'undefined' && Render.canvas) { Render.zoom = st.zoom0; Render.resize(); } st.zoom0 = null; }
+  // after the core moved the truck: keep the move if the truck is well placed (or better placed than before: turning by
+  // the water's edge can poke its nose out, and then it may drive back in); otherwise keep one axis, or stay put
+  keepOnLand(g, v) {
+    // a turn that would swing an end of the truck off the sand waits (driving away from the edge always works)
+    if (v.pa !== undefined && v.pa !== v.angle) { const bA = this.truckBad(g, v.px, v.py, v.angle); if (bA > 0 && bA > this.truckBad(g, v.px, v.py, v.pa)) v.angle = v.pa; }
+    const a = v.angle, ok = (x, y, before) => { const b = this.truckBad(g, x, y, a); return b <= 0 || b < before - 1e-6; };
+    const b0 = this.truckBad(g, v.px, v.py, a);
+    if (!ok(v.x, v.y, b0)) {
+      if (ok(v.x, v.py, b0)) { v.y = v.py; v.vy = 0; }
+      else if (ok(v.px, v.y, b0)) { v.x = v.px; v.vx = 0; }
+      else { v.x = v.px; v.y = v.py; v.vx = 0; v.vy = 0; }
+    }
+    v.px = v.x; v.py = v.y; v.pa = v.angle;
+    g.player.x = v.x; g.player.y = v.y;
   },
-  // the hook's ground spot must stay on Rocket Island's sand
-  landOk(G) { const s = this.island(), m = 26; return G.x > s.x0 + m && G.x < s.x1 - m && G.y > s.y0 + m && G.y < s.y1 - m; },
-  updateCranes(g, dt) {
-    const st = this.st, cr = this.ridingCrane(g), K = CFG.ROCKETISLE.CRANE;
-    if (cr && st.ride !== cr) this.startRide(g, cr);
-    if (!cr && st.ride) this.endRide(g);
-    for (const c of st.cranes) c.man = c === cr ? Math.min(1, c.man + dt * 2.5) : Math.max(0, c.man - dt * 1.2);
-    if (cr) {
-      // the joystick: left/right swings the jib round, up/down runs the trolley out and in (not while the hook goes down)
-      const a = Input.axis();
-      if ((a.x || a.y) && !(cr.cyc && cr.cyc.dir < 0)) {
-        const th = cr.th + a.x * K.TURN * dt, d = U.clamp(cr.d - a.y * K.TROLLEY * dt, K.DMIN, cr.k.L - 8);
-        if (this.landOk(this.hookGround(cr, { th, d }))) { cr.th = th; cr.d = d; }
-        else if (this.landOk(this.hookGround(cr, { th, d: cr.d }))) cr.th = th;
-        else if (this.landOk(this.hookGround(cr, { th: cr.th, d }))) cr.d = d;
+  rocketBase(i) { return i === 0 ? CFG.ISLANDS.ROCKET.BASE : CFG.ISLANDS.ROCKET.SITE2.BASE; },
+  rocketList(g) { const out = []; if (!this.st.fly) out.push(0); if (this.site2On(g)) out.push(1); return out; },
+  updateVehicles(g, dt) {
+    const st = this.st, ride = this.myRide(g), F = CFG.ROCKETISLE.TRUCK;
+    for (const v of this.mine()) {
+      if (v === ride) this.keepOnLand(g, v); else { v.px = v.x; v.py = v.y; v.pa = v.angle; }
+    }
+    st.hornCd = Math.max(0, st.hornCd - dt);
+    // fuelling: the truck stands still while the hose is out; the gauge fills; a worker cheers when it is full
+    const f = st.fuel;
+    if (f) {
+      f.t += dt;
+      const tr = st.truck;
+      if (ride === tr) { tr.x = tr.px = f.x; tr.y = tr.py = f.y; tr.angle = f.a; tr.vx = 0; tr.vy = 0; g.player.x = tr.x; g.player.y = tr.y; }
+      const k = U.clamp((f.t - F.HOSE) / f.dur, 0, 1);
+      st.gauge[f.i] = Math.max(st.gauge[f.i], U.lerp(f.from, 1, k));
+      if (k >= 1 && !f.done) {
+        f.done = true; st.hold[f.i] = F.HOLD;
+        const B = this.rocketBase(f.i), G = F.GAUGE[f.i];
+        g.floats.push({ x: B.x + G.dx, y: B.y - G.z - 96, text: 'Full tank! 🚀', color: '#ffe08a', t: 0, dur: 1.6, big: true });
+        g.s.rocket.fuel = (g.s.rocket.fuel || 0) + 1;
+        this.cheerFor(g, f.i);
+        Sfx.chime(); Haptics.success();
       }
-      if (cr.cyc) this.updateHook(g, cr, dt);
-      // the camera looks between the cab and the hook (the chef's spot drives it; the core drew it on the seat)
-      const G = this.hookGround(cr, cr), p = g.player;
-      p.x = (cr.C.x + G.x) / 2; p.y = (cr.C.y - cr.k.H + G.y) / 2 + 40; p.moving = false;
+      if (f.t > F.HOSE + f.dur + F.BACK) st.fuel = null;
     }
-    // panels dropped on the sand lie there a while, then slide back to their pile
-    for (const q of st.loose) {
-      q.t += dt;
-      if (q.t > K.LOOSE) { const k = Math.min(1, (q.t - K.LOOSE) / K.SLIDE), e = k * k * (3 - 2 * k); q.x = U.lerp(q.x0, q.home.x, e); q.y = U.lerp(q.y0, q.home.y + 8, e); q.gone = k >= 1; }
+    for (const i of [0, 1]) {
+      if (f && f.i === i) continue;
+      if (st.hold[i] > 0) st.hold[i] -= dt; else st.gauge[i] = Math.max(0, st.gauge[i] - dt / F.DRAIN);
     }
-    st.loose = st.loose.filter((q) => !q.gone);
     for (const list of st.placed) for (const q of list) q.t += dt;
     st.placed[0] = st.placed[0].filter((q) => !q.fade || q.t < 2.5);
     if (st.s2.cheer) { st.s2.cheer.t += dt; if (st.s2.cheer.t > 1.8) st.s2.cheer = null; }
   },
-  // what the hook would do if lowered here: grab a panel (a pile, one lying on the sand), click its panel onto a rocket,
-  // put it back on a pile, drop it on the sand, or just go down and up again
-  hookTarget(g, cr) {
-    const st = this.st, K = CFG.ROCKETISLE.CRANE, G = this.hookGround(cr, cr), near = (P, r) => U.dist(G.x, G.y, P.x, P.y) < r;
-    const piles = st.cranes.map((c) => this.pileSpot(c));
-    if (cr.load) {
-      for (const i of this.site2On(g) ? [0, 1] : [0]) {
-        if (!near(this.rocketSpot(i), K.PLACE_R)) continue;
-        const slots = CFG.ROCKETISLE.CRANES[i].SLOTS, n = st.placed[i].filter((q) => !q.fade).length;
-        return { what: 'place', rocket: i, slot: slots[n % slots.length], stop: slots[n % slots.length] + 31 };
-      }
-      if (piles.some((P) => near(P, K.GRAB_R))) return { what: 'pile', stop: 44 };
-      return { what: 'drop', stop: 40 };
+  // the horn: a little toot when there is nothing else to do
+  horn(g, v) {
+    const st = this.st; if (st.hornCd > 0) return; st.hornCd = 0.5;
+    g.floats.push({ x: v.x, y: v.y - 56, text: 'Toot toot! 📯', color: '#fff', t: 0, dur: 1, big: true });
+    Sfx.tone(330, 0.16, 'square', 0.03); Haptics.tap();
+  },
+  // the nearest rocket within reach of the button (null when none)
+  nearRocket(g, x, y, r) {
+    let best = null, bd = r;
+    for (const i of this.rocketList(g)) { const B = this.rocketBase(i), d = U.dist(x, y, B.x, B.y); if (d < bd) { bd = d; best = i; } }
+    return best;
+  },
+
+  // ---------- the rocket fuel truck ----------
+  // where the hose plugs in (low on the rocket's left side), and the hose reel at the truck's back (its top, on screen)
+  fuelPort(i) { const B = this.rocketBase(i); return { x: B.x - 24, y: B.y - 34 }; },
+  reel(v) { const c = Math.cos(v.angle), s = Math.sin(v.angle); return { x: v.x - c * 47, y: v.y - s * 47 - 14 }; },
+  truckAction(g, v) {
+    const st = this.st;
+    if (st.fuel) return null;
+    const i = this.nearRocket(g, v.x, v.y, CFG.ROCKETISLE.TRUCK.FUEL_R);
+    if (i !== null) return { label: '⛽ Fuel the rocket!', run: (gg) => this.startFuel(gg, v, i) };
+    return { label: '📯 Toot toot!', run: (gg) => this.horn(gg, v) };
+  },
+  startFuel(g, v, i) {
+    const st = this.st, F = CFG.ROCKETISLE.TRUCK, P = this.fuelPort(i), from = st.gauge[i];
+    st.fuel = { i, t: 0, x: v.x, y: v.y, a: v.angle, from, dur: Math.max(0.8, F.FILL * (1 - from)), done: false };
+    v.vx = 0; v.vy = 0;
+    g.floats.push({ x: P.x - 10, y: P.y - 30, text: 'Glug glug ⛽', color: '#8ef0a0', t: 0, dur: 1.8, big: true });
+    Sfx.tone(150, 0.5, 'sine', 0.05, 90); Haptics.tap();
+  },
+  truckHint(g, v) {
+    const st = this.st;
+    if (st.fuel) return { text: st.fuel.done ? 'Full tank! 🚀' : 'Glug glug! ⛽', target: null };
+    if (this.nearRocket(g, v.x, v.y, CFG.ROCKETISLE.TRUCK.FUEL_R) !== null) return { text: 'Fuel the rocket! ⛽', target: null };
+    const i = this.nearRocket(g, v.x, v.y, Infinity);
+    return { text: 'Drive to a rocket! ⛽', target: i === null ? null : this.rocketBase(i) };
+  },
+  // the hose from the reel to the rocket's port: it reaches out, green fuel runs along it, then it winds back
+  drawHose(r, g) {
+    const st = this.st, f = st.fuel; if (!f) return;
+    const F = CFG.ROCKETISLE.TRUCK, ctx = r.ctx, A = this.reel(st.truck), P = this.fuelPort(f.i);
+    const out = f.t < F.HOSE ? f.t / F.HOSE : f.t > F.HOSE + f.dur ? 1 - (f.t - F.HOSE - f.dur) / F.BACK : 1;
+    const k = U.clamp(out, 0, 1); if (k <= 0) return;
+    const E = { x: U.lerp(A.x, P.x, k), y: U.lerp(A.y, P.y, k) }, M = { x: (A.x + E.x) / 2, y: Math.max(A.y, E.y) + 30 * k };
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.quadraticCurveTo(M.x, M.y, E.x, E.y); ctx.stroke();
+    ctx.strokeStyle = '#41b883'; ctx.lineWidth = 4; ctx.stroke();
+    if (!f.done && f.t > F.HOSE) { ctx.strokeStyle = '#c8ffd4'; ctx.lineWidth = 2.5; ctx.setLineDash([5, 9]); ctx.lineDashOffset = -g.time * 70; ctx.stroke(); ctx.setLineDash([]); ctx.lineDashOffset = 0; }
+    // the nozzle on the end
+    ctx.fillStyle = '#5c6670'; U.roundRect(ctx, E.x - 6, E.y - 5, 12, 10, 3); ctx.fill(); ctx.fillStyle = '#ffd166'; ctx.fillRect(E.x - 2, E.y - 7, 4, 3);
+  },
+  // the fuel gauge beside a rocket: a tube that fills green, with a pump on top
+  drawGauge(r, g, i) {
+    const st = this.st, lv = st.gauge[i], fueling = st.fuel && st.fuel.i === i;
+    if (lv < 0.01 && !fueling) return;
+    const fs = i === 0 ? this.flyState(g, 'islands') : null; if (fs && fs.lift > 1) return;
+    const ctx = r.ctx, B = this.rocketBase(i), G = CFG.ROCKETISLE.TRUCK.GAUGE[i], x = B.x + G.dx, y = B.y - G.z, h = 64, w = 18;
+    const full = lv >= 0.999, flash = full && Math.floor(g.time * 4) % 2;
+    ctx.fillStyle = 'rgba(0,0,0,0.25)'; U.roundRect(ctx, x - w / 2 + 2, y - h + 3, w, h, 7); ctx.fill();
+    ctx.fillStyle = '#fff'; U.roundRect(ctx, x - w / 2, y - h, w, h, 7); ctx.fill();
+    ctx.save(); U.roundRect(ctx, x - w / 2 + 3, y - h + 3, w - 6, h - 6, 5); ctx.clip();
+    ctx.fillStyle = '#d9dde3'; ctx.fillRect(x - w / 2, y - h, w, h);
+    const fh = (h - 6) * lv; ctx.fillStyle = flash ? '#8ef0a0' : '#41b883'; ctx.fillRect(x - w / 2, y - 3 - fh, w, fh);
+    if (fueling && !full) { ctx.fillStyle = 'rgba(255,255,255,0.7)'; for (let k = 0; k < 3; k++) { const by = y - 6 - ((g.time * 30 + k * 13) % Math.max(4, fh)); ctx.beginPath(); ctx.arc(x - 2 + k * 2, by, 1.6, 0, Math.PI * 2); ctx.fill(); } }
+    ctx.restore();
+    ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 2; U.roundRect(ctx, x - w / 2, y - h, w, h, 7); ctx.stroke();
+    ctx.fillStyle = 'rgba(43,29,20,0.4)'; for (let k = 1; k < 4; k++) ctx.fillRect(x - w / 2 + 2, y - h + k * h / 4, 5, 1.5);
+    ctx.font = r.font(15); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('⛽', x, y - h - 12);
+  },
+
+  // ---------- the tower cranes (js/towercrane.js drives them; Rocket Island gives them their rockets) ----------
+  rocketSpot(i) { const B = this.rocketBase(i); return { x: B.x + 2, y: B.y + 10 }; },
+  // the cranes' hooks stay over Rocket Island's sand
+  landOk(G) { const s = this.island(), m = 26; return G.x > s.x0 + m && G.x < s.x1 - m && G.y > s.y0 + m && G.y < s.y1 - m; },
+  // the rockets as the cranes' targets: the hook counts anywhere across a rocket's fins; the panel clicks on at the
+  // rocket's next free spot (stored and drawn here, a worker on that rocket's site cheers)
+  craneTargets(g) {
+    return this.rocketList(g).map((i) => {
+      const B = this.rocketBase(i);
+      return {
+        x: B.x - 46, y: B.y + 10, w: 92, h: 0, rocket: i,
+        label: '🚀 Put it on the rocket', hint: 'Put the panel on the rocket! 🚀', carryHint: 'Move the panel to the rocket! 🚀',
+        spot: (gg, c, H) => { const slots = CFG.ROCKETISLE.CRANES[i].SLOTS, n = this.st.placed[i].filter((q) => !q.fade).length; return { x: B.x + U.clamp(H.x - B.x, -10, 10), y: B.y + 10, z: slots[n % slots.length] + 10 }; },
+        onPlace: (gg, c, piece) => {
+          const st = this.st; st.placed[i].push({ zc: piece.z - 10, dx: piece.x - B.x, t: 0, fade: i === 0 && this.stage(gg) >= 2 });
+          if (st.placed[i].length > 8) st.placed[i].shift();
+          gg.s.rocket.panels = (gg.s.rocket.panels || 0) + 1;
+          this.cheerFor(gg, i);
+        },
+      };
+    });
+  },
+  // a crane working on its own: the first one fetches panels (stage 0), lifts the nose cone (stage 1), or stands parked,
+  // turned away (stage 2); Rocket #2's lifts panels round and round
+  autoPose(i, g, c) {
+    const st = this.st, T = TowerCrane, J = c.H, CK = CFG.ROCKETISLE;
+    if (!st) return null;
+    const P = T.pileSpot(T.piles(g, c)[0]), S = this.rocketSpot(i), A = T.polar(c, P.x, P.y), Bt = T.polar(c, S.x, S.y);
+    if (i === 0) {
+      const stage = this.stage(g);
+      if (stage >= 2) return { th: CK.CRANES[0].PARK, d: 90, z: J - 40, load: false, nose: false, ph: 'parked' };
+      const nose = stage === 1, k = st.crane / CK.CRANE_PERIOD;
+      // a panel goes on high up the frame; the nose cone (hanging 76 below the hook) sits on the open top ring
+      return Object.assign(T.calc(k, A, Bt, nose ? J - 12 : J - 40, nose ? 82 : 44, nose ? CK.ROCKET_H - 60 + 76 : CK.ROCKET_H - 70, nose), { nose, kind: nose ? 'nose' : 'panel' });
     }
-    if (piles.some((P) => near(P, K.GRAB_R))) return { what: 'grab', stop: 44 };
-    const q = st.loose.find((o) => o.t < K.LOOSE && near(o, K.GRAB_R)); if (q) return { what: 'grab', loose: q, stop: 40 };
-    return { what: 'none', stop: 40 };
+    return Object.assign(T.calc(st.s2.crane / CK.SITE2.CRANE_PERIOD, A, Bt, J - 40, 44, CK.SITE2.H - 20, false), { nose: false, kind: 'panel' });
   },
-  craneAction(g, cr) {
-    if (cr.cyc && cr.cyc.dir < 0) return { label: '⬆️ Raise the hook', run: (gg) => { cr.cyc.dir = 1; cr.cyc.what = 'none'; } };
-    const tg = this.hookTarget(g, cr);
-    const label = { place: '🚀 Put it on the rocket', pile: '⬇️ Put it back', drop: '⬇️ Drop the panel', grab: '🪝 Grab a panel', none: '⬇️ Lower the hook' }[tg.what];
-    return { label, run: (gg) => { cr.cyc = Object.assign({ dir: -1 }, tg); Sfx.tone(300, 0.25, 'triangle', 0.03, -80); Haptics.tap(); } };
-  },
-  // the hook goes down to its stop, does its thing at the bottom, and winds back up to the jib
-  updateHook(g, cr, dt) {
-    const c = cr.cyc, K = CFG.ROCKETISLE.CRANE, rest = cr.k.H - 40;
-    if (c.dir < 0) {
-      cr.z = Math.max(c.stop, cr.z - K.HOOK * dt);
-      if (cr.z <= c.stop) { this.hookBottom(g, cr, c); c.dir = 1; c.what = 'none'; }
-    } else {
-      cr.z = Math.min(rest, cr.z + K.HOOK * dt);
-      if (cr.z >= rest) cr.cyc = null;
-    }
-  },
-  hookBottom(g, cr, c) {
-    const st = this.st, G = this.hookGround(cr, cr), R = CFG.ISLANDS.ROCKET, say = (text, y) => g.floats.push({ x: G.x, y: (y || G.y - cr.z) - 20, text, color: '#ffe08a', t: 0, dur: 1.3, big: true });
-    if (c.what === 'grab') {
-      cr.load = true; if (c.loose) st.loose = st.loose.filter((q) => q !== c.loose);
-      say('Got it! 🪝'); Sfx.pickup(); Haptics.tap();
-    } else if (c.what === 'place') {
-      const i = c.rocket, B = i === 0 ? R.BASE : R.SITE2.BASE, done = i === 0 && this.stage(g) >= 2;
-      cr.load = false;
-      st.placed[i].push({ zc: c.slot, dx: U.clamp(G.x - B.x, -10, 10), t: 0, fade: done });
-      if (st.placed[i].length > 8) st.placed[i].shift();
-      for (let k = 0; k < 12; k++) g.fx.push({ kind: 'sparkle', x0: B.x + U.rand(-30, 30), y0: B.y - c.slot + U.rand(-24, 24), x1: 0, y1: 0, t: -k * 0.04, dur: 0.6 });
-      say('Click! ✨', B.y - c.slot - 20);
-      g.s.rocket.panels = (g.s.rocket.panels || 0) + 1;
-      this.cheerFor(g, i);
-      Sfx.chime(); Haptics.success();
-    } else if (c.what === 'pile') {
-      cr.load = false; say('Back on the pile!'); Sfx.drop();
-    } else if (c.what === 'drop') {
-      cr.load = false;
-      st.loose.push({ x: G.x, y: G.y - 4, x0: G.x, y0: G.y - 4, t: 0, home: cr.pile }); if (st.loose.length > 6) st.loose.shift();
-      say('Thud!'); Sfx.drop(); Haptics.tap();
-    }
-  },
-  // the nearest worker on the ground at that rocket's site hops and cheers 🎉
+  // the pose of each crane (and where its hook is drawn): for the tests and mission control
+  craneState() { return this.cranes[0] ? TowerCrane.state(this.cranes[0]) : null; },
+  crane2State() { return this.cranes[1] ? TowerCrane.state(this.cranes[1]) : null; },
+  // the nearest ground worker at that rocket's site hops and cheers 🎉
   cheerFor(g, i) {
-    const st = this.st, B = i === 0 ? CFG.ISLANDS.ROCKET.BASE : CFG.ISLANDS.ROCKET.SITE2.BASE;
+    const st = this.st, B = this.rocketBase(i);
     const list = i === 0 ? st.workers.filter((w) => w.z <= 4) : st.s2.workers.filter((w) => !w.deck);
     let who = null, bd = Infinity; for (const w of list) { const d = U.dist(w.x, w.y, B.x, B.y); if (d < bd) { bd = d; who = w; } }
     if (!who) return;
     who.wave = 1.6; who.waveCd = 7; who.facing = B.x < who.x ? -1 : 1;
     if (i === 0) st.cheer = { who, t: 0, text: '🎉' }; else st.s2.cheer = { who, t: 0, text: '🎉' };
   },
-  craneHint(g, cr) {
-    const c = cr.cyc;
-    if (c && c.dir < 0) return { text: 'Down goes the hook! 🪝', target: null };
-    const tg = this.hookTarget(g, cr);
-    if (tg.what === 'place') return { text: 'Press the button: put it on the rocket! 🚀', target: null };
-    if (cr.load) return { text: 'Swing the panel over to a rocket! 🚀', target: null };
-    if (tg.what === 'grab') return { text: 'Press the button to grab a panel! 🪝', target: null };
-    return { text: 'Swing the crane to the panels! 🏗️', target: null };
-  },
-  // on foot by a crane's door: climb in
-  craneSeatHint(g) {
-    const p = g.player, list = this.site2On(g) ? this.st.cranes : [this.st.cranes[0]];
-    for (const cr of list) {
-      const S = cr.k.SEAT, d = U.dist(p.x, p.y, S.x, S.y);
-      if (d < CFG.ROCKETISLE.CRANE.NEAR) return { text: 'Drive the crane! 🏗️', target: d < 30 ? null : S };
-    }
+  // on foot by the fuel truck: climb in (js/towercrane.js answers at the cranes' doors)
+  seatHint(g) {
+    const p = g.player, v = this.st.truck, d = U.dist(p.x, p.y, v.x, v.y);
+    if (this.myVehicles(g).includes(v) && d < CFG.ROCKETISLE.TRUCK.NEAR) return { text: 'Drive the fuel truck! ⛽', target: d < 30 ? null : { x: v.x, y: v.y } };
     return null;
   },
-  hookItem(r, g, items, i) { const cr = this.st.cranes[i], G = this.hookGround(cr, this.pose(i, g)); items.push({ y: G.y + 6, draw: () => this.drawHook(r, g, i) }); },
-  // the crane's mast and jib (the hook and its load are their own entity, drawn by its spot on the ground)
-  drawCrane(r, g, i) {
-    const cr = this.st.cranes[i], pose = this.pose(i, g), riding = this.st.ride === cr;
-    this.drawCraneAt(r, g, cr, pose, riding);
+  // the fuel truck like the core's site vehicles (r.drawSiteVehicle), but the chef sits in its cab (over the tank the head
+  // would hide ROCKET FUEL)
+  drawTruck(r, g, v) {
+    const ctx = r.ctx, riding = g.driving && g.vehicle === v, dx = 46;
+    ctx.save(); ctx.translate(v.x, v.y); ctx.rotate(v.angle);
+    r.drawVehicle(v.kind, g, g.s.paint[v.kind], v);
+    if (riding) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(dx - 10, 0, 8, 10, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(dx - 7, 0, 5.5, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(dx - 9, 0, 5, 0, Math.PI * 2); ctx.fill(); }
+    ctx.restore();
+    r.drawRidingExtras(g, v, 30);
   },
-  // a tower crane at C: its base with a little door, the mast up to the jib's height, the jib turned to `pose.th` (a
-  // lattice band out to its tip, the counter-jib with its weight behind), the tower's peak with its tie cables, the
-  // trolley, the cab with its driver (the chef when riding), and a pennant on the tip once it is parked
-  drawCraneAt(r, g, cr, pose, riding) {
-    const ctx = r.ctx, C = cr.C, J = cr.k.H, top = C.y - J, ux = Math.cos(pose.th), uy = Math.sin(pose.th), L = cr.k.L, LC = cr.k.LC;
-    const at = (dist, h) => ({ x: C.x + dist * ux, y: C.y + dist * uy - h });
-    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(C.x - 22, C.y + 10, 48, 10);
-    ctx.fillStyle = '#5c6670'; U.roundRect(ctx, C.x - 22, C.y - 6, 44, 22, 4); ctx.fill();
-    ctx.fillStyle = '#ffd166'; for (let x = C.x - 20; x < C.x + 20; x += 10) ctx.fillRect(x, C.y + 10, 5, 4);   // hazard stripes on the base
-    // the mast: two yellow rails with zigzag bracing, a little ladder up the front
-    ctx.strokeStyle = '#f2b705'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(C.x - 8, C.y - 4); ctx.lineTo(C.x - 8, top); ctx.moveTo(C.x + 8, C.y - 4); ctx.lineTo(C.x + 8, top); ctx.stroke();
-    ctx.lineWidth = 1.5; ctx.beginPath(); for (let y = C.y - 4, k = 0; y > top + 8; y -= 16, k++) { ctx.moveTo(C.x + (k % 2 ? 8 : -8), y); ctx.lineTo(C.x + (k % 2 ? -8 : 8), Math.max(top, y - 16)); } ctx.stroke();
-    // the door into the mast at its foot (where the chef climbs in)
-    ctx.fillStyle = '#e4572e'; U.roundRect(ctx, C.x - 7, C.y - 22, 14, 18, 3); ctx.fill(); ctx.fillStyle = '#bfe3ff'; ctx.fillRect(C.x - 4, C.y - 19, 8, 5); ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(C.x + 4, C.y - 11, 1.4, 0, Math.PI * 2); ctx.fill();
-    // the jib: from the counter-jib's end to the tip, a lattice band; drawn behind the mast's top when it points north
-    const E = at(L, J), Q = at(-LC, J), M = at(0, J);
-    let nx = -uy, ny = ux; if (ny < 0) { nx = -nx; ny = -ny; } nx *= 9; ny *= 9;
-    const jib = () => {
-      ctx.strokeStyle = '#f2b705'; ctx.lineWidth = 3; ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.moveTo(Q.x, Q.y); ctx.lineTo(E.x, E.y); ctx.moveTo(M.x + nx, M.y + ny); ctx.lineTo(E.x + nx * 0.4, E.y + ny * 0.4); ctx.stroke();
-      ctx.lineWidth = 1.2; ctx.beginPath();
-      const n = Math.max(2, Math.round(L / 16));
-      for (let k = 0; k < n; k++) { const a = k / n, b = (k + 1) / n, sa = 1 - 0.6 * a, sb = 1 - 0.6 * b; const A = { x: U.lerp(M.x, E.x, a), y: U.lerp(M.y, E.y, a) }, B2 = { x: U.lerp(M.x, E.x, b), y: U.lerp(M.y, E.y, b) }; if (k % 2) { ctx.moveTo(A.x, A.y); ctx.lineTo(B2.x + nx * sb, B2.y + ny * sb); } else { ctx.moveTo(A.x + nx * sa, A.y + ny * sa); ctx.lineTo(B2.x, B2.y); } }
-      ctx.stroke(); ctx.lineCap = 'butt';
-      ctx.fillStyle = '#5c6670'; ctx.beginPath(); ctx.arc(Q.x, Q.y + 6, 11, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#7d8591'; U.roundRect(ctx, Q.x - 12, Q.y - 2, 24, 16, 3); ctx.fill();   // the counterweight
-      // tie cables from the peak to the tip and the counter-jib, the trolley on the jib
-      ctx.strokeStyle = '#9aa0a8'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(C.x, top - 30); ctx.lineTo(E.x, E.y); ctx.moveTo(C.x, top - 30); ctx.lineTo(Q.x, Q.y); ctx.stroke();
-      const T = at(pose.d, J); ctx.fillStyle = '#3e424a'; U.roundRect(ctx, T.x - 7, T.y - 3, 14, 8, 2); ctx.fill();
-      if (pose.ph === 'parked') { ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.moveTo(E.x, E.y); ctx.lineTo(E.x - 18 * ux + 4, E.y - 18 * uy - 7 + Math.sin(g.time * 4) * 2); ctx.lineTo(E.x, E.y - 14); ctx.closePath(); ctx.fill(); }
-    };
-    const peak = () => { ctx.fillStyle = '#f2b705'; ctx.beginPath(); ctx.moveTo(C.x - 6, top + 2); ctx.lineTo(C.x, top - 32); ctx.lineTo(C.x + 6, top + 2); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#5c6670'; ctx.beginPath(); ctx.ellipse(C.x, top + 2, 13, 5, 0, 0, Math.PI * 2); ctx.fill(); };
-    // the cab beside the mast's top, with a big window: the driver in a hard hat, or the chef
-    const cab = () => {
-      const cx = C.x + 10, cy = top + 4;
-      ctx.fillStyle = '#e4572e'; U.roundRect(ctx, cx, cy, 24, 22, 4); ctx.fill(); ctx.fillStyle = '#bfe3ff'; U.roundRect(ctx, cx + 3, cy + 3, 18, 11, 2); ctx.fill();
-      if (riding) {
-        ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(cx + 12, cy + 12, 4.5, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(cx + 9.5, cy + 6, 3.4, 0, Math.PI * 2); ctx.arc(cx + 14.5, cy + 6, 3.4, 0, Math.PI * 2); ctx.fill(); ctx.fillRect(cx + 7.5, cy + 6, 9, 3.5);
-        ctx.fillStyle = '#2b1d14'; ctx.fillRect(cx + 10, cy + 11, 1.4, 1.4); ctx.fillRect(cx + 13, cy + 11, 1.4, 1.4);
-      } else {
-        ctx.fillStyle = cr.k.driver; ctx.beginPath(); ctx.arc(cx + 12, cy + 12, 4, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(cx + 12, cy + 10, 4.5, Math.PI, 0); ctx.fill();
-      }
-      ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fillRect(cx + 4, cy + 4, 3, 9);
-    };
-    if (uy < -0.2) { jib(); peak(); cab(); } else { peak(); jib(); cab(); }
+  // top-down art, nose +x (the core has translated and rotated): sized like the concrete mixer
+  vehicleArt: {
+    // the rocket fuel truck: a red cab with a beacon, a round white tank with ROCKET FUEL on its green band, a hose reel
+    fueltruck(r, g, color, v, h) {
+      const ctx = r.ctx, c = color || '#e4572e', t = g.time;
+      h.shadow(112, 24); h.wheels([-38, -14, 36], 14, 9, 22);
+      ctx.fillStyle = '#5c6670'; U.roundRect(ctx, -56, -18, 112, 36, 6); ctx.fill();                       // chassis
+      ctx.fillStyle = c; U.roundRect(ctx, 24, -22, 32, 44, 7); ctx.fill();                                 // cab
+      ctx.fillStyle = '#bfe3ff'; U.roundRect(ctx, 44, -17, 9, 34, 3); ctx.fill(); U.roundRect(ctx, 28, -17, 7, 34, 3); ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(24, -3, 32, 6);
+      // the tank: a white cylinder lying along the truck, a green band round it
+      const tg = ctx.createLinearGradient(0, -21, 0, 21); tg.addColorStop(0, '#c9ccd2'); tg.addColorStop(0.3, '#ffffff'); tg.addColorStop(1, '#b9bcc2');
+      ctx.fillStyle = tg; U.roundRect(ctx, -42, -21, 62, 42, 16); ctx.fill();
+      ctx.strokeStyle = '#7d8591'; ctx.lineWidth = 1.5; U.roundRect(ctx, -42, -21, 62, 42, 16); ctx.stroke();
+      ctx.fillStyle = '#41b883'; ctx.fillRect(-42, -6, 62, 12);
+      ctx.fillStyle = '#7d8591'; for (const x of [-30, 8]) { ctx.beginPath(); ctx.arc(x, -13, 3.5, 0, Math.PI * 2); ctx.fill(); }   // filler caps
+      // ROCKET FUEL on the band, the right way up whichever way the truck faces
+      ctx.save(); ctx.translate(-11, 0); if (v && Math.cos(v.angle) < -0.01) ctx.rotate(Math.PI);
+      ctx.fillStyle = '#fff'; ctx.font = r.font(7); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('ROCKET FUEL', 0, 0.5);
+      ctx.restore();
+      // the hose reel on the back: a drum with green hose wound round it
+      ctx.fillStyle = '#3e424a'; U.roundRect(ctx, -56, -16, 12, 32, 3); ctx.fill();
+      ctx.fillStyle = '#41b883'; for (let y = -13; y < 13; y += 4) ctx.fillRect(-55, y, 10, 2.5);
+      ctx.fillStyle = '#9aa0a8'; ctx.fillRect(-57, -17, 14, 2); ctx.fillRect(-57, 15, 14, 2);
+      if (!(RocketExt.st && RocketExt.st.fuel && v === RocketExt.st.truck)) { ctx.fillStyle = '#5c6670'; U.roundRect(ctx, -62, 8, 8, 7, 2); ctx.fill(); }   // the nozzle hooked on
+      h.lights(112, 22);
+      // the beacon on the cab roof, blinking orange
+      const on = Math.floor(t * 3) % 2;
+      if (on) { ctx.fillStyle = 'rgba(255,179,0,0.35)'; ctx.beginPath(); ctx.arc(28, -15, 9, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = on ? '#ffb300' : '#ffe08a'; ctx.beginPath(); ctx.arc(28, -15, 4, 0, Math.PI * 2); ctx.fill();
+    },
   },
-  // the hook, its cable and its load, drawn by the hook's spot on the ground (in front of a rocket or a pile it is over)
-  drawHook(r, g, i) {
-    const ctx = r.ctx, cr = this.st.cranes[i], pose = this.pose(i, g), J = cr.k.H, G = this.hookGround(cr, pose), x = G.x, hy = G.y - pose.z, ty = G.y - J;
-    ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x - 2, ty + 4); ctx.lineTo(x - 2, hy); ctx.moveTo(x + 2, ty + 4); ctx.lineTo(x + 2, hy); ctx.stroke();
-    ctx.fillStyle = '#ffd166'; U.roundRect(ctx, x - 5, hy - 2, 10, 8, 2); ctx.fill();
-    ctx.strokeStyle = '#3e424a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, hy + 10, 4, 0, Math.PI); ctx.stroke();
-    if (pose.load && pose.nose) {
-      // the nose cone hangs in two slings, tip up
-      ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, hy + 12); ctx.lineTo(x - 18, hy + 54); ctx.moveTo(x, hy + 12); ctx.lineTo(x + 18, hy + 54); ctx.stroke();
-      this.drawNose(ctx, x, hy + 76, g.time, false);
-    } else if (pose.load) {
-      ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, hy + 12); ctx.lineTo(x - 12, hy + 22); ctx.moveTo(x, hy + 12); ctx.lineTo(x + 12, hy + 22); ctx.stroke();
-      this.drawPanel(ctx, x, hy + 31);
-    }
-  },
-  // a hanging (or bolted-on) panel centred at (x, y)
-  drawPanel(ctx, x, y, a) {
-    if (a !== undefined) ctx.globalAlpha = a;
-    ctx.fillStyle = '#ff8c42'; U.roundRect(ctx, x - 14, y - 9, 28, 18, 3); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(x - 12, y - 7, 24, 3);
-    ctx.fillStyle = '#c9ccd2'; for (const dx of [-9, 9]) { ctx.beginPath(); ctx.arc(x + dx, y + 3, 1.6, 0, Math.PI * 2); ctx.fill(); }
-    ctx.globalAlpha = 1;
-  },
-  // panels clicked onto a rocket (on the finished rocket 1 they shine and melt into its paint)
+  // panels the cranes clicked onto a rocket (on the finished rocket 1 they shine and melt into its paint)
   drawPlaced(r, g, i) {
-    const ctx = r.ctx, B = i === 0 ? CFG.ISLANDS.ROCKET.BASE : CFG.ISLANDS.ROCKET.SITE2.BASE;
+    const ctx = r.ctx, B = this.rocketBase(i);
     for (const q of this.st.placed[i]) {
-      const a = q.fade ? Math.max(0, 1 - q.t / 2.5) : 1, x = B.x + q.dx, y = B.y - q.zc;
-      this.drawPanel(ctx, x, y, a);
+      const x = B.x + q.dx, y = B.y - q.zc, a = q.fade ? Math.max(0, 1 - q.t / 2.5) : 1;
+      if (typeof TowerCrane !== 'undefined') TowerCrane.drawPiece(ctx, 'panel', x, y, a);
       if (q.t < 0.5) { ctx.strokeStyle = `rgba(255,255,255,${(1 - q.t / 0.5).toFixed(3)})`; ctx.lineWidth = 3; U.roundRect(ctx, x - 17, y - 12, 34, 24, 5); ctx.stroke(); }
     }
-  },
-  // a panel lying on the sand (sliding home once it has lain there a while)
-  drawLoose(r, g, q) {
-    const ctx = r.ctx;
-    ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(q.x + 2, q.y + 3, 17, 5, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#ff8c42'; U.roundRect(ctx, q.x - 15, q.y - 6, 30, 9, 2); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(q.x - 13, q.y - 5, 26, 2);
-  },
-  // while driving: a ring on the sand where the hook would come down (green over a pile or a rocket)
-  drawAim(r, g) {
-    const st = this.st, cr = st.ride; if (!cr) return;
-    const ctx = r.ctx, G = this.hookGround(cr, cr), tg = this.hookTarget(g, cr), good = tg.what !== 'none' && tg.what !== 'drop', pulse = 1 + Math.sin(g.time * 5) * 0.08;
-    ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(G.x, G.y, 10, 4, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = good ? '#41b883' : '#fff'; ctx.lineWidth = 3; ctx.setLineDash([7, 5]);
-    ctx.beginPath(); ctx.ellipse(G.x, G.y, 24 * pulse, 10 * pulse, 0, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
-  },
-  drawTruck(r, g) {
-    const ctx = r.ctx, T = CFG.ISLANDS.ROCKET.TRUCK, x = T.x, y = T.y;
-    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(x + 4, y + 12, 52, 9, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#2b1d14'; for (const dx of [-30, 18, 34]) { ctx.beginPath(); ctx.arc(x + dx, y + 6, 8, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#9aa0a8'; ctx.beginPath(); ctx.arc(x + dx, y + 6, 3, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#2b1d14'; }
-    // the cab faces west
-    ctx.fillStyle = '#e4572e'; U.roundRect(ctx, x - 48, y - 32, 30, 34, 6); ctx.fill(); ctx.fillStyle = '#bfe3ff'; U.roundRect(ctx, x - 44, y - 28, 14, 12, 3); ctx.fill();
-    ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(x - 34, y - 36, 4, 0, Math.PI * 2); ctx.fill();   // the roof light (its glow blinks live)
-    // the round tank with FUEL on it
-    ctx.fillStyle = '#f5f7fa'; U.roundRect(ctx, x - 16, y - 34, 64, 34, 14); ctx.fill();
-    ctx.fillStyle = 'rgba(0,0,0,0.08)'; ctx.fillRect(x - 12, y - 10, 56, 4);
-    ctx.fillStyle = '#41b883'; ctx.fillRect(x - 16, y - 22, 64, 9);
-    ctx.fillStyle = '#fff'; ctx.font = r.font(8); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('ROCKET FUEL', x + 16, y - 17);
-    ctx.fillStyle = '#5c6670'; ctx.fillRect(x - 16, y - 2, 64, 6);
   },
   drawParts(r, g) {
     const ctx = r.ctx, P = CFG.ISLANDS.ROCKET.PARTS, x = P.x, y = P.y, n = 3 - this.stage(g);   // the pile shrinks as the rocket grows
@@ -1552,5 +1515,25 @@ const RocketExt = {
     ctx.restore();
   },
 };
+// the two tower cranes (js/towercrane.js, loaded first; without it there are none): the first site's (parked aside once rocket 1 is finished) and Rocket #2's
+RocketExt.cranes = typeof TowerCrane === 'undefined' ? [] : [0, 1].map((i) => {
+  const R = CFG.ISLANDS.ROCKET, k = CFG.ROCKETISLE.CRANES[i], C = i ? R.SITE2.CRANE : R.CRANE, P = i ? R.SITE2.PARTS : k.PILE;
+  return TowerCrane.create({
+    id: 'rocket' + (i + 1), area: 'islands', base: { x: C.x, y: C.y }, seat: k.SEAT, height: k.H, reach: k.L, counter: k.LC, driver: k.driver,
+    piles: [{ x: P.x, y: P.y, kind: 'panel' }], fetchHint: 'Move the hook to the panels! 🪝',
+    exists: (g) => i === 0 || RocketExt.site2On(g),
+    available: (g) => { const st = RocketExt.st; return !!st && !st.up && !st.climb && !st.fly && (i === 0 || RocketExt.site2On(g)); },
+    land: (x, y) => RocketExt.landOk({ x, y }),
+    targets: (g) => (RocketExt.st ? RocketExt.craneTargets(g) : []),
+    idle: (g, c) => RocketExt.autoPose(i, g, c),
+    // the nose cone hangs in two slings, tip up
+    drawLoad: (r, g, c, kind, x, y) => {
+      if (kind !== 'nose') return false;
+      const ctx = r.ctx; ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 18, y + 42); ctx.moveTo(x, y); ctx.lineTo(x + 18, y + 42); ctx.stroke();
+      RocketExt.drawNose(ctx, x, y + 64, g.time, false);
+      return true;
+    },
+  });
+});
 Game.ext.unshift(RocketExt);   // ahead of the islands' own button and hints
 Render.ext.push(RocketExt);

@@ -9,16 +9,20 @@
 // walkways (climb up, edges hold, peek in the hatch, climb down), a save up there reloading at the ladder's foot, rescues
 // and Take-me-home from the top.
 // Visits anywhere on the island's land (its corners, beaches and the bridge's landing), once per stay (the jet ski at the
-// beach does not count until the chef steps ashore). The cranes: '🏗️ Drive the crane', the camera steps back, the
-// joystick swings the jib and runs the trolley, grab a panel, click it onto a rocket (sparkle, a worker cheers 🎉), drop
-// one on the sand (it slides back), '🚶 Climb down'. The rocket's inside (js/rocketinside.js): shut before stage 2, then
-// three decks (the suit, the oven, the bunk, the porthole, the treadmill, the plant), the flight deck's panel (lights,
-// Mission Control, Blast off), blast off from inside to the moon, inside again on the moon (its flag) and Fly home from
+// beach does not count until the chef steps ashore). The trucks, sized like the concrete mixer and kept on the island's
+// land: the rocket fuel truck (drive it to a rocket, '⛽ Fuel the rocket!': the hose reaches out, the gauge fills, a worker
+// cheers 🎉; a horn toot elsewhere; hop out). The tower cranes ('🏗️ Drive the crane', no zoom, the camera follows the
+// hook): the joystick moves the hook over the ground; steer it to the pile, '🪝 Grab a panel', steer to a rocket, '🚀 Put
+// it on the rocket': sparkle, a worker cheers 🎉; '⬇️ Put it down' elsewhere, it slides back; '🚶 Climb down'; the
+// second crane only with Rocket #2's site. The rocket's inside (js/rocketinside.js): shut before stage 2, then
+// three decks (the suit, the oven, the bunk, the porthole, the treadmill, the plant), the flight deck (sit in the pilot
+// seat: no panel, Mission Control's bubble, the big button says Blast off), blast off from inside to the moon, inside again on the moon (its flag) and Fly home from
 // there; a rescue, Take-me-home and a reload inside. Screenshots desktop + phone.
 module.exports = async (t) => {
-  // until the coordinator wires js/moon.js and js/rocketinside.js into index.html, serve the page with them added
+  // until the coordinator wires js/towercrane.js, js/moon.js and js/rocketinside.js into index.html, serve the page with them added
   await t.page.route(/^http:\/\/127\.0\.0\.1:\d+\/(index\.html)?(\?.*)?$/, async (route) => {
     const resp = await route.fetch(); let body = await resp.text();
+    if (!body.includes('js/towercrane.js')) body = body.replace('<script src="js/islands.js"></script>', '<script src="js/islands.js"></script>\n  <script src="js/towercrane.js"></script>');
     if (!body.includes('js/moon.js')) body = body.replace('<script src="js/rocket.js"></script>', '<script src="js/rocket.js"></script>\n  <script src="js/moon.js"></script>');
     if (!body.includes('js/rocketinside.js')) body = body.replace('<script src="js/moon.js"></script>', '<script src="js/moon.js"></script>\n  <script src="js/rocketinside.js"></script>');
     await route.fulfill({ response: resp, body, headers: Object.assign({}, resp.headers(), { 'content-type': 'text/html' }) });
@@ -31,12 +35,14 @@ module.exports = async (t) => {
     render: Render.ext.includes(RocketExt) && Render.ext.includes(MoonExt), visits: Game.s.rocket.visits, flag: Game.s.moon.flag,
     inside: typeof RocketInsideExt !== 'undefined' && Render.ext.includes(RocketInsideExt) && Game.ext.indexOf(RocketInsideExt) < Game.ext.indexOf(CityExt), inArea: CFG.AREAS.rocketinside && CFG.AREAS.rocketinside.WORLD,
     crane: CFG.VEHICLES.crane && [CFG.VEHICLES.crane.label, CFG.VEHICLES.crane.exit],
+    fuel: CFG.VEHICLES.fueltruck && [CFG.VEHICLES.fueltruck.label, CFG.VEHICLES.fueltruck.exit, CFG.VEHICLES.fueltruck.speed > 100],
   }));
   t.expect(reg.moon && reg.buggy && reg.render, `moon registered ${JSON.stringify(reg)}`);
   t.expectEq(JSON.stringify(reg.area), JSON.stringify({ x0: 0, y0: 5000, x1: 2000, y1: 6200 }), 'the moon map sits in its free rectangle');
   t.expect(reg.inside, 'the rocket\'s inside is registered (before the City)');
   t.expectEq(JSON.stringify(reg.inArea), JSON.stringify({ x0: 2500, y0: 5000, x1: 3300, y1: 5600 }), 'the rocket\'s inside sits in its free rectangle');
   t.expectEq(JSON.stringify(reg.crane), JSON.stringify(['🏗️ Drive the crane', '🚶 Climb down']), 'the crane is a vehicle: drive it, climb down');
+  t.expectEq(JSON.stringify(reg.fuel), JSON.stringify(['⛽ Drive the fuel truck', '🚶 Hop out', true]), 'the rocket fuel truck is a vehicle that drives');
   t.expect(reg.order, 'the rocket and the moon answer before the islands and the City');
   t.expectEq(reg.visits, 0, 'no visits yet');
   t.expectEq(reg.flag, false, 'no flag yet');
@@ -53,7 +59,7 @@ module.exports = async (t) => {
     RocketExt.entities(Render, Game, items);
     return { on: RocketExt.site2On(Game), lot: obs.some((o) => o.x === L.x0 && o.y === L.y0 && o.w === L.x1 - L.x0), scaffold: obs.some((o) => o.x === G.D[1].x0 - 2), items: items.length };
   });
-  const state = () => t.ev(() => ({ visits: Game.s.rocket.visits, stage: RocketExt.stage(Game), label: T.label(), hint: T.hint(), ask: RocketExt.st.ask && RocketExt.st.ask.line, more: RocketExt.st.ask && RocketExt.st.ask.more, key: RocketExt.bgKey(Game), crane: RocketExt.craneState(RocketExt.stage(Game)), swing: RocketExt.st.swing }));
+  const state = () => t.ev(() => ({ visits: Game.s.rocket.visits, stage: RocketExt.stage(Game), label: T.label(), hint: T.hint(), ask: RocketExt.st.ask && RocketExt.st.ask.line, more: RocketExt.st.ask && RocketExt.st.ask.more, key: RocketExt.bgKey(Game), crane: RocketExt.craneState(), swing: RocketExt.st.swing, trucks: RocketExt.vehicles(Game).concat(TowerCrane.vehicles(Game)).map((v) => v.kind + (v.tc ? ':' + v.tc : '')).join(',') }));
 
   // ---- visit 1: walk over the bridge from Starfish Cove onto Rocket Island
   const landX = await t.ev(() => { const b = CFG.ISLANDS.LINKS.find((l) => l.key === 'bridge2'); T.tp(b.x0 - 30, (b.y0 + b.y1) / 2, 'islands'); T.steer(1, 0); T.until(() => Game.s.rocket.visits > 0, 600); const x = Game.player.x; T.step(30); T.unsteer(); return x - RocketExt.island().x0; });
@@ -63,6 +69,7 @@ module.exports = async (t) => {
   t.expectEq(s1.stage, 0, 'stage 0: a bare frame');
   t.expectEq(s1.ask, "We're building a rocket! Come back soon!", 'a worker greets the chef');
   t.expect(!s1.crane.nose && s1.crane.ph !== 'parked', 'the crane fetches panels');
+  t.expectEq(s1.trucks, 'fueltruck,crane:rocket1', 'the fuel truck and the first crane can be climbed into (no second crane yet)');
   t.expectEq(s1.key, 'rocket0', 'the sign shows stage 0');
   // walking about on the island, or stepping into mission control and out, is the same stay
   await tp(S.isle.x, S.isle.y, 'islands'); await tp(S.ask.x + 40, S.ask.y + 30, 'islands');
@@ -85,6 +92,166 @@ module.exports = async (t) => {
   t.expect(lotIn.label !== '🪜 Climb up' && lotIn.hint !== 'Climb the scaffolding! 🪜', `stage 0: nothing to climb ${JSON.stringify(lotIn)}`);
   t.expect(lotIn.out && lotIn.free && lotIn.onIsle, `stage 0: a chef inside the fenced lot lands outside it ${JSON.stringify(lotIn)}`);
 
+  // ---- the trucks are regular size: like Construction Town's concrete mixer and dump truck (radius and drawn size)
+  const size = await t.ev(() => {
+    const bbox = (kind, v) => {
+      const c = document.createElement('canvas'); c.width = 400; c.height = 300; const cx = c.getContext('2d'), ctx0 = Render.ctx;
+      Render.ctx = cx; cx.translate(200, 150);
+      try { Render.drawVehicle(kind, Game, undefined, v); } finally { Render.ctx = ctx0; }
+      const d = cx.getImageData(0, 0, 400, 300).data; let x0 = 400, y0 = 300, x1 = -1, y1 = -1;
+      for (let y = 0; y < 300; y++) for (let x = 0; x < 400; x++) if (d[(y * 400 + x) * 4 + 3] > 60) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      return { w: x1 - x0 + 1, h: y1 - y0 + 1 };
+    };
+    const V = CFG.VEHICLES, st = RocketExt.st;
+    return {
+      mixer: bbox('mixer', { kind: 'mixer', x: 0, y: 0, angle: 0, drum: 0 }), dump: bbox('dumptruck', Game.dumptruck), fuel: bbox('fueltruck', st.truck),
+      r: { mixer: V.mixer.radius, dump: V.dumptruck.radius, fuel: V.fueltruck.radius },
+    };
+  });
+  const like = (a, b) => a.w >= b.w * 0.85 && a.w <= b.w * 1.15 && a.h >= b.h * 0.85 && a.h <= b.h * 1.2;
+  t.expect(like(size.fuel, size.mixer) && like(size.fuel, size.dump), `the fuel truck is drawn the mixer's size ${JSON.stringify(size)}`);
+  t.expect(size.r.fuel === size.r.mixer && Math.abs(size.r.fuel - size.r.dump) <= 2, `its radius matches the mixer's ${JSON.stringify(size.r)}`);
+
+  // ---- the rocket fuel truck: parked by pad 1; climb in, drive to the rocket, fuel it, hop out
+  const fpark = await t.ev(() => {
+    const v = RocketExt.st.truck, P = CFG.ROCKETISLE.TRUCK.PARK, A = CFG.ISLANDS.ROCKET.ASK; T.tp(P.x, P.y - 48, 'islands'); Render.setZoom(1.6); T.step(3);
+    return { at: Math.hypot(v.x - P.x, v.y - P.y), d: Math.hypot(P.x - A.x, P.y - A.y), near: Game.nearVehicle === v, hint: T.hint(), zoom: Render.zoom };
+  });
+  t.expect(fpark.at < 1 && fpark.d < 220 && fpark.near, `the fuel truck is parked by the first pad ${JSON.stringify(fpark)}`);
+  t.expectEq(fpark.hint, 'Drive the fuel truck! ⛽', 'fuel truck hint beside it');
+  await t.wait(200);
+  t.expectEq(await t.page.textContent('#btn-car'), '⛽ Drive the fuel truck', 'the vehicle button reads Drive the fuel truck');
+  await t.shot('fuel-parked');
+  const fuel = await t.ev(() => {
+    const v = RocketExt.st.truck, st = RocketExt.st; Game.enterCar(); T.step(2);
+    const r = { driving: Game.driving && Game.vehicle === v, zoom: Render.zoom, label0: T.label(), hint0: T.hint(), target0: !!(Game.hint && Game.hint.target) };
+    // drive east along the pad's south edge until the button offers fuel
+    T.steer(1, 0); r.n = T.until(() => T.label() === '⛽ Fuel the rocket!', 400); T.step(10); T.unsteer(); T.step(20);
+    r.label = T.label(); r.hint = T.hint(); r.x = v.x; r.y = v.y; r.moved = v.x - CFG.ROCKETISLE.TRUCK.PARK.x;
+    r.gauge0 = st.gauge[0]; T.act();
+    r.fueling = !!st.fuel; r.glug = Game.floats.some((f) => f.text === 'Glug glug ⛽'); r.hint2 = T.hint(); r.label2 = T.label();
+    T.step(30); r.hose = !!st.fuel;
+    // the joystick does not pull the truck away while the hose is out
+    T.steer(-1, 0); T.step(30); T.unsteer(); r.held = Math.hypot(v.x - r.x, v.y - r.y);
+    r.mid = st.gauge[0];
+    T.until(() => st.fuel && st.fuel.done, 600); r.cheer = st.cheer && st.cheer.text; r.who = st.cheer && st.cheer.who.wave > 0;
+    T.until(() => !st.fuel, 600);
+    r.full = st.gauge[0]; r.fuelled = Game.s.rocket.fuel; r.fullFloat = Game.floats.some((f) => f.text === 'Full tank! 🚀'); r.zoom2 = Render.zoom;
+    return r;
+  });
+  t.expect(fuel.driving && fuel.label0 === '📯 Toot toot!' && fuel.hint0 === 'Drive to a rocket! ⛽' && fuel.target0, `in the fuel truck: a horn, and a hint to the rocket ${JSON.stringify(fuel)}`);
+  t.expect(fuel.n >= 0 && fuel.moved > 30 && fuel.label === '⛽ Fuel the rocket!' && fuel.hint === 'Fuel the rocket! ⛽', `drove up to the rocket ${JSON.stringify(fuel)}`);
+  t.expect(fuel.fueling && fuel.glug && fuel.hint2 === 'Glug glug! ⛽' && fuel.label2 === null && fuel.hose, `fuelling: the hose goes out, glug glug ${JSON.stringify(fuel)}`);
+  t.expect(fuel.held < 1 && fuel.mid > fuel.gauge0 && fuel.mid < 1, `the truck stays put while the gauge fills ${JSON.stringify(fuel)}`);
+  t.expect(fuel.full === 1 && fuel.fuelled === 1 && fuel.fullFloat && fuel.cheer === '🎉' && fuel.who, `the gauge is full and a worker cheers ${JSON.stringify(fuel)}`);
+  t.expect(Math.abs(fuel.zoom2 - fpark.zoom) < 1e-9 && Math.abs(fuel.zoom - fpark.zoom) < 1e-9, 'the camera does not zoom while driving');
+  await t.ev(() => { const st = RocketExt.st; RocketExt.startFuel(Game, st.truck, 0); T.step(60); });
+  await t.shot('fuel-fuelling');
+  await t.page.setViewportSize({ width: 390, height: 844 });
+  await t.ev(() => { Render.resize(); Render.setZoom(1.4); Game.cameraSnap = true; T.step(30); });
+  await t.shot('phone-fuel-fuelling');
+  await t.page.setViewportSize({ width: 1100, height: 720 });
+  // it stays on the island: driving hard at the bridge, the beaches and the water never takes it off the land
+  const onLand = await t.ev(() => {
+    const v = RocketExt.st.truck, s = RocketExt.island(), m = CFG.ROCKETISLE.LAND_M, out = [];
+    T.until(() => !RocketExt.st.fuel, 600); Render.resize();
+    for (const [x, y, n] of [[-1, 0, 240], [0, 1, 120], [-1, -0.2, 120], [0, -1, 300], [1, 0, 400], [0, 1, 300], [-1, 0.3, 300]]) {
+      T.steer(x, y); T.step(n); T.unsteer(); T.step(5);
+      out.push({ x: Math.round(v.x), y: Math.round(v.y), bad: Math.round(RocketExt.truckBad(Game, v.x, v.y, v.angle) * 10) / 10, on: v.x >= s.x0 + m - 0.5 && v.x <= s.x1 - m + 0.5 && v.y >= s.y0 + m - 0.5 && v.y <= s.y1 - m + 0.5, chef: Game.player.x === v.x && Game.player.y === v.y, driving: Game.vehicle === v });
+    }
+    return { out, visits: Game.s.rocket.visits };
+  });
+  t.expect(onLand.out.every((o) => o.on && o.bad < 4 && o.chef && o.driving), `the fuel truck stays on Rocket Island's land ${JSON.stringify(onLand)}`);
+  t.expectEq(onLand.visits, 1, 'driving about the island is the same stay');
+  const fout = await t.ev(() => {
+    const v = RocketExt.st.truck; Game.exitCar(); T.step(3); const p = Game.player;
+    return { driving: Game.driving, d: Math.hypot(p.x - v.x, p.y - v.y), free: !Game.obstacles().some((o) => Game.hitRect(p.x, p.y, 12, o)), near: Game.nearVehicle === v, visits: Game.s.rocket.visits };
+  });
+  t.expect(!fout.driving && fout.d < 70 && fout.free && fout.near && fout.visits === 1, `hopped out beside the fuel truck ${JSON.stringify(fout)}`);
+
+  // ---- the first tower crane: climb in at the mast's door; the joystick moves the hook over the ground (the camera
+  // follows it), steer it to the pile, grab a panel, steer to the rocket, put it on; put one down elsewhere; climb down
+  const steerHelpers = () => t.ev(() => {
+    // push the joystick straight at a ground spot until the button reads `label` (or `max` steps)
+    window.steerHook = (cr, P, label, max) => {
+      let n = 0;
+      for (; n < (max || 400); n++) {
+        if (T.label() === label) break;
+        const G = TowerCrane.hook(cr), dx = P.x - G.x, dy = P.y - G.y, d = Math.hypot(dx, dy) || 1;
+        T.steer(dx / d, dy / d); T.step(1);
+      }
+      T.unsteer(); return T.label() === label ? n : -1;
+    };
+  });
+  await steerHelpers();
+  const cdoor = await t.ev(() => {
+    const cr = TowerCrane.get('rocket1'), S = CFG.ROCKETISLE.CRANES[0].SEAT; T.tp(S.x - 20, S.y + 10, 'islands'); T.step(3);
+    return { near: Game.nearVehicle === cr.v, hint: T.hint(), zoom: Render.zoom, scale: Render.scale, second: TowerCrane.vehicles(Game).includes(TowerCrane.get('rocket2').v) };
+  });
+  t.expect(cdoor.near && cdoor.hint === 'Drive the crane! 🏗️', `the vehicle button offers the crane at its door ${JSON.stringify(cdoor)}`);
+  t.expect(!cdoor.second, 'no second crane before Rocket #2\'s site opens');
+  await t.wait(200);
+  t.expectEq(await t.page.textContent('#btn-car'), '🏗️ Drive the crane', 'the vehicle button reads Drive the crane');
+  const crane = await t.ev(() => {
+    const st = RocketExt.st, cr = TowerCrane.get('rocket1'), S = CFG.ROCKETISLE.CRANES[0].SEAT, K = CFG.TOWERCRANE; Game.enterCar(); T.step(30); cr.load = false;
+    const G0 = TowerCrane.hook(cr), p = Game.player;
+    const r = { driving: Game.driving && Game.vehicle === cr.v, ride: TowerCrane.ride === cr, still: cr.v.x === S.x && cr.v.y === S.y, zoom: Render.zoom, scale: Render.scale, up: Game.floats.some((f) => f.text === 'Up in the crane! 🏗️'), cam: Math.hypot(p.x - G0.x, p.y - (G0.y - 50)) };
+    // the joystick moves the hook like walking: left goes left, up goes up (from the middle of its reach)
+    const M = { x: cr.C.x - 90, y: cr.C.y + 90 };
+    for (let i = 0; i < 300; i++) { const G = TowerCrane.hook(cr), dx = M.x - G.x, dy = M.y - G.y, d = Math.hypot(dx, dy); if (d < 4) break; T.steer(dx / d, dy / d); T.step(1); }
+    T.unsteer(); const Gm = TowerCrane.hook(cr); r.mid = Math.round(Math.hypot(Gm.x - M.x, Gm.y - M.y));
+    T.steer(-1, 0); T.step(15); T.unsteer(); const G1 = TowerCrane.hook(cr); r.left = G1.x - Gm.x; r.leftY = Math.abs(G1.y - Gm.y);
+    T.steer(0, -1); T.step(15); T.unsteer(); const G2 = TowerCrane.hook(cr); r.upMove = G2.y - G1.y;
+    // pushed far away the hook stops at the jib's reach and on the sand
+    T.steer(1, 1); T.step(240); T.unsteer(); const G3 = TowerCrane.hook(cr); r.reach = Math.round(U.dist(cr.C.x, cr.C.y, G3.x, G3.y)); r.L = cr.L; r.land = RocketExt.landOk(G3);
+    // to the pile, grab
+    r.n1 = window.steerHook(cr, TowerCrane.pileSpot(TowerCrane.piles(Game, cr)[0]), '🪝 Grab a panel'); r.grabHint = T.hint();
+    T.act(); r.during = T.label(); r.dip = T.until(() => !cr.cyc, 120); r.load = cr.load; r.got = Game.floats.some((f) => f.text === 'Got it! 🪝'); r.carryHint = T.hint();
+    return r;
+  });
+  t.expect(crane.driving && crane.ride && crane.still && crane.up, `up in the crane, which stays put ${JSON.stringify(crane)}`);
+  t.expect(Math.abs(crane.zoom - cdoor.zoom) < 1e-9 && crane.cam < 1, `no zoom; the camera follows the hook ${JSON.stringify(crane)}`);
+  t.expect(crane.left < -40 && crane.leftY < 2 && crane.upMove < -40, `the joystick moves the hook left and up ${JSON.stringify(crane)}`);
+  t.expect(crane.reach <= crane.L - 7 && crane.land, `the hook stops at the jib's reach ${JSON.stringify(crane)}`);
+  t.expect(crane.n1 >= 0 && crane.grabHint === 'Grab a panel! 🪝', `steered the hook to the pile ${JSON.stringify(crane)}`);
+  t.expect(crane.during === '🪝 Grab a panel' && crane.dip >= 0 && crane.dip < 60 && crane.load && crane.got && crane.carryHint === 'Move the panel to the rocket! 🚀', `one quick dip grabs a panel ${JSON.stringify(crane)}`);
+  await t.ev(() => { T.step(20); T.act(); T.step(10); });   // the next press puts it down right by the pile; grab it back for the pictures
+  await t.ev(() => { const cr = TowerCrane.get('rocket1'); T.until(() => !cr.cyc, 120); T.step(20); window.steerHook(cr, TowerCrane.pileSpot(TowerCrane.piles(Game, cr)[0]), '🪝 Grab a panel'); Render.setZoom(1.3); T.act(); T.step(24); });
+  await t.shot('crane-grab');
+  const cplace = await t.ev(() => {
+    const st = RocketExt.st, cr = TowerCrane.get('rocket1'); T.until(() => !cr.cyc, 120);
+    const n = window.steerHook(cr, RocketExt.rocketSpot(0), '🚀 Put it on the rocket');
+    const r = { n, hint: T.hint(), placed0: st.placed[0].length, panels0: Game.s.rocket.panels || 0 };
+    T.act(); T.step(16); r.lifting = cr.z > 150 && cr.load;
+    return r;
+  });
+  t.expect(cplace.n >= 0 && cplace.hint === 'Put the panel on the rocket! 🚀', `steered the panel over to the rocket ${JSON.stringify(cplace)}`);
+  t.expect(cplace.lifting, `the hook lifts the panel up the rocket ${JSON.stringify(cplace)}`);
+  await t.shot('crane-place');
+  const click = await t.ev(() => {
+    const st = RocketExt.st, cr = TowerCrane.get('rocket1'); const dip = T.until(() => !cr.cyc, 120); T.step(2);
+    return { dip, load: cr.load, placed: st.placed[0].length, panels: Game.s.rocket.panels, click: Game.floats.some((f) => f.text === 'Click! ✨'), sparkles: Game.fx.filter((f) => f.kind === 'sparkle').length, cheer: st.cheer && st.cheer.text, hop: st.cheer && st.cheer.who.wave > 0 };
+  });
+  t.expect(!click.load && click.dip < 60 && click.placed === cplace.placed0 + 1 && click.panels === cplace.panels0 + 1, `the panel clicks onto the rocket ${JSON.stringify(click)}`);
+  t.expect(click.click && click.sparkles >= 5 && click.cheer === '🎉' && click.hop, `a sparkle and a worker cheers ${JSON.stringify(click)}`);
+  await t.ev(() => T.step(4));
+  await t.shot('crane-click');
+  const cdown = await t.ev(() => {
+    const st = RocketExt.st, cr = TowerCrane.get('rocket1');
+    const n = window.steerHook(cr, TowerCrane.pileSpot(TowerCrane.piles(Game, cr)[0]), '🪝 Grab a panel'); T.act(); T.until(() => !cr.cyc, 120);
+    const r = { n, load: cr.load };
+    T.steer(1, 0); T.step(30); T.unsteer(); r.label = T.label(); r.hint = T.hint(); T.act(); T.until(() => !cr.cyc, 120);
+    T.step(10); r.loose = cr.loose.length; r.load2 = cr.load; r.thud = Game.floats.some((f) => f.text === 'Thud!'); r.empty = T.label();
+    T.step(60 * (CFG.TOWERCRANE.LOOSE + CFG.TOWERCRANE.SLIDE) + 10); r.after = cr.loose.length;
+    Game.exitCar(); T.step(3); const p = Game.player, S = CFG.ROCKETISLE.CRANES[0].SEAT;
+    Object.assign(r, { driving: Game.driving, ride: TowerCrane.ride, d: Math.hypot(p.x - S.x, p.y - S.y), free: !Game.obstacles().some((o) => Game.hitRect(p.x, p.y, 12, o)), near: Game.nearVehicle === cr.v, zoom: Render.zoom, visits: Game.s.rocket.visits });
+    return r;
+  });
+  t.expect(cdown.n >= 0 && cdown.load && cdown.label === '⬇️ Put it down' && cdown.hint === 'Move the panel to the rocket! 🚀', `carrying a panel away from the rockets: put it down ${JSON.stringify(cdown)}`);
+  t.expect(cdown.loose === 1 && !cdown.load2 && cdown.thud && cdown.empty === '🪝 Grab a panel' && cdown.after === 0, `the panel lands on the sand (it can be picked up again) and slides back to its pile ${JSON.stringify(cdown)}`);
+  t.expect(!cdown.driving && cdown.ride === null && cdown.d < 70 && cdown.free && cdown.near && cdown.visits === 1, `climbed down beside the crane ${JSON.stringify(cdown)}`);
+  await t.ev(() => { Render.setZoom(1); T.step(90); });   // the crane goes back to its own work
+
   // ---- visit 2: off the island (to Starfish Cove) and back
   await tp(S.cove.x, S.cove.y, 'islands');
   t.expectEq((await state()).visits, 1, 'leaving does not count');
@@ -93,8 +260,8 @@ module.exports = async (t) => {
   t.expectEq(s2.visits, 2, 'coming back counts the second visit');
   t.expectEq(s2.stage, 1, 'stage 1: most panels on');
   t.expectEq(s2.ask, 'We made progress! Come back soon!', 'the progress greeting');
-  t.expect(await t.ev(() => T.toasts.includes('🚀 The rocket grew! Come back once more!')), 'one toast for the new stage');
   t.expect(s2.crane.nose, 'the crane lifts the nose cone');
+  t.expect(await t.ev(() => T.toasts.includes('🚀 The rocket grew! Come back once more!')), 'one toast for the new stage');
   t.expectEq(s2.key, 'rocket1', 'the art changed to stage 1');
   await tp(S.ask.x, S.ask.y, 'islands');
   t.expectEq((await state()).label, '🚀 Ask about the rocket', 'still no Blast off at stage 1');
@@ -117,6 +284,7 @@ module.exports = async (t) => {
   t.expect(await t.ev(() => T.toasts.includes('🚀 The rocket is ready! Hop in!')), 'the ready toast');
   t.expectEq(s3.key, 'rocket2', 'the sign reads READY FOR LAUNCH');
   t.expectEq(s3.crane.ph, 'parked', 'the crane turned aside');
+  t.expectEq(s3.trucks, 'fueltruck,crane:rocket1,crane:rocket2', 'the second crane came with Rocket #2\'s site');
   const cheer = await t.ev(() => { T.step(300); return { swing: RocketExt.st.swing, ground: RocketExt.st.workers.every((w) => w.z === 0), hop: RocketExt.st.workers.some((w) => w.hop > 0), sparks: RocketExt.st.sparks.length }; });
   t.expect(cheer.swing === 1 && cheer.ground && cheer.sparks === 0, `the scaffold swung away and the workers came down ${JSON.stringify(cheer)}`);
   const hopped = await t.ev(() => { let h = false; for (let i = 0; i < 300 && !h; i++) { T.step(1); h = RocketExt.st.workers.some((w) => w.hop > 2); } return h; });
@@ -134,7 +302,7 @@ module.exports = async (t) => {
 
   // ---- Rocket #2: its site opened next door once the first rocket was finished
   const on2 = await site2();
-  t.expect(on2.on && !on2.lot && on2.scaffold && on2.items >= lot1.items + 11, `stage 2: Rocket #2's site is there ${JSON.stringify([lot1, on2])}`);
+  t.expect(on2.on && !on2.lot && on2.scaffold && on2.items >= lot1.items + 9, `stage 2: Rocket #2's site is there ${JSON.stringify([lot1, on2])}`);
   const busy = await t.ev(() => {
     const s2 = RocketExt.st.s2, c = s2.workers.find((w) => w.role === 'carry'), x0 = c.x, y0 = c.y, crane0 = RocketExt.crane2State();
     let sparks = 0, bang = false, deckSparks = false, weldLow = false, moved = 0;
@@ -264,97 +432,53 @@ module.exports = async (t) => {
   t.expect(edgeVisits.stay === 0, `one stay counts once ${JSON.stringify(edgeVisits)}`);
   t.expect(edgeVisits.riding && edgeVisits.jetski === 0 && edgeVisits.ashore === 1, `the jet ski at the beach does not count, stepping ashore does ${JSON.stringify(edgeVisits)}`);
 
-  // ---- the cranes: climb into Rocket #2's crane, swing it, grab a panel, click it onto the rocket, drop one, climb down
-  const craneNear = await t.ev(() => {
-    const S = CFG.ROCKETISLE.CRANES[1].SEAT; T.tp(S.x + 20, S.y + 10, 'islands'); T.step(3);
-    return { near: Game.nearVehicle && Game.nearVehicle.kind, car: Game.carNear, hint: T.hint(), label: T.label(), scale: Render.scale };
-  });
-  t.expect(craneNear.near === 'crane' && craneNear.car, `the vehicle button offers the crane at its door ${JSON.stringify(craneNear)}`);
-  t.expectEq(craneNear.hint, 'Drive the crane! 🏗️', 'crane hint at its door');
-  await t.wait(200);
-  t.expectEq(await t.page.textContent('#btn-car'), '🏗️ Drive the crane', 'the vehicle button reads Drive the crane');
-  await t.shot('crane-door');
-  const ride = await t.ev(() => {
-    Game.enterCar(); T.step(60);
-    const cr = RocketExt.st.cranes[1], v = cr.v, S = CFG.ROCKETISLE.CRANES[1].SEAT;
-    const r = { driving: Game.driving && Game.vehicle.kind === 'crane', ride: RocketExt.st.ride === cr, scale: Render.scale, still: v.x === S.x && v.y === S.y, label: T.label(), hint: T.hint(), floats: Game.floats.map((f) => f.text) };
-    // the joystick: right swings the jib round, up runs the trolley out
-    cr.load = false; cr.d = 150; const th0 = cr.th, d0 = cr.d; T.steer(1, 0); T.step(20); T.unsteer(); r.swung = cr.th - th0;
-    const d1 = cr.d; T.steer(0, -1); T.step(15); T.unsteer(); r.out = cr.d - d1; T.steer(0, 1); T.step(10); T.unsteer(); r.in = cr.d - d1 - r.out;
-    r.seatStill = v.x === S.x && v.y === S.y; r.d0 = d0;
-    // to the panels, lower the hook, grab one
-    const P = RocketExt.polar(cr, RocketExt.pileSpot(cr).x, RocketExt.pileSpot(cr).y); cr.th = P.th; cr.d = P.d; T.step(2);
-    r.grabLabel = T.label(); r.grabHint = T.hint(); T.act(); r.lowering = !!cr.cyc && cr.cyc.dir < 0; r.downLabel = T.label();
-    T.until(() => cr.cyc && cr.cyc.dir > 0, 600); r.got = Game.floats.some((f) => f.text === 'Got it! 🪝');
-    r.n = T.until(() => !cr.cyc, 600); r.load = cr.load;
+  // ---- Rocket #2's crane (it came with the site): steer the hook to its pile, grab, steer to Rocket #2, put it on
+  await steerHelpers();
+  const c2 = await t.ev(() => {
+    const st = RocketExt.st, cr = TowerCrane.get('rocket2'), S = CFG.ROCKETISLE.CRANES[1].SEAT; T.tp(S.x + 20, S.y + 10, 'islands'); T.step(3);
+    const r = { near: Game.nearVehicle === cr.v, hint: T.hint(), offered: TowerCrane.vehicles(Game).includes(cr.v), zoom: Render.zoom };
+    Game.enterCar(); T.step(30); r.driving = Game.vehicle === cr.v; r.took = cr.load; cr.load = false;   // (it may take over a panel from its own work: start empty)
+    r.n1 = window.steerHook(cr, TowerCrane.pileSpot(TowerCrane.piles(Game, cr)[0]), '🪝 Grab a panel'); T.act(); T.until(() => !cr.cyc, 120); r.load = cr.load; r.carryHint = T.hint();
+    r.n2 = window.steerHook(cr, RocketExt.rocketSpot(1), '🚀 Put it on the rocket'); r.placed0 = st.placed[1].length; r.panels0 = Game.s.rocket.panels;
+    T.act(); T.until(() => !cr.cyc, 120); T.step(2);
+    r.placed = st.placed[1].length; r.panels = Game.s.rocket.panels; r.cheer = st.s2.cheer && st.s2.cheer.text; r.hop = st.s2.cheer && st.s2.cheer.who.wave > 0; r.zoom2 = Render.zoom;
     return r;
   });
-  t.expect(ride.driving && ride.ride && ride.still, `sitting in the crane, which stays put ${JSON.stringify(ride)}`);
-  t.expect(ride.scale < craneNear.scale, `the camera steps back while in the crane (${craneNear.scale} → ${ride.scale})`);
-  t.expect(ride.floats.includes('Up in the crane! 🏗️'), 'up in the crane float');
-  t.expect(ride.swung > 0.2 && ride.out > 10 && ride.in < -5 && ride.seatStill, `the joystick swings the jib and runs the trolley ${JSON.stringify(ride)}`);
-  t.expectEq(ride.grabLabel, '🪝 Grab a panel', 'grab a panel over the pile');
-  t.expectEq(ride.grabHint, 'Press the button to grab a panel! 🪝', 'grab hint over the pile');
-  t.expect(ride.lowering && ride.downLabel === '⬆️ Raise the hook', 'the hook goes down (and could come back up)');
-  t.expect(ride.n >= 0 && ride.load === true && ride.got, `a panel on the hook ${JSON.stringify(ride)}`);
-  await t.shot('crane-panel');
-  const place = await t.ev(() => {
-    const cr = RocketExt.st.cranes[1], P = RocketExt.rocketSpot(1), q = RocketExt.polar(cr, P.x, P.y);
-    // swing over Rocket #2 with the joystick (a few tries), then put it on
-    cr.th = q.th - 0.25; cr.d = q.d; let n = 0; T.steer(1, 0); while (n < 200 && RocketExt.hookTarget(Game, cr).what !== 'place') { T.step(1); n++; } T.unsteer();
-    const r = { n, label: T.label(), hint: T.hint(), placed0: RocketExt.st.placed[1].length, panels0: Game.s.rocket.panels || 0 };
-    T.act(); T.until(() => cr.cyc && cr.cyc.dir > 0, 600);
-    r.placed = RocketExt.st.placed[1].length; r.panels = Game.s.rocket.panels; r.load = cr.load; r.click = Game.floats.some((f) => f.text === 'Click! ✨');
-    r.sparkles = Game.fx.filter((f) => f.kind === 'sparkle').length; r.cheer = RocketExt.st.s2.cheer && RocketExt.st.s2.cheer.text; r.hop = RocketExt.st.s2.cheer && RocketExt.st.s2.cheer.who.wave > 0;
-    return r;
+  t.expect(c2.offered && c2.near && c2.hint === 'Drive the crane! 🏗️' && c2.driving, `Rocket #2's crane ${JSON.stringify(c2)}`);
+  t.expect(c2.n1 >= 0 && c2.load && c2.carryHint === 'Move the panel to the rocket! 🚀' && c2.n2 >= 0, `steered to its pile, grabbed, steered to Rocket #2 ${JSON.stringify(c2)}`);
+  t.expect(c2.placed === c2.placed0 + 1 && c2.panels === c2.panels0 + 1 && c2.cheer === '🎉' && c2.hop, `the panel clicks onto Rocket #2 and a worker cheers ${JSON.stringify(c2)}`);
+  t.expect(Math.abs(c2.zoom2 - c2.zoom) < 1e-9, 'no camera zoom in the second crane');
+  // the fuel truck fuels Rocket #2 too
+  const f2 = await t.ev(() => {
+    const st = RocketExt.st, v = st.truck; Game.exitCar(); T.step(2); v.x = v.px = 4372; v.y = v.py = 2850; v.angle = v.pa = 0; T.tp(v.x, v.y + 46, 'islands'); Game.enterCar(); T.step(2);
+    const label = T.label(); T.act(); const i = st.fuel && st.fuel.i; T.until(() => !st.fuel, 600);
+    return { label, i, gauge: st.gauge[1], cheer: st.s2.cheer && st.s2.cheer.text };
   });
-  t.expect(place.n < 200 && place.label === '🚀 Put it on the rocket' && place.hint === 'Press the button: put it on the rocket! 🚀', `over Rocket #2 with a panel ${JSON.stringify(place)}`);
-  t.expect(place.placed === place.placed0 + 1 && place.panels === place.panels0 + 1 && !place.load && place.click, `the panel clicks onto Rocket #2 ${JSON.stringify(place)}`);
-  t.expect(place.sparkles >= 5 && place.cheer === '🎉' && place.hop, `a sparkle and a worker cheers ${JSON.stringify(place)}`);
-  await t.ev(() => T.step(12));
-  await t.shot('crane-click');
-  const drop = await t.ev(() => {
-    const cr = RocketExt.st.cranes[1]; T.until(() => !cr.cyc, 600);
-    cr.load = true; const q = RocketExt.polar(cr, 4400, 2620); cr.th = q.th; cr.d = q.d; T.step(1);
-    const r = { label: T.label() }; T.act(); T.until(() => cr.cyc && cr.cyc.dir > 0, 600);
-    r.loose = RocketExt.st.loose.length; r.load = cr.load; r.thud = Game.floats.some((f) => f.text === 'Thud!');
-    T.step(60 * (CFG.ROCKETISLE.CRANE.LOOSE + CFG.ROCKETISLE.CRANE.SLIDE) + 10); r.after = RocketExt.st.loose.length;
-    return r;
-  });
-  t.expect(drop.label === '⬇️ Drop the panel' && drop.loose === 1 && !drop.load && drop.thud, `a panel dropped on the sand ${JSON.stringify(drop)}`);
-  t.expectEq(drop.after, 0, 'the dropped panel slides back to its pile');
-  const climbDown = await t.ev(() => {
-    const scale = Render.scale; Game.exitCar(); T.step(5);
-    const p = Game.player, S = CFG.ROCKETISLE.CRANES[1].SEAT;
-    return { scale, scale2: Render.scale, driving: Game.driving, ride: RocketExt.st.ride, d: Math.hypot(p.x - S.x, p.y - S.y), free: !Game.obstacles().some((o) => Game.hitRect(p.x, p.y, 12, o)), near: Game.nearVehicle && Game.nearVehicle.kind, visits: Game.s.rocket.visits };
-  });
-  t.expect(!climbDown.driving && climbDown.ride === null && climbDown.d < 70 && climbDown.free && climbDown.near === 'crane', `climbed down beside the crane ${JSON.stringify(climbDown)}`);
-  t.expectEq(climbDown.scale2, craneNear.scale, 'the camera comes back');
-  // the first site's crane (parked aside now rocket 1 is finished) can be driven too; panels click onto rocket 1
-  const c1 = await t.ev(() => {
-    const S = CFG.ROCKETISLE.CRANES[0].SEAT, cr = RocketExt.st.cranes[0], v0 = Game.s.rocket.visits; T.tp(S.x, S.y + 10, 'islands'); T.step(2);
-    const near = Game.nearVehicle && Game.nearVehicle.kind, parked = RocketExt.craneState().ph;
-    Game.enterCar(); T.step(30);
-    const P = RocketExt.polar(cr, RocketExt.pileSpot(cr).x, RocketExt.pileSpot(cr).y); cr.th = P.th; cr.d = P.d; T.step(1); const l1 = T.label(); T.act(); T.until(() => !cr.cyc, 600);
-    const B = RocketExt.polar(cr, RocketExt.rocketSpot(0).x, RocketExt.rocketSpot(0).y); cr.th = B.th; cr.d = B.d; T.step(1); const l2 = T.label(); T.act(); T.until(() => cr.cyc && cr.cyc.dir > 0, 600);
-    const r = { near, parked, l1, l2, placed: RocketExt.st.placed[0].length, cheer: RocketExt.st.cheer && RocketExt.st.cheer.text, ride: RocketExt.st.ride === cr, visits: Game.s.rocket.visits - v0 };
-    return r;
-  });
-  t.expect(c1.near === 'crane' && c1.parked === 'parked' && c1.ride, `the first crane, parked aside, can be driven ${JSON.stringify(c1)}`);
-  t.expect(c1.l1 === '🪝 Grab a panel' && c1.l2 === '🚀 Put it on the rocket' && c1.placed === 1 && c1.cheer === '🎉', `a panel clicks onto rocket 1 ${JSON.stringify(c1)}`);
-  t.expectEq(c1.visits, 0, 'riding a crane is still the same stay');
-  await t.ev(() => T.step(10));
-  await t.shot('crane1');
+  t.expect(f2.label === '⛽ Fuel the rocket!' && f2.i === 1 && f2.gauge === 1 && f2.cheer === '🎉', `the fuel truck fuels Rocket #2 ${JSON.stringify(f2)}`);
+  // pictures: the second crane grabbing and placing (desktop and phone), the fuel truck on the phone
+  const c2grab = () => t.ev(() => { const st = RocketExt.st, cr = TowerCrane.get('rocket2'), S = CFG.ROCKETISLE.CRANES[1].SEAT; Game.exitCar(); T.tp(S.x + 20, S.y + 10, 'islands'); Game.enterCar(); T.step(20); cr.load = false; window.steerHook(cr, TowerCrane.pileSpot(TowerCrane.piles(Game, cr)[0]), '🪝 Grab a panel'); T.act(); T.step(24); });
+  const c2place = () => t.ev(() => { const cr = TowerCrane.get('rocket2'); T.until(() => !cr.cyc, 120); window.steerHook(cr, RocketExt.rocketSpot(1), '🚀 Put it on the rocket'); T.act(); T.step(16); });
+  await t.ev(() => Render.setZoom(1.2));
+  await c2grab(); await t.shot('crane2-grab');
+  await c2place(); await t.shot('crane2-place');
   await t.page.setViewportSize({ width: 390, height: 844 });
-  await t.ev(() => { Render.resize(); const cr = RocketExt.st.cranes[0]; T.until(() => !cr.cyc, 600); cr.load = true; const B = RocketExt.polar(cr, RocketExt.rocketSpot(0).x - 40, RocketExt.rocketSpot(0).y - 60); cr.th = B.th; cr.d = B.d; T.step(30); });
-  await t.shot('phone-crane1');
-  await t.ev(() => { Game.exitCar(); T.step(2); const S = CFG.ROCKETISLE.CRANES[1].SEAT; T.tp(S.x, S.y, 'islands'); Game.enterCar(); T.step(1); const cr = RocketExt.st.cranes[1]; cr.load = true; const P = RocketExt.rocketSpot(1), q = RocketExt.polar(cr, P.x, P.y); cr.th = q.th; cr.d = q.d; T.step(40); });
-  await t.shot('phone-crane2');
-  // Take me home from a crane
-  const ghc = await t.ev(() => { const z = RocketExt.st.zoom0; Game.goHome(); T.step(2); return { z, zoom: Render.zoom, area: Game.area, driving: Game.driving, ride: RocketExt.st.ride, cyc: RocketExt.st.cranes.every((c) => !c.cyc && !c.load) }; });
-  t.expect(ghc.area === 'town' && !ghc.driving && ghc.ride === null && Math.abs(ghc.zoom - ghc.z) < 1e-9 && ghc.cyc, `Take me home from the crane ${JSON.stringify(ghc)}`);
+  await t.ev(() => { Render.resize(); Render.setZoom(1.2); });
+  await c2grab(); await t.shot('phone-crane-grab');
+  await c2place(); await t.shot('phone-crane-place');
+  await t.ev(() => { const st = RocketExt.st, v = st.truck; Game.exitCar(); T.step(2); v.x = v.px = 4100; v.y = v.py = 2850; v.angle = v.pa = 0; T.tp(v.x, v.y + 46, 'islands'); Game.enterCar(); T.act(); T.step(70); });
+  await t.shot('phone-fuel-rocket1');
+  // Take me home from a crane (carrying a panel, mid-dip, the truck fuelling): everything cleared, the zoom untouched
+  const ghc = await t.ev(() => {
+    const st = RocketExt.st, cr = TowerCrane.get('rocket1'), S = CFG.ROCKETISLE.CRANES[0].SEAT; Game.exitCar(); T.step(2); RocketExt.startFuel(Game, st.truck, 0);
+    T.tp(S.x, S.y + 20, 'islands'); Game.enterCar(); T.step(5); cr.load = true; T.act();
+    const z = Render.zoom, cyc = !!cr.cyc; Game.goHome(); T.step(2);
+    const P = CFG.ROCKETISLE.TRUCK.PARK;
+    return { z, cyc, zoom: Render.zoom, area: Game.area, driving: Game.driving, ride: TowerCrane.ride, parked: Math.hypot(st.truck.x - P.x, st.truck.y - P.y), busy: RocketExt.cranes.some((c) => c.load || c.cyc), fuel: st.fuel, hint: RocketExt.hint(Game), action: RocketExt.action(Game), vehicles: RocketExt.vehicles(Game).length };
+  });
+  t.expect(ghc.cyc && ghc.area === 'town' && !ghc.driving && ghc.ride === null && ghc.parked < 1 && !ghc.busy && ghc.fuel === null && Math.abs(ghc.zoom - ghc.z) < 1e-9, `Take me home from the crane ${JSON.stringify(ghc)}`);
+  t.expect(ghc.hint === undefined && ghc.action === null && ghc.vehicles === 0, `no rocket hints, buttons or vehicles in town ${JSON.stringify(ghc)}`);
   await t.page.setViewportSize({ width: 1100, height: 720 });
-  await t.ev(() => { Render.resize(); T.step(2); });
+  await t.ev(() => { Render.resize(); Render.setZoom(1); T.step(2); });
 
   // ---- the rocket's inside: in through the door, three decks, the flight deck's panel
   await tp(S.ask.x, S.ask.y, 'islands');
@@ -415,36 +539,33 @@ module.exports = async (t) => {
   t.expect(fd.floats.includes('The flight deck! 🚀'), 'the flight deck float');
   await t.ev(() => T.step(20));
   await t.shot('inside-top');
-  // the pilot seat and its panel: lights, Mission Control, (Blast off later)
+  // the pilot seat: no panel, the big button says Blast off (pressed later); Mission Control pipes up on its own
   const seat = await t.ev(() => {
-    const K = CFG.ROCKETIN, st = RocketInsideExt.st, r = {};
+    const K = CFG.ROCKETIN, st = RocketInsideExt.st, r = {}, calls = Game.s.rocketin.calls;
     T.tp(K.PILOT_SPOT.x, K.PILOT_SPOT.y); r.label = T.label(); T.act(); r.seat = !!st.seat; r.hint = T.hint(); r.next = T.label();
+    r.noPanel = !('btns' in st) && !('lights' in st) && typeof RocketInsideExt.drawPanel !== 'function' && typeof RocketInsideExt.press !== 'function';
+    T.step(90); r.radio = st.radio && st.radio.t >= 0 && st.radio.text; r.calls = Game.s.rocketin.calls - calls; r.still = !!st.seat; r.next2 = T.label();
+    // watch what the real frames draw while seated
+    const ctx = Render.ctx, fill = ctx.fillText; window.__drawn = []; ctx.fillText = function (txt, ...a) { window.__drawn.push(String(txt)); return fill.call(this, txt, ...a); };
     return r;
   });
-  await t.wait(200);   // a frame or two draws the panel
+  await t.wait(250);   // a few real frames draw the flight deck with the chef in the seat
   Object.assign(seat, await t.ev(() => {
-    const st = RocketInsideExt.st, r = {};
-    r.btns = st.btns.map((b) => b.key);
-    T.act(); r.lights = st.lights; r.next2 = T.label();
-    RocketInsideExt.press(Game, 'lights'); r.lightsBack = st.lights; RocketInsideExt.press(Game, 'lights');
-    T.act(); r.radio = st.radio && st.radio.text; r.hint2 = T.hint(); r.next3 = T.label(); r.calls = Game.s.rocketin.calls;
-    return r;
+    const ctx = Render.ctx; delete ctx.fillText; const drawn = window.__drawn; delete window.__drawn;
+    const dom = [...document.querySelectorAll('button, [role=button]')].filter((b) => b.id !== 'btn-make').map((b) => b.textContent).filter((x) => /Lights|Mission Control|Stand up|Blast off/.test(x));
+    return { frames: drawn.length, panelText: drawn.filter((x) => /Lights|Call|Stand up|MISSION CONTROL|Press Call/.test(x)), dom, bigBtn: document.getElementById('btn-make').textContent };
   }));
-  t.expect(seat.label === '👨‍🚀 Sit in the pilot seat' && seat.seat && seat.hint === 'You are the pilot! Press a button 👨‍🚀' && seat.next === '💡 Lights', `in the pilot seat ${JSON.stringify(seat)}`);
-  t.expect(['lights', 'call', 'fly', 'up'].every((k) => seat.btns.includes(k)), `the panel's buttons ${JSON.stringify(seat.btns)}`);
-  t.expect(seat.lights === false && seat.lightsBack === true && seat.next2 === '📡 Call Mission Control', `the lights go off and on ${JSON.stringify(seat)}`);
-  t.expect(seat.radio === "Rocket, you're go for launch! 🚀" && seat.hint2 === 'Mission Control says go! 🚀' && seat.next3 === '🚀 Blast off!' && seat.calls === 1, `Mission Control answers ${JSON.stringify(seat)}`);
+  t.expect(seat.label === '👨‍🚀 Sit in the pilot seat' && seat.seat && seat.hint === 'Press the button to blast off! 🚀' && seat.next === '🚀 Blast off!', `in the pilot seat: the big button says Blast off ${JSON.stringify(seat)}`);
+  t.expect(seat.noPanel && seat.frames > 0 && seat.panelText.length === 0 && seat.dom.length === 0 && seat.bigBtn === '🚀 Blast off!', `no cockpit panel (no buttons, nothing drawn) ${JSON.stringify(seat)}`);
+  t.expect(seat.radio === "You're go for launch! 🚀" && seat.calls === 1 && seat.still && seat.next2 === '🚀 Blast off!', `Mission Control pipes up by itself ${JSON.stringify(seat)}`);
   await t.ev(() => T.step(20));
-  await t.shot('inside-panel');
-  // a tap on the panel's own Stand up button gets the chef up; sit again for the launch
-  const tapUp = await t.ev(() => {
-    const b = RocketInsideExt.st.btns.find((q) => q.key === 'up'), rect = Render.canvas.getBoundingClientRect();
-    const ev = new PointerEvent('pointerdown', { clientX: rect.left + b.x + b.w / 2, clientY: rect.top + b.y + b.h / 2, bubbles: true, cancelable: true });
-    Render.canvas.dispatchEvent(ev); T.step(1);
-    const r = { seat: !!RocketInsideExt.st.seat, free: RocketInsideExt.free(Game.player.x, Game.player.y) };
-    return r;
+  await t.shot('inside-pilot');
+  // pushing the stick gets the chef up again; sit again for the launch
+  const stickUp = await t.ev(() => {
+    T.steer(1, 0); T.step(40); T.unsteer();
+    return { seat: !!RocketInsideExt.st.seat, free: RocketInsideExt.free(Game.player.x, Game.player.y), label: T.label() };
   });
-  t.expect(!tapUp.seat && tapUp.free, `the panel's Stand up button ${JSON.stringify(tapUp)}`);
+  t.expect(!stickUp.seat && stickUp.free && stickUp.label !== '🚀 Blast off!', `the stick stands the chef up ${JSON.stringify(stickUp)}`);
   // rescue: a chef saved inside a wall goes back onto the airlock's mat
   const rin = await t.ev(() => { T.tp(2900, 5250); T.step(2); const p = Game.player, E = CFG.ROCKETIN.EXIT; return Math.hypot(p.x - E.x, p.y - E.y); });
   t.expect(rin < 1, 'inside a wall in the rocket: back on the airlock mat');
@@ -466,9 +587,9 @@ module.exports = async (t) => {
   const ghi = await t.ev(() => {
     const K = CFG.ROCKETIN, A = CFG.ISLANDS.ROCKET.ASK; T.tp(A.x, A.y, 'islands'); T.act(); T.tp(K.PILOT_SPOT.x, K.PILOT_SPOT.y); T.act();
     const seat = !!RocketInsideExt.st.seat; Game.goHome(); T.step(2); const st = RocketInsideExt.st;
-    return { seat, area: Game.area, seat2: st.seat, suit: st.suit, hint: RocketInsideExt.hint(Game), action: RocketInsideExt.action(Game), lights: st.lights };
+    return { seat, area: Game.area, seat2: st.seat, suit: st.suit, hint: RocketInsideExt.hint(Game), action: RocketInsideExt.action(Game), radio: st.radio };
   });
-  t.expect(ghi.seat && ghi.area === 'town' && ghi.seat2 === null && ghi.suit === 0 && ghi.hint === undefined && ghi.action === null && ghi.lights, `Take me home from inside the rocket ${JSON.stringify(ghi)}`);
+  t.expect(ghi.seat && ghi.area === 'town' && ghi.seat2 === null && ghi.suit === 0 && ghi.hint === undefined && ghi.action === null && ghi.radio === null, `Take me home from inside the rocket ${JSON.stringify(ghi)}`);
   await t.ev(() => { const K = CFG.ROCKETIN, A = CFG.ISLANDS.ROCKET.ASK; T.tp(A.x, A.y, 'islands'); T.act(); T.tp(K.OVEN.x + 40, K.OVEN.y); T.step(2); Game.save(); });
   await t.reload();
   const relIn = await t.ev(() => { T.step(2); const p = Game.player; return { area: Game.area, where: Game.s.rocketin.where, free: RocketInsideExt.free(p.x, p.y), visits: Game.s.rocket.visits, hint: T.hint() }; });
@@ -480,7 +601,7 @@ module.exports = async (t) => {
   await tp(S.ask.x, S.ask.y, 'islands');
   const launch = await t.ev(() => {
     const K = CFG.ROCKETIN; T.act(); T.tp(K.PILOT_SPOT.x, K.PILOT_SPOT.y); T.act();
-    T.act(); T.act(); const btn = T.label(); T.act(); Render.updateCamera(Game, true);   // lights, Mission Control, Blast off! (a frame snaps the camera to the pad)
+    const btn = T.label(); T.act(); Render.updateCamera(Game, true);   // sit, Blast off! (a frame snaps the camera to the pad)
     const fly = RocketExt.st.fly, label = T.label(), area = Game.area, p = Game.player, B = CFG.ISLANDS.ROCKET.BASE, inRocket = Math.hypot(p.x - B.x, p.y - (B.y - 20)) < 1;
     T.until(() => RocketExt.st.fly && RocketExt.st.fly.t > 2.6, 400);
     const counting = { hint: T.hint(), smoke: RocketExt.st.smoke.length, flame: RocketExt.flyState(Game, 'islands').flame, floats: Game.floats.map((f) => f.text) };
@@ -520,14 +641,14 @@ module.exports = async (t) => {
     const D = CFG.MOON.DOOR, K = CFG.ROCKETIN; T.tp(D.x, D.y, 'moon'); T.step(1); T.act(); T.step(2);
     const r = { area: Game.area, where: Game.s.rocketin.where, wasOn: RocketExt.st.wasOn };
     T.tp(K.LOOK.x, K.LOOK.y); T.act(); r.earth = Game.floats.some((f) => f.text === 'I can see the Earth! 🌍'); T.step(60 * K.LOOK_T + 5);
-    T.tp(K.PILOT_SPOT.x, K.PILOT_SPOT.y); T.act(); T.act(); T.act(); r.radio = RocketInsideExt.st.radio && RocketInsideExt.st.radio.text; r.fly = T.label();
+    T.tp(K.PILOT_SPOT.x, K.PILOT_SPOT.y); T.act(); T.step(90); r.radio = RocketInsideExt.st.radio && RocketInsideExt.st.radio.text; r.fly = T.label(); r.hint = T.hint();
     return r;
   });
   t.expect(moonIn.area === 'rocketinside' && moonIn.where === 'moon' && !moonIn.wasOn && moonIn.earth, `inside the rocket on the moon ${JSON.stringify(moonIn)}`);
-  t.expect(moonIn.radio === 'Rocket, come on home! 🏠' && moonIn.fly === '🚀 Fly home', `the flight deck on the moon: Fly home ${JSON.stringify(moonIn)}`);
+  t.expect(moonIn.radio === 'Come on home, Rocket! 🏠' && moonIn.fly === '🚀 Fly home' && moonIn.hint === 'Press the button to fly home! 🚀', `the flight deck on the moon: Fly home ${JSON.stringify(moonIn)}`);
   await t.ev(() => T.step(20));
-  await t.shot('moon-inside-panel');
-  await t.ev(() => { const K = CFG.ROCKETIN; RocketInsideExt.press(Game, 'up'); T.tp(K.EXIT.x + 120, K.EXIT.y); T.step(20); });
+  await t.shot('moon-inside-pilot');
+  await t.ev(() => { const K = CFG.ROCKETIN; RocketInsideExt.standUp(Game); T.tp(K.EXIT.x + 120, K.EXIT.y); T.step(20); });
   await t.shot('moon-inside-bottom');
   const moonOut = await t.ev(() => { const K = CFG.ROCKETIN; T.tp(K.EXIT.x, K.EXIT.y); T.act(); T.step(2); const p = Game.player, D = CFG.MOON.DOOR; return { area: Game.area, d: Math.hypot(p.x - D.x, p.y - D.y) }; });
   t.expect(moonOut.area === 'moon' && moonOut.d < 1, `out on the moon at the rocket's door ${JSON.stringify(moonOut)}`);
@@ -603,7 +724,7 @@ module.exports = async (t) => {
   // ---- fly home: the same trip backwards, landing on Rocket Island's pad
   const home = await t.ev(() => {
     const D = CFG.MOON.DOOR, K = CFG.ROCKETIN; T.tp(D.x, D.y, 'moon'); T.step(2);
-    T.act(); T.tp(K.PILOT_SPOT.x, K.PILOT_SPOT.y); T.act(); T.act(); T.act();
+    T.act(); T.tp(K.PILOT_SPOT.x, K.PILOT_SPOT.y); T.act();   // in, sit: the big button says Fly home
     const label = T.label(); T.act(); const area = Game.area, fly = RocketExt.st.fly && RocketExt.st.fly.kind;
     T.until(() => !!Game.travel, 800); const tr = Game.travel && { via: Game.travel.via, to: Game.travel.to };
     return { label, tr, area, fly };
@@ -636,7 +757,7 @@ module.exports = async (t) => {
     const D = CFG.MOON.DOOR; T.tp(D.x + 80, D.y, 'moon'); MoonExt.st.treat = { t: 20 }; T.step(2);
     Game.goHome(); T.step(2);
     const a = { area: Game.area, treat: MoonExt.st.treat, hint: MoonExt.hint(Game), rhint: RocketExt.hint(Game) };
-    const A = CFG.ISLANDS.ROCKET.ASK, K = CFG.ROCKETIN; T.tp(A.x, A.y, 'islands'); T.act(); T.tp(K.PILOT_SPOT.x, K.PILOT_SPOT.y); T.act(); RocketInsideExt.press(Game, 'fly'); T.step(100);
+    const A = CFG.ISLANDS.ROCKET.ASK, K = CFG.ROCKETIN; T.tp(A.x, A.y, 'islands'); T.act(); T.tp(K.PILOT_SPOT.x, K.PILOT_SPOT.y); T.act(); T.act(); T.step(100);
     const mid = !!RocketExt.st.fly; Game.goHome(); T.step(2);
     return Object.assign(a, { mid, fly: RocketExt.st.fly, area2: Game.area, travel: Game.travel });
   });
@@ -664,7 +785,7 @@ module.exports = async (t) => {
   await t.shot('phone-peek');
   await t.ev(() => { const A = CFG.ISLANDS.ROCKET.ASK; T.tp(A.x, A.y + 20, 'islands'); T.step(5); });
   t.expectEq(await t.ev(() => RocketExt.st.up), 0, 'phone: back on the ground at the rocket');
-  // phone: the rocket's three decks and the flight deck's panel
+  // phone: the rocket's three decks and the pilot seat
   await t.ev(() => { T.act(); const K = CFG.ROCKETIN; T.tp(K.OVEN.x - 40, K.OVEN.y); T.step(30); });
   t.expectEq(await t.ev(() => Game.area), 'rocketinside', 'phone: inside the rocket');
   await t.shot('phone-inside-bottom');
@@ -672,10 +793,9 @@ module.exports = async (t) => {
   await t.shot('phone-inside-middle');
   await t.ev(() => { const K = CFG.ROCKETIN; T.tp(K.PILOT_SPOT.x + 40, K.PILOT_SPOT.y + 10); T.step(30); });
   await t.shot('phone-inside-top');
-  await t.ev(() => { const K = CFG.ROCKETIN; T.tp(K.PILOT_SPOT.x, K.PILOT_SPOT.y); T.act(); T.act(); T.act(); T.step(30); });
-  await t.wait(200);
-  t.expect(await t.ev(() => RocketInsideExt.st.btns.length === 4), 'phone: the panel and its buttons');
-  await t.shot('phone-inside-panel');
+  await t.ev(() => { const K = CFG.ROCKETIN; T.tp(K.PILOT_SPOT.x, K.PILOT_SPOT.y); T.act(); T.step(90); });
+  t.expect(await t.ev(() => !!RocketInsideExt.st.seat && T.label() === '🚀 Blast off!'), 'phone: in the pilot seat, Blast off on the big button');
+  await t.shot('phone-inside-pilot');
   const pl = await t.ev(() => { const label = T.label(); T.act(); Render.updateCamera(Game, true); /* a real frame would snap the camera onto the pad */ const n = T.until(() => RocketExt.st.fly && RocketExt.st.fly.t > CFG.ROCKETISLE.LIFTOFF + 0.5, 400); return { label, n, area: Game.area }; });
   t.expect(pl.label === '🚀 Blast off!' && pl.n >= 0 && pl.area === 'islands', `phone: blast off from the flight deck ${JSON.stringify(pl)}`);
   await t.shot('phone-liftoff');

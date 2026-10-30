@@ -10,10 +10,9 @@
 //     in a jar to water, a round porthole showing the island (or the moon) and '👀 Look out the window' for a big view, a
 //     treadmill to run on.
 //   - Top deck (the flight deck): big round windows (blue sky on the island, stars and the Earth on the moon), the pilot
-//     seat ('👨‍🚀 Sit in the pilot seat') with a control panel in screen space like the jet's cockpit: '💡 Lights' (the
-//     cabin goes dim and the little lights glow), '📡 Call Mission Control' (Mission Control answers in a bubble: "Rocket,
-//     you're go for launch! 🚀") and '🚀 Blast off!' (on the moon '🚀 Fly home'), which steps outside into the rocket
-//     on its pad and runs js/rocket.js's own launch: countdown, liftoff, the flight. The big button runs the next one.
+//     seat ('👨‍🚀 Sit in the pilot seat'): Mission Control pipes up in a little bubble ("You're go for launch! 🚀") and the
+//     big button says '🚀 Blast off!' (on the moon '🚀 Fly home'), which steps outside into the rocket on its pad and runs
+//     js/rocket.js's own launch: countdown, liftoff, the flight. Pushing the stick stands you up again.
 // `g.s.rocketin.where` remembers which pad the rocket stands on ('islands' or 'moon') for the way out and a reload.
 // Map: CFG.AREAS.rocketinside, the free rectangle 2500..3300 × 5000..5600.
 // Extension module: registered first in Game.ext (it only answers inside its map) and in Render.ext.
@@ -35,13 +34,13 @@ CFG.ROCKETIN = {
   PORTHOLE: { x: 2966, y: 5252, r: 26 }, LOOK: { x: 2966, y: 5326 }, TREAD: { x: 3036, y: 5326 },
   PILOT: { x: 2900, y: 5146 }, PILOT_SPOT: { x: 2856, y: 5162 }, COPILOT: { x: 2990, y: 5146 },
   WINDOWS: [[2836, 5070, 22], [2900, 5064, 30], [2964, 5070, 22]],
-  SPOT_R: 30, CLIMB: 210, SUIT: 30, SLICE: 5, RUN: 4, LOOK_T: 3.6, FADE: 0.45,
+  SPOT_R: 30, CLIMB: 210, SUIT: 30, SLICE: 5, RUN: 4, LOOK_T: 3.6, FADE: 0.45, RADIO: 1, RADIO_T: 4,
 };
 CFG.AREAS.rocketinside = { WORLD: CFG.ROCKETIN.WORLD };
 
 const RocketInsideExt = {
   name: 'rocketinside',
-  st: null, hooked: false,
+  st: null,
   defaults: { rocketin: { seen: false, where: 'islands', pilot: false, suits: 0, pizzas: 0, naps: 0, runs: 0, looks: 0, waters: 0, calls: 0, flights: 0 } },
 
   // ---------- state ----------
@@ -50,7 +49,7 @@ const RocketInsideExt = {
     for (const [k, v] of Object.entries(this.defaults.rocketin)) if (g.s.rocketin[k] === undefined) g.s.rocketin[k] = v;
     this.st = {
       fade: 0, climb: null, seat: null, bunk: null, run: null, look: null, radio: null,
-      suit: 0, slices: [], bake: 0, bloom: 0, lights: true, zT: 0, btns: [], obs: null,
+      suit: 0, slices: [], bake: 0, bloom: 0, zT: 0, obs: null,
     };
     this.st.obs = this.buildObstacles();
   },
@@ -87,7 +86,7 @@ const RocketInsideExt = {
   enter(g, where) {
     const K = CFG.ROCKETIN, p = g.player, st = this.st || (this.build(g), this.st), s = g.s.rocketin;
     s.where = where === 'moon' ? 'moon' : 'islands';
-    this.clear(g); st.lights = true; st.fade = K.FADE;
+    this.clear(g); st.fade = K.FADE;
     g.area = 'rocketinside'; p.x = K.EXIT.x; p.y = K.EXIT.y; p.moving = false; p.facing = 1; p.hasMoved = true; g.cameraSnap = true;
     Sfx.ding(); Haptics.tap();
     if (!s.seen) { s.seen = true; g.toast('🚀 Welcome aboard the Pizza Rocket!', true); }
@@ -120,17 +119,11 @@ const RocketInsideExt = {
     for (const [key, S] of list) { const dd = U.dist(p.x, p.y, S.x, S.y); if (dd < bd) { bd = dd; best = key; } }
     return best;
   },
-  nextButton(g) {
-    const s = this.st.seat;
-    if (!s.lit) return { key: 'lights', label: '💡 Lights' };
-    if (!s.called) return { key: 'call', label: '📡 Call Mission Control' };
-    return this.where(g) === 'moon' ? { key: 'fly', label: '🚀 Fly home' } : { key: 'fly', label: '🚀 Blast off!' };
-  },
   action(g) {
     if (!this.st) this.build(g);
     const st = this.st;
     if (g.area !== 'rocketinside' || !this.onFoot(g) || st.climb) return null;
-    if (st.seat) { const b = this.nextButton(g); return { label: b.label, run: (gg) => this.press(gg, b.key) }; }
+    if (st.seat) return { label: this.where(g) === 'moon' ? '🚀 Fly home' : '🚀 Blast off!', run: (gg) => this.blast(gg) };
     if (st.bunk) return { label: '🚶 Get up', run: (gg) => this.standUp(gg) };
     if (st.run) return { label: '🛑 Stop running', run: (gg) => this.standUp(gg) };
     const k = this.spotAt(g), A = {
@@ -212,7 +205,9 @@ const RocketInsideExt = {
   },
   sitPilot(g) {
     const st = this.st, p = g.player, P = CFG.ROCKETIN.PILOT;
-    st.seat = { t: 0, lit: false, called: false, still: 0 }; g.s.rocketin.pilot = true;
+    st.seat = { t: 0, still: 0 }; g.s.rocketin.pilot = true; g.s.rocketin.calls++;
+    // Mission Control pipes up on its own a moment later (a little bubble on the flight deck)
+    st.radio = { t: -CFG.ROCKETIN.RADIO, text: this.where(g) === 'moon' ? 'Come on home, Rocket! 🏠' : "You're go for launch! 🚀" };
     p.x = P.x; p.y = P.y; p.moving = false; p.facing = 1;
     g.floats.push({ x: P.x, y: P.y - 80, text: 'Pilot on board! 👨‍🚀', color: '#ffe08a', t: 0, dur: 1.4, big: true });
     Sfx.pickup(); Haptics.tap();
@@ -226,24 +221,9 @@ const RocketInsideExt = {
     if (to) { p.x = to.x; p.y = to.y; }
     p.moving = false; Sfx.drop();
   },
-  // the flight deck's buttons (the big button runs the next one; the panel's own buttons can be tapped)
-  press(g, key) {
-    const st = this.st, p = g.player;
-    if (!st || !st.seat || g.area !== 'rocketinside') return;
-    if (key === 'lights') {
-      st.seat.lit = true; st.lights = !st.lights;
-      g.floats.push({ x: p.x, y: p.y - 80, text: st.lights ? 'Lights on! 💡' : 'Lights off! ✨', color: '#ffe08a', t: 0, dur: 1.3, big: true });
-      Sfx.ding(); Haptics.tap();
-    } else if (key === 'call') {
-      st.seat.called = true; g.s.rocketin.calls++;
-      st.radio = { t: 0, text: this.where(g) === 'moon' ? 'Rocket, come on home! 🏠' : "Rocket, you're go for launch! 🚀" };
-      Sfx.chime(); Haptics.tap();
-    } else if (key === 'fly') this.blast(g);
-    else if (key === 'up') this.standUp(g);
-  },
   home(g) {
     const st = this.st; if (!st) return;
-    this.clear(g); st.suit = 0; st.slices = []; st.bake = 0; st.bloom = 0; st.fade = 0; st.lights = true;
+    this.clear(g); st.suit = 0; st.slices = []; st.bake = 0; st.bloom = 0; st.fade = 0;
   },
   // a save or a push that left the chef in a wall or in the furniture goes back onto the airlock's mat
   rescue(g) {
@@ -260,7 +240,7 @@ const RocketInsideExt = {
     if (st.suit > 0) st.suit = Math.max(0, st.suit - dt);
     for (const s of st.slices) s.t += dt;
     st.slices = st.slices.filter((s) => s.t < K.SLICE);
-    if (st.radio) { st.radio.t += dt; if (st.radio.t > 4) st.radio = null; }
+    if (st.radio) { st.radio.t += dt; if (st.radio.t > K.RADIO_T) st.radio = null; }
     if (st.look) { st.look.t += dt; if (st.look.t > K.LOOK_T) st.look = null; }
     if (g.area !== 'rocketinside') { if (this.busy() || st.look) this.clear(g); return; }
     if (!this.onFoot(g)) return;
@@ -292,7 +272,7 @@ const RocketInsideExt = {
     const st = this.st, K = CFG.ROCKETIN, p = g.player;
     if (!this.onFoot(g)) return undefined;
     if (st.climb) return { text: st.climb.up ? 'Up we go! 🪜' : 'Down we go! 🪜', target: null };
-    if (st.seat) return st.radio ? { text: 'Mission Control says go! 🚀', target: null } : { text: 'You are the pilot! Press a button 👨‍🚀', target: null };
+    if (st.seat) return { text: this.where(g) === 'moon' ? 'Press the button to fly home! 🚀' : 'Press the button to blast off! 🚀', target: null };
     if (st.bunk) return { text: 'Sweet dreams in space! 😴', target: null };
     if (st.run) return { text: 'Run, run, run! 🏃', target: null };
     if (st.look) return { text: 'What a view! 👀', target: null };
@@ -600,26 +580,19 @@ const RocketInsideExt = {
     ctx.restore();
     ctx.globalAlpha = 1;
   },
-  // lights off: the cabin goes dim and its little lights glow
+  // Mission Control's little bubble on the flight deck, a moment after the chef sits in the pilot seat
   overlay(r, g) {
-    if (!this.st || g.area !== 'rocketinside' || this.st.lights) return;
-    const ctx = r.ctx, K = CFG.ROCKETIN, Hl = K.HULL, t = g.time;
-    ctx.fillStyle = 'rgba(10,14,46,0.5)'; this.hullPath(ctx, Hl.x0, Hl.y0, Hl.x1 - Hl.x0, Hl.y1 - Hl.y0, 180, 14); ctx.fill();
-    const cols = ['#ff8fab', '#ffd166', '#8ef0a0', '#5ad1ff'];
-    for (const F of K.DECKS) for (let x = F.x0 + 10, i = 0; x < F.x1; x += 34, i++) {
-      const on = 0.55 + 0.45 * Math.sin(t * 3 + i), y = F.wall + 4;
-      ctx.fillStyle = cols[i % 4]; ctx.globalAlpha = on; ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI * 2); ctx.fill();
-      ctx.globalAlpha = on * 0.25; ctx.beginPath(); ctx.arc(x, y, 10, 0, Math.PI * 2); ctx.fill();
-    }
-    ctx.globalAlpha = 1;
+    const st = this.st; if (!st || g.area !== 'rocketinside' || !st.radio || st.radio.t < 0) return;
+    const ctx = r.ctx, P = CFG.ROCKETIN.COPILOT, k = Math.min(1, st.radio.t / 0.2, (CFG.ROCKETIN.RADIO_T - st.radio.t) / 0.3);
+    ctx.save(); ctx.globalAlpha = Math.max(0, k);
+    r.drawBubble(P.x - 40, P.y - 86 + Math.sin(g.time * 4) * 2, () => { ctx.font = r.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('📡 ' + st.radio.text, 0, 0); }, 200, '#e8f6ff');
+    ctx.restore();
   },
 
-  // ---------- screen space: the fade, the big view out of the porthole, the flight deck's panel ----------
+  // ---------- screen space: the fade, the big view out of the porthole ----------
   screen(r, g) {
     if (!this.st) return;
     const ctx = r.ctx, st = this.st, W = r.canvas.width / r.dpr, H = r.canvas.height / r.dpr;
-    this.hook(r);
-    st.btns = [];
     if (g.area === 'rocketinside' && st.look) {
       const a = Math.min(1, st.look.t / 0.25, (CFG.ROCKETIN.LOOK_T - st.look.t) / 0.3);
       if (a > 0) {
@@ -632,90 +605,7 @@ const RocketInsideExt = {
         ctx.restore();
       }
     }
-    if (g.area === 'rocketinside' && st.seat) this.drawPanel(r, g, W, H);
     if (st.fade > 0) { ctx.fillStyle = `rgba(8,10,30,${(st.fade / CFG.ROCKETIN.FADE).toFixed(3)})`; ctx.fillRect(0, 0, W, H); }
-  },
-  // the panel sits along the bottom, above the big button; on a wide screen it moves aside so the chef stays in view
-  panelRect(r, g, W, H) {
-    const ph = Math.min(230, H * 0.32), y = H - 86 - ph, p = g.player, sx = (p.x - r.camX) * r.scale, sy = (p.y - r.camY) * r.scale;
-    let w = Math.min(W - 24, 640), x = (W - w) / 2;
-    if (sy > y - 10 && sx + 50 > x && sx - 50 < x + w) {
-      if (W - sx - 62 >= 440) { x = sx + 50; w = Math.min(640, W - x - 12); } else if (sx - 62 >= 440) { w = Math.min(640, sx - 62); x = sx - 50 - w; }
-    }
-    return { x, y, w, h: ph };
-  },
-  drawPanel(r, g, W, H) {
-    const ctx = r.ctx, st = this.st, t = g.time, P = this.panelRect(r, g, W, H), small = P.w < 480, moon = this.where(g) === 'moon';
-    ctx.save();
-    ctx.fillStyle = 'rgba(0,0,0,0.3)'; U.roundRect(ctx, P.x + 4, P.y + 6, P.w, P.h, 18); ctx.fill();
-    ctx.fillStyle = '#2d3440'; U.roundRect(ctx, P.x, P.y, P.w, P.h, 18); ctx.fill();
-    ctx.fillStyle = '#3a4250'; U.roundRect(ctx, P.x + 6, P.y + 6, P.w - 12, P.h - 12, 14); ctx.fill();
-    // the three buttons along the top (the next one glows)
-    const keys = [['lights', st.lights ? '💡 Lights' : '💡 Lights on', '#ffd166'], ['call', small ? '📡 Call' : '📡 Call Mission Control', '#9fd8ff'], ['fly', moon ? '🚀 Fly home' : '🚀 Blast off!', '#ff8c6b']];
-    const bw = (P.w - 24 - 2 * 10) / 3, bh = 46, by = P.y + 14, next = this.nextButton(g).key;
-    keys.forEach(([key, label, col], i) => {
-      const bx = P.x + 12 + i * (bw + 10), glow = key === next && Math.floor(t * 2) % 2 === 0;
-      ctx.fillStyle = 'rgba(0,0,0,0.35)'; U.roundRect(ctx, bx, by + 4, bw, bh, 12); ctx.fill();
-      ctx.fillStyle = col; U.roundRect(ctx, bx, by, bw, bh, 12); ctx.fill();
-      if (glow) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; U.roundRect(ctx, bx - 2, by - 2, bw + 4, bh + 4, 13); ctx.stroke(); }
-      ctx.fillStyle = '#2b1d14'; ctx.font = r.font(small ? 13 : 15); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(label, bx + bw / 2, by + bh / 2 + 1);
-      st.btns.push({ key, x: bx, y: by, w: bw, h: bh });
-    });
-    // the stand-up button on the panel's corner
-    const ux = P.x + P.w - 104, uy = P.y - 40;
-    ctx.fillStyle = 'rgba(0,0,0,0.3)'; U.roundRect(ctx, ux + 2, uy + 3, 100, 32, 12); ctx.fill();
-    ctx.fillStyle = '#fff8ee'; U.roundRect(ctx, ux, uy, 100, 32, 12); ctx.fill();
-    ctx.fillStyle = '#2b1d14'; ctx.font = r.font(13); ctx.fillText('🚶 Stand up', ux + 50, uy + 17);
-    st.btns.push({ key: 'up', x: ux, y: uy, w: 100, h: 32 });
-    // below: the radio screen with Mission Control (and its answer), a radar with the moon (or the Earth), blinking lights
-    const top = by + bh + 12, bot = P.y + P.h - 12, mh = bot - top;
-    const sw = Math.min(P.w * 0.56, 330), sx = P.x + 14;
-    ctx.fillStyle = '#1e2733'; U.roundRect(ctx, sx, top, sw, mh, 10); ctx.fill();
-    ctx.fillStyle = '#16323f'; U.roundRect(ctx, sx + 4, top + 4, sw - 8, mh - 8, 8); ctx.fill();
-    const fs = Math.max(0.8, Math.min(1.6, mh / 80)), fx = sx + 24 * fs, fy = top + mh - 8;
-    ctx.save(); ctx.beginPath(); U.roundRect(ctx, sx + 4, top + 4, sw - 8, mh - 8, 8); ctx.clip();
-    ctx.translate(fx, fy); ctx.scale(fs, fs);
-    if (typeof RocketExt !== 'undefined') RocketExt.drawWorker(r, g, { x: 0, y: 0, z: 0, hop: st.radio ? Math.abs(Math.sin(t * 8)) * 4 : 0, facing: 1, moving: false, bob: 0, role: 'radio', weld: 0, hat: '#ffffff', shirt: '#3b7dd8', skin: '#c68642' });
-    // a headset with a little microphone
-    ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, -36, 10, Math.PI * 1.05, Math.PI * 1.95); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(8, -32); ctx.quadraticCurveTo(12, -26, 6, -24); ctx.stroke();
-    ctx.restore();
-    ctx.fillStyle = '#9fd8ff'; ctx.font = r.font(9); ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText('🛰️ MISSION CONTROL', sx + 10, top + 8);
-    // Mission Control's answer in a bubble (wrapped onto two lines when the screen is narrow)
-    const text = st.radio ? st.radio.text : (st.seat.called ? '📡 …' : '📡 Press Call!'), fsz = small ? 12 : 14;
-    ctx.font = r.font(fsz);
-    const bx2 = fx + 22 * fs, maxW = sx + sw - 10 - bx2 - 20, words = text.split(' '), lines = [''];
-    for (const wd of words) { const tryL = lines[lines.length - 1] ? lines[lines.length - 1] + ' ' + wd : wd; if (ctx.measureText(tryL).width > maxW && lines[lines.length - 1]) lines.push(wd); else lines[lines.length - 1] = tryL; }
-    const tw = Math.min(maxW, Math.max(...lines.map((l) => ctx.measureText(l).width))) + 20, bh2 = lines.length * (fsz + 4) + 12, by2 = Math.min(top + mh / 2 + 4, top + mh - 10 - bh2 / 2);
-    if (st.radio || !st.seat.called) {
-      ctx.fillStyle = st.radio ? '#fff' : 'rgba(255,255,255,0.25)'; U.roundRect(ctx, bx2, by2 - bh2 / 2, tw, bh2, 9); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(bx2 + 2, by2 + bh2 / 2 - 14); ctx.lineTo(bx2 - 8, by2 + bh2 / 2 - 4); ctx.lineTo(bx2 + 6, by2 + bh2 / 2 - 4); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = st.radio ? '#2b1d14' : '#d9e6f2'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-      lines.forEach((l, i) => ctx.fillText(l, bx2 + 10, by2 - bh2 / 2 + 6 + (fsz + 4) * (i + 0.5) + 1));
-    }
-    // the radar: a round green screen with a sweeping line and the moon (or the Earth) on it
-    const rx = sx + sw + (P.x + P.w - 14 - sx - sw) / 2, ry = top + mh / 2, R = Math.max(14, Math.min(mh / 2 - 4, (P.x + P.w - 14 - sx - sw) / 2 - 8));
-    ctx.fillStyle = '#1e2733'; ctx.beginPath(); ctx.arc(rx, ry, R + 5, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#0f3d2a'; ctx.beginPath(); ctx.arc(rx, ry, R, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = 'rgba(142,240,160,0.4)'; ctx.lineWidth = 1; for (const k of [0.33, 0.66]) { ctx.beginPath(); ctx.arc(rx, ry, R * k, 0, Math.PI * 2); ctx.stroke(); }
-    const sa = t * 2; ctx.strokeStyle = '#8ef0a0'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx + Math.cos(sa) * R, ry + Math.sin(sa) * R); ctx.stroke();
-    if (moon) { if (typeof MoonExt !== 'undefined') MoonExt.drawEarth(ctx, rx + R * 0.4, ry - R * 0.35, R * 0.22); }
-    else if (typeof RocketExt !== 'undefined') RocketExt.sceneMoon(r, ctx, rx + R * 0.4, ry - R * 0.35, R * 0.22, t);
-    ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(rx, ry, 3, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
-  },
-  // taps on the panel's buttons (the canvas otherwise starts the joystick)
-  hook(r) {
-    if (this.hooked || !r.canvas) return;
-    this.hooked = true;
-    r.canvas.addEventListener('pointerdown', (e) => {
-      const st = this.st; if (!st || !st.seat || Game.area !== 'rocketinside' || !st.btns.length) return;
-      const q = Render.toScreen(e.clientX, e.clientY), b = st.btns.find((o) => q.x >= o.x && q.x <= o.x + o.w && q.y >= o.y && q.y <= o.y + o.h);
-      if (!b) return;
-      e.preventDefault(); e.stopImmediatePropagation();
-      Sfx.init(); Sfx.resume();
-      this.press(Game, b.key);
-    }, { capture: true });
   },
 };
 Game.ext.unshift(RocketInsideExt);   // first in line (it only answers inside its own map)

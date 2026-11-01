@@ -52,8 +52,10 @@ module.exports = async (t) => {
     const label = T.label(); T.act(); T.step(2);
     const flakes = AquariumExt.st.flakes.length, fed = Game.s.aquarium.fed, after = T.label(), floats = Game.floats.map((f) => f.text);
     const big = CFG.AQUARIUM.TANKS[0], before = AquariumExt.st.fish.filter((f) => f.tank === big).map((f) => f.x);
-    T.step(90);
-    const moved = AquariumExt.st.fish.filter((f) => f.tank === big).filter((f, i) => Math.abs(f.x - before[i]) > 8).length;
+    // the farthest each fish got from where it started during the rush (a fish already by the flakes may end up back where it was)
+    const fishes = AquariumExt.st.fish.filter((f) => f.tank === big), far = fishes.map(() => 0);
+    for (let k = 0; k < 90; k++) { T.step(1); fishes.forEach((f, i) => { far[i] = Math.max(far[i], Math.abs(f.x - before[i])); }); }
+    const moved = far.filter((d) => d > 8).length;
     return { label, flakes, fed, after, moved, floats, hint: T.hint() };
   });
   t.expectEq(feed.label, '🐟 Feed the fish', 'feed label by the bucket');

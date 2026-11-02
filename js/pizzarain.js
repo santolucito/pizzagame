@@ -9,7 +9,12 @@
 // More to do: sit in the armchair (pinned, a comfy sigh), bring pizzas up from the shop's oven and eat one at the side
 // table off the white-and-blue plate (the chef sits on the stool and it goes bite by bite), and ring the old corded
 // landline on the wall shelf by the door: a delivery person in a red cap opens the door, walks to the table, puts a
-// whole pepperoni pizza on the plate, waves and leaves. Leaving the room mid-delivery leaves the pizza on the plate.
+// whole pepperoni pizza on the plate (and a soda pop bottle beside it), waves and leaves. Leaving the room mid-delivery
+// leaves the pizza on the plate. Soda pop: a little retro red soda fridge stands by the table (and a crate for the
+// empties). At the table '🥤 Drink a soda pop' (free, again and again): the chef sits on the stool, a fizzy bottle hops
+// out of the fridge onto the table (or the delivered one is used), he sips it through a striped straw (the level drops
+// sip by sip, bubbles rise, "sip" floats), "Ahh! Fizzy! 🥤", a little "burp! 😅" every other bottle, and the empty
+// bottle flies into the crate. A meal at the table ends with "And a soda? 🥤" and the next press drinks one.
 // Extension module: registered with Game.ext (first, so its door beats the bedroom's buttons) and Render.ext.
 // See the hook list in js/EXTENSIONS.md. This file never touches js/upstairs.js: it only reads UpstairsExt.st.
 CFG.PIZZARAIN = {
@@ -21,7 +26,12 @@ CFG.PIZZARAIN = {
   RUG: { x: 5300, y: 4246, rx: 112, ry: 58 },             // a pizza-shaped rug
   CHAIR: { x: 5110, y: 4300, block: [5078, 4272, 64, 52], sit: { x: 5110, y: 4310 }, stand: { x: 5160, y: 4304 }, reach: 54, near: 60 },
   // the side table: the chef eats on the stool west of it (free floor), the delivery person serves from the north side
-  TABLE: { x: 5486, y: 4290, block: [5462, 4276, 48, 30], seat: { x: 5446, y: 4298 }, plate: { x: 5474, y: 4289 }, server: { x: 5492, y: 4256 }, reach: 62 },
+  TABLE: { x: 5486, y: 4290, block: [5462, 4276, 48, 30], seat: { x: 5446, y: 4298 }, plate: { x: 5485, y: 4291 }, server: { x: 5492, y: 4256 }, reach: 62 },
+  // soda pop: the retro soda fridge against the east wall by the table (y = the bottom of its front), the crate for the
+  // empties beside the table, the bottle's spot on the table (west edge, right by the stool: the straw reaches the chef)
+  COOLER: { x: 5532, y: 4268, block: [5516, 4248, 32, 20] },
+  CRATE: { x: 5535, y: 4296, block: [5522, 4286, 26, 14], slots: 6 },
+  SODA: { spot: { x: 5464, y: 4293 }, scale: 1.2, hop: 0.45, dur: 2.5, sips: [0.35, 0.95, 1.55, 2.15], sip: 0.35, toss: 0.5 },
   // the old corded telephone on a little wall shelf on the west wall, just north of the door
   PHONE: { x: 5063, y: 4174, block: [5050, 4156, 26, 26], spot: { x: 5094, y: 4172 }, reach: 30, near: 44 },
   // the delivery: the doorway, the mat, across the room, the server spot at the table (all free floor after the doorway)
@@ -41,16 +51,25 @@ CFG.PIZZARAIN = {
 CFG.AREAS.pizzarain = { WORLD: CFG.PIZZARAIN.WORLD };
 
 const PIZZARAIN_BULBS = ['#ff5c5c', '#ffd166', '#5ad26f', '#4aa3ff', '#ff8fab', '#ffa94d'];
+// the soda pop flavours: cola, orange, cherry and lemon-lime (the liquid and the bottle cap)
+const PIZZARAIN_SODAS = [
+  { name: 'cola', liquid: '#6b3416', cap: '#d62828' },
+  { name: 'orange', liquid: '#ff8c1a', cap: '#ff6a00' },
+  { name: 'cherry', liquid: '#d7263d', cap: '#ff8fab' },
+  { name: 'lemon-lime', liquid: '#7bd34a', cap: '#2e9e44' },
+];
 const PIZZARAIN_PUFFS = [[-78, 8, 28], [-44, -8, 36], [-4, -16, 42], [38, -8, 38], [78, 8, 28], [-24, 12, 30], [24, 14, 30]];   // [dx, dy, r]
 
 const PizzaRainExt = {
   name: 'pizzarain',
   st: null,   // runtime (not saved): the slices in the air and on the floor, this visit's count, the chew, the fade,
-              // the seat (null | 'chair' | 'table'), the plate (null | { kind: 'slice' | 'pizza' }), the meal, the delivery
+              // the seat (null | 'chair' | 'table'), the plate (null | { kind: 'slice' | 'pizza' }), the meal, the delivery,
+              // the soda being drunk, the delivered bottle waiting on the table (gift: a flavour index or null), the
+              // empty bottle flying to the crate (toss), the fizz bubbles, sodaNext (a meal just ended: offer a soda)
 
   // ---------- saved state ----------
-  defaults: { pizzarain: { eaten: 0, visits: 0, seen: false, sits: 0, meals: 0, orders: 0 } },
-  state(g) { if (!g.s.pizzarain) g.s.pizzarain = { eaten: 0, visits: 0, seen: false, sits: 0, meals: 0, orders: 0 }; return g.s.pizzarain; },
+  defaults: { pizzarain: { eaten: 0, visits: 0, seen: false, sits: 0, meals: 0, orders: 0, sodas: 0 } },
+  state(g) { if (!g.s.pizzarain) g.s.pizzarain = { eaten: 0, visits: 0, seen: false, sits: 0, meals: 0, orders: 0, sodas: 0 }; return g.s.pizzarain; },
 
   // ---------- helpers ----------
   // on foot and not in a ride, a taxi, the Pizza Tower, a bus...
@@ -72,7 +91,7 @@ const PizzaRainExt = {
     o.push({ x: W.x0, y: W.y0, w: W.x1 - W.x0, h: R.y0 - W.y0 });                                   // the whole slope of the ceiling
     o.push({ x: R.x0 - w, y: R.y1, w: R.x1 - R.x0 + 2 * w, h: w });
     o.push({ x: R.x0 - w, y: R.y0, w, h: R.y1 - R.y0 }, { x: R.x1, y: R.y0, w, h: R.y1 - R.y0 });
-    for (const it of [C.CHAIR, C.TABLE, C.LAMP, C.PLANT, C.PHONE]) o.push({ x: it.block[0], y: it.block[1], w: it.block[2], h: it.block[3] });
+    for (const it of [C.CHAIR, C.TABLE, C.LAMP, C.PLANT, C.PHONE, C.COOLER, C.CRATE]) o.push({ x: it.block[0], y: it.block[1], w: it.block[2], h: it.block[3] });
     return o;
   },
   roomFree(x, y) {
@@ -99,22 +118,24 @@ const PizzaRainExt = {
   settle() {
     const st = this.st;
     if (st.meal) { if (st.meal.kind === 'slice') st.plate = null; st.meal = null; }
+    st.soda = null; st.toss = null; st.sodaNext = false;   // a soda half drunk is cleared away
     st.seat = null;
-    if (st.del) { if (!st.del.placed && !st.plate) st.plate = { kind: 'pizza' }; st.del = null; }
+    if (st.del) { if (!st.del.placed && !st.plate) { st.plate = { kind: 'pizza' }; if (st.gift === null) st.gift = this.randomFlavour(); } st.del = null; }
     st.door = 0;
   },
+  randomFlavour() { return Math.floor(Math.random() * PIZZARAIN_SODAS.length); },
   resetVisit() {
     const st = this.st;
-    st.inside = false; st.eaten = 0; st.full = false; st.burped = false; st.chew = 0; st.slices.length = 0; st.crumbs.length = 0; st.spawnT = 0.3;
+    st.inside = false; st.eaten = 0; st.full = false; st.burped = false; st.chew = 0; st.slices.length = 0; st.crumbs.length = 0; st.fizz.length = 0; st.spawnT = 0.3;
   },
 
   // ---------- game hooks ----------
   build(g) {
     this.state(g);
     this.st = { inside: false, eaten: 0, full: false, burped: false, chew: 0, fade: 0, slices: [], crumbs: [], spawnT: 0.3, spawned: 0, landed: 0, faded: 0,
-      seat: null, plate: null, meal: null, del: null, door: 0, delivered: 0 };
+      seat: null, plate: null, meal: null, del: null, door: 0, delivered: 0, soda: null, gift: null, toss: null, fizz: [], sodaNext: false };
   },
-  home(g) { if (this.st) { this.settle(); this.st.plate = null; this.resetVisit(); this.st.fade = 0; } },
+  home(g) { if (this.st) { this.settle(); this.st.plate = null; this.st.gift = null; this.resetVisit(); this.st.fade = 0; } },
   obstacles(g) { return g.area === 'pizzarain' ? this.roomBlocks() : []; },
   bgKey() { return 'pr'; },   // constant: the door on the bedroom wall never changes, it only has to be painted once this file is loaded
   enter(g) {
@@ -138,12 +159,17 @@ const PizzaRainExt = {
     if (this.bedroomOk(g) && this.atMat(g)) return { label: '🍕 Go into the pizza room', run: (gg) => this.enter(gg) };
     if (g.area !== 'pizzarain' || !this.st) return null;
     const st = this.st, C = CFG.PIZZARAIN;
-    if (st.meal) return null;   // busy eating: nothing to press for a moment
+    if (st.meal || st.soda) return null;   // busy eating or drinking: nothing to press for a moment
     if (st.seat) return { label: '🚶 Stand up', run: (gg) => this.standUp(gg) };
     if (this.atExit(g)) return { label: '🚪 Back to the bedroom', run: (gg) => this.leave(gg) };
     if (this.atTable(g)) {
+      // one button: the pizza on the plate first, then the soda a meal just offered (or the delivered bottle), then a
+      // slice off the carried stack, and otherwise a soda pop (free, as often as you like)
       if (this.pizzaWaiting()) return { label: '🍽️ Eat the pizza', run: (gg) => this.eatAtTable(gg) };
+      const soda = { label: '🥤 Drink a soda pop', run: (gg) => this.drinkSoda(gg) };
+      if (st.sodaNext || st.gift !== null) return soda;
       if (g.player.carry > 0 && !st.plate && !(st.del && st.del.phase === 'serve')) return { label: '🍽️ Eat a slice at the table', run: (gg) => this.eatAtTable(gg) };
+      return soda;
     }
     if (this.near(g, C.PHONE.spot, C.PHONE.reach)) return { label: '📞 Order a pizza', run: (gg) => this.order(gg) };
     if (this.near(g, C.CHAIR, C.CHAIR.reach)) return { label: '🪑 Sit in the armchair', run: (gg) => this.sit(gg) };
@@ -155,12 +181,15 @@ const PizzaRainExt = {
       const st = this.st, C = CFG.PIZZARAIN, T = C.TABLE;
       if (st) {
         if (st.meal) return { text: 'Yum yum! 😋', target: null };
+        if (st.soda) return { text: 'Sip sip! 🥤', target: null };
         if (this.pizzaWaiting()) return { text: 'Your pizza is here! 🍽️', target: this.atTable(g) ? null : T.seat };   // (also from the armchair: the arrow shows the way)
         if (st.seat === 'chair') return { text: 'Ahh, so comfy 😌', target: null };
+        if (st.sodaNext && this.atTable(g)) return { text: 'And a soda? 🥤', target: null };
         if (g.player.carry > 0 && !st.plate) return { text: 'Eat a slice at the table 🍽️', target: this.atTable(g) ? null : T.seat };
         if (st.del) return { text: 'Your pizza is on its way! 🍕', target: null };
         if (this.near(g, C.PHONE.spot, C.PHONE.near)) return { text: 'Call for a pizza! 📞', target: null };
         if (this.near(g, C.CHAIR, C.CHAIR.near)) return { text: 'Sit in the comfy chair 🪑', target: null };
+        if (this.atTable(g)) return { text: 'Have a soda pop! 🥤', target: null };
       }
       return { text: st && st.full ? "You're full! The cloud will rain again next visit 😋" : 'Catch the falling pizza! 🍕', target: null };
     }
@@ -174,12 +203,14 @@ const PizzaRainExt = {
     const st = this.st, C = CFG.PIZZARAIN, R = C.ROOM;
     st.fade = Math.max(0, st.fade - dt);
     st.chew = Math.max(0, st.chew - dt);
-    if (g.area !== 'pizzarain') { if (st.inside || st.del || st.meal || st.seat) { this.settle(); this.resetVisit(); } return; }
+    if (g.area !== 'pizzarain') { if (st.inside || st.del || st.meal || st.seat || st.soda) { this.settle(); this.resetVisit(); } return; }
     if (!st.inside) st.inside = true;   // arrived by a saved position
     const pp = g.player;
     if (st.seat) { const S = this.seatSpot(st.seat); pp.x = S.x; pp.y = S.y; pp.moving = false; pp.facing = 1; }   // pinned in the seat, facing into the room / the table
+    if (st.sodaNext && !st.seat && !this.atTable(g)) st.sodaNext = false;   // walked off: the soda offer is over
     this.rescue(g);
     this.updateMeal(g, dt);
+    this.updateSoda(g, dt);
     this.updateDelivery(g, dt);
     // the cloud lets a slice go every so often, never more than a handful at a time
     st.spawnT -= dt;
@@ -274,10 +305,61 @@ const PizzaRainExt = {
       st.meal = null; st.plate = null; st.seat = null;   // the plate is empty again; the chef stays on the stool spot (free floor)
       const sv = this.state(g); sv.meals = (sv.meals || 0) + 1;
       g.floats.push({ x: p.x, y: p.y - 80, text: 'Delicious! 😋', color: '#ffe08a', t: 0, dur: 1.8, big: true });
+      g.floats.push({ x: p.x, y: p.y - 104, text: 'And a soda? 🥤', color: '#bdf3ff', t: 0, dur: 2.2, big: true });
+      st.sodaNext = true;   // the next press at the table drinks a soda pop
       g.fx.push({ kind: 'sparkle', x0: p.x, y0: p.y - 36, x1: p.x, y1: p.y - 36, t: 0, dur: 0.6 });
       Haptics.success();
     }
   },
+  // ---------- soda pop at the table ----------
+  // the chef sits on the stool; a bottle hops out of the soda fridge onto the table (or the delivered one is opened)
+  drinkSoda(g) {
+    const st = this.st, p = g.player, T = CFG.PIZZARAIN.TABLE, S = CFG.PIZZARAIN.SODA;
+    if (st.soda || st.meal) return;
+    const gift = st.gift !== null, flav = gift ? st.gift : this.randomFlavour();
+    st.gift = null; st.sodaNext = false;
+    st.soda = { t: gift ? S.hop : 0, flav, gift, sips: 0, sip: 0, popped: false, bubT: 0 };
+    st.seat = 'table'; p.x = T.seat.x; p.y = T.seat.y; p.moving = false; p.facing = 1;
+    Sfx.pickup(); Haptics.tap();
+  },
+  // the level left in the bottle, in steps (1 = full, 0 = empty)
+  sodaLeft() { const s = this.st && this.st.soda; return s ? 1 - s.sips / CFG.PIZZARAIN.SODA.sips.length : 0; },
+  sodaFizz(n, x, y, spread) {
+    const st = this.st;
+    for (let i = 0; i < n && st.fizz.length < 40; i++) st.fizz.push({ x: x + U.rand(-spread, spread), y: y + U.rand(-2, 2), vx: U.rand(-10, 10), vy: U.rand(-70, -35), t: 0, dur: U.rand(0.5, 0.9), r: U.rand(1.2, 2.4), ph: U.rand(0, 6) });
+  },
+  updateSoda(g, dt) {
+    const st = this.st, C = CFG.PIZZARAIN, S = C.SODA, P = S.spot, p = g.player, s = st.soda;
+    for (let i = st.fizz.length - 1; i >= 0; i--) { const b = st.fizz[i]; b.t += dt; b.x += (b.vx + Math.sin(b.t * 9 + b.ph) * 12) * dt; b.y += b.vy * dt; if (b.t > b.dur) st.fizz.splice(i, 1); }
+    if (st.toss) { st.toss.t += dt; if (st.toss.t >= S.toss) { st.toss = null; const K = C.CRATE; g.fx.push({ kind: 'sparkle', x0: K.x, y0: K.y - 10, x1: K.x, y1: K.y - 10, t: 0, dur: 0.4 }); } }
+    if (!s) return;
+    s.t += dt; s.sip = Math.max(0, s.sip - dt);
+    const neckY = P.y - 24 * S.scale;
+    if (!s.popped && s.t >= S.hop) { s.popped = true; this.sodaFizz(8, P.x, neckY, 3); g.floats.push({ x: P.x + 8, y: neckY - 10, text: 'pop!', color: '#fff', t: 0, dur: 0.8, big: false }); }
+    if (!s.popped) return;
+    const k = s.t - S.hop;
+    while (s.sips < S.sips.length && k >= S.sips[s.sips]) {
+      s.sips++; s.sip = S.sip;
+      g.floats.push({ x: p.x + U.rand(-6, 6), y: p.y - 66, text: 'sip', color: '#bdf3ff', t: 0, dur: 0.9, big: false });
+      this.sodaFizz(3, P.x, neckY, 2);
+    }
+    s.bubT -= dt; if (s.bubT <= 0) { s.bubT = 0.14; this.sodaFizz(1, P.x, neckY, 1.5); }   // it keeps fizzing
+    if (k >= S.dur) {
+      const sv = this.state(g); sv.sodas = (sv.sodas || 0) + 1;
+      st.soda = null; st.seat = null;   // all gone: the chef stays on the stool spot (free floor), the empty flies to the crate
+      st.toss = { t: 0, flav: s.flav };
+      g.floats.push({ x: p.x, y: p.y - 80, text: 'Ahh! Fizzy! 🥤', color: '#bdf3ff', t: 0, dur: 1.8, big: true });
+      if (sv.sodas % 2 === 0) g.floats.push({ x: p.x + 26, y: p.y - 104, text: 'burp! 😅', color: '#ffe08a', t: 0, dur: 1.5, big: false });   // every other bottle
+      g.fx.push({ kind: 'sparkle', x0: p.x, y0: p.y - 36, x1: p.x, y1: p.y - 36, t: 0, dur: 0.6 });
+      Haptics.success();
+    }
+  },
+  // how many empties show in the crate (one that is still flying is not in yet); a full crate starts over
+  crateCount(g) {
+    const n = (this.state(g).sodas || 0) - (this.st.toss ? 1 : 0), K = CFG.PIZZARAIN.CRATE.slots;
+    return n <= 0 ? 0 : ((n - 1) % K) + 1;
+  },
+
   // how much is left on the plate (1 = untouched, 0 = all gone)
   plateLeft() { const st = this.st; if (!st.plate) return 0; if (!st.meal) return 1; return 1 - st.meal.bites / CFG.PIZZARAIN.meal.bites.length; },
 
@@ -317,7 +399,10 @@ const PizzaRainExt = {
         d.moving = false;
         if (!d.placed && (st.meal || st.plate)) { d.t = 0; break; }
         d.lid = Math.min(1, d.t / 0.35);
-        if (!d.placed && d.t >= D.place) { d.placed = true; st.plate = { kind: 'pizza' }; st.delivered++; Sfx.ding(); }
+        if (!d.placed && d.t >= D.place) {
+          d.placed = true; st.plate = { kind: 'pizza' }; st.delivered++; Sfx.ding();
+          if (st.gift === null && !st.soda) { st.gift = this.randomFlavour(); const S = C.SODA.spot; g.fx.push({ kind: 'sparkle', x0: S.x, y0: S.y - 12, x1: S.x, y1: S.y - 12, t: 0, dur: 0.6 }); }   // and a soda pop with it
+        }
         if (d.t >= D.serve) { d.phase = 'wave'; d.t = 0; }
         break;
       case 'wave':
@@ -357,7 +442,86 @@ const PizzaRainExt = {
     ctx.fillStyle = '#9fe0ff'; ctx.beginPath(); ctx.arc(cx, D.y0 + 11, 4.5, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.arc(cx - dir * 7, D.y0 + h * 0.56, 2.2, 0, Math.PI * 2); ctx.fill();   // the knob, on the room side
   },
-  // the white plate with its blue rim and little blue dots
+  // the retro soda fridge: a round-topped red cabinet with a white stripe, a frosty glass door with rows of bottles in
+  // all four flavours, a chrome handle and a little grille at the bottom
+  paintCooler(r, ctx) {
+    const K = CFG.PIZZARAIN.COOLER, x0 = K.x - 16, w = 32, yb = K.y, h = 62, y0 = yb - h;
+    ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(K.x - 2, yb + 2, 19, 5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#2b1d14'; ctx.fillRect(x0 + 3, yb - 2, 4, 4); ctx.fillRect(x0 + w - 7, yb - 2, 4, 4);   // little feet
+    ctx.fillStyle = '#d62828'; U.roundRect(ctx, x0, y0, w, h - 1, 9); ctx.fill();
+    ctx.fillStyle = '#a61e1e'; U.roundRect(ctx, x0 + w - 5, y0 + 4, 5, h - 9, 3); ctx.fill();   // the shaded side
+    ctx.fillStyle = 'rgba(255,255,255,0.28)'; U.roundRect(ctx, x0 + 3, y0 + 3, 4, h - 14, 2); ctx.fill();   // the shine
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(x0, y0 + 9, w, 6);   // the white stripe with a red wave
+    ctx.strokeStyle = '#d62828'; ctx.lineWidth = 1.2; ctx.beginPath(); for (let i = 0; i <= 12; i++) { const xx = x0 + 2 + i * (w - 4) / 12, yy = y0 + 12 + Math.sin(i * 1.1) * 1.4; if (i) ctx.lineTo(xx, yy); else ctx.moveTo(xx, yy); } ctx.stroke();
+    // the glass door with two shelves of bottles
+    const gx = x0 + 4, gy = y0 + 18, gw = w - 11, gh = 30;
+    ctx.fillStyle = '#e8e8e8'; U.roundRect(ctx, gx - 1.5, gy - 1.5, gw + 3, gh + 3, 3); ctx.fill();
+    ctx.fillStyle = '#c7eefa'; U.roundRect(ctx, gx, gy, gw, gh, 2); ctx.fill();
+    for (let row = 0; row < 2; row++) {
+      const sy = gy + 14 + row * 15;
+      for (let i = 0; i < 4; i++) {
+        const F = PIZZARAIN_SODAS[(i + row * 2) % PIZZARAIN_SODAS.length], bx = gx + 3 + i * 5;
+        ctx.fillStyle = F.liquid; U.roundRect(ctx, bx - 1.8, sy - 9, 3.6, 9, 1.2); ctx.fill(); ctx.fillRect(bx - 0.9, sy - 12, 1.8, 3);
+        ctx.fillStyle = F.cap; ctx.fillRect(bx - 1.2, sy - 13, 2.4, 1.4);
+      }
+      ctx.fillStyle = '#9fb7c0'; ctx.fillRect(gx, sy, gw, 1.2);   // the shelf
+    }
+    ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.beginPath(); ctx.moveTo(gx + 2, gy + gh - 4); ctx.lineTo(gx + gw - 6, gy + 2); ctx.lineTo(gx + gw - 2, gy + 2); ctx.lineTo(gx + 6, gy + gh - 4); ctx.closePath(); ctx.fill();   // frost shine
+    ctx.fillStyle = '#e8e8e8'; U.roundRect(ctx, x0 + w - 6, gy + 4, 3, 18, 1.5); ctx.fill();   // the chrome handle
+    ctx.fillStyle = '#7a1414'; U.roundRect(ctx, x0 + 4, yb - 11, w - 11, 7, 2); ctx.fill();   // the grille
+    ctx.fillStyle = '#d62828'; for (let i = 0; i < 4; i++) ctx.fillRect(x0 + 6 + i * 5, yb - 10, 2, 5);
+  },
+  // one retro soda bottle standing on its base at (0, 0) (the caller translates/rotates): a curvy glass bottle, the
+  // soda inside up to `level` (0..1) with bubbles rising in it, a white label band and (closed) a crown cap
+  drawBottle(ctx, F, level, cap, time, sc) {
+    if (sc) ctx.scale(sc, sc);
+    ctx.beginPath();
+    ctx.moveTo(-4.6, 0); ctx.lineTo(4.6, 0);
+    ctx.bezierCurveTo(5.8, -5, 3.8, -8, 5, -13);
+    ctx.quadraticCurveTo(5.2, -17, 2, -19.5);
+    ctx.lineTo(2, -24); ctx.lineTo(-2, -24); ctx.lineTo(-2, -19.5);
+    ctx.quadraticCurveTo(-5.2, -17, -5, -13);
+    ctx.bezierCurveTo(-3.8, -8, -5.8, -5, -4.6, 0);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(214,245,236,0.75)'; ctx.fill();
+    ctx.save(); ctx.clip();
+    const top = -22 * level;
+    if (level > 0) {
+      ctx.fillStyle = F.liquid; ctx.fillRect(-7, top, 14, -top + 1);
+      ctx.fillStyle = 'rgba(255,255,255,0.75)';
+      for (let i = 0; i < 4; i++) { const hgt = -top, by = -((time * 16 + i * 5.7) % Math.max(1, hgt)), bx = Math.sin(i * 2.1 + time * 3) * 2.4; ctx.beginPath(); ctx.arc(bx, by, 0.9, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.fillRect(-7, top, 14, 1.2);   // the foamy top
+    }
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(-7, -8, 14, 3.2); ctx.fillStyle = F.cap; ctx.beginPath(); ctx.arc(0, -6.4, 1.2, 0, Math.PI * 2); ctx.fill();   // the label
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(40,90,80,0.6)'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.fillRect(-3.4, -16, 1.2, 9);   // the shine
+    if (cap) { ctx.fillStyle = F.cap; U.roundRect(ctx, -2.6, -26, 5.2, 2.6, 0.8); ctx.fill(); ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(-2.6, -23.8, 5.2, 0.6); }
+  },
+  // the bendy striped straw from the bottle's neck to the chef's mouth (it turns the soda's colour during a sip)
+  drawStraw(ctx, x, y, mx, my, col) {
+    const path = () => { ctx.beginPath(); ctx.moveTo(x + 0.6, y - 20); ctx.lineTo(x + 0.6, y - 34); ctx.quadraticCurveTo(x + 0.6, y - 38, mx, my); };
+    ctx.lineCap = 'round';
+    path(); ctx.strokeStyle = col || '#ffffff'; ctx.lineWidth = 2.6; ctx.stroke();
+    if (!col) { path(); ctx.setLineDash([2.2, 2.2]); ctx.strokeStyle = '#e4572e'; ctx.lineWidth = 2.6; ctx.stroke(); ctx.setLineDash([]); }
+  },
+  // the wooden crate for the empties beside the table: slots seen from above, the empties' necks poking up
+  drawCrate(ctx, g) {
+    const K = CFG.PIZZARAIN.CRATE, x = K.x, y = K.y, n = this.crateCount(g);
+    ctx.fillStyle = 'rgba(0,0,0,0.16)'; ctx.beginPath(); ctx.ellipse(x + 1, y + 2, 17, 4.5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#c98a2e'; U.roundRect(ctx, x - 15, y - 16, 30, 12, 2); ctx.fill();   // the back and the top rim
+    ctx.fillStyle = '#7a4a1c'; ctx.fillRect(x - 13, y - 14, 26, 9);   // inside, dark
+    // the empties standing in their slots: the back row, then the front row
+    const empty = { liquid: '#000', cap: '#9fd8c8' };
+    for (const row of [0, 1]) for (let c = 0; c < 3; c++) {
+      const i = row * 3 + c; if (i >= n) continue;
+      ctx.save(); ctx.translate(x - 8.5 + c * 8.5, y - 9 + row * 4); this.drawBottle(ctx, empty, 0, false, 0, 0.62); ctx.restore();
+    }
+    ctx.fillStyle = '#f2b134'; U.roundRect(ctx, x - 15, y - 7, 30, 10, 2); ctx.fill();   // the front side, sunny yellow
+    ctx.fillStyle = '#e4572e'; ctx.fillRect(x - 15, y - 4, 30, 2.4);   // a red band
+    ctx.fillStyle = '#b8401c'; U.roundRect(ctx, x - 4, y - 6, 8, 2.6, 1.3); ctx.fill();   // the hand hole
+  },
+
   paintPlate(ctx, x, y) {
     ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.beginPath(); ctx.ellipse(x + 1, y + 2, 15, 10, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.ellipse(x, y, 15, 10, 0, 0, Math.PI * 2); ctx.fill();
@@ -434,14 +598,15 @@ const PizzaRainExt = {
     ctx.fillStyle = '#8a2a36'; U.roundRect(ctx, Ch.x - 34, Ch.y - 14, 14, 36, 7); ctx.fill(); U.roundRect(ctx, Ch.x + 20, Ch.y - 14, 14, 36, 7); ctx.fill();   // the arms
     ctx.fillStyle = '#ffd166'; U.roundRect(ctx, Ch.x - 12, Ch.y - 8, 24, 18, 6); ctx.fill(); ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.arc(Ch.x, Ch.y + 1, 4, 0, Math.PI * 2); ctx.fill();   // a pizza cushion
     ctx.fillStyle = '#4aa3d8'; U.roundRect(ctx, Ch.x + 18, Ch.y - 10, 18, 22, 4); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.5)'; for (let k = 0; k < 3; k++) ctx.fillRect(Ch.x + 20, Ch.y - 6 + k * 7, 14, 2);   // the blanket
-    // a little side table with the white-and-blue plate, a napkin and a glass of juice, and a stool on its west side
+    // a little side table with the white-and-blue plate and a napkin, and a stool on its west side
     const T = C.TABLE, Pl = T.plate, Sd = T.seat;
     ctx.fillStyle = 'rgba(0,0,0,0.16)'; ctx.beginPath(); ctx.ellipse(T.x + 3, T.y + 11, 30, 17, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#9b6531'; ctx.beginPath(); ctx.ellipse(T.x, T.y + 6, 28, 18, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#c99a5f'; ctx.beginPath(); ctx.ellipse(T.x, T.y, 28, 18, 0, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = 'rgba(255,255,255,0.22)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(T.x, T.y, 23, 14, 0, Math.PI * 1.1, Math.PI * 1.6); ctx.stroke();
     this.paintPlate(ctx, Pl.x, Pl.y);
-    ctx.fillStyle = '#ff8fab'; ctx.fillRect(T.x + 10, T.y - 9, 9, 9); ctx.fillStyle = '#ffa94d'; U.roundRect(ctx, T.x + 13, T.y - 6, 7, 10, 2); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillRect(T.x + 14, T.y - 5, 2, 7);
+    ctx.fillStyle = '#ff8fab'; ctx.save(); ctx.translate(T.x - 6, T.y - 12); ctx.rotate(-0.2); ctx.fillRect(-5, -3.5, 10, 7); ctx.restore();   // the napkin
+    this.paintCooler(r, ctx);
     // the stool: a round red seat on three legs
     ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(Sd.x + 2, Sd.y + 4, 13, 5, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#5b3a1a'; ctx.fillRect(Sd.x - 9, Sd.y - 6, 3, 10); ctx.fillRect(Sd.x + 6, Sd.y - 6, 3, 10); ctx.fillRect(Sd.x - 1.5, Sd.y - 4, 3, 9);
@@ -542,6 +707,24 @@ const PizzaRainExt = {
     // the telephone on its wall shelf, the food on the plate, the delivery person
     items.push({ y: C.PHONE.y + 8, draw: () => this.drawPhone(ctx, g) });
     if (st.plate) items.push({ y: C.TABLE.y + 1, draw: () => this.drawPlateFood(r, ctx) });
+    items.push({ y: C.CRATE.y, draw: () => this.drawCrate(ctx, g) });
+    // the soda bottle: hopping out of the fridge, then on the table with its straw to the chef's mouth (drawn before the
+    // chef, so the far end of the straw tucks under the face and the hand sits on the bottle); or the delivered one waiting
+    const so = st.soda, Sp = C.SODA.spot;
+    if (so || st.gift !== null) items.push({ y: Sp.y, draw: () => {
+      const F = PIZZARAIN_SODAS[so ? so.flav : st.gift];
+      if (so && !so.popped) {   // the hop: an arc from the fridge's door over to the table, cap on
+        const k = U.clamp(so.t / C.SODA.hop, 0, 1), K = C.COOLER, x = U.lerp(K.x - 4, Sp.x, k), y = U.lerp(K.y - 20, Sp.y, k) - Math.sin(k * Math.PI) * 30;
+        ctx.save(); ctx.translate(x, y); ctx.rotate((1 - k) * -0.9); this.drawBottle(ctx, F, 1, true, g.time, C.SODA.scale); ctx.restore();
+        return;
+      }
+      ctx.fillStyle = 'rgba(0,0,0,0.16)'; ctx.beginPath(); ctx.ellipse(Sp.x + 1, Sp.y + 1, 7, 2.6, 0, 0, Math.PI * 2); ctx.fill();
+      if (so) {
+        const n = C.SODA.sips.length, shown = U.clamp(1 - (so.sips - so.sip / C.SODA.sip) / n, 0, 1);   // slides down during each sip
+        this.drawStraw(ctx, Sp.x, Sp.y, p.x + 6, p.y - 33, so.sip > 0 ? F.liquid : null);
+        ctx.save(); ctx.translate(Sp.x, Sp.y); this.drawBottle(ctx, F, shown, false, g.time, C.SODA.scale); ctx.restore();
+      } else { ctx.save(); ctx.translate(Sp.x, Sp.y); this.drawBottle(ctx, F, 1, true, g.time, C.SODA.scale); ctx.restore(); }
+    } });
     const d = st.del;
     if (d && ['open', 'in', 'serve', 'wave', 'out'].includes(d.phase)) items.push({ y: d.y, draw: () => this.drawCourier(r, ctx, g, d) });
     // sitting: the armchair's arms and seat front (or the stool's seat) in front of the chef's legs
@@ -556,6 +739,9 @@ const PizzaRainExt = {
       const Sd = C.TABLE.seat;
       ctx.fillStyle = '#a32f3c'; ctx.beginPath(); ctx.ellipse(Sd.x, Sd.y - 3, 13, 6, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.ellipse(Sd.x, Sd.y - 5, 13, 6, 0, 0, Math.PI * 2); ctx.fill();
+    } });
+    if (so && so.sip > 0) items.push({ y: p.y + 0.6, draw: () => {   // puffed rosy cheeks on each sip
+      ctx.fillStyle = 'rgba(255,143,171,0.65)'; ctx.beginPath(); ctx.arc(p.x - 5, p.y - 33, 3.2, 0, Math.PI * 2); ctx.arc(p.x + 9, p.y - 33, 3.2, 0, Math.PI * 2); ctx.fill();
     } });
     if (st.meal) items.push({ y: p.y + 0.6, draw: () => {
       const m = st.meal, bob = m.chomp > 0 ? Math.sin(g.time * 30) * 1.2 : 0;
@@ -646,7 +832,15 @@ const PizzaRainExt = {
     if (!this.st || g.area !== 'pizzarain') return;
     const ctx = r.ctx, st = this.st, p = g.player, C = CFG.PIZZARAIN, Ph = C.PHONE, d = st.del;
     for (const c of st.crumbs) { ctx.globalAlpha = U.clamp(1 - c.t / c.dur, 0, 1); ctx.fillStyle = c.col; ctx.beginPath(); ctx.arc(c.x, c.y, 2, 0, Math.PI * 2); ctx.fill(); }
+    // the soda's fizz bubbles popping out of the bottle
+    ctx.lineWidth = 1;
+    for (const b of st.fizz) { ctx.globalAlpha = U.clamp(1.4 - b.t / b.dur, 0, 1); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
     ctx.globalAlpha = 1;
+    // the empty bottle tumbling over into the crate
+    if (st.toss) {
+      const S = C.SODA, K = C.CRATE, k = U.clamp(st.toss.t / S.toss, 0, 1), x = U.lerp(S.spot.x, K.x, k), y = U.lerp(S.spot.y - 4, K.y - 8, k) - Math.sin(k * Math.PI) * 34;
+      ctx.save(); ctx.translate(x, y); ctx.rotate(k * Math.PI * 2); this.drawBottle(ctx, PIZZARAIN_SODAS[st.toss.flav], 0, false, g.time, S.scale); ctx.restore();
+    }
     // on the phone: the receiver at the chef's ear on its curly cord
     if (this.receiverLifted(g)) {
       const ex = p.x - 12, ey = p.y - 34, sx = Ph.x - 11, sy = Ph.y - 6, n = 26;

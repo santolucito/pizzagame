@@ -109,7 +109,14 @@ module.exports = async (t) => {
   t.expect(loft.yDown < 4100, 'cannot walk off the loft edge');
   t.expectEq(await t.ev(() => T.label()), '🪜 Climb down', 'climb-down label in the loft');
   await t.ev(() => { const E = CFG.BARN.eye; T.tp(E.x, E.y, 'barn'); T.step(1); });
-  t.expectEq(await t.ev(() => T.label()), '🪜 Climb down', 'no look-outside button at the window either');
+  t.expectEq(await t.ev(() => T.label()), '🪟 Look outside', 'look-outside button at the window');
+  t.expectEq(await t.ev(() => T.hint()), 'Look out of the window 🪟', 'window hint');
+  await t.ev(() => { T.act(); T.step(1); });
+  t.expect(await t.ev(() => BarnExt.st.view > 0), 'the window view shows when asked');
+  t.expectEq(await t.ev(() => T.hint()), 'What a view! 🌾', 'view hint');
+  await t.shot('loft-view');
+  await t.ev(() => { T.steer(-1, 0); T.step(30); T.unsteer(); T.step(40); });
+  t.expectEq(await t.ev(() => BarnExt.st.view), 0, 'walking away ends the view');
   t.expectEq(await t.ev(() => T.hint()), 'Climb back down the ladder 🪜', 'climb-down hint');
   await t.ev(() => { T.act(); T.step(2); });
   t.expect(await t.ev(() => !BarnExt.st.loft && Math.hypot(Game.player.x - CFG.BARN.ladder.foot.x, Game.player.y - CFG.BARN.ladder.foot.y) < 10 && BarnExt.free(Game.player.x, Game.player.y)), 'back on the floor at the ladder');

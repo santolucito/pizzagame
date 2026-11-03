@@ -523,9 +523,11 @@ const Game = {
     const p = this.player, F = CFG.FARM;
     for (const pl of this.plots) {
       if (!pl.ready) { pl.t -= dt; if (pl.t <= 0) pl.ready = true; continue; }
-      // on foot, or riding the tractor (a car or scooter cannot harvest)
-      const harvester = !this.driving || this.vehicle.kind === 'tractor';
-      if (harvester && U.dist(p.x, p.y, pl.x, pl.y) < (this.driving ? 44 : 34)) { if (this.addIngredient(pl.kind, pl.x, pl.y)) { pl.ready = false; pl.t = F.regrow[pl.kind]; } }
+      // on foot, or riding the tractor or a vehicle whose spec says `harvests` (a car or scooter cannot harvest)
+      const hspec = this.driving && CFG.VEHICLES[this.vehicle.kind];
+      const harvester = !this.driving || this.vehicle.kind === 'tractor' || (hspec && hspec.harvests);
+      const reach = !this.driving ? 34 : hspec && hspec.harvests ? (hspec.harvestReach || 44) : 44;
+      if (harvester && U.dist(p.x, p.y, pl.x, pl.y) < reach) { if (this.addIngredient(pl.kind, pl.x, pl.y)) { pl.ready = false; pl.t = F.regrow[pl.kind]; } }
     }
     const c = this.cow;
     c.moo = Math.max(0, c.moo - dt); c.timer -= dt;

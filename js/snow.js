@@ -28,11 +28,11 @@ CFG.SNOW = {
   },
   // ---- Snowy Peak
   TOP: { x0: 5560, y0: 5150, x1: 5770, y1: 5236 },           // the top station (solid footprint)
-  TOP_SPOT: { x: 5640, y: 5270 },                            // '🚡 Ride down' (to Construction Town)
-  ARRIVE: { x: 5640, y: 5318 },                              // where the chef steps off a lift at the top
+  TOP_SPOT: { x: 5612, y: 5270 },                            // '🚡 Ride down' (to Construction Town)
+  ARRIVE: { x: 5612, y: 5318 },                              // where the chef steps off a lift at the top
   BOTTOM: { x0: 5650, y0: 6500, x1: 5750, y1: 6560 },        // the bottom station (solid footprint)
-  BOTTOM_SPOT: { x: 5640, y: 6452 },                         // '🚡 Ride up'
-  STRANDS: [5684, 5716], CABLE_H: 104, LIFT_SPEED: 340,
+  BOTTOM_SPOT: { x: 5612, y: 6452 },                         // '🚡 Ride up'
+  STRANDS: [5668, 5732], CABLE_H: 110, LIFT_SPEED: 340,
   TOWERS: [5560, 5860, 6160],                                // lift towers along x 5700
   SLOPE: { x0: 5040, y0: 5340, x1: 6460, y1: 6290 },         // where the snow slides you downhill
   RACK: { x: 5330, y: 5232 }, RACK_SPOT: { x: 5330, y: 5272 },
@@ -48,9 +48,10 @@ CFG.SNOW = {
   // pines: [x, y, size]
   TREES: [[5030, 5400, 1.2], [5040, 5700, 1.1], [5025, 6000, 1.3], [5045, 6250, 1], [5290, 5560, 1], [5470, 5700, 0.9],
     [5130, 5850, 1], [5320, 6020, 1.1], [5480, 6180, 0.9], [5830, 5480, 1], [6420, 5600, 1.1], [5840, 5900, 0.9],
-    [6410, 6050, 1], [5850, 6200, 1], [5100, 5222, 1.1], [5520, 5206, 1], [5900, 5212, 1.1], [6300, 5204, 1], [6480, 5226, 1.2],
+    [6410, 6050, 1], [5850, 6200, 1], [5100, 5222, 1.1], [5480, 5206, 1], [5900, 5212, 1.1], [6300, 5204, 1], [6480, 5226, 1.2],
     [5200, 6530, 1], [5450, 6566, 1.1], [6000, 6540, 1], [6300, 6522, 1.2], [6520, 5970, 1], [7360, 5300, 1.2],
-    [7370, 5700, 1.1], [7350, 6100, 1.2], [7360, 6450, 1], [6580, 6510, 1.1], [7120, 5980, 0.9], [6900, 5220, 1], [7220, 5212, 1.1]],
+    [7370, 5700, 1.1], [7350, 6100, 1.2], [7360, 6450, 1], [6580, 6510, 1.1], [7120, 5980, 0.9], [6900, 5220, 1], [7220, 5212, 1.1],
+    [6620, 6400, 0.9], [7250, 6420, 1], [7300, 5990, 1.1], [5250, 6420, 0.9], [6100, 6460, 0.8], [6420, 5200, 0.9]],
   MEADOW: { x0: 6540, y0: 5250, x1: 7340, y1: 5910 },
   CABIN: { x0: 6700, y0: 6080, x1: 6960, y1: 6200 }, COCOA_PAD: { x: 6830, y: 6266 }, COCOA_T: 30, COCOA_PRICE: 3,
   DOG: { x0: 6580, y0: 5960, x1: 7300, y1: 6500, home: { x: 7040, y: 6290 } },
@@ -655,7 +656,7 @@ const SnowExt = {
     ctx.strokeStyle = 'rgba(59,125,216,0.35)'; ctx.lineWidth = 3; ctx.setLineDash([14, 10]);
     ctx.beginPath(); ctx.moveTo(5790, L.y0); ctx.lineTo(5790, L.y1); ctx.moveTo(6440, L.y0); ctx.lineTo(6440, L.y1); ctx.stroke(); ctx.setLineDash([]);
     // the lift corridor
-    ctx.fillStyle = 'rgba(200,215,235,0.35)'; ctx.fillRect(5655, S.TOP.y1, 90, S.BOTTOM.y0 - S.TOP.y1);
+    ctx.fillStyle = 'rgba(200,215,235,0.35)'; ctx.fillRect(5640, S.TOP.y1, 120, S.BOTTOM.y0 - S.TOP.y1);
     // the start line of the ski run
     ctx.fillStyle = '#3b7dd8'; ctx.fillRect(5800, L.y0 - 3, 630, 6);
     ctx.fillStyle = '#e4572e'; ctx.fillRect(5800, L.y0 - 3, 30, 6); ctx.fillRect(6400, L.y0 - 3, 30, 6);
@@ -697,16 +698,15 @@ const SnowExt = {
     ['#e4572e', '#3b7dd8', '#2f9e44', '#ffd166'].forEach((c, i) => { const x = K.x - 34 + i * 23; ctx.fillStyle = c; U.roundRect(ctx, x - 9, K.y - 40, 18, 40, 5); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(x - 6, K.y - 32, 12, 3); ctx.fillRect(x - 6, K.y - 22, 12, 3); ctx.fillStyle = '#5c6670'; ctx.fillRect(x - 10, K.y - 2, 20, 3); });
     ctx.fillStyle = '#ffffff'; ctx.fillRect(K.x - 50, K.y - 50, 100, 5);
     this.paintSpot(r, S.RACK_SPOT, '🛷');
-    // the ski hut, with skis leaning on its front
-    this.paintHut(r, S.SKI_HUT, '#c0392b', '⛷️ SKIS');
-    for (let i = 0; i < 4; i++) { const x = S.SKI_HUT.x1 - 18 - i * 12; ctx.fillStyle = ['#ffd166', '#3b7dd8', '#e4572e', '#2f9e44'][i]; U.roundRect(ctx, x - 2.5, S.SKI_HUT.y1 - 52, 5, 52, 2.5); ctx.fill(); }
     this.paintSpot(r, S.SKI_SPOT, '⛷️');
-    // the top station
-    this.paintHut(r, S.TOP, '#7a4a26', '🚡 SKI LIFT', S.TOP.x0 + 60);
     this.paintSpot(r, S.TOP_SPOT, '🚡');
     this.paintSpot(r, S.BOTTOM_SPOT, '🚡');
-    // the sky band with the mountain peaks (drawn last so nothing pokes into it)
+    // the sky band with the mountain peaks (drawn before the huts at the top so their roofs stand against it)
     this.paintSky(r, W.x0, W.x1, W.y0, top);
+    // the ski hut, with skis leaning on its front, and the top station
+    this.paintHut(r, S.SKI_HUT, '#c0392b', '⛷️ SKIS');
+    for (let i = 0; i < 4; i++) { const x = S.SKI_HUT.x1 - 18 - i * 12; ctx.fillStyle = ['#ffd166', '#3b7dd8', '#e4572e', '#2f9e44'][i]; U.roundRect(ctx, x - 3, S.SKI_HUT.y1 - 64, 6, 64, 3); ctx.fill(); }
+    this.paintHut(r, S.TOP, '#7a4a26', '🚡 SKI LIFT', S.TOP.x0 + 60);
   },
   paintSky(r, x0, x1, y0, base) {
     const ctx = r.ctx, h = (i) => this.hash(i);
@@ -744,14 +744,18 @@ const SnowExt = {
   },
   // a timber hut seen from the front: the roof (with snow) above its footprint, a log wall, a door and a window
   paintHut(r, B, roof, label, labelX) {
-    const ctx = r.ctx, wallH = 46, fy = B.y1 - wallH, w = B.x1 - B.x0, cx = (B.x0 + B.x1) / 2, lx = labelX || cx;
+    // (sized for the chef: the wall is taller than a person and the door fits one)
+    const ctx = r.ctx, wallH = 76, fy = B.y1 - wallH, w = B.x1 - B.x0, cx = (B.x0 + B.x1) / 2, lx = labelX || cx, rt = Math.min(B.y0, fy) - 34;
     ctx.fillStyle = 'rgba(80,120,170,0.25)'; ctx.fillRect(B.x0 + 8, B.y0 + 10, w, B.y1 - B.y0);
     ctx.fillStyle = '#a0683a'; ctx.fillRect(B.x0, fy, w, wallH);
-    ctx.fillStyle = '#7d4f2b'; for (let y = fy + 7; y < B.y1; y += 8) ctx.fillRect(B.x0, y, w, 2);
-    ctx.fillStyle = '#5b3a1a'; U.roundRect(ctx, cx - 12, B.y1 - 32, 24, 32, 4); ctx.fill();
-    ctx.fillStyle = '#ffe9a8'; U.roundRect(ctx, B.x0 + 10, fy + 10, 22, 16, 3); ctx.fill(); U.roundRect(ctx, B.x1 - 32, fy + 10, 22, 16, 3); ctx.fill();
-    ctx.fillStyle = roof; ctx.beginPath(); ctx.moveTo(B.x0 - 8, fy + 2); ctx.lineTo(B.x1 + 8, fy + 2); ctx.lineTo(B.x1 - 4, B.y0 - 6); ctx.lineTo(B.x0 + 4, B.y0 - 6); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(B.x0 - 5, fy - 2); ctx.lineTo(B.x1 + 5, fy - 2); ctx.lineTo(B.x1 - 7, B.y0 - 4); ctx.lineTo(B.x0 + 7, B.y0 - 4); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#7d4f2b'; for (let y = fy + 8; y < B.y1; y += 10) ctx.fillRect(B.x0, y, w, 3);
+    ctx.fillStyle = '#b07a45'; for (const x of [B.x0, B.x1]) for (let y = fy + 4; y < B.y1; y += 10) { ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.fill(); }
+    ctx.fillStyle = '#5b3a1a'; U.roundRect(ctx, cx - 17, B.y1 - 54, 34, 54, 5); ctx.fill();
+    ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(cx + 10, B.y1 - 27, 2.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ffe9a8'; U.roundRect(ctx, B.x0 + 12, fy + 18, 30, 24, 4); ctx.fill(); U.roundRect(ctx, B.x1 - 42, fy + 18, 30, 24, 4); ctx.fill();
+    ctx.strokeStyle = '#5b3a1a'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(B.x0 + 27, fy + 18); ctx.lineTo(B.x0 + 27, fy + 42); ctx.moveTo(B.x1 - 27, fy + 18); ctx.lineTo(B.x1 - 27, fy + 42); ctx.stroke();
+    ctx.fillStyle = roof; ctx.beginPath(); ctx.moveTo(B.x0 - 12, fy + 4); ctx.lineTo(B.x1 + 12, fy + 4); ctx.lineTo(B.x1 - 6, rt); ctx.lineTo(B.x0 + 6, rt); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(B.x0 - 8, fy - 2); ctx.lineTo(B.x1 + 8, fy - 2); ctx.lineTo(B.x1 - 9, rt + 2); ctx.lineTo(B.x0 + 9, rt + 2); ctx.closePath(); ctx.fill();
     for (let x = B.x0; x <= B.x1; x += 12) { ctx.beginPath(); ctx.arc(x, fy - 1, 5 + (x % 3), 0, Math.PI); ctx.fill(); }
     ctx.font = r.font(12); const tw = ctx.measureText(label).width + 20;
     ctx.fillStyle = '#2d3a4a'; U.roundRect(ctx, lx - tw / 2, fy - 30, tw, 22, 6); ctx.fill();
@@ -848,7 +852,8 @@ const SnowExt = {
   },
 
   // ---- drawings
-  drawPine(ctx, x, y, s) {
+  drawPine(ctx, x, y, s0) {
+    const s = s0 * 1.8;
     ctx.fillStyle = 'rgba(70,100,150,0.2)'; ctx.beginPath(); ctx.ellipse(x + 6 * s, y + 2, 26 * s, 8 * s, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#6b4a2b'; ctx.fillRect(x - 4 * s, y - 14 * s, 8 * s, 16 * s);
     for (let i = 0; i < 3; i++) {
@@ -860,9 +865,12 @@ const SnowExt = {
   },
   drawTower(r, x, y) {
     const ctx = r.ctx, H = CFG.SNOW.CABLE_H, S = CFG.SNOW;
-    ctx.fillStyle = 'rgba(70,100,150,0.22)'; ctx.beginPath(); ctx.ellipse(x + 6, y + 2, 14, 5, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#7d8591'; ctx.fillRect(x - 4, y - H, 8, H + 2);
-    ctx.fillStyle = '#5c6670'; ctx.fillRect(S.STRANDS[0] - 6, y - H - 4, S.STRANDS[1] - S.STRANDS[0] + 12, 6);
+    ctx.fillStyle = 'rgba(70,100,150,0.22)'; ctx.beginPath(); ctx.ellipse(x + 8, y + 2, 20, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#5c6670'; ctx.fillRect(x - 12, y - 6, 24, 8);
+    ctx.fillStyle = '#7d8591'; ctx.fillRect(x - 6, y - H, 12, H);
+    ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(x - 4, y - H, 3, H - 6);
+    ctx.strokeStyle = '#5c6670'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x - 6, y - H + 22); ctx.lineTo(S.STRANDS[0] + 6, y - H); ctx.moveTo(x + 6, y - H + 22); ctx.lineTo(S.STRANDS[1] - 6, y - H); ctx.stroke();
+    ctx.fillStyle = '#5c6670'; ctx.fillRect(S.STRANDS[0] - 8, y - H - 5, S.STRANDS[1] - S.STRANDS[0] + 16, 7);
     ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(S.STRANDS[0], y - H - 1, 3, 0, Math.PI * 2); ctx.arc(S.STRANDS[1], y - H - 1, 3, 0, Math.PI * 2); ctx.fill();
   },
   // a chair hanging from the cable at (gx, gy): the bar, a bench with a backrest and a safety bar
@@ -882,15 +890,15 @@ const SnowExt = {
     ctx.strokeStyle = '#3e424a'; ctx.lineWidth = 2;
     ctx.beginPath(); for (const x of S.STRANDS) { ctx.moveTo(x, y0); ctx.lineTo(x, y1); } ctx.stroke();
     // empty chairs going round (up on the left strand, down on the right)
-    const sp = 120, off = (t * 50) % sp, L = st.lift, cols = ['#e4572e', '#3b7dd8', '#2f9e44', '#ffd166'];
+    const sp = 210, off = (t * 50) % sp, L = st.lift, cols = ['#e4572e', '#3b7dd8', '#2f9e44', '#ffd166'];
     for (let i = 0; y0 + i * sp < y1 + sp; i++) {
       const yu = y1 - i * sp - off, yd = y0 + i * sp + off;
       if (yu > y0 && yu < y1 && !(L && L.lift > 0 && Math.abs(yu - (L.gy - H)) < 90) && yu > r.camY - 80 && yu < r.camY + r.viewH) this.drawChair(ctx, S.STRANDS[0], yu, cols[i % 4], Math.sin(t * 2 + i) * 0.05);
       if (yd > y0 && yd < y1 && yd > r.camY - 80 && yd < r.camY + r.viewH) this.drawChair(ctx, S.STRANDS[1], yd, cols[(i + 2) % 4], Math.sin(t * 2 + i + 1) * 0.05);
     }
     // the big wheels at both stations
-    this.drawWheel(ctx, 5700, S.TOP.y1 - 10 - H, 18, t);
-    this.drawWheel(ctx, 5700, S.BOTTOM.y0 + 10 - H, 18, -t);
+    this.drawWheel(ctx, 5700, S.TOP.y1 - 10 - H, 32, t);
+    this.drawWheel(ctx, 5700, S.BOTTOM.y0 + 10 - H, 32, -t);
   },
   drawWheel(ctx, x, y, R, t) {
     ctx.strokeStyle = '#5c6670'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.stroke();
@@ -979,14 +987,15 @@ const SnowExt = {
     for (const d of [-1, 1]) {
       const x = gt.x + d * S.GATE_HALF;
       ctx.fillStyle = 'rgba(70,100,150,0.22)'; ctx.beginPath(); ctx.ellipse(x + 3, gt.y + 1, 6, 2.5, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#5c6670'; ctx.fillRect(x - 1.5, gt.y - 34, 3, 35);
-      const wv = Math.sin(t * 5 + i + d) * 2;
-      ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x, gt.y - 34); ctx.lineTo(x - d * 18, gt.y - 29 + wv); ctx.lineTo(x, gt.y - 22); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#5c6670'; ctx.fillRect(x - 2, gt.y - 62, 4, 63);
+      ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(x, gt.y - 62, 3.5, 0, Math.PI * 2); ctx.fill();
+      const wv = Math.sin(t * 5 + i + d) * 3;
+      ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x, gt.y - 60); ctx.lineTo(x - d * 30, gt.y - 51 + wv); ctx.lineTo(x, gt.y - 40); ctx.closePath(); ctx.fill();
     }
-    if (done) { ctx.font = r.font(14); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('⭐', gt.x, gt.y - 30 + Math.sin(t * 4 + i) * 2); }
+    if (done) { ctx.font = r.font(18); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('⭐', gt.x, gt.y - 48 + Math.sin(t * 4 + i) * 2); }
   },
   drawFinish(r, g) {
-    const ctx = r.ctx, S = CFG.SNOW, F = S.FINISH, y = S.FINISH_Y, h = 96, t = g.time;
+    const ctx = r.ctx, S = CFG.SNOW, F = S.FINISH, y = S.FINISH_Y, h = 124, t = g.time;
     for (const x of [F.x0 + 4, F.x1 - 4]) {
       ctx.fillStyle = 'rgba(70,100,150,0.22)'; ctx.beginPath(); ctx.ellipse(x + 5, y + 2, 12, 4, 0, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#e4572e'; ctx.fillRect(x - 6, y - h, 12, h);
@@ -1007,23 +1016,23 @@ const SnowExt = {
     ctx.fillStyle = '#7d8591'; ctx.fillRect(5700 - 4, B.y0 + 10 - S.CABLE_H, 8, B.y0 - 40 - (B.y0 + 10 - S.CABLE_H));
   },
   drawCabin(r, g) {
-    const ctx = r.ctx, C = CFG.SNOW.CABIN, t = g.time, w = C.x1 - C.x0, cx = (C.x0 + C.x1) / 2, wallH = 64, fy = C.y1 - wallH;
+    const ctx = r.ctx, C = CFG.SNOW.CABIN, t = g.time, w = C.x1 - C.x0, cx = (C.x0 + C.x1) / 2, wallH = 90, fy = C.y1 - wallH;
     ctx.fillStyle = 'rgba(70,100,150,0.25)'; ctx.fillRect(C.x0 + 10, C.y0 + 8, w, C.y1 - C.y0);
     // chimney with smoke
-    ctx.fillStyle = '#8a5a3a'; ctx.fillRect(C.x1 - 60, C.y0 - 64, 22, 50);
-    for (let i = 0; i < 4; i++) { const k = ((t * 0.4 + i / 4) % 1); ctx.fillStyle = `rgba(240,240,250,${(0.7 * (1 - k)).toFixed(2)})`; ctx.beginPath(); ctx.arc(C.x1 - 49 + Math.sin(k * 6 + i) * 8, C.y0 - 70 - k * 60, 7 + k * 10, 0, Math.PI * 2); ctx.fill(); }
+    ctx.fillStyle = '#8a5a3a'; ctx.fillRect(C.x1 - 60, C.y0 - 80, 24, 56);
+    for (let i = 0; i < 4; i++) { const k = ((t * 0.4 + i / 4) % 1); ctx.fillStyle = `rgba(240,240,250,${(0.7 * (1 - k)).toFixed(2)})`; ctx.beginPath(); ctx.arc(C.x1 - 48 + Math.sin(k * 6 + i) * 8, C.y0 - 86 - k * 60, 7 + k * 10, 0, Math.PI * 2); ctx.fill(); }
     // log walls
     ctx.fillStyle = '#9a5f33'; ctx.fillRect(C.x0, fy, w, wallH);
     ctx.fillStyle = '#7a4a26'; for (let y = fy + 8; y < C.y1; y += 9) ctx.fillRect(C.x0, y, w, 3);
     for (const x of [C.x0, C.x1]) { ctx.fillStyle = '#b07a45'; for (let y = fy + 4; y < C.y1; y += 9) { ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.fill(); } }
     // door, windows with a warm glow
-    ctx.fillStyle = '#5b3a1a'; U.roundRect(ctx, cx - 16, C.y1 - 42, 32, 42, 5); ctx.fill();
-    ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(cx + 9, C.y1 - 20, 2.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#5b3a1a'; U.roundRect(ctx, cx - 19, C.y1 - 58, 38, 58, 6); ctx.fill();
+    ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(cx + 11, C.y1 - 28, 3, 0, Math.PI * 2); ctx.fill();
     const glow = 0.85 + Math.sin(t * 3) * 0.08;
-    for (const wx of [C.x0 + 22, C.x1 - 66]) { ctx.fillStyle = `rgba(255,214,120,${glow.toFixed(2)})`; U.roundRect(ctx, wx, fy + 16, 44, 28, 4); ctx.fill(); ctx.strokeStyle = '#5b3a1a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(wx + 22, fy + 16); ctx.lineTo(wx + 22, fy + 44); ctx.moveTo(wx, fy + 30); ctx.lineTo(wx + 44, fy + 30); ctx.stroke(); }
+    for (const wx of [C.x0 + 22, C.x1 - 66]) { ctx.fillStyle = `rgba(255,214,120,${glow.toFixed(2)})`; U.roundRect(ctx, wx, fy + 22, 44, 34, 4); ctx.fill(); ctx.strokeStyle = '#5b3a1a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(wx + 22, fy + 22); ctx.lineTo(wx + 22, fy + 56); ctx.moveTo(wx, fy + 39); ctx.lineTo(wx + 44, fy + 39); ctx.stroke(); }
     // roof and its thick snow
-    ctx.fillStyle = '#6b3d1f'; ctx.beginPath(); ctx.moveTo(C.x0 - 14, fy + 4); ctx.lineTo(C.x1 + 14, fy + 4); ctx.lineTo(C.x1 - 10, C.y0 - 16); ctx.lineTo(C.x0 + 10, C.y0 - 16); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(C.x0 - 10, fy - 2); ctx.lineTo(C.x1 + 10, fy - 2); ctx.lineTo(C.x1 - 14, C.y0 - 14); ctx.lineTo(C.x0 + 14, C.y0 - 14); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#6b3d1f'; ctx.beginPath(); ctx.moveTo(C.x0 - 14, fy + 4); ctx.lineTo(C.x1 + 14, fy + 4); ctx.lineTo(C.x1 - 10, C.y0 - 40); ctx.lineTo(C.x0 + 10, C.y0 - 40); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(C.x0 - 10, fy - 2); ctx.lineTo(C.x1 + 10, fy - 2); ctx.lineTo(C.x1 - 14, C.y0 - 38); ctx.lineTo(C.x0 + 14, C.y0 - 38); ctx.closePath(); ctx.fill();
     for (let x = C.x0 - 6; x <= C.x1 + 6; x += 14) { ctx.beginPath(); ctx.arc(x, fy - 1, 6 + (x % 4), 0, Math.PI); ctx.fill(); }
     // the sign
     ctx.font = r.font(14); const label = '☕ COCOA CABIN', tw = ctx.measureText(label).width + 24;

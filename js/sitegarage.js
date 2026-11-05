@@ -9,7 +9,8 @@
 // up. In the morning the doors roll up, each machine hops "Good morning! ☀️", backs out and drives to its usual
 // parking spot. The chef can also put a machine to bed any time: drive it into its own bay and stop ("Night night!
 // 😴"), hop out (the chef steps out in front of the bay) and the door rolls down; it sleeps until morning or until
-// the chef presses '🌅 Wake up' at its door. Which machines are tucked in is saved (g.s.sitegarage.beds).
+// the chef presses '🌅 Wake up' at its door (tucked in during the day, it just naps for CFG.SITEGARAGE.NAP seconds). A new
+// session starts in the morning, so machines saved asleep wake up when the game loads. Which machines are tucked in is saved (g.s.sitegarage.beds).
 // Extension module: registered with Game.ext (first, so its button and hints beat the site's) and Render.ext.
 CFG.SITEGARAGE = {
   X0: 3232, Y0: -106,               // the building's top-left corner (its back wall sits on the walkable edge below the rails)
@@ -36,6 +37,7 @@ CFG.SITEGARAGE = {
   FILLET: 56,                       // how round the turns are
   DOOR_T: 1.2,                      // seconds for a door to roll up or down
   START_GAP: 0.5,                   // seconds between machines setting off at bedtime
+  NAP: 40,                          // a machine tucked in during the day naps this long, then wakes up by itself
 };
 (() => {
   const G = CFG.SITEGARAGE;
@@ -187,8 +189,16 @@ const SiteGarageExt = {
     if (!st.placed) this.placeSleepers(g);
     // the sky: bedtime when dusk falls, morning when the day comes back
     const night = this.isNight();
-    if (st.night === null) st.night = night;
-    else if (night !== st.night) { st.night = night; if (night) this.bedtime(g); else this.morning(g); }
+    if (st.night === null) {
+      st.night = night;
+      // a new session always starts in the morning: whoever was put to bed last time wakes up now
+      if (!night && this.anyAsleep()) this.morning(g);
+    } else if (night !== st.night) { st.night = night; if (night) this.bedtime(g); else this.morning(g); }
+    // a daytime nap: a machine tucked in while the sun is up wakes by itself after a little while
+    if (!night) for (const b of G.BAYS) {
+      const m = st.m[b.id];
+      if (m.state === 'asleep' && m.napUntil && g.time >= m.napUntil) { m.napUntil = null; this.forget(g, m); m.state = 'waking'; m.t = 0; m.wakeAt = 2.0; m.hopped = false; m.hop = 0; m.trip = null; }
+    }
     // the chef driving a machine: no self-driving for that one; parking in a bay; hopping out tucks it in
     const drv = g.driving ? g.vehicle : null, did = this.idOf(g, drv);
     if (did) this.driven(g, st.m[did], drv);
@@ -295,7 +305,7 @@ const SiteGarageExt = {
     for (const b of G.BAYS) {
       const m = st.m[b.id], v = this.vehicleOf(g, b.id); if (!v) continue;
       if (g.driving && g.vehicle === v) continue;
-      if (m.state === 'asleep' || m.state === 'parking') { this.forget(g, m); m.state = 'waking'; m.t = 0; m.wakeAt = 2.0 + k * 0.7; m.hopped = false; m.trip = null; k++; }
+      if (m.state === 'asleep' || m.state === 'parking') { this.forget(g, m); m.state = 'waking'; m.t = 0; m.wakeAt = 2.0 + k * 0.7; m.hopped = false; m.hop = 0; m.trip = null; k++; }
       else if (m.state === 'toBed') { m.bay = null; m.state = 'toHome'; m.trip = this.makeTrip(g, m, v, this.homeOf(m.id), 0); if (!m.trip) m.state = 'out'; }
     }
     if (k && g.area === 'site' && this.nearGarage(g)) Sfx.chime ? Sfx.chime() : Sfx.ding();
@@ -304,13 +314,14 @@ const SiteGarageExt = {
   wakeBay(g, i, byChef) {
     const m = this.claimer(i), G = CFG.SITEGARAGE; if (!m) return;
     this.forget(g, m);
-    m.state = 'waking'; m.t = 0; m.wakeAt = Infinity; m.hopped = false; m.trip = null; m.stay = !!byChef;
+    m.state = 'waking'; m.t = 0; m.wakeAt = Infinity; m.hopped = false; m.hop = 0; m.trip = null; m.stay = !!byChef;
     if (byChef) { g.s.sitegarage.wakes = (g.s.sitegarage.wakes || 0) + 1; Sfx.ding(); Haptics.success(); }
     void G;
   },
   forget(g, m) { if (g.s.sitegarage.beds) delete g.s.sitegarage.beds[m.id]; },
   fallAsleep(g, m) {
     m.state = 'asleep'; m.trip = null;
+    m.napUntil = this.isNight() ? null : g.time + CFG.SITEGARAGE.NAP;
     g.s.sitegarage.beds[m.id] = m.bay;
     if (m.manual) g.s.sitegarage.tucks = (g.s.sitegarage.tucks || 0) + 1;
     m.manual = false;

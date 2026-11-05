@@ -219,6 +219,26 @@ const AtmosphereExt = {
     ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
   },
 
+  // The ride cut-scenes (train, ferry, plane, bus, lift…) draw their own daytime sky; this lays the time of day over
+  // the finished scene: the golden-hour glow, the dawn blush, and at dusk a night sky band with twinkling stars (the
+  // scene's sun turns into a pale moon under it). Underground (the subway) there are no stars.
+  travelScreen(r, g, W, H) {
+    if (!g.travel || !this.weather.town) return;
+    const ctx = r.ctx, A = CFG.ATMOSPHERE;
+    ctx.save(); ctx.setTransform(r.dpr, 0, 0, r.dpr, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    if (this.warm > 0) { const c = A.GOLDEN_COLOR; ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${(A.GOLDEN_ALPHA * 1.3 * this.warm).toFixed(3)})`; ctx.fillRect(0, 0, W, H); }
+    if (this.dawnWarm > 0) { const c = A.DAWN_COLOR; ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${(A.DAWN_ALPHA * 1.3 * this.dawnWarm).toFixed(3)})`; ctx.fillRect(0, 0, W, H); }
+    if (this.dusk > 0) {
+      const c = A.DUSK_COLOR, k = this.dusk;
+      const sky = ctx.createLinearGradient(0, 0, 0, H * 0.62);
+      sky.addColorStop(0, `rgba(24,26,72,${(0.5 * k).toFixed(3)})`); sky.addColorStop(1, 'rgba(24,26,72,0)');
+      ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H * 0.62);
+      ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${(A.DUSK_ALPHA * k).toFixed(3)})`; ctx.fillRect(0, 0, W, H);
+      if (k > 0.5 && g.travel.via !== 'subway') this.drawStars(ctx, g, W, H);
+    }
+    ctx.restore();
+  },
+
   // Warm light leaking out of the lit shops: the pizzeria's front (Main Street side) and door, the ice cream door.
   // Runs inside the even-odd clip, so it only lands outside the interiors.
   drawSpill(r, g, W, H) {

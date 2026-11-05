@@ -184,27 +184,37 @@ module.exports = async (t) => {
   t.expect(tuck.d0 < 0.2 && tuck.d === 1 && tuck.st === 'asleep' && tuck.inBay && tuck.bed === tuck.bay && tuck.tucks === 1, `then the door rolled down and it sleeps ${JSON.stringify(tuck)}`);
   await t.ev(() => { const G = CFG.SITEGARAGE; T.tp(3560, G.MAT_Y + 30, 'site'); Render.setZoom(0.75); Game.cameraSnap = true; T.step(2); });
 
-  // ---- save and reload at night: everybody is still in bed with the doors shut
+  // ---- save at night and reload: a new session starts in the morning, so everybody wakes up and goes back to work
   await t.ev(() => Game.save());
   await t.reload();
   await t.ev(helpers);
   const reload = await t.ev(() => {
     Game.area = 'site'; T.step(3);
-    return { asleep: SG.ids.filter((id) => SG.m(id).state === 'asleep').length, inBays: SG.ids.every((id) => SG.inRect(SG.v(id), SG.bayOf(id))), doors: SiteGarageExt.st.doors.map((d) => d.d), beds: Object.keys(Game.s.sitegarage.beds).length, toasted: Game.s.sitegarage.toasted };
+    const waking = SG.ids.filter((id) => SG.m(id).state === 'waking').length, phase = AtmosphereExt.phase;
+    const r = SG.run(() => SG.ids.every((id) => SG.m(id).state === 'out'), 60 * 60);
+    return { waking, phase, ok: r.ok, s: (r.n / 60).toFixed(1), beds: Object.keys(Game.s.sitegarage.beds).length, doors: SiteGarageExt.st.doors.map((d) => d.d), toasted: Game.s.sitegarage.toasted };
   });
-  t.expect(reload.asleep === 6 && reload.inBays && reload.doors.every((d) => d === 1) && reload.beds === 6 && reload.toasted, `a reload at night keeps them in bed ${JSON.stringify(reload)}`);
-  // they stay in bed through the (new) morning's first frames, and '🌅 Wake up' rolls a door up
+  t.expect(reload.phase === 'day' && reload.waking === 6, `after a reload (morning) all six wake up ${JSON.stringify(reload)}`);
+  t.expect(reload.ok && reload.beds === 0 && reload.doors.every((d) => d === 0) && reload.toasted, `and drive back out, doors up, nobody saved asleep ${JSON.stringify(reload)}`);
+  // tucked in during the day: '🌅 Wake up' at its door, or it wakes by itself after a nap
   const wake = await t.ev(() => {
-    const G = CFG.SITEGARAGE, b = G.BAYS[SG.bayOf('bulldozer')], v = SG.v('bulldozer');
-    T.step(120); const still = SG.m('bulldozer').state;
+    const G = CFG.SITEGARAGE, b = G.BAYS[SG.bayOf('bulldozer')], v = SG.v('bulldozer'), m = SG.m('bulldozer');
+    const tuck = () => { v.x = b.cx; v.y = G.PARK_Y; v.angle = -Math.PI / 2; m.state = 'parking'; m.bay = b.i; m.settled = false; m.manual = true; T.tp(b.cx, G.MAT_Y + 60, 'site'); SG.run(() => m.state === 'asleep', 60 * 10); };
+    tuck(); const still = m.state;
     T.tp(b.cx, G.MAT_Y, 'site'); T.step(2); const label = T.label(); Game.floats.length = 0;
     T.act(); T.step(130);
-    const r = { still, label, d: SiteGarageExt.st.doors[b.i].d, st: SG.m('bulldozer').state, hello: Game.floats.some((f) => f.text === 'Good morning! ☀️'), bed: Game.s.sitegarage.beds.bulldozer, wakes: Game.s.sitegarage.wakes, inBay: SG.inRect(v, b.i) };
+    const r = { still, label, d: SiteGarageExt.st.doors[b.i].d, st: m.state, hello: Game.floats.some((f) => f.text === 'Good morning! ☀️'), bed: Game.s.sitegarage.beds.bulldozer, wakes: Game.s.sitegarage.wakes, inBay: SG.inRect(v, b.i) };
     T.steer(0, -1); T.step(30); T.unsteer(); r.near = Game.findNearVehicle() === v;
+    // a nap: tucked in again, left alone, it wakes by itself
+    T.tp(b.cx, G.MAT_Y + 60, 'site'); T.step(1); Game.enterCar && Game.driving && Game.exitCar();
+    tuck(); r.napping = m.state;
+    const n = SG.run(() => m.state !== 'asleep', 60 * (G.NAP + 10)); r.napWoke = n.ok; r.napS = (n.n / 60).toFixed(1);
+    SG.run(() => m.state === 'out', 60 * 60);
     return r;
   });
-  t.expect(wake.still === 'asleep' && wake.label === '🌅 Wake up', `still asleep after the reload, Wake up at its door ${JSON.stringify(wake)}`);
+  t.expect(wake.still === 'asleep' && wake.label === '🌅 Wake up', `a machine tucked in by day sleeps, Wake up at its door ${JSON.stringify(wake)}`);
   t.expect(wake.d === 0 && wake.st === 'out' && wake.hello && wake.bed === undefined && wake.wakes === 1 && wake.inBay && wake.near, `Wake up rolls the door up and the dozer can be driven ${JSON.stringify(wake)}`);
+  t.expect(wake.napping === 'asleep' && wake.napWoke && Number(wake.napS) > 30, `a daytime nap ends by itself ${JSON.stringify(wake)}`);
 
   // ---- a wrong bay only says whose bed it is: the dump truck into the dozer's (open) bay
   const wrong = await t.ev(() => {
@@ -222,7 +232,9 @@ module.exports = async (t) => {
 
   // ---- a rescue: the chef stuck behind a closed door ends up in front of it
   const resc = await t.ev(() => {
-    const G = CFG.SITEGARAGE, b = G.BAYS[SG.bayOf('mixer0')];
+    const G = CFG.SITEGARAGE, b = G.BAYS[SG.bayOf('mixer0')], v = SG.v('mixer0'), m = SG.m('mixer0');
+    v.x = b.cx; v.y = G.PARK_Y; v.angle = -Math.PI / 2; m.state = 'parking'; m.bay = b.i; m.settled = false; m.manual = true;
+    T.tp(b.cx, G.MAT_Y + 60, 'site'); SG.run(() => m.state === 'asleep' && SiteGarageExt.st.doors[b.i].d === 1, 60 * 10);
     T.tp(b.cx + 30, G.PARK_Y + 20, 'site'); T.step(2);
     return { x: Math.round(Game.player.x), y: Math.round(Game.player.y), cx: b.cx, mat: G.MAT_Y };
   });

@@ -983,7 +983,13 @@ const Render = {
   },
 
   // The ride between the towns: a side-on view of the train chugging past mountains.
+  // ...and every ride wears the time of day: the atmosphere tints the finished scene (golden hour, dusk with stars)
   drawTravel(g) {
+    const ctx = this.ctx; ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.shadowBlur = 0;   // nothing left over from the last frame
+    this.drawTravelScene(g);
+    if (typeof AtmosphereExt !== 'undefined' && AtmosphereExt.travelScreen) AtmosphereExt.travelScreen(this, g, this.canvas.width / this.dpr, this.canvas.height / this.dpr);
+  },
+  drawTravelScene(g) {
     const ctx = this.ctx, tr = g.travel, W = this.canvas.width / this.dpr, H = this.canvas.height / this.dpr;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     if (tr.via !== 'train') { const e = this.ext.find((x) => x.travel && x.travel[tr.via]); if (e) e.travel[tr.via](this, g, W, H); return; }

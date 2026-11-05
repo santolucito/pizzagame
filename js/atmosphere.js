@@ -235,7 +235,21 @@ const AtmosphereExt = {
       ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H * 0.62);
       ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${(A.DUSK_ALPHA * k).toFixed(3)})`; ctx.fillRect(0, 0, W, H);
       if (k > 0.5 && g.travel.via !== 'subway') this.drawStars(ctx, g, W, H);
+      const s = r.sunAt; if (s) this.drawMoon(ctx, s.x / r.dpr, s.y / r.dpr, (s.R / r.dpr) * 1.25, k);
     }
+    ctx.restore();
+  },
+  // A big friendly crescent moon with a soft glow and a few craters.
+  drawMoon(ctx, x, y, R, a) {
+    ctx.save(); ctx.globalAlpha = U.clamp(a, 0, 1);
+    const gl = ctx.createRadialGradient(x, y, R * 0.5, x, y, R * 2.6);
+    gl.addColorStop(0, 'rgba(255,246,210,0.5)'); gl.addColorStop(1, 'rgba(255,246,210,0)');
+    ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(x, y, R * 2.6, 0, Math.PI * 2); ctx.fill();
+    // the crescent: the disc with a bite taken out of its upper right
+    ctx.beginPath(); ctx.rect(x - R * 3, y - R * 3, R * 6, R * 6); ctx.arc(x + R * 0.52, y - R * 0.3, R * 0.86, 0, Math.PI * 2); ctx.clip('evenodd');
+    ctx.fillStyle = '#fff4c4'; ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(214,196,140,0.75)';
+    for (const [dx, dy, rr] of [[-0.58, 0.18, 0.15], [-0.22, 0.62, 0.11], [-0.66, -0.3, 0.09], [0.2, 0.78, 0.07]]) { ctx.beginPath(); ctx.arc(x + dx * R, y + dy * R, rr * R, 0, Math.PI * 2); ctx.fill(); }
     ctx.restore();
   },
 

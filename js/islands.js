@@ -1265,7 +1265,7 @@ const IslandsExt = {
       const toIslands = tr.to === 'islands';
       const sky = ctx.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#79c6f2'); sky.addColorStop(0.55, '#d9f0ff'); sky.addColorStop(1, '#eaf7ff');
       ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = '#fff7c2'; ctx.beginPath(); ctx.arc(W * 0.78, H * 0.16, Math.min(W, H) * 0.06, 0, Math.PI * 2); ctx.fill();
+      r.skySun(ctx, W * 0.78, H * 0.16, Math.min(W, H) * 0.06);
       const waterY = H * 0.6;
       const layer = (speed, draw) => { const off = (dist * speed) % 2000; for (let q = -1; q <= Math.ceil(W / 2000) + 1; q++) draw(q * 2000 - off); };
       layer(0.08, (ox) => { ctx.fillStyle = 'rgba(255,255,255,0.92)'; for (let i = 0; i < 5; i++) { const cx = ox + i * 410 + 60, cy = H * (0.1 + (i % 3) * 0.08); ctx.beginPath(); ctx.arc(cx, cy, 18, 0, Math.PI * 2); ctx.arc(cx + 20, cy - 10, 24, 0, Math.PI * 2); ctx.arc(cx + 46, cy, 17, 0, Math.PI * 2); ctx.fill(); } });

@@ -1279,7 +1279,7 @@ const CityExt = {
       // sky, sun, clouds
       const sky = ctx.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#79c6f2'); sky.addColorStop(0.6, '#d9f0ff'); sky.addColorStop(1, '#eaf7ff');
       ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
-      ctx.fillStyle = '#fff7c2'; ctx.beginPath(); ctx.arc(W * 0.8, H * 0.16, Math.min(W, H) * 0.06, 0, Math.PI * 2); ctx.fill();
+      r.skySun(ctx, W * 0.8, H * 0.16, Math.min(W, H) * 0.06);
       layer(0.08, 410, (x, px, i) => { const cy = H * (0.1 + (i % 3) * 0.07); ctx.fillStyle = 'rgba(255,255,255,0.92)'; ctx.beginPath(); ctx.arc(x, cy, 18, 0, Math.PI * 2); ctx.arc(x + 20, cy - 10, 24, 0, Math.PI * 2); ctx.arc(x + 46, cy, 17, 0, Math.PI * 2); ctx.fill(); });
       // far layer: hills, then rooftops, then a tall skyline
       layer(0.25, 150, (x, px, i, z) => {

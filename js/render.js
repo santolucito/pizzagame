@@ -984,7 +984,16 @@ const Render = {
 
   // The ride between the towns: a side-on view of the train chugging past mountains.
   // ...and every ride wears the time of day: the atmosphere tints the finished scene (golden hour, dusk with stars)
+  // The sun in a ride's sky: it fades out as dusk falls, and the atmosphere puts a bright moon in its place (drawn over
+  // the dusk tint, at the spot remembered here in device pixels, so mirrored scenes work too).
+  skySun(ctx, x, y, R) {
+    const k = typeof AtmosphereExt !== 'undefined' ? AtmosphereExt.dusk : 0, m = ctx.getTransform();
+    this.sunAt = { x: m.a * x + m.c * y + m.e, y: m.b * x + m.d * y + m.f, R: R * Math.hypot(m.a, m.b) };
+    if (k >= 1) return;
+    ctx.globalAlpha = 1 - k; ctx.fillStyle = '#fff7c2'; ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+  },
   drawTravel(g) {
+    this.sunAt = null;
     const ctx = this.ctx; ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.shadowBlur = 0;   // nothing left over from the last frame
     this.drawTravelScene(g);
     if (typeof AtmosphereExt !== 'undefined' && AtmosphereExt.travelScreen) AtmosphereExt.travelScreen(this, g, this.canvas.width / this.dpr, this.canvas.height / this.dpr);
@@ -1000,7 +1009,7 @@ const Render = {
     ctx.save(); if (mirrored) { ctx.translate(W, 0); ctx.scale(-1, 1); }
     const sky = ctx.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#79c6f2'); sky.addColorStop(0.6, '#d9f0ff'); sky.addColorStop(1, '#eaf7ff');
     ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = '#fff7c2'; ctx.beginPath(); ctx.arc(W * 0.8, H * 0.18, Math.min(W, H) * 0.06, 0, Math.PI * 2); ctx.fill();
+    this.skySun(ctx, W * 0.8, H * 0.18, Math.min(W, H) * 0.06);
     const groundY = H * 0.78;
     const layer = (speed, draw) => { const off = (dist * speed) % 2000; for (let r = -1; r <= Math.ceil(W / 2000) + 1; r++) draw(r * 2000 - off); };
     // clouds

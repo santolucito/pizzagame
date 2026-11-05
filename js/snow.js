@@ -1237,7 +1237,7 @@ const SnowExt = {
     // sky and far peaks (slow parallax)
     const sky = ctx.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#6fb8ef'); sky.addColorStop(1, '#e8f6ff');
     ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = '#fff7c2'; ctx.beginPath(); ctx.arc(W * 0.82, H * 0.14, Math.min(W, H) * 0.05, 0, Math.PI * 2); ctx.fill();
+    r.skySun(ctx, W * 0.82, H * 0.14, Math.min(W, H) * 0.05);
     const far = s * 0.12, base = H * 0.42 + s * 0.06;
     for (let i = -1; i < W / 160 + 3; i++) {
       const j = i + Math.floor(far / 160), px = j * 160 - far + 80, ph = 90 + h(j * 3.3) * 110, w = 150;

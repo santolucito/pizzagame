@@ -989,11 +989,19 @@ const Render = {
   skySun(ctx, x, y, R) {
     const k = typeof AtmosphereExt !== 'undefined' ? AtmosphereExt.dusk : 0, m = ctx.getTransform();
     this.sunAt = { x: m.a * x + m.c * y + m.e, y: m.b * x + m.d * y + m.f, R: R * Math.hypot(m.a, m.b) };
-    if (k >= 1) return;
-    ctx.globalAlpha = 1 - k; ctx.fillStyle = '#fff7c2'; ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+    if (k < 1) { ctx.globalAlpha = 1 - k; ctx.fillStyle = '#fff7c2'; ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1; }
+    // at dusk the stars and the moon go up right here, in the sky layer, so clouds, hills and trees pass in front of them
+    if (k > 0 && typeof AtmosphereExt !== 'undefined' && AtmosphereExt.drawMoon) {
+      const W = this.canvas.width / this.dpr, H = this.canvas.height / this.dpr, s = this.sunAt;
+      ctx.save(); ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      if (k > 0.5) AtmosphereExt.drawStars(ctx, Game, W, H);
+      AtmosphereExt.drawMoon(ctx, s.x / this.dpr, s.y / this.dpr, (s.R / this.dpr) * 1.25, k);
+      ctx.restore();
+      this.skyDrawn = true;
+    }
   },
   drawTravel(g) {
-    this.sunAt = null;
+    this.sunAt = null; this.skyDrawn = false;
     const ctx = this.ctx; ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.shadowBlur = 0;   // nothing left over from the last frame
     this.drawTravelScene(g);
     if (typeof AtmosphereExt !== 'undefined' && AtmosphereExt.travelScreen) AtmosphereExt.travelScreen(this, g, this.canvas.width / this.dpr, this.canvas.height / this.dpr);

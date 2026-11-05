@@ -230,21 +230,45 @@ const AtmosphereExt = {
     if (this.dawnWarm > 0) { const c = A.DAWN_COLOR; ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${(A.DAWN_ALPHA * 1.3 * this.dawnWarm).toFixed(3)})`; ctx.fillRect(0, 0, W, H); }
     if (this.dusk > 0) {
       const c = A.DUSK_COLOR, k = this.dusk;
-      const sky = ctx.createLinearGradient(0, 0, 0, H * 0.62);
-      sky.addColorStop(0, `rgba(24,26,72,${(0.5 * k).toFixed(3)})`); sky.addColorStop(1, 'rgba(24,26,72,0)');
-      ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H * 0.62);
-      ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${(A.DUSK_ALPHA * k).toFixed(3)})`; ctx.fillRect(0, 0, W, H);
-      if (k > 0.5 && g.travel.via !== 'subway') this.drawStars(ctx, g, W, H);
-      const s = r.sunAt; if (s) this.drawMoon(ctx, s.x / r.dpr, s.y / r.dpr, (s.R / r.dpr) * 1.25, k);
+      const tint = (t) => {
+        const sky = t.createLinearGradient(0, 0, 0, H * 0.62);
+        sky.addColorStop(0, `rgba(24,26,72,${(0.5 * k).toFixed(3)})`); sky.addColorStop(1, 'rgba(24,26,72,0)');
+        t.fillStyle = sky; t.fillRect(0, 0, W, H * 0.62);
+        t.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${(A.DUSK_ALPHA * k).toFixed(3)})`; t.fillRect(0, 0, W, H);
+      };
+      if (r.skyDrawn && r.sunAt) {
+        // the moon and the stars were drawn in the scene's sky (behind everything else): lay the tint from a layer with a
+        // soft hole of moonlight around the moon and pin-pricks at the stars, so they stay bright
+        const cw = r.canvas.width, ch = r.canvas.height;
+        if (!this.tintCv) this.tintCv = document.createElement('canvas');
+        const cv = this.tintCv; if (cv.width !== cw || cv.height !== ch) { cv.width = cw; cv.height = ch; }
+        const t = cv.getContext('2d');
+        t.setTransform(1, 0, 0, 1, 0, 0); t.globalCompositeOperation = 'source-over'; t.globalAlpha = 1; t.clearRect(0, 0, cw, ch);
+        t.setTransform(r.dpr, 0, 0, r.dpr, 0, 0); tint(t);
+        t.globalCompositeOperation = 'destination-out';
+        const s = r.sunAt, mx = s.x / r.dpr, my = s.y / r.dpr, R = (s.R / r.dpr) * 1.25;
+        const hole = t.createRadialGradient(mx, my, R, mx, my, R * 2.6);
+        hole.addColorStop(0, `rgba(0,0,0,${(0.9 * k).toFixed(3)})`); hole.addColorStop(1, 'rgba(0,0,0,0)');
+        t.fillStyle = hole; t.beginPath(); t.arc(mx, my, R * 2.6, 0, Math.PI * 2); t.arc(mx, my, R, 0, Math.PI * 2, true); t.fill('evenodd');
+        // the lit crescent itself (its dark bite keeps the night tint)
+        t.save(); t.beginPath(); t.rect(mx - R * 3, my - R * 3, R * 6, R * 6); t.arc(mx + R * 0.52, my - R * 0.3, R * 0.86, 0, Math.PI * 2); t.clip('evenodd');
+        t.fillStyle = `rgba(0,0,0,${(0.9 * k).toFixed(3)})`; t.beginPath(); t.arc(mx, my, R + 0.5, 0, Math.PI * 2); t.fill(); t.restore();
+        if (k > 0.5) { t.fillStyle = 'rgba(0,0,0,0.8)'; for (const st of this.stars) { t.beginPath(); t.arc(st.x * W, 60 + st.y * H, st.s + 0.8, 0, Math.PI * 2); t.fill(); } }
+        t.globalCompositeOperation = 'source-over';
+        ctx.drawImage(cv, 0, 0, W, H);
+      } else {
+        tint(ctx);
+        if (k > 0.5 && g.travel.via !== 'subway') this.drawStars(ctx, g, W, H);
+      }
     }
     ctx.restore();
   },
   // A big friendly crescent moon with a soft glow and a few craters.
   drawMoon(ctx, x, y, R, a) {
     ctx.save(); ctx.globalAlpha = U.clamp(a, 0, 1);
-    const gl = ctx.createRadialGradient(x, y, R * 0.5, x, y, R * 2.6);
+    const gl = ctx.createRadialGradient(x, y, R, x, y, R * 2.6);
     gl.addColorStop(0, 'rgba(255,246,210,0.5)'); gl.addColorStop(1, 'rgba(255,246,210,0)');
-    ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(x, y, R * 2.6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(x, y, R * 2.6, 0, Math.PI * 2); ctx.arc(x, y, R, 0, Math.PI * 2, true); ctx.fill('evenodd');   // the glow stays outside the disc
     // the crescent: the disc with a bite taken out of its upper right
     ctx.beginPath(); ctx.rect(x - R * 3, y - R * 3, R * 6, R * 6); ctx.arc(x + R * 0.52, y - R * 0.3, R * 0.86, 0, Math.PI * 2); ctx.clip('evenodd');
     ctx.fillStyle = '#fff4c4'; ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill();

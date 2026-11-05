@@ -26,7 +26,7 @@ module.exports = async (t) => {
     save: Game.s.snow && Game.s.snow.built === 0 && Game.s.snow.men.length === 0,
   }));
   t.expect(reg.ok, 'the snow extension is registered');
-  t.expectEq(JSON.stringify([reg.world.x0, reg.world.y0, reg.world.x1, reg.world.y1]), JSON.stringify([5000, 5000, 7400, 6600]), 'the snow map sits in its free rectangle');
+  t.expectEq(JSON.stringify([reg.world.x0, reg.world.y0, reg.world.x1, reg.world.y1]), JSON.stringify([5000, 5000, 7400, 6800]), 'the snow map sits in its free rectangle');
   t.expect(reg.noSky, 'the snow map draws its own sky');
   t.expect(reg.order, 'the snow extension answers before Construction Town and the City');
   t.expect(reg.vehicles, 'sled and skis are registered vehicles');
@@ -73,24 +73,26 @@ module.exports = async (t) => {
   const up = await t.ev(() => { const B = CFG.SNOW.CT.BOARD; T.tp(B.x, B.y, 'site'); T.toasts.length = 0; T.act(); T.step(30); return { travel: Game.travel && { via: Game.travel.via, to: Game.travel.to } }; });
   t.expect(up.travel && up.travel.via === 'skilift' && up.travel.to === 'snow', 'riding the lift starts the ski lift cut-scene');
   await t.shot('lift-cutscene');
-  const top = await t.ev(() => { T.until(() => !Game.travel, 600); return { area: Game.area, x: Game.player.x, y: Game.player.y, toasts: T.toasts.slice(), seen: Game.s.snow.seen, label: T.label(), hint: T.hint() }; });
+  const top = await t.ev(() => { T.until(() => !Game.travel, 600); const came = SnowExt.st.lift && SnowExt.st.lift.kind; const comeY = Game.player.y; T.until(() => !SnowExt.st.lift, 600); return { came, comeY, area: Game.area, x: Game.player.x, y: Game.player.y, toasts: T.toasts.slice(), seen: Game.s.snow.seen, label: T.label(), hint: T.hint() }; });
   t.expectEq(top.area, 'snow', 'the lift lands on Snowy Peak');
-  t.expect(top.x === S.ARRIVE.x && top.y === S.ARRIVE.y, 'the chef steps off at the top station');
+  t.expect(top.came === 'in' && top.comeY > S.WORLD.y1, 'the chair comes up from below the bottom edge of the map');
+  t.expect(top.x === S.VALLEY.OFF.x && top.y === S.VALLEY.OFF.y, 'the chef steps off at the valley station at the bottom');
   t.expect(top.toasts.filter((m) => m === '⛄ Welcome to Snowy Peak!').length === 1 && top.seen, 'one welcome toast the first time');
   t.expect(top.hint && top.hint.length > 0, 'a hint on arrival');
-  const again = await t.ev(() => { T.toasts.length = 0; Game.startTravel('snow', 'skilift', 1); T.until(() => !Game.travel, 300); return T.toasts.length; });
+  const again = await t.ev(() => { T.toasts.length = 0; Game.startTravel('snow', 'skilift', 1); T.until(() => !Game.travel, 300); T.until(() => !SnowExt.st.lift, 600); return T.toasts.length; });
   t.expectEq(again, 0, 'no second welcome toast');
   const spots = await t.ev(() => {
     const S = CFG.SNOW, obs = Game.obstacles(), out = {};
-    for (const k of ['TOP_SPOT', 'EXIT_SPOT', 'ARRIVE', 'BOTTOM_SPOT', 'RACK_SPOT', 'SKI_SPOT', 'COCOA_PAD']) out[k] = !obs.some((o) => Game.hitRect(S[k].x, S[k].y, 12, o)) && S[k].y >= Game.walkTop();
+    for (const k of ['TOP_SPOT', 'DOWN_ARRIVE', 'ARRIVE', 'BOTTOM_SPOT', 'RACK_SPOT', 'SKI_SPOT', 'COCOA_PAD']) out[k] = !obs.some((o) => Game.hitRect(S[k].x, S[k].y, 12, o)) && S[k].y >= Game.walkTop();
     T.tp(S.TOP_SPOT.x, S.TOP_SPOT.y, 'snow'); out.down = T.label();
-    T.tp(S.EXIT_SPOT.x, S.EXIT_SPOT.y, 'snow'); out.down2 = T.label(); out.hint2 = T.hint();
+    for (const k of ['BOARD', 'OFF']) out['VALLEY.' + k] = !obs.some((o) => Game.hitRect(S.VALLEY[k].x, S.VALLEY[k].y, 12, o));
+    T.tp(S.VALLEY.BOARD.x, S.VALLEY.BOARD.y, 'snow'); out.down2 = T.label(); out.hint2 = T.hint();
     return out;
   });
   for (const k of Object.keys(spots)) if (!['down', 'down2', 'hint2'].includes(k)) t.expect(spots[k], `${k} is free snow`);
-  t.expectEq(spots.down, '🏗️ Back to town', 'the way home at the top station');
-  t.expectEq(spots.down2, '🏗️ Back to town', 'the way home at the bottom of the runs too');
-  t.expect(/Construction Town/.test(spots.hint2 || ''), 'the hint at the bottom exit says where it goes');
+  t.expectEq(spots.down, '🚡 Ride down', 'the top station rides the mountain lift down');
+  t.expectEq(spots.down2, '🏗️ Back to town', 'the valley station takes you home');
+  t.expect(/Construction Town/.test(spots.hint2 || ''), 'the hint at the valley station says where it goes');
 
   // ---- sledding: grab a sled, slide down by itself, steer, bump a tree, stop at the bottom, ride up with it
   const sled1 = await t.ev(() => {
@@ -202,6 +204,14 @@ module.exports = async (t) => {
   t.expectEq(lift.label, '🚡 Ride up', 'the button at the bottom station');
   t.expect(/lift/.test(lift.hint), 'the hint at the bottom station');
   t.expect(lift.n >= 0 && lift.x === S.ARRIVE.x && lift.y === S.ARRIVE.y, 'the in-map lift glides up to the top station');
+  const liftDown = await t.ev(() => {
+    const S = CFG.SNOW; T.tp(S.TOP_SPOT.x, S.TOP_SPOT.y, 'snow');
+    const label = T.label(); T.act(); const kind = SnowExt.st.lift && SnowExt.st.lift.kind;
+    const n = T.until(() => !SnowExt.st.lift, 900);
+    return { label, kind, n, x: Game.player.x, y: Game.player.y, area: Game.area };
+  });
+  t.expect(liftDown.label === '🚡 Ride down' && liftDown.kind === 'down', 'the top station rides the right-hand cable down');
+  t.expect(liftDown.n >= 0 && liftDown.area === 'snow' && liftDown.x === S.DOWN_ARRIVE.x && liftDown.y === S.DOWN_ARRIVE.y, 'and the chef steps off at the bottom station');
 
   // ---- the snowman: three snowballs, stacked, a face; the count kept across a reload
   const sm1 = await t.ev(() => {
@@ -273,13 +283,16 @@ module.exports = async (t) => {
 
   // ---- riding back down to Construction Town, next to the mine
   const down = await t.ev(() => {
-    const S = CFG.SNOW; T.tp(S.TOP_SPOT.x, S.TOP_SPOT.y, 'snow'); T.act();
-    const tr = Game.travel && { via: Game.travel.via, to: Game.travel.to };
+    const S = CFG.SNOW; T.tp(S.VALLEY.BOARD.x, S.VALLEY.BOARD.y, 'snow'); T.act();
+    const kind = SnowExt.st.lift && SnowExt.st.lift.kind; let lowest = 0;
+    T.until(() => { lowest = Math.max(lowest, Game.player.y); return !!Game.travel; }, 600);
+    const tr = Game.travel && { via: Game.travel.via, to: Game.travel.to, kind, off: lowest > S.WORLD.y1 };
     T.until(() => !Game.travel, 600);
     const M = CFG.MINES.DOOR, p = Game.player;
     return { tr, area: Game.area, mine: Math.hypot(p.x - M.x, p.y - M.y), x: p.x, y: p.y };
   });
-  t.expect(down.tr && down.tr.via === 'skilift' && down.tr.to === 'site', 'riding down plays the lift ride back');
+  t.expect(down.tr && down.tr.kind === 'out' && down.tr.off, 'the chair carries the chef down off the bottom of the map');
+  t.expect(down.tr && down.tr.via === 'skilift' && down.tr.to === 'site', 'then the lift ride back to town plays');
   t.expect(down.area === 'site' && down.x === S.CT.BOARD.x && down.y === S.CT.BOARD.y && down.mine < 200, 'back in Construction Town at the lift, next to the mine');
 
   // ---- Take-me-home from the snow, on skis

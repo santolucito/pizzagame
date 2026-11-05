@@ -16,7 +16,7 @@
 // Extension module: Game.ext.unshift + Render.ext.push (see js/EXTENSIONS.md).
 
 CFG.SNOW = {
-  WORLD: { x0: 5000, y0: 5000, x1: 7400, y1: 6600, walkY0: 5172 },
+  WORLD: { x0: 5000, y0: 5000, x1: 7400, y1: 6800, walkY0: 5172 },
   SKY_H: 150,
   TRAVEL_DUR: 6,
   // ---- Construction Town: the lift station on the grass west of the mine's hill (x 3976..4124, y -98..34)
@@ -28,11 +28,21 @@ CFG.SNOW = {
   },
   // ---- Snowy Peak
   TOP: { x0: 5560, y0: 5150, x1: 5770, y1: 5236 },           // the top station (solid footprint)
-  TOP_SPOT: { x: 5612, y: 5270 },                            // '🚡 Ride down' (to Construction Town)
-  ARRIVE: { x: 5612, y: 5318 },                              // where the chef steps off a lift at the top
+  // The mountain lift: chairs go UP on the left cable and DOWN on the right one, between the bottom and top stations.
+  TOP_SPOT: { x: 5790, y: 5276 },                            // '🚡 Ride down' (the right-hand cable, down to the bottom station)
+  ARRIVE: { x: 5612, y: 5318 },                              // where the chef steps off the lift at the top
   BOTTOM: { x0: 5650, y0: 6500, x1: 5750, y1: 6560 },        // the bottom station (solid footprint)
-  BOTTOM_SPOT: { x: 5612, y: 6452 },                         // '🚡 Ride up'
-  EXIT_SPOT: { x: 5830, y: 6452 },                           // '🏗️ Back to town' at the bottom too (the top one is TOP_SPOT)
+  BOTTOM_SPOT: { x: 5612, y: 6452 },                         // '🚡 Ride up' (the left-hand cable)
+  DOWN_ARRIVE: { x: 5790, y: 6452 },                         // where the chef steps off after riding down
+  // The valley lift: the lift from Construction Town comes up from the bottom edge of the map to this station (you
+  // arrive on its left cable), and its right cable carries you back down, off the bottom of the screen, to town.
+  VALLEY: {
+    X: 5960, WHEEL_Y: 6612, SPEED: 120,                      // the cable's middle, where the big wheel stands
+    HUT: { x0: 5800, y0: 6600, x1: 5896, y1: 6676 },         // the ticket hut (solid), west of the deck
+    DECK: { x0: 5904, y0: 6600, x1: 6016, y1: 6800 },        // the boarding deck under the cable
+    BOARD: { x: 5960, y: 6720 },                             // '🏗️ Back to town'
+    OFF: { x: 5960, y: 6648 },                               // where the chef steps off on arriving
+  },
   STRANDS: [5668, 5732], CABLE_H: 110, LIFT_SPEED: 340,
   TOWERS: [5560, 5860, 6160],                                // lift towers along x 5700
   SLOPE: { x0: 5040, y0: 5340, x1: 6460, y1: 6290 },         // where the snow slides you downhill
@@ -50,9 +60,10 @@ CFG.SNOW = {
   TREES: [[5030, 5400, 1.2], [5040, 5700, 1.1], [5025, 6000, 1.3], [5045, 6250, 1], [5290, 5560, 1], [5470, 5700, 0.9],
     [5130, 5850, 1], [5320, 6020, 1.1], [5480, 6180, 0.9], [5830, 5480, 1], [6420, 5600, 1.1], [5840, 5900, 0.9],
     [6410, 6050, 1], [5850, 6200, 1], [5100, 5222, 1.1], [5900, 5212, 1.1], [6300, 5204, 1], [6480, 5226, 1.2],
-    [5200, 6530, 1], [5450, 6566, 1.1], [6000, 6540, 1], [6300, 6522, 1.2], [6520, 5970, 1], [7360, 5300, 1.2],
+    [5200, 6530, 1], [5450, 6566, 1.1], [6300, 6522, 1.2], [6520, 5970, 1], [7360, 5300, 1.2],
     [7370, 5700, 1.1], [7350, 6100, 1.2], [7360, 6450, 1], [6580, 6510, 1.1], [7120, 5980, 0.9], [6900, 5220, 1], [7220, 5212, 1.1],
-    [6620, 6400, 0.9], [7250, 6420, 1], [7300, 5990, 1.1], [5250, 6420, 0.9], [6100, 6460, 0.8], [6420, 5200, 0.9]],
+    [6620, 6400, 0.9], [7250, 6420, 1], [7300, 5990, 1.1], [5250, 6420, 0.9], [6100, 6460, 0.8], [6420, 5200, 0.9],
+    [5100, 6700, 1.1], [5330, 6740, 1], [5560, 6690, 0.9], [6200, 6720, 1.1], [6450, 6690, 1], [6700, 6740, 1.2], [6980, 6700, 1], [7250, 6730, 1.1]],
   MEADOW: { x0: 6540, y0: 5250, x1: 7340, y1: 5910 },
   CABIN: { x0: 6700, y0: 6080, x1: 6960, y1: 6200 }, COCOA_PAD: { x: 6730, y: 6262 }, COCOA_T: 30, COCOA_PRICE: 3,
   DOG: { x0: 6580, y0: 5960, x1: 7300, y1: 6500, home: { x: 7040, y: 6290 } },
@@ -94,7 +105,8 @@ const SnowExt = {
   buildObs() {
     const S = CFG.SNOW, o = [];
     const box = (b) => ({ x: b.x0, y: b.y0, w: b.x1 - b.x0, h: b.y1 - b.y0 });
-    o.push(box(S.TOP), box(S.BOTTOM), box(S.SKI_HUT), box(S.CABIN));
+    o.push(box(S.TOP), box(S.BOTTOM), box(S.SKI_HUT), box(S.CABIN), box(S.VALLEY.HUT));
+    o.push({ x: S.VALLEY.X - 7, y: S.VALLEY.WHEEL_Y - 8, w: 14, h: 10 });   // the valley wheel's post
     o.push({ x: S.RACK.x - 50, y: S.RACK.y - 36, w: 100, h: 40 });
     for (const [x, y, s] of S.TREES) o.push({ x: x - 10 * s, y: y - 9, w: 20 * s, h: 14 });
     for (const ty of S.TOWERS) o.push({ x: 5700 - 7, y: ty - 6, w: 14, h: 10 });
@@ -160,7 +172,8 @@ const SnowExt = {
     if (g.driving) {
       if (!this.riding(g)) return null;
       const v = g.vehicle;
-      if (this.near(g, S.TOP_SPOT, 44) || (this.near(g, S.EXIT_SPOT, 46) && this.speedOf(v) < 70 && !v.air)) return { label: '🏗️ Back to town', run: (gg) => this.rideDownMountain(gg) };
+      if (this.near(g, S.VALLEY.BOARD, 46) && this.speedOf(v) < 70 && !v.air) return { label: '🏗️ Back to town', run: (gg) => this.rideDownMountain(gg) };
+      if (this.near(g, S.TOP_SPOT, 44) && this.speedOf(v) < 70) return { label: '🚡 Ride down', run: (gg) => this.startLift(gg, 'down') };
       if (this.inRunout(v.x, v.y) && this.speedOf(v) < 70 && !v.air) return { label: '🚡 Ride up', run: (gg) => this.startLift(gg) };
       return null;
     }
@@ -169,8 +182,9 @@ const SnowExt = {
       if (sk) return { label: '⛄ Stack it!', run: (gg) => this.stackOnto(gg, sk) };
       return { label: '✋ Let go', run: (gg) => this.letGo(gg) };
     }
-    if (this.near(g, S.TOP_SPOT, 44) || this.near(g, S.EXIT_SPOT, 46)) return { label: '🏗️ Back to town', run: (gg) => this.rideDownMountain(gg) };
-    if (this.near(g, S.BOTTOM_SPOT, 44)) return { label: '🚡 Ride up', run: (gg) => this.startLift(gg) };
+    if (this.near(g, S.VALLEY.BOARD, 46)) return { label: '🏗️ Back to town', run: (gg) => this.rideDownMountain(gg) };
+    if (this.near(g, S.TOP_SPOT, 44)) return { label: '🚡 Ride down', run: (gg) => this.startLift(gg, 'down') };
+    if (this.near(g, S.BOTTOM_SPOT, 44)) return { label: '🚡 Ride up', run: (gg) => this.startLift(gg, 'up') };
     if (this.near(g, S.RACK_SPOT, 46)) return { label: '🛷 Grab a sled', run: (gg) => this.grabSled(gg) };
     if (this.near(g, S.SKI_SPOT, 46)) return { label: '⛷️ Put on skis', run: (gg) => this.putOnSkis(gg) };
     const done = st.stacks.find((sk) => sk.balls.length >= 3 && U.dist(p.x, p.y, sk.x, sk.y) < this.stackBase(sk) + 130);
@@ -193,7 +207,7 @@ const SnowExt = {
     }
     if (g.area !== 'snow' || g.travel) return undefined;
     if (this.busy(g)) return null;
-    if (st.lift) return { text: 'Up we go! 🚡', target: null };
+    if (st.lift) return { text: { up: 'Up we go! 🚡', down: 'Down we go! 🚡', out: 'Bye bye, Snowy Peak! 👋', in: 'Here comes Snowy Peak! 🏔️' }[st.lift.kind] || 'Wheee! 🚡', target: null };
     const s = g.s.snow;
     if (g.driving) {
       const v = g.vehicle; if (!this.riding(g)) return null;
@@ -212,8 +226,8 @@ const SnowExt = {
       if (this.sizeOf(b.r) < 3) return { text: 'Walk around to roll it bigger! ❄️', target: null };
       return { text: 'Big snowball! Let go and roll another ❄️', target: null };
     }
-    if (this.near(g, S.TOP_SPOT, 44)) return { text: 'Ride the lift back to Construction Town 🏗️', target: null };
-    { const d = U.dist(p.x, p.y, S.EXIT_SPOT.x, S.EXIT_SPOT.y); if (d < 90) return { text: 'Ride the lift back to Construction Town 🏗️', target: d < 44 ? null : S.EXIT_SPOT }; }
+    if (this.near(g, S.VALLEY.BOARD, 46)) return { text: 'Ride the lift home to Construction Town 🏗️', target: null };
+    if (this.near(g, S.TOP_SPOT, 44)) return { text: 'Ride the lift down the mountain 🚡', target: null };
     if (this.near(g, S.BOTTOM_SPOT, 44)) return { text: 'Ride the lift up the mountain! 🚡', target: null };
     if (this.near(g, S.RACK_SPOT, 46)) return { text: 'Grab a sled! 🛷', target: null };
     if (this.near(g, S.SKI_SPOT, 46)) return { text: 'Put on the skis! ⛷️', target: null };
@@ -251,10 +265,12 @@ const SnowExt = {
     const S = CFG.SNOW, p = g.player, s = this.save(g), st = this.st;
     st.lift = null; st.ball = null;
     if (tr.to === 'snow') {
-      p.x = S.ARRIVE.x; p.y = S.ARRIVE.y; p.facing = 1;
+      const P = this.liftPath('in');
+      st.lift = { kind: 'in', t: 0, from: { x: P.x, y: P.y0 }, veh: null, gx: P.x, gy: P.y0, lift: 0, sway: 0 };
+      p.x = P.x; p.y = P.y0; p.facing = 1;
       s.rides++;
-      if (!s.seen) { s.seen = true; g.toast('⛄ Welcome to Snowy Peak!', true); this.say(g, S.TOP_SPOT.x - 40, S.TOP_SPOT.y - 60, '🏗️ The way home!', '#ffd166', false, 3.5); }
-      else this.say(g, p.x, p.y - 80, 'Snowy Peak! 🏔️', '#ffffff', true, 1.6);
+      if (!s.seen) { s.seen = true; g.toast('⛄ Welcome to Snowy Peak!', true); }
+      else this.say(g, S.VALLEY.OFF.x, S.VALLEY.OFF.y - 80, 'Snowy Peak! 🏔️', '#ffffff', true, 1.6);
     } else {
       p.x = S.CT.BOARD.x; p.y = S.CT.BOARD.y; p.facing = 1;
     }
@@ -273,11 +289,13 @@ const SnowExt = {
     Sfx.chime(); Haptics.tap();
     g.startTravel('snow', 'skilift', CFG.SNOW.TRAVEL_DUR);
   },
+  // hop on the valley lift: the chair carries the chef down off the bottom of the screen, then the ride to town plays
   rideDownMountain(g) {
+    const st = this.st, p = g.player;
     this.parkGear(g);
-    this.st.ball = null;
+    st.ball = null; st.run = null;
+    st.lift = { kind: 'out', t: 0, from: { x: p.x, y: p.y }, veh: null, gx: p.x, gy: p.y, lift: 0, sway: 0 };
     Sfx.chime(); Haptics.tap();
-    g.startTravel('site', 'skilift', CFG.SNOW.TRAVEL_DUR);
   },
   // step off the sled / skis: both go back to their rack and hut
   parkGear(g) {
@@ -285,7 +303,7 @@ const SnowExt = {
     if (this.riding(g)) { g.driving = false; g.vehicle = null; }
     st.sled = null; st.skis = null; st.run = null;
   },
-  startLift(g) {
+  startLift(g, kind) {
     const st = this.st, p = g.player;
     let veh = null;
     if (this.riding(g)) {
@@ -293,29 +311,38 @@ const SnowExt = {
       veh.sx = 0; veh.sy = 0; veh.vx = 0; veh.vy = 0; veh.air = null; veh.z = 0; veh.bump = 0; veh.run = false;
     } else if (st.sled && this.inRunout(st.sled.x, st.sled.y)) st.sled = null;   // a sled left at the bottom goes back to its rack
     st.run = null; st.ball = null;
-    st.lift = { t: 0, from: { x: p.x, y: p.y }, veh, gx: p.x, gy: p.y, lift: 0, sway: 0 };
+    st.lift = { kind: kind === 'down' ? 'down' : 'up', t: 0, from: { x: p.x, y: p.y }, veh, gx: p.x, gy: p.y, lift: 0, sway: 0 };
     Sfx.pickup(); Haptics.tap();
   },
+  // where each lift ride goes: the cable it rides (x), from y0 to y1, and where the chef steps off
+  liftPath(kind) {
+    const S = CFG.SNOW, V = S.VALLEY, off = S.WORLD.y1 + 160;
+    if (kind === 'down') return { x: S.STRANDS[1], y0: S.TOP_SPOT.y, y1: S.DOWN_ARRIVE.y, dest: S.DOWN_ARRIVE, speed: S.LIFT_SPEED, say: 'At the bottom! 🚡' };
+    if (kind === 'out') return { x: V.X + 32, y0: V.BOARD.y, y1: off, dest: null, speed: V.SPEED };
+    if (kind === 'in') return { x: V.X - 32, y0: off, y1: V.BOARD.y, dest: V.OFF, speed: V.SPEED, say: null };
+    return { x: S.STRANDS[0], y0: S.BOTTOM_SPOT.y, y1: S.ARRIVE.y, dest: S.ARRIVE, speed: S.LIFT_SPEED, say: 'At the top! 🏔️' };
+  },
   stepLift(g, dt) {
-    const S = CFG.SNOW, st = this.st, L = st.lift, p = g.player;
+    const S = CFG.SNOW, st = this.st, L = st.lift, p = g.player, P = this.liftPath(L.kind);
     L.t += dt;
-    const bx = S.STRANDS[0], by = S.BOTTOM_SPOT.y;
-    const walk = U.clamp(U.dist(L.from.x, L.from.y, bx, by) / 320, 0.2, 1.4);
+    const walk = L.kind === 'in' ? 0 : U.clamp(U.dist(L.from.x, L.from.y, P.x, P.y0) / 320, 0.2, 1.4);
     if (L.t < walk) {
-      const k = L.t / walk; L.gx = U.lerp(L.from.x, bx, k); L.gy = U.lerp(L.from.y, by, k); L.lift = 0;
-      p.facing = bx < L.from.x ? -1 : 1; p.moving = true; p.bob += dt * 14;
+      const k = L.t / walk; L.gx = U.lerp(L.from.x, P.x, k); L.gy = U.lerp(L.from.y, P.y0, k); L.lift = 0;
+      p.facing = P.x < L.from.x ? -1 : 1; p.moving = true; p.bob += dt * 14;
     } else {
-      const total = by - S.ARRIVE.y, d = (L.t - walk) * S.LIFT_SPEED;
-      L.gx = bx; L.gy = by - Math.min(d, total);
+      const dir = P.y1 < P.y0 ? -1 : 1, total = Math.abs(P.y1 - P.y0), d = (L.t - walk) * P.speed;
+      L.gx = P.x; L.gy = P.y0 + dir * Math.min(d, total);
       L.lift = 40 * U.clamp(Math.min(d / 70, (total - d) / 70), 0, 1);
+      if (L.kind === 'in' || L.kind === 'out') L.lift = 40 * U.clamp(L.kind === 'in' ? (total - d) / 70 : d / 70, 0, 1);
       L.sway = Math.sin(g.time * 2.4) * 0.08;
       p.moving = false; p.facing = 1;
       if (d >= total) {
         const v = L.veh;
         st.lift = null;
-        p.x = S.ARRIVE.x; p.y = S.ARRIVE.y; p.moving = false;
-        if (v) { v.x = S.ARRIVE.x; v.y = S.ARRIVE.y; v.angle = Math.PI / 2; g.vehicle = v; g.driving = true; }
-        this.say(g, p.x, p.y - 80, 'At the top! 🏔️', '#ffffff', true, 1.4);
+        if (L.kind === 'out') { g.startTravel('site', 'skilift', S.TRAVEL_DUR); return; }
+        p.x = P.dest.x; p.y = P.dest.y; p.moving = false;
+        if (v) { v.x = P.dest.x; v.y = P.dest.y; v.angle = Math.PI / 2; g.vehicle = v; g.driving = true; }
+        if (P.say) this.say(g, p.x, p.y - 80, P.say, '#ffffff', true, 1.4);
         st.lastP = null; st.lastPrint = null;
         return;
       }
@@ -692,7 +719,14 @@ const SnowExt = {
       for (let i = 0; i <= n; i++) { const x = U.lerp(x0, x1, i / n), y = U.lerp(y0, y1, i / n); ctx.fillStyle = '#6b4a2b'; ctx.fillRect(x - 3, y - 22, 6, 24); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y - 22, 4, Math.PI, 0); ctx.fill(); }
     };
     fence(S.FENCE.x, S.FENCE.y0, S.FENCE.x, S.FENCE.y1);
-    fence(W.x0 + 10, W.y1 - 8, W.x1 - 10, W.y1 - 8);
+    fence(W.x0 + 10, W.y1 - 8, S.VALLEY.DECK.x0 - 8, W.y1 - 8); fence(S.VALLEY.DECK.x1 + 8, W.y1 - 8, W.x1 - 10, W.y1 - 8);
+    // the valley lift's boarding deck: planks under the cable, running off the bottom edge with it
+    const VD = S.VALLEY.DECK;
+    ctx.fillStyle = 'rgba(80,120,170,0.25)'; ctx.fillRect(VD.x0 + 5, VD.y0 + 5, VD.x1 - VD.x0, VD.y1 - VD.y0);
+    ctx.fillStyle = '#c08a52'; ctx.fillRect(VD.x0, VD.y0, VD.x1 - VD.x0, VD.y1 - VD.y0);
+    ctx.fillStyle = '#9a6a3a'; for (let y = VD.y0 + 10; y < VD.y1; y += 12) ctx.fillRect(VD.x0, y, VD.x1 - VD.x0, 2);
+    ctx.fillStyle = '#7a4a26'; ctx.fillRect(VD.x0, VD.y0, 4, VD.y1 - VD.y0); ctx.fillRect(VD.x1 - 4, VD.y0, 4, VD.y1 - VD.y0);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(VD.x0, VD.y0, VD.x1 - VD.x0, 4);
     // the sled rack: a wooden A-frame with sleds leaning on it
     const K = S.RACK;
     ctx.fillStyle = 'rgba(80,120,170,0.25)'; ctx.beginPath(); ctx.ellipse(K.x + 4, K.y + 4, 56, 12, 0, 0, Math.PI * 2); ctx.fill();
@@ -701,8 +735,8 @@ const SnowExt = {
     ctx.fillStyle = '#ffffff'; ctx.fillRect(K.x - 50, K.y - 50, 100, 5);
     this.paintSpot(r, S.RACK_SPOT, '🛷');
     this.paintSpot(r, S.SKI_SPOT, '⛷️');
-    this.paintExit(r, S.TOP_SPOT, -112);
-    this.paintExit(r, S.EXIT_SPOT, 64);
+    this.paintExit(r, S.VALLEY.BOARD);
+    this.paintSpot(r, S.TOP_SPOT, '🚡');
     this.paintSpot(r, S.BOTTOM_SPOT, '🚡');
     // the sky band with the mountain peaks (drawn before the huts at the top so their roofs stand against it)
     this.paintSky(r, W.x0, W.x1, W.y0, top);
@@ -710,6 +744,8 @@ const SnowExt = {
     this.paintHut(r, S.SKI_HUT, '#c0392b', '⛷️ SKIS');
     for (let i = 0; i < 4; i++) { const x = S.SKI_HUT.x1 - 18 - i * 12; ctx.fillStyle = ['#ffd166', '#3b7dd8', '#e4572e', '#2f9e44'][i]; U.roundRect(ctx, x - 3, S.SKI_HUT.y1 - 64, 6, 64, 3); ctx.fill(); }
     this.paintHut(r, S.TOP, '#7a4a26', '🚡 SKI LIFT', S.TOP.x0 + 60);
+    // the valley station's ticket hut, west of its deck
+    this.paintHut(r, S.VALLEY.HUT, '#ff8c1a', '🏗️ TO TOWN');
   },
   paintSky(r, x0, x1, y0, base) {
     const ctx = r.ctx, h = (i) => this.hash(i);
@@ -739,13 +775,12 @@ const SnowExt = {
     ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; U.roundRect(ctx, x - w / 2, y - 52, w, 24, 6); ctx.stroke();
     ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, x, y - 39);
   },
-  // the way back to Construction Town: an orange mat with the town's crane on it and a big sign beside it
-  paintExit(r, s, signDx) {
+  // the way back to Construction Town: an orange mat with the town's crane on it
+  paintExit(r, s) {
     const ctx = r.ctx;
     ctx.fillStyle = 'rgba(255,140,26,0.3)'; ctx.beginPath(); ctx.ellipse(s.x, s.y, 30, 14, 0, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = '#ff8c1a'; ctx.lineWidth = 3; ctx.setLineDash([6, 4]); ctx.beginPath(); ctx.ellipse(s.x, s.y, 30, 14, 0, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
     ctx.font = r.font(15); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🏗️', s.x, s.y + 1);
-    this.paintSign(r, s.x + signDx, s.y - 6, '🏗️ TO TOWN', '#ff8c1a');
   },
   paintSpot(r, s, ico) {
     const ctx = r.ctx;
@@ -817,6 +852,7 @@ const SnowExt = {
     S.GATES.forEach((gt, i) => { if (vis(gt.x, gt.y)) items.push({ y: gt.y, draw: () => this.drawGate(r, g, gt, i) }); });
     if (vis(6120, S.FINISH_Y)) items.push({ y: S.FINISH_Y, draw: () => this.drawFinish(r, g) });
     if (vis(5700, S.BOTTOM.y1)) items.push({ y: S.BOTTOM.y1, draw: () => this.drawBottomStation(r, g) });
+    { const V = S.VALLEY; if (vis(V.X, V.WHEEL_Y)) items.push({ y: V.WHEEL_Y, draw: () => { const c = r.ctx; c.fillStyle = 'rgba(70,100,150,0.22)'; c.beginPath(); c.ellipse(V.X + 6, V.WHEEL_Y + 2, 16, 5, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#7d8591'; c.fillRect(V.X - 5, V.WHEEL_Y - S.CABLE_H, 10, S.CABLE_H + 2); } }); }
     if (vis(6830, S.CABIN.y1)) items.push({ y: S.CABIN.y1, draw: () => this.drawCabin(r, g) });
     for (const k of st.kids) if (vis(k.x, k.y)) items.push({ y: k.y, draw: () => this.drawKid(r, g, k) });
     { const d = st.dog; if (vis(d.x, d.y)) items.push({ y: d.y, draw: () => this.drawDog(r, g, d) }); }
@@ -904,12 +940,31 @@ const SnowExt = {
     const sp = 210, off = (t * 50) % sp, L = st.lift, cols = ['#e4572e', '#3b7dd8', '#2f9e44', '#ffd166'];
     for (let i = 0; y0 + i * sp < y1 + sp; i++) {
       const yu = y1 - i * sp - off, yd = y0 + i * sp + off;
-      if (yu > y0 && yu < y1 && !(L && L.lift > 0 && Math.abs(yu - (L.gy - H)) < 90) && yu > r.camY - 80 && yu < r.camY + r.viewH) this.drawChair(ctx, S.STRANDS[0], yu, cols[i % 4], Math.sin(t * 2 + i) * 0.05);
-      if (yd > y0 && yd < y1 && yd > r.camY - 80 && yd < r.camY + r.viewH) this.drawChair(ctx, S.STRANDS[1], yd, cols[(i + 2) % 4], Math.sin(t * 2 + i + 1) * 0.05);
+      const near = (kind, y) => L && L.kind === kind && L.lift > 0 && Math.abs(y - (L.gy - H)) < 90;
+      if (yu > y0 && yu < y1 && !near('up', yu) && yu > r.camY - 80 && yu < r.camY + r.viewH) this.drawChair(ctx, S.STRANDS[0], yu, cols[i % 4], Math.sin(t * 2 + i) * 0.05);
+      if (yd > y0 && yd < y1 && !near('down', yd) && yd > r.camY - 80 && yd < r.camY + r.viewH) this.drawChair(ctx, S.STRANDS[1], yd, cols[(i + 2) % 4], Math.sin(t * 2 + i + 1) * 0.05);
     }
     // the big wheels at both stations
     this.drawWheel(ctx, 5700, S.TOP.y1 - 10 - H, 32, t);
     this.drawWheel(ctx, 5700, S.BOTTOM.y0 + 10 - H, 32, -t);
+    this.drawValleyLine(r, g);
+  },
+  // the valley lift: from its wheel at the station the cable runs down off the bottom of the map, towards town;
+  // chairs come up on the left cable and go down on the right one
+  drawValleyLine(r, g) {
+    const ctx = r.ctx, S = CFG.SNOW, V = S.VALLEY, H = S.CABLE_H, L = this.st.lift, t = g.time;
+    if (r.camX > V.X + 120 || r.camX + r.viewW < V.X - 120 || r.camY + r.viewH < V.WHEEL_Y - H - 60) return;
+    const xl = V.X - 32, xr = V.X + 32, y0 = V.WHEEL_Y - H, y1 = S.WORLD.y1 + 80;
+    ctx.strokeStyle = '#3e424a'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(xl, y0); ctx.lineTo(xl, y1); ctx.moveTo(xr, y0); ctx.lineTo(xr, y1); ctx.stroke();
+    const sp = 170, off = (t * 50) % sp, cols = ['#ff8c1a', '#3b7dd8', '#2f9e44', '#ffd166'];
+    const near = (kind, y) => L && L.kind === kind && L.lift > 0 && Math.abs(y - (L.gy - H)) < 90;
+    for (let i = 0; y0 + i * sp < y1 + sp; i++) {
+      const yu = y1 - i * sp - off, yd = y0 + 20 + i * sp + off;
+      if (yu > y0 + 20 && yu < y1 && !near('in', yu)) this.drawChair(ctx, xl, yu, cols[i % 4], Math.sin(t * 2 + i) * 0.05);
+      if (yd < y1 && !near('out', yd)) this.drawChair(ctx, xr, yd, cols[(i + 2) % 4], Math.sin(t * 2 + i + 1) * 0.05);
+    }
+    this.drawWheel(ctx, V.X, y0, 32, t);
   },
   drawWheel(ctx, x, y, R, t) {
     ctx.strokeStyle = '#5c6670'; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.stroke();

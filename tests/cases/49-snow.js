@@ -82,12 +82,15 @@ module.exports = async (t) => {
   t.expectEq(again, 0, 'no second welcome toast');
   const spots = await t.ev(() => {
     const S = CFG.SNOW, obs = Game.obstacles(), out = {};
-    for (const k of ['TOP_SPOT', 'ARRIVE', 'BOTTOM_SPOT', 'RACK_SPOT', 'SKI_SPOT', 'COCOA_PAD']) out[k] = !obs.some((o) => Game.hitRect(S[k].x, S[k].y, 12, o)) && S[k].y >= Game.walkTop();
+    for (const k of ['TOP_SPOT', 'EXIT_SPOT', 'ARRIVE', 'BOTTOM_SPOT', 'RACK_SPOT', 'SKI_SPOT', 'COCOA_PAD']) out[k] = !obs.some((o) => Game.hitRect(S[k].x, S[k].y, 12, o)) && S[k].y >= Game.walkTop();
     T.tp(S.TOP_SPOT.x, S.TOP_SPOT.y, 'snow'); out.down = T.label();
+    T.tp(S.EXIT_SPOT.x, S.EXIT_SPOT.y, 'snow'); out.down2 = T.label(); out.hint2 = T.hint();
     return out;
   });
-  for (const k of Object.keys(spots)) if (k !== 'down') t.expect(spots[k], `${k} is free snow`);
-  t.expectEq(spots.down, '🚡 Ride down', 'the button at the top station');
+  for (const k of Object.keys(spots)) if (!['down', 'down2', 'hint2'].includes(k)) t.expect(spots[k], `${k} is free snow`);
+  t.expectEq(spots.down, '🏗️ Back to town', 'the way home at the top station');
+  t.expectEq(spots.down2, '🏗️ Back to town', 'the way home at the bottom of the runs too');
+  t.expect(/Construction Town/.test(spots.hint2 || ''), 'the hint at the bottom exit says where it goes');
 
   // ---- sledding: grab a sled, slide down by itself, steer, bump a tree, stop at the bottom, ride up with it
   const sled1 = await t.ev(() => {

@@ -32,6 +32,7 @@ CFG.SNOW = {
   ARRIVE: { x: 5612, y: 5318 },                              // where the chef steps off a lift at the top
   BOTTOM: { x0: 5650, y0: 6500, x1: 5750, y1: 6560 },        // the bottom station (solid footprint)
   BOTTOM_SPOT: { x: 5612, y: 6452 },                         // '🚡 Ride up'
+  EXIT_SPOT: { x: 5830, y: 6452 },                           // '🏗️ Back to town' at the bottom too (the top one is TOP_SPOT)
   STRANDS: [5668, 5732], CABLE_H: 110, LIFT_SPEED: 340,
   TOWERS: [5560, 5860, 6160],                                // lift towers along x 5700
   SLOPE: { x0: 5040, y0: 5340, x1: 6460, y1: 6290 },         // where the snow slides you downhill
@@ -48,12 +49,12 @@ CFG.SNOW = {
   // pines: [x, y, size]
   TREES: [[5030, 5400, 1.2], [5040, 5700, 1.1], [5025, 6000, 1.3], [5045, 6250, 1], [5290, 5560, 1], [5470, 5700, 0.9],
     [5130, 5850, 1], [5320, 6020, 1.1], [5480, 6180, 0.9], [5830, 5480, 1], [6420, 5600, 1.1], [5840, 5900, 0.9],
-    [6410, 6050, 1], [5850, 6200, 1], [5100, 5222, 1.1], [5480, 5206, 1], [5900, 5212, 1.1], [6300, 5204, 1], [6480, 5226, 1.2],
+    [6410, 6050, 1], [5850, 6200, 1], [5100, 5222, 1.1], [5900, 5212, 1.1], [6300, 5204, 1], [6480, 5226, 1.2],
     [5200, 6530, 1], [5450, 6566, 1.1], [6000, 6540, 1], [6300, 6522, 1.2], [6520, 5970, 1], [7360, 5300, 1.2],
     [7370, 5700, 1.1], [7350, 6100, 1.2], [7360, 6450, 1], [6580, 6510, 1.1], [7120, 5980, 0.9], [6900, 5220, 1], [7220, 5212, 1.1],
     [6620, 6400, 0.9], [7250, 6420, 1], [7300, 5990, 1.1], [5250, 6420, 0.9], [6100, 6460, 0.8], [6420, 5200, 0.9]],
   MEADOW: { x0: 6540, y0: 5250, x1: 7340, y1: 5910 },
-  CABIN: { x0: 6700, y0: 6080, x1: 6960, y1: 6200 }, COCOA_PAD: { x: 6830, y: 6266 }, COCOA_T: 30, COCOA_PRICE: 3,
+  CABIN: { x0: 6700, y0: 6080, x1: 6960, y1: 6200 }, COCOA_PAD: { x: 6730, y: 6262 }, COCOA_T: 30, COCOA_PRICE: 3,
   DOG: { x0: 6580, y0: 5960, x1: 7300, y1: 6500, home: { x: 7040, y: 6290 } },
   KIDS: [{ lane: 5200, delay: 0, shirt: '#e4572e', cap: '#3b7dd8', sled: '#3b7dd8' }, { lane: 5400, delay: 6, shirt: '#8e5bd1', cap: '#ffd166', sled: '#2f9e44' },
     { lane: 5545, delay: 12, shirt: '#2f9e44', cap: '#e4572e', sled: '#ffd166' }],
@@ -159,7 +160,7 @@ const SnowExt = {
     if (g.driving) {
       if (!this.riding(g)) return null;
       const v = g.vehicle;
-      if (this.near(g, S.TOP_SPOT, 44)) return { label: '🚡 Ride down', run: (gg) => this.rideDownMountain(gg) };
+      if (this.near(g, S.TOP_SPOT, 44) || (this.near(g, S.EXIT_SPOT, 46) && this.speedOf(v) < 70 && !v.air)) return { label: '🏗️ Back to town', run: (gg) => this.rideDownMountain(gg) };
       if (this.inRunout(v.x, v.y) && this.speedOf(v) < 70 && !v.air) return { label: '🚡 Ride up', run: (gg) => this.startLift(gg) };
       return null;
     }
@@ -168,7 +169,7 @@ const SnowExt = {
       if (sk) return { label: '⛄ Stack it!', run: (gg) => this.stackOnto(gg, sk) };
       return { label: '✋ Let go', run: (gg) => this.letGo(gg) };
     }
-    if (this.near(g, S.TOP_SPOT, 40)) return { label: '🚡 Ride down', run: (gg) => this.rideDownMountain(gg) };
+    if (this.near(g, S.TOP_SPOT, 44) || this.near(g, S.EXIT_SPOT, 46)) return { label: '🏗️ Back to town', run: (gg) => this.rideDownMountain(gg) };
     if (this.near(g, S.BOTTOM_SPOT, 44)) return { label: '🚡 Ride up', run: (gg) => this.startLift(gg) };
     if (this.near(g, S.RACK_SPOT, 46)) return { label: '🛷 Grab a sled', run: (gg) => this.grabSled(gg) };
     if (this.near(g, S.SKI_SPOT, 46)) return { label: '⛷️ Put on skis', run: (gg) => this.putOnSkis(gg) };
@@ -211,7 +212,8 @@ const SnowExt = {
       if (this.sizeOf(b.r) < 3) return { text: 'Walk around to roll it bigger! ❄️', target: null };
       return { text: 'Big snowball! Let go and roll another ❄️', target: null };
     }
-    if (this.near(g, S.TOP_SPOT, 40)) return { text: 'Ride the lift back down to Construction Town 🚡', target: null };
+    if (this.near(g, S.TOP_SPOT, 44)) return { text: 'Ride the lift back to Construction Town 🏗️', target: null };
+    { const d = U.dist(p.x, p.y, S.EXIT_SPOT.x, S.EXIT_SPOT.y); if (d < 90) return { text: 'Ride the lift back to Construction Town 🏗️', target: d < 44 ? null : S.EXIT_SPOT }; }
     if (this.near(g, S.BOTTOM_SPOT, 44)) return { text: 'Ride the lift up the mountain! 🚡', target: null };
     if (this.near(g, S.RACK_SPOT, 46)) return { text: 'Grab a sled! 🛷', target: null };
     if (this.near(g, S.SKI_SPOT, 46)) return { text: 'Put on the skis! ⛷️', target: null };
@@ -229,7 +231,7 @@ const SnowExt = {
     if (!s.runs) return { text: 'Put on skis! ⛷️', target: S.SKI_SPOT };
     if (!s.built) return { text: 'Build a snowman! ⛄', target: { x: (S.MEADOW.x0 + S.MEADOW.x1) / 2, y: S.MEADOW.y0 + 120 } };
     if (!s.cocoas) return { text: 'Warm up with a hot cocoa! ☕', target: S.COCOA_PAD };
-    return { text: 'Sled, ski or build a snowman! ❄️', target: null };
+    return { text: 'Sled, ski, build a snowman, or ride home 🏗️', target: null };
   },
   pads(g) {
     if (g.area !== 'snow' || !this.st) return [];
@@ -251,7 +253,7 @@ const SnowExt = {
     if (tr.to === 'snow') {
       p.x = S.ARRIVE.x; p.y = S.ARRIVE.y; p.facing = 1;
       s.rides++;
-      if (!s.seen) { s.seen = true; g.toast('⛄ Welcome to Snowy Peak!', true); }
+      if (!s.seen) { s.seen = true; g.toast('⛄ Welcome to Snowy Peak!', true); this.say(g, S.TOP_SPOT.x - 40, S.TOP_SPOT.y - 60, '🏗️ The way home!', '#ffd166', false, 3.5); }
       else this.say(g, p.x, p.y - 80, 'Snowy Peak! 🏔️', '#ffffff', true, 1.6);
     } else {
       p.x = S.CT.BOARD.x; p.y = S.CT.BOARD.y; p.facing = 1;
@@ -699,7 +701,8 @@ const SnowExt = {
     ctx.fillStyle = '#ffffff'; ctx.fillRect(K.x - 50, K.y - 50, 100, 5);
     this.paintSpot(r, S.RACK_SPOT, '🛷');
     this.paintSpot(r, S.SKI_SPOT, '⛷️');
-    this.paintSpot(r, S.TOP_SPOT, '🚡');
+    this.paintExit(r, S.TOP_SPOT, -112);
+    this.paintExit(r, S.EXIT_SPOT, 64);
     this.paintSpot(r, S.BOTTOM_SPOT, '🚡');
     // the sky band with the mountain peaks (drawn before the huts at the top so their roofs stand against it)
     this.paintSky(r, W.x0, W.x1, W.y0, top);
@@ -735,6 +738,14 @@ const SnowExt = {
     ctx.fillStyle = col; U.roundRect(ctx, x - w / 2, y - 52, w, 24, 6); ctx.fill();
     ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; U.roundRect(ctx, x - w / 2, y - 52, w, 24, 6); ctx.stroke();
     ctx.fillStyle = '#ffffff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, x, y - 39);
+  },
+  // the way back to Construction Town: an orange mat with the town's crane on it and a big sign beside it
+  paintExit(r, s, signDx) {
+    const ctx = r.ctx;
+    ctx.fillStyle = 'rgba(255,140,26,0.3)'; ctx.beginPath(); ctx.ellipse(s.x, s.y, 30, 14, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#ff8c1a'; ctx.lineWidth = 3; ctx.setLineDash([6, 4]); ctx.beginPath(); ctx.ellipse(s.x, s.y, 30, 14, 0, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+    ctx.font = r.font(15); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🏗️', s.x, s.y + 1);
+    this.paintSign(r, s.x + signDx, s.y - 6, '🏗️ TO TOWN', '#ff8c1a');
   },
   paintSpot(r, s, ico) {
     const ctx = r.ctx;

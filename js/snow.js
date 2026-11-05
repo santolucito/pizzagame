@@ -65,7 +65,7 @@ CFG.SNOW = {
     [6620, 6400, 0.9], [7250, 6420, 1], [7300, 5990, 1.1], [5250, 6420, 0.9], [6100, 6460, 0.8], [6420, 5200, 0.9],
     [5100, 6700, 1.1], [5330, 6740, 1], [5560, 6690, 0.9], [6200, 6720, 1.1], [6450, 6690, 1], [6700, 6740, 1.2], [6980, 6700, 1], [7250, 6730, 1.1]],
   MEADOW: { x0: 6540, y0: 5250, x1: 7340, y1: 5910 },
-  CABIN: { x0: 6700, y0: 6080, x1: 6960, y1: 6200 }, COCOA_PAD: { x: 6730, y: 6262 }, COCOA_T: 30, COCOA_PRICE: 3,
+  CABIN: { x0: 6700, y0: 6080, x1: 6960, y1: 6200 }, CABIN_DOOR: { x: 6830, y: 6232 }, COCOA_T: 30,   // hot cocoa: inside the Cocoa Cabin (js/cocoacabin.js)
   DOG: { x0: 6580, y0: 5960, x1: 7300, y1: 6500, home: { x: 7040, y: 6290 } },
   KIDS: [{ lane: 5200, delay: 0, shirt: '#e4572e', cap: '#3b7dd8', sled: '#3b7dd8' }, { lane: 5400, delay: 6, shirt: '#8e5bd1', cap: '#ffd166', sled: '#2f9e44' },
     { lane: 5545, delay: 12, shirt: '#2f9e44', cap: '#e4572e', sled: '#ffd166' }],
@@ -231,7 +231,7 @@ const SnowExt = {
     if (this.near(g, S.BOTTOM_SPOT, 44)) return { text: 'Ride the lift up the mountain! 🚡', target: null };
     if (this.near(g, S.RACK_SPOT, 46)) return { text: 'Grab a sled! 🛷', target: null };
     if (this.near(g, S.SKI_SPOT, 46)) return { text: 'Put on the skis! ⛷️', target: null };
-    if (st.cocoa > 0 && this.near(g, S.COCOA_PAD, 60)) return { text: 'Mmm, hot cocoa! ☕', target: null };
+    if (st.cocoa > 0 && this.near(g, S.CABIN_DOOR, 60)) return { text: 'Mmm, hot cocoa! ☕', target: null };
     const done = st.stacks.find((sk) => sk.balls.length >= 3);
     if (done) return { text: 'Give the snowman a face! 🥕', target: { x: done.x, y: done.y + 20 } };
     if (this.inMeadow(p.x, p.y)) {
@@ -244,20 +244,8 @@ const SnowExt = {
     if (!s.sleds) return { text: 'Grab a sled and slide down! 🛷', target: S.RACK_SPOT };
     if (!s.runs) return { text: 'Put on skis! ⛷️', target: S.SKI_SPOT };
     if (!s.built) return { text: 'Build a snowman! ⛄', target: { x: (S.MEADOW.x0 + S.MEADOW.x1) / 2, y: S.MEADOW.y0 + 120 } };
-    if (!s.cocoas) return { text: 'Warm up with a hot cocoa! ☕', target: S.COCOA_PAD };
+    if (!s.cocoas) return { text: 'Warm up with a hot cocoa! ☕', target: S.CABIN_DOOR };
     return { text: 'Sled, ski, build a snowman, or ride home 🏗️', target: null };
-  },
-  pads(g) {
-    if (g.area !== 'snow' || !this.st) return [];
-    const S = CFG.SNOW;
-    return [{ key: 'snowCocoa', label: 'Hot cocoa', ico: '☕', pos: S.COCOA_PAD, price: S.COCOA_PRICE, sub: 'warm & yummy' }];
-  },
-  onPad(g, pad) {
-    if (pad.key !== 'snowCocoa') return;
-    const p = g.player, s = this.save(g);
-    this.st.cocoa = CFG.SNOW.COCOA_T; s.cocoas++;
-    this.say(g, p.x, p.y - 74, 'Mmm, hot cocoa! ☕', '#ffe08a', true, 1.6);
-    Haptics.success();
   },
   arrive(g, tr) {
     if (tr.via !== 'skilift') return;

@@ -29,12 +29,10 @@ module.exports = async (t) => {
   // ---- the door spot on the snow
   const spot = await t.ev(() => {
     const D = CFG.COCOACABIN.DOOR_OUT, S = CFG.SNOW;
-    return { dx: D.x - (S.CABIN.x0 + S.CABIN.x1) / 2, below: D.y - S.CABIN.y1, free: SnowExt.free(Game, D.x, D.y, 12), pad: S.COCOA_PAD, padD: Math.hypot(D.x - S.COCOA_PAD.x, D.y - S.COCOA_PAD.y) };
+    return { dx: D.x - (S.CABIN.x0 + S.CABIN.x1) / 2, below: D.y - S.CABIN.y1, free: SnowExt.free(Game, D.x, D.y, 12) };
   });
   t.expect(spot.dx === 0 && spot.below > 20 && spot.below < 40, `the door spot is right below the cabin's door (${JSON.stringify(spot)})`);
   t.expect(spot.free, 'the door spot is free snow');
-  if (spot.pad.x === 6830 && spot.pad.y === 6266) console.log('   (the hot cocoa pad is still at its old spot in front of the door; the coordinator is moving it)');
-  else t.expect(spot.padD > 40 + 6 + 12, `the door spot is off the hot cocoa pad (${JSON.stringify(spot)})`);
   await t.ev(() => { const D = CFG.COCOACABIN.DOOR_OUT; T.tp(D.x + 50, D.y + 10, 'snow'); T.step(2); });
   t.expectEq(await t.ev(() => T.hint()), 'Go inside the Cocoa Cabin! 🍫', 'door hint near the door');
   t.expect(await t.ev(() => { const D = CFG.COCOACABIN.DOOR_OUT, h = Game.hint; return !!h.target && h.target.x === D.x && h.target.y === D.y; }), 'the hint arrow points at the door');

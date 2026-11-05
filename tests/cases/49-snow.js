@@ -83,7 +83,7 @@ module.exports = async (t) => {
   t.expectEq(again, 0, 'no second welcome toast');
   const spots = await t.ev(() => {
     const S = CFG.SNOW, obs = Game.obstacles(), out = {};
-    for (const k of ['TOP_SPOT', 'DOWN_ARRIVE', 'ARRIVE', 'BOTTOM_SPOT', 'RACK_SPOT', 'SKI_SPOT', 'COCOA_PAD']) out[k] = !obs.some((o) => Game.hitRect(S[k].x, S[k].y, 12, o)) && S[k].y >= Game.walkTop();
+    for (const k of ['TOP_SPOT', 'DOWN_ARRIVE', 'ARRIVE', 'BOTTOM_SPOT', 'RACK_SPOT', 'SKI_SPOT', 'CABIN_DOOR']) out[k] = !obs.some((o) => Game.hitRect(S[k].x, S[k].y, 12, o)) && S[k].y >= Game.walkTop();
     T.tp(S.TOP_SPOT.x, S.TOP_SPOT.y, 'snow'); out.down = T.label();
     for (const k of ['BOARD', 'OFF']) out['VALLEY.' + k] = !obs.some((o) => Game.hitRect(S.VALLEY[k].x, S.VALLEY[k].y, 12, o));
     T.tp(S.VALLEY.BOARD.x, S.VALLEY.BOARD.y, 'snow'); out.down2 = T.label(); out.hint2 = T.hint();
@@ -262,16 +262,15 @@ module.exports = async (t) => {
   const cap = await t.ev(() => { const s = Game.s.snow; for (let i = 0; i < 4; i++) { SnowExt.st.stacks.push({ x: 6700 + i * 120, y: 5700, balls: [26, 20, 15], t: 0 }); SnowExt.addFace(Game, SnowExt.st.stacks[SnowExt.st.stacks.length - 1]); } return { built: s.built, men: s.men.length }; });
   t.expect(cap.built === 5 && cap.men === 3, 'up to three snowmen stay standing');
 
-  // ---- hot cocoa for $3, carried for 30 s
+  // ---- hot cocoa only comes from inside the Cocoa Cabin (no pad on the snow), and is carried for 30 s
   const cocoa = await t.ev(() => {
-    const S = CFG.SNOW; Game.s.cash = 10; T.tp(S.COCOA_PAD.x, S.COCOA_PAD.y, 'snow');
-    const n = T.until(() => SnowExt.st.cocoa > 0, 600);
-    const out = { n, cash: Game.s.cash, cocoas: Game.s.snow.cocoas, t: SnowExt.st.cocoa };
-    T.tp(S.COCOA_PAD.x + 120, S.COCOA_PAD.y + 40, 'snow'); T.step(60 * 31); out.after = SnowExt.st.cocoa;
-    return out;
+    const S = CFG.SNOW; T.tp(S.CABIN_DOOR.x - 100, S.CABIN_DOOR.y + 40, 'snow'); T.step(2);
+    const pads = Game.allPads().filter((p) => /cocoa/i.test(p.key + ' ' + p.label)).length, hint = T.hint(), tgt = Game.hint && Game.hint.target;
+    SnowExt.st.cocoa = S.COCOA_T; T.step(2); const t0 = SnowExt.st.cocoa; T.step(60 * 31);
+    return { pads, hint, tgt, t0, after: SnowExt.st.cocoa };
   });
-  t.expect(cocoa.n >= 0 && Math.abs(cocoa.cash - 7) < 0.01 && cocoa.cocoas === 1, 'standing on the pad buys a $3 hot cocoa');
-  t.expect(cocoa.t > 29 && cocoa.after === 0, 'the cocoa is carried for 30 s');
+  t.expect(cocoa.pads === 0, `no hot cocoa pad outside the cabin ${JSON.stringify(cocoa)}`);
+  t.expect(cocoa.t0 > 29 && cocoa.after === 0, 'the cocoa is carried for 30 s');
 
   // ---- rescue: a chef inside a tree goes to the top station
   const rescue = await t.ev(() => { const tr = CFG.SNOW.TREES[4]; T.tp(tr[0], tr[1] - 2, 'snow'); T.step(2); return { x: Game.player.x, y: Game.player.y }; });

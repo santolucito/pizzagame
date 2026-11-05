@@ -7,7 +7,7 @@
 //     tyre tracks in the snow.
 //   - Snowy Peak: an orange snow plow truck ('snowplow') is parked by the valley lift station. The flat snow away from
 //     the runs and the snowman meadow is fresh powder; the plow clears roads through it (a packed blue-grey track with
-//     little snowbanks along its sides and a spray off the blade) and fresh snow slowly fills them back in.
+//     little snowbanks along its sides and a spray off the blade) which stay clear while the chef is on Snowy Peak; fresh snow covers them once the chef has left.
 // Everything here is runtime-only (nothing saved).
 //
 // The snow on the ground is a coarse grid (CELL px) drawn into an offscreen canvas at RES px per world px. Each cell is
@@ -22,9 +22,8 @@ CFG.SNOWPLOW = {
   CELL: 24, RES: 0.5,                 // grid cell size (world px) and the cover canvas's resolution (canvas px per world px)
   FALL: 30,                           // seconds of full snowfall for the site's cover to build from bare ground to full
   MELT: 150,                          // seconds for a full site cover to melt away once the snow stops
-  SITE_REFILL: 40,                    // seconds of snowfall for a plowed site cell to fill back in
-  PEAK_REFILL: 120,                   // seconds for a plowed road on Snowy Peak to fill in with fresh powder
-  BANK_FADE: 150,                     // seconds for the snowbanks beside a plowed road to settle
+  // Plowed roads (the plow's on Snowy Peak, the bulldozer's in Construction Town) stay clear for as long as the chef is
+  // in that place (its buildings count too); fresh snow covers them again once the chef has gone somewhere else.
   PILE_CAP: 14,                       // the most snow (in cells) a bulldozer's blade pile holds
   PILE_MAX: 36,                       // piles left lying around at once
   BUDGET: 60,                         // cell redraws per frame (more while the layer is invisible)
@@ -351,6 +350,20 @@ const SnowPlowExt = {
     }
   },
 
+  // which place an area belongs to (an interior counts as its town: the Cocoa Cabin is still Snowy Peak)
+  placeOf(area) {
+    if (typeof WorldMapExt !== 'undefined' && WorldMapExt.placeOf) return WorldMapExt.placeOf(area) || area;
+    return { cocoacabin: 'snow', mines: 'site', diner: 'site', hardware: 'site' }[area] || area;
+  },
+  // fresh snow over every plowed cell of a map (and its banks, piles and tyre marks)
+  refresh(area) {
+    const L = this.layers[area], st = this.st;
+    for (const i of L.active.slice()) this.setCell(L, i, 0, 0);
+    this.stepActive(L, 0, 0);
+    st.stamps = st.stamps.filter((s) => s.area !== area);
+    if (area === 'site') { st.piles = []; st.carry = 0; }
+  },
+
   // ---------- game hooks ----------
   vehicles(g) { this.ensure(g); return g.area === 'snow' ? [this.v] : []; },
 
@@ -358,6 +371,13 @@ const SnowPlowExt = {
     this.ensure(g);
     const st = this.st;
     st.time += dt;
+    // leaving a place: its plowed roads fill in with fresh snow (they stay clear while the chef is still there)
+    const place = g.travel ? null : this.placeOf(g.area);
+    if (place !== st.place) {
+      if (st.place === 'snow') this.refresh('snow');
+      if (st.place === 'site') this.refresh('site');
+      st.place = place;
+    }
     this.updateSite(g, dt);
     this.updatePeak(g, dt);
     // paint a layer ahead of time, a band per step: the site's while it snows, Snowy Peak's on the way there
@@ -379,8 +399,6 @@ const SnowPlowExt = {
     const was = st.level;
     if (k > 0) st.level = Math.min(1, st.level + k * dt / P.FALL);
     else st.level = Math.max(0, st.level - dt / P.MELT);
-    // plowed cells fill in again while it snows
-    if (L.active.length) this.stepActive(L, k > 0 ? k * dt / P.SITE_REFILL : 0, 0);
     // all melted: the ground is bare, so every plowed cell starts fresh for the next shower
     if (st.level <= 0 && was > 0) {
       for (const i of L.active.slice()) this.setCell(L, i, 0);
@@ -459,7 +477,6 @@ const SnowPlowExt = {
   // ---- Snowy Peak: the plow
   updatePeak(g, dt) {
     const P = CFG.SNOWPLOW, st = this.st, L = this.layers.snow, v = this.v;
-    if (L.active.length) this.stepActive(L, dt / P.PEAK_REFILL, dt / P.BANK_FADE);
     const riding = this.riding(g);
     v.flash += dt * (riding ? 1 : 0.5);
     if (g.area !== 'snow' || g.travel) return;

@@ -187,12 +187,17 @@ module.exports = async (t) => {
   await t.shot('plowing');
   await t.ev(() => { T.unsteer(); T.step(2); });
 
-  // ---- the road fills back in over a couple of minutes
+  // ---- the road stays clear while the chef is on Snowy Peak (the Cocoa Cabin counts), and fills in once they leave
   const refill = await t.ev(() => {
-    const y = CFG.SNOWPLOW.SPOT.y, d = () => SnowPlowExt.depthAt('snow', 6240, y);
-    T.step(60 * 50); const at50 = d(); T.step(60 * 80); return { at50, at130: d(), active: SnowPlowExt.layers.snow.active.length };
+    const y = CFG.SNOWPLOW.SPOT.y, d = () => SnowPlowExt.depthAt('snow', 6240, y), p = Game.player;
+    const at0 = d(); T.step(60 * 130); const at130 = d();
+    const x = p.x, yy = p.y; Game.area = 'cocoacabin'; T.step(30); Game.area = 'snow'; T.step(30); const cabin = d();
+    Game.startTravel('site', 'skilift', 1); T.until(() => !Game.travel, 600); T.step(5);
+    Game.startTravel('snow', 'skilift', 1); T.until(() => !Game.travel, 600); T.until(() => !SnowExt.st.lift, 600); T.step(5);
+    return { at0, at130, cabin, back: d(), active: SnowPlowExt.layers.snow.active.length, area: Game.area, x, yy };
   });
-  t.expect(refill.at50 > 0.2 && refill.at50 < 0.8 && refill.at130 === 1, `fresh snow fills the road back in ${JSON.stringify(refill)}`);
+  t.expect(refill.at0 < 0.2 && refill.at130 < 0.2 && refill.cabin < 0.2, `the road stays plowed while the chef is on Snowy Peak ${JSON.stringify(refill)}`);
+  t.expect(refill.area === 'snow' && refill.back === 1 && refill.active === 0, `after a trip to town the road is fresh powder again ${JSON.stringify(refill)}`);
 
   // ---- hop out on free snow; the plow stays where it was left
   const out = await t.ev(() => {

@@ -9,6 +9,16 @@ A feature file defines one object, pushes it to **both** `Game.ext` and `Render.
 config under a new key on `CFG` (for example `CFG.CITY = {...}`), register a new map in `CFG.AREAS`, and add
 vehicle specs to `CFG.VEHICLES`. It must not edit the core files.
 
+## Design rule: everything can be ridden and entered
+
+The game is played by a dad and his four-to-five-year-old son, and the house rule is simple: **every vehicle can be
+ridden or driven, and every building can be entered.** When you add a vehicle (a truck, a crane, a boat, a ride), give
+it a one-button way to get on (`CFG.VEHICLES` + `vehicles()`, or a ride of your own) and a way to get off. When you
+draw a building, give it a door ('🚪 Go inside') and a small interior with a few one-button things to do (see
+"Interiors" below), or make it obviously not a building (a fence, a sign, a tank). Purely decorative props are fine;
+something that looks like a vehicle or a house is not decoration. One button for everything, no reading needed, no
+failure states, everything drawn to the chef's scale (a person is about 70 px tall).
+
 ## Maps ("areas")
 
 The whole game shares one coordinate space. Each map is a rectangle of it; nothing in one map can reach

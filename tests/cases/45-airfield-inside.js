@@ -1,9 +1,10 @@
 'use strict';
 // Inside the airfield's buildings: each door spot (free ground, reachable, its label and hint, no hint further away),
 // going in (the room, the mat, a welcome toast once, a hint that points at something in the room), every interactive
-// thing (the terminal's check-in desk, security arch, baggage carousel, seats and $3 toy plane; the hangar's tug and
-// mechanic; the tower's stairs, binoculars and microphone; the workshop's propeller, vice, mechanic and $4 toolbox),
-// nothing stuck anywhere, a rescue from a wall, Take-me-home from inside, and going back out onto the door spot.
+// thing (the big terminal's whole flow: check-in, security with the X-ray belt and the scanner arch, picking the bag up,
+// the lounge's seats and $3 toy plane, on to Gate 1, baggage claim; the hangar's mechanic and the tug that drives you
+// out; the tower's stairs, binoculars and microphone; the workshop's propeller, vice, mechanic and $4 toolbox), nothing
+// stuck anywhere, a rescue from a wall, Take-me-home from inside, and going back out onto the door spot.
 module.exports = async (t) => {
   await t.boot();
   // until the coordinator wires js/airfield-inside.js into index.html, load it into the booted page
@@ -11,7 +12,10 @@ module.exports = async (t) => {
   t.expect(await t.ev(() => typeof AirfieldInsideExt !== 'undefined'), 'the extension is loaded');
   t.expect(await t.ev(() => Game.ext.indexOf(AirfieldInsideExt) < Game.ext.indexOf(CityExt) && Game.ext.indexOf(AirfieldInsideExt) < Game.ext.indexOf(AirfieldExt)), 'it answers before the City and the airfield');
   const rects = await t.ev(() => Object.entries(CFG.AF_IN.ROOMS).map(([k, R]) => [k, CFG.AREAS[k] && CFG.AREAS[k].WORLD === R.WORLD, R.WORLD.x0, R.WORLD.y0, R.WORLD.x1 - R.WORLD.x0, R.WORLD.y1 - R.WORLD.y0]));
-  t.expectEq(JSON.stringify(rects), JSON.stringify([['afterminal', true, 13000, 4000, 600, 400], ['afhangar', true, 14000, 4000, 600, 400], ['aftower', true, 15000, 4000, 600, 400], ['afworkshop', true, 16000, 4000, 600, 400]]), 'four interiors in their reserved rectangles');
+  t.expectEq(JSON.stringify(rects), JSON.stringify([['afterminal', true, 27000, 4000, 1040, 740], ['afhangar', true, 14000, 4000, 600, 400], ['aftower', true, 15000, 4000, 600, 400], ['afworkshop', true, 16000, 4000, 600, 400], ['affuel', true, 19000, 4000, 600, 400], ['afgate', true, 23000, 4000, 600, 400]]), 'the interiors in their reserved rectangles (the fuel farm and gate 1: tests/cases/60-airport-buildings.js)');
+  // the big terminal sits in a free rectangle of its own: nothing else overlaps it
+  t.expectEq(await t.ev(() => { const a = CFG.AREAS.afterminal.WORLD; return Object.entries(CFG.AREAS).filter(([k, A]) => k !== 'afterminal' && a.x0 < A.WORLD.x1 && a.x1 > A.WORLD.x0 && a.y0 < A.WORLD.y1 && a.y1 > A.WORLD.y0).map(([k]) => k).join(','); }), '', 'no other map overlaps the terminal');
+  t.expectEq(await t.ev(() => WorldMapExt.placeOf('afterminal')), 'town', 'the terminal is on the world map, in town');
 
   const ROOMS = ['afterminal', 'afhangar', 'aftower', 'afworkshop'];
   const HINTS = { afterminal: 'Go inside the terminal! 🧳', afhangar: 'Go inside the hangar! ✈️', aftower: 'Go inside the control tower! 🗼', afworkshop: 'Go inside the workshop! 🔧' };
@@ -68,7 +72,7 @@ module.exports = async (t) => {
     t.expect(TOASTS[k] === (await t.ev((k) => CFG.AF_IN.ROOMS[k].toast, k)), `${k}: its toast text`);
     // every spot you press the button on, and the exit mat, is free floor; nobody is stuck anywhere in the room
     const spots = await t.ev((k) => {
-      const R = CFG.AF_IN.ROOMS[k], E = AirfieldInsideExt, names = ['EXIT', 'CHECKIN', 'BAG_SPOT', 'TOY_PAD', 'MECH_SPOT', 'TUG_SPOT', 'FOOT', 'VICE_SPOT', 'PROP_SPOT', 'HI_SPOT', 'TOOL_PAD'];
+      const R = CFG.AF_IN.ROOMS[k], E = AirfieldInsideExt, names = ['EXIT', 'CHECKIN', 'BAG_SPOT', 'TOY_PAD', 'TRAY_SPOT', 'PICK_SPOT', 'ARCH_SPOT', 'ARCH_BACK', 'GATE_DOOR', 'MECH_SPOT', 'TUG_SPOT', 'FOOT', 'VICE_SPOT', 'PROP_SPOT', 'HI_SPOT', 'TOOL_PAD'];
       const pts = names.filter((n) => R[n]).map((n) => [n, R[n]]);
       if (k === 'afterminal') for (const y of R.SEAT_YS) for (const x of R.SEAT_XS) pts.push(['seat', { x, y }]);
       return pts.filter(([n, q]) => !E.free(Game, q.x, q.y) || Game.obstacles().some((o) => Game.hitRect(q.x, q.y, 11.5, o))).map(([n]) => n);
@@ -99,48 +103,88 @@ module.exports = async (t) => {
     t.expect(again.area === k && again.n === 1, `${k}: in again, the toast only once`);
   }
 
-  // ======== the terminal ========
+  // ======== the terminal: check-in, security, the lounge ========
   // (the walk-everywhere checks above tried things on the way: start the counting afresh)
   await t.ev(() => { for (const k of Object.keys(Game.s.afIn)) if (typeof Game.s.afIn[k] === 'number') Game.s.afIn[k] = 0; AirfieldInsideExt.home(Game); });
   await t.ev(() => { Game.s.cash = 0; const R = CFG.AF_IN.ROOMS.afterminal; T.tp(R.EXIT.x, R.EXIT.y - 8, 'afterminal'); T.step(2); });
+  const size = await t.ev(() => { const A = CFG.AF_IN.ROOMS.afterminal.ROOM; return [A.x1 - A.x0, A.y1 - A.y0]; });
+  t.expect(size[0] >= 900 && size[1] >= 560, `terminal: about twice the old room (${size})`);
   t.expectEq(await t.ev(() => T.hint()), 'Check in at the desk! 🎫', 'terminal: check-in hint first');
   await t.shot('terminal');
+  // check in: a boarding pass, and the big suitcase rides off along the belt behind the desk
   await t.ev(() => { const R = CFG.AF_IN.ROOMS.afterminal; T.tp(R.CHECKIN.x, R.CHECKIN.y, 'afterminal'); });
   t.expectEq(await t.ev(() => T.label()), '🎫 Check in', 'terminal: check-in label at the desk');
   await t.ev(() => { T.act(); T.step(2); });
   t.expect(await t.ev(() => Game.s.afIn.checkins === 1 && AirfieldInsideExt.st.agent > 0 && Game.floats.some((f) => f.text === '🎫 Boarding pass!')), 'terminal: checked in, a boarding pass');
+  const ride = await t.ev(() => { const E = AirfieldInsideExt, R = CFG.AF_IN.ROOMS.afterminal, a = E.checkBagPos(); T.step(90); const b = E.checkBagPos(); T.step(140); return { a, b, gone: !E.st.checkBag || E.checkBagPos().gone, scale: R.SCALE, beltY: R.BELT_Y }; });
+  t.expect(ride.a && ride.b && Math.abs(ride.a.x - ride.scale.x) < 2 && ride.b.x < ride.a.x - 20 && ride.b.y === ride.beltY && ride.gone, `terminal: the checked suitcase rides off along the belt (${JSON.stringify(ride)})`);
+  await t.ev(() => { const R = CFG.AF_IN.ROOMS.afterminal; T.tp(R.CHECKIN.x, R.CHECKIN.y, 'afterminal'); T.act(); T.step(50); });
   await t.shot('terminal-checkin');
-  t.expectEq(await t.ev(() => T.hint()), 'Walk through the security arch! 🚨', 'terminal: the arch next');
-  // walking through the arch, from the desk side down towards the door: beep
-  const beep = await t.ev(() => {
-    const A = CFG.AF_IN.ROOMS.afterminal.ARCH, x = (A.x0 + A.x1) / 2;
-    T.tp(x, A.y - 40, 'afterminal'); T.step(2); const before = Game.s.afIn.beeps;
-    T.steer(0, 1); const n = T.until(() => Game.player.y > A.y + 20, 120); T.unsteer();
-    return { before, n, beeps: Game.s.afIn.beeps, beep: AirfieldInsideExt.st.beep, hint: T.hint(), y: Game.player.y };
+  // security: the bag on the belt, through the X-ray (the screen shows a pizza and a teddy), out the far end
+  t.expectEq(await t.ev(() => T.hint()), 'Put your bag on the belt! 🧳', 'terminal: the X-ray belt next');
+  t.expect(await t.ev(() => { const R = CFG.AF_IN.ROOMS.afterminal, h = Game.hint.target; return !!h && h.x === R.TRAY_SPOT.x && h.y === R.TRAY_SPOT.y; }), 'terminal: the hint points at the grey tray');
+  await t.ev(() => { const R = CFG.AF_IN.ROOMS.afterminal; T.tp(R.TRAY_SPOT.x, R.TRAY_SPOT.y, 'afterminal'); });
+  t.expectEq(await t.ev(() => T.label()), '🧳 Put your bag on the belt', 'terminal: tray label');
+  const xr = await t.ev(() => {
+    const E = AirfieldInsideExt; E.st.bag = 12; T.act(); T.step(2);
+    const r = { ph0: E.xrayPhase(), carried: E.st.bag, n: Game.s.afIn.xrays, floats: Game.floats.map((f) => f.text), label: T.label() };
+    const p0 = E.xbagPos(); T.step(30); const p1 = E.xbagPos(); r.rides = !!(p0 && p1 && p1.y < p0.y - 20);
+    T.until(() => E.xrayPhase() === 'scan', 200); T.step(30);
+    r.ph1 = E.xrayPhase(); r.hidden = E.xbagPos() === null; r.items = E.st.xray.items.map((i) => i[0]); r.hint = T.hint();
+    return r;
   });
-  t.expect(beep.before === 0 && beep.n >= 0 && beep.beeps === 1 && beep.beep > 0, `terminal: walking through the arch beeps (${JSON.stringify(beep)})`);
-  t.expectEq(beep.hint, 'Beep! It found your pizza! 🍕', 'terminal: beep hint');
-  await t.ev(() => { T.steer(0, -1); T.step(4); T.unsteer(); T.step(2); });
-  await t.shot('terminal-beep');
-  // walking down past the gift shop, round the arch, does not beep
-  const round = await t.ev(() => {
+  t.expect(xr.ph0 === 'in' && xr.carried === 0 && xr.n === 1 && xr.floats.includes('On the belt! 🧳') && xr.label !== '🧳 Put your bag on the belt', `terminal: the bag goes on the belt (${JSON.stringify(xr)})`);
+  t.expect(xr.rides, 'terminal: the bag rides along the belt towards the X-ray');
+  t.expect(xr.ph1 === 'scan' && xr.hidden, 'terminal: inside the X-ray tunnel');
+  t.expectEq(xr.items.join(','), 'pizza,teddy', 'terminal: the X-ray finds a pizza and a teddy');
+  t.expectEq(xr.hint, 'Look! The X-ray sees inside your bag 👀', 'terminal: X-ray hint');
+  await t.shot('terminal-xray');
+  await t.page.setViewportSize({ width: 390, height: 844 });
+  await t.ev(() => { Render.resize(); T.step(2); });
+  await t.shot('terminal-xray-phone');
+  await t.page.setViewportSize({ width: 1100, height: 720 });
+  await t.ev(() => { Render.resize(); T.step(1); });
+  // the scanner arch: '🚶 Walk through' walks the chef through it: green lights, "Beep! All clear", the guard waves
+  t.expectEq(await t.ev(() => { T.until(() => AirfieldInsideExt.xrayPhase() !== 'scan', 300); T.step(1); return T.hint(); }), 'Walk through the scanner! 🚶', 'terminal: the scanner arch next');
+  await t.ev(() => { const R = CFG.AF_IN.ROOMS.afterminal; T.tp(R.ARCH_SPOT.x, R.ARCH_SPOT.y, 'afterminal'); });
+  t.expectEq(await t.ev(() => T.label()), '🚶 Walk through', 'terminal: walk-through label at the arch');
+  const thru = await t.ev(() => {
+    const E = AirfieldInsideExt, R = CFG.AF_IN.ROOMS.afterminal; T.act();
+    const walking = !!E.st.walk, l = T.label(); let crossed = null;
+    const n = T.until(() => { if (crossed === null && Game.player.y < R.PART_Y) crossed = { beeps: Game.s.afIn.beeps }; return !E.st.walk; }, 300);
+    return { walking, l, n, crossed, y: Game.player.y, x: Game.player.x, beeps: Game.s.afIn.beeps, beep: E.st.beep, hint: T.hint(), walkThrus: Game.s.afIn.walkThrus, partY: R.PART_Y };
+  });
+  t.expect(thru.walking && thru.l === null && thru.n > 20, `terminal: walking through the arch, no button meanwhile (${JSON.stringify(thru)})`);
+  t.expect(thru.y < thru.partY - 30 && thru.beeps === 1 && thru.beep > 0 && thru.walkThrus === 1, `terminal: through to the lounge, all clear (${JSON.stringify(thru)})`);
+  t.expectEq(thru.hint, 'Beep! All clear ✅', 'terminal: all-clear hint');
+  await t.ev(() => { T.step(4); });
+  await t.shot('terminal-allclear');
+  // the bag comes out the far end: pick it up
+  const pick = await t.ev(() => {
+    const E = AirfieldInsideExt, R = CFG.AF_IN.ROOMS.afterminal; T.until(() => E.st.bagReady, 400); T.step(120);
+    const hint = T.hint(), tgt = Game.hint && Game.hint.target, at = E.xbagPos();
+    T.tp(R.PICK_SPOT.x, R.PICK_SPOT.y, 'afterminal'); const label = T.label(); T.act(); T.step(2);
+    return { hint, toPick: !!tgt && tgt.x === R.PICK_SPOT.x, at, belt: R.XBELT, label, bag: E.st.bag, ready: E.st.bagReady, n: Game.s.afIn.pickups, floats: Game.floats.map((f) => f.text) };
+  });
+  t.expectEq(pick.hint, 'Pick up your bag! 🧳', 'terminal: pick-up hint');
+  t.expect(pick.toPick && pick.at && pick.at.y < pick.belt.y0 + 30, `terminal: the bag waits at the lounge end of the belt (${JSON.stringify(pick)})`);
+  t.expectEq(pick.label, '🧳 Pick up your bag', 'terminal: pick-up label');
+  t.expect(pick.bag > 29 && !pick.ready && pick.n === 1 && pick.floats.includes('Got my bag! 🧳'), `terminal: carrying the bag (${JSON.stringify(pick)})`);
+  await t.ev(() => { const R = CFG.AF_IN.ROOMS.afterminal; T.tp(R.PICK_SPOT.x + 30, R.PICK_SPOT.y + 30, 'afterminal'); T.step(2); });
+  await t.shot('terminal-pickup');
+  // the glass wall: no way between the hall and the lounge except through the arch; walking through by hand beeps too
+  const glass = await t.ev(() => {
+    const R = CFG.AF_IN.ROOMS.afterminal, out = [];
+    for (const x of [27100, 27300, 27470, 27650, 27800, 27950]) { T.tp(x, R.PART_Y - 40, 'afterminal'); T.steer(0, 1); T.step(60); T.unsteer(); if (Game.player.y > R.PART_Y) out.push(x); AirfieldInsideExt.resetRoom(); }
     T.step(120);
-    T.tp(13475, 4150, 'afterminal'); T.steer(0, 1); T.until(() => Game.player.y > 4260, 120); T.unsteer();
-    return { beeps: Game.s.afIn.beeps, y: Game.player.y };
+    const b0 = Game.s.afIn.beeps; T.tp(R.ARCH_BACK.x, R.ARCH_BACK.y, 'afterminal'); T.steer(0, 1); const n = T.until(() => Game.player.y > R.PART_Y + 30, 200); T.unsteer();
+    return { through: out, n, beeped: Game.s.afIn.beeps - b0 };
   });
-  t.expect(round.beeps === 1 && round.y > 4250, `terminal: walking round the arch does not beep (${JSON.stringify(round)})`);
-  // the bag on the carousel
-  t.expectEq(await t.ev(() => { T.step(1); return T.hint(); }), 'Grab your bag from the belt! 🧳', 'terminal: bag hint');
-  await t.ev(() => { const S = CFG.AF_IN.ROOMS.afterminal.BAG_SPOT; T.tp(S.x, S.y, 'afterminal'); });
-  t.expectEq(await t.ev(() => T.label()), '🧳 Grab your bag', 'terminal: grab label by the belt');
-  await t.ev(() => { T.act(); T.step(2); });
-  const bag = await t.ev(() => ({ bag: AirfieldInsideExt.st.bag, bags: Game.s.afIn.bags, label: T.label(), floats: Game.floats.map((f) => f.text) }));
-  t.expect(bag.bag > 29 && bag.bags === 1 && bag.floats.includes('Got my bag! 🧳'), `terminal: carrying the bag (${JSON.stringify(bag)})`);
-  t.expect(bag.label !== '🧳 Grab your bag', 'terminal: no second bag while carrying one');
-  await t.ev(() => { const P = CFG.AF_IN.ROOMS.afterminal.BAG_SPOT; T.tp(P.x + 30, P.y + 20, 'afterminal'); T.step(2); });
-  await t.shot('terminal-bag');
-  // the seats
-  t.expectEq(await t.ev(() => T.hint()), 'Have a seat and wait for your plane 💺', 'terminal: seat hint');
+  t.expectEq(glass.through.join(','), '', 'terminal: the glass wall keeps the lounge apart');
+  t.expect(glass.n > 0 && glass.beeped === 1, `terminal: walking back through the arch by hand beeps all clear (${JSON.stringify(glass)})`);
+  t.expectEq(await t.ev(() => { T.step(140); const R = CFG.AF_IN.ROOMS.afterminal; T.tp(R.ARCH_SPOT.x, R.ARCH_SPOT.y, 'afterminal'); return T.label(); }), '🚶 Walk through', 'terminal: the button walks you through from the hall side again');
+  // the lounge: the seats facing the big window
+  t.expectEq(await t.ev(() => { const R = CFG.AF_IN.ROOMS.afterminal; T.tp(R.ARCH_BACK.x, R.ARCH_BACK.y - 30, 'afterminal'); T.step(2); return T.hint(); }), 'Have a seat and wait for your plane 💺', 'terminal: seat hint in the lounge');
   const seat = await t.ev(() => {
     const R = CFG.AF_IN.ROOMS.afterminal, x = R.SEAT_XS[1], y = R.SEAT_YS[0]; T.tp(x, y + 4, 'afterminal');
     const label = T.label(); T.act(); T.step(2);
@@ -158,43 +202,57 @@ module.exports = async (t) => {
   t.expect(await t.ev(() => { const R = CFG.AF_IN.ROOMS.afterminal; T.tp(R.SEAT_XS[0], R.SEAT_YS[1], 'afterminal'); T.act(); T.steer(1, 0); T.step(40); T.unsteer(); return !AirfieldInsideExt.st.seat; }), 'terminal: pushing the stick for a moment gets you up');
   // the gift shop's toy plane, $3
   await t.ev(() => { Game.s.cash = 10; T.step(1); });
-  t.expectEq(await t.ev(() => { const R = CFG.AF_IN.ROOMS.afterminal; T.tp(R.EXIT.x, R.EXIT.y - 8, 'afterminal'); T.step(1); return T.hint(); }), 'Buy a toy plane at the gift shop! ✈️', 'terminal: toy plane hint with cash in hand');
+  t.expectEq(await t.ev(() => { const R = CFG.AF_IN.ROOMS.afterminal; T.tp(R.ARCH_BACK.x - 60, R.ARCH_BACK.y - 30, 'afterminal'); T.step(1); return T.hint(); }), 'Buy a toy plane at the gift shop! ✈️', 'terminal: toy plane hint with cash in hand');
   const toy = await t.ev(() => { const P = CFG.AF_IN.ROOMS.afterminal.TOY_PAD; T.tp(P.x, P.y, 'afterminal'); const n = T.until(() => Game.s.afIn.toys > 0, 600); return { n, cash: Game.s.cash, toy: AirfieldInsideExt.st.toy, floats: Game.floats.map((f) => f.text) }; });
   t.expect(toy.n >= 0 && toy.toy > 0 && toy.floats.includes('Zoom! A toy plane! ✈️'), `terminal: a toy plane (${JSON.stringify(toy)})`);
   t.expectEq(toy.cash, 7, 'terminal: the toy plane cost $3');
-  await t.ev(() => { const P = CFG.AF_IN.ROOMS.afterminal.TOY_PAD; T.tp(P.x - 60, P.y - 20, 'afterminal'); T.step(4); });
+  await t.ev(() => { const P = CFG.AF_IN.ROOMS.afterminal.TOY_PAD; T.tp(P.x + 60, P.y - 20, 'afterminal'); T.step(4); });
   await t.shot('terminal-toy');
+  // on to Gate 1 through the doorway in the east wall
+  t.expectEq(await t.ev(() => T.hint()), 'Walk on to Gate 1 and the big jet! 🛫', 'terminal: Gate 1 hint');
+  const gate = await t.ev(() => { const R = CFG.AF_IN.ROOMS.afterminal; T.tp(R.GATE_DOOR.x, R.GATE_DOOR.y, 'afterminal'); const label = T.label(); T.act(); T.step(3); const G = CFG.AF_IN.ROOMS.afgate; return { label, area: Game.area, d: Math.hypot(Game.player.x - G.EXIT.x, Game.player.y - (G.EXIT.y - 8)), n: Game.s.afIn.toGates }; });
+  t.expect(gate.label === '🛫 Go to Gate 1' && gate.area === 'afgate' && gate.d < 2 && gate.n === 1, `terminal: through to Gate 1 (${JSON.stringify(gate)})`);
+  // back in the terminal's lounge: the way out is back through security; then baggage claim in the hall
+  t.expectEq(await t.ev(() => { const R = CFG.AF_IN.ROOMS.afterminal; T.tp(R.TOY_PAD.x + 80, R.TOY_PAD.y, 'afterminal'); T.step(2); return T.hint(); }), 'Back through security to the way out 🚪', 'terminal: lounge all done: back through security');
+  t.expectEq(await t.ev(() => { const R = CFG.AF_IN.ROOMS.afterminal; AirfieldInsideExt.st.bag = 0; T.tp(R.ARCH_BACK.x, R.ARCH_BACK.y, 'afterminal'); T.act(); T.until(() => !AirfieldInsideExt.st.walk, 300); T.step(150); return T.hint(); }), 'Grab a bag from the baggage carousel! 🧳', 'terminal: baggage claim hint in the hall (once the bag from security is put away)');
+  await t.ev(() => { AirfieldInsideExt.st.bag = 0; const S = CFG.AF_IN.ROOMS.afterminal.BAG_SPOT; T.tp(S.x, S.y, 'afterminal'); });
+  t.expectEq(await t.ev(() => T.label()), '🧳 Grab your bag', 'terminal: grab label by the carousel');
+  const bag = await t.ev(() => { T.act(); T.step(2); return { bag: AirfieldInsideExt.st.bag, bags: Game.s.afIn.bags, label: T.label(), floats: Game.floats.map((f) => f.text) }; });
+  t.expect(bag.bag > 29 && bag.bags === 1 && bag.floats.includes('Got my bag! 🧳') && bag.label !== '🧳 Grab your bag', `terminal: a bag off the carousel (${JSON.stringify(bag)})`);
   t.expectEq(await t.ev(() => T.hint()), 'Back outside through the door 🚪', 'terminal: the exit hint once everything is done');
   // the bag and the toy are gone after half a minute; the board flipped meanwhile
   const later = await t.ev(() => { const n0 = AirfieldInsideExt.st.flipN; T.step(60 * 31); return { bag: AirfieldInsideExt.st.bag, toy: AirfieldInsideExt.st.toy, flips: AirfieldInsideExt.st.flipN - n0 }; });
   t.expect(later.bag === 0 && later.toy === 0, 'terminal: bag and toy last half a minute');
   t.expect(later.flips >= 5, `terminal: the departures board keeps flipping (${later.flips})`);
   await t.page.setViewportSize({ width: 390, height: 844 });
-  await t.ev(() => { Render.resize(); const R = CFG.AF_IN.ROOMS.afterminal; T.tp(R.CAROUSEL.x - 60, R.BAG_SPOT.y, 'afterminal'); T.step(2); });
+  await t.ev(() => { Render.resize(); const R = CFG.AF_IN.ROOMS.afterminal; T.tp(R.ARCH_SPOT.x + 20, R.ARCH_SPOT.y + 40, 'afterminal'); T.step(2); });
   await t.shot('terminal-phone');
+  await t.ev(() => { const R = CFG.AF_IN.ROOMS.afterminal; T.tp(R.SEAT_XS[0] - 60, R.SEAT_YS[1] + 30, 'afterminal'); T.step(2); });
+  await t.shot('terminal-lounge-phone');
   await t.page.setViewportSize({ width: 1100, height: 720 });
   await t.ev(() => { Render.resize(); T.step(1); });
 
   // ======== the hangar ========
   await t.ev(() => { const R = CFG.AF_IN.ROOMS.afhangar; T.tp(R.EXIT.x, R.EXIT.y - 8, 'afhangar'); T.step(2); });
-  t.expectEq(await t.ev(() => T.hint()), 'Sit in the tug! 🚜', 'hangar: tug hint first');
+  t.expectEq(await t.ev(() => T.hint()), 'Say hi to the mechanic under the plane 🔧', 'hangar: mechanic hint first');
   await t.shot('hangar');
-  await t.ev(() => { const S = CFG.AF_IN.ROOMS.afhangar.TUG_SPOT; T.tp(S.x, S.y, 'afhangar'); });
-  t.expectEq(await t.ev(() => T.label()), '🚜 Sit in the tug', 'hangar: tug label');
-  await t.ev(() => { T.act(); T.step(3); });
-  const tug = await t.ev(() => { const T0 = CFG.AF_IN.ROOMS.afhangar.TUG; return { tug: !!AirfieldInsideExt.st.tug, tugs: Game.s.afIn.tugs, label: T.label(), hint: T.hint(), floats: Game.floats.map((f) => f.text), d: Math.hypot(Game.player.x - (T0.x - 10), Game.player.y - (T0.y + 2)) }; });
-  t.expect(tug.tug && tug.tugs === 1 && tug.d < 1, `hangar: sitting in the tug (${JSON.stringify(tug)})`);
-  t.expect(tug.floats.includes('Toot toot! 🚜'), 'hangar: the tug toots');
-  t.expectEq(tug.label, '🚶 Hop out', 'hangar: hop-out label');
-  t.expectEq(tug.hint, 'Toot toot! Press the button to hop out 🚜', 'hangar: tug hint');
-  await t.shot('hangar-tug');
-  t.expect(await t.ev(() => { T.act(); T.step(2); const S = CFG.AF_IN.ROOMS.afhangar.TUG_SPOT; return !AirfieldInsideExt.st.tug && Math.hypot(Game.player.x - S.x, Game.player.y - S.y) < 1; }), 'hangar: hopped out beside the tug');
-  t.expectEq(await t.ev(() => T.hint()), 'Say hi to the mechanic under the plane 🔧', 'hangar: mechanic hint next');
   await t.ev(() => { const S = CFG.AF_IN.ROOMS.afhangar.MECH_SPOT; T.tp(S.x, S.y, 'afhangar'); });
   t.expectEq(await t.ev(() => T.label()), '👋 Say hi', 'hangar: say-hi label by the mechanic');
   await t.ev(() => { T.act(); T.step(3); });
   t.expect(await t.ev(() => AirfieldInsideExt.st.mech > 0 && Game.s.afIn.mechs === 1 && AirfieldInsideExt.st.sparks.length > 3), 'hangar: the mechanic says hi, sparks fly');
   await t.shot('hangar-mechanic');
+  t.expectEq(await t.ev(() => T.hint()), 'Drive the tug out to the planes! 🚜', 'hangar: the tug next');
+  await t.ev(() => { const S = CFG.AF_IN.ROOMS.afhangar.TUG_SPOT; T.tp(S.x, S.y, 'afhangar'); });
+  t.expectEq(await t.ev(() => T.label()), '🚜 Drive the tug', 'hangar: tug label');
+  await t.ev(() => { T.act(); T.step(3); });
+  const tug = await t.ev(() => { const T0 = CFG.AF_IN.ROOMS.afhangar.TUG; return { tug: !!AirfieldInsideExt.st.tug, tugs: Game.s.afIn.tugs, label: T.label(), hint: T.hint(), floats: Game.floats.map((f) => f.text), d: Math.hypot(Game.player.x - (T0.x - 10), Game.player.y - (T0.y + 2)) }; });
+  t.expect(tug.tug && tug.tugs === 1 && tug.d < 1 && tug.floats.includes('Toot toot! 🚜'), `hangar: at the wheel of the tug, toot toot (${JSON.stringify(tug)})`);
+  t.expectEq(tug.label, null, 'hangar: no button while the tug starts off');
+  t.expectEq(tug.hint, 'Toot toot! Off we go! 🚜', 'hangar: tug hint');
+  await t.shot('hangar-tug');
+  const out = await t.ev(() => { T.step(60); const v = Game.vehicle, H = CFG.AIRFIELD.GSE.tug; return { area: Game.area, driving: Game.driving, kind: v && v.kind, d: v ? Math.hypot(v.x - H.x, v.y - H.y) : -1, busy: AirfieldInsideExt.busy() }; });
+  t.expect(out.area === 'town' && out.driving && out.kind === 'bagtug' && out.d < 1 && !out.busy, `hangar: drove out at the wheel of the bag train on the apron (${JSON.stringify(out)})`);
+  await t.ev(() => { Game.exitCar(); const R = CFG.AF_IN.ROOMS.afhangar; T.tp(R.EXIT.x, R.EXIT.y - 8, 'afhangar'); T.step(2); });
   t.expectEq(await t.ev(() => T.hint()), 'Back outside through the door 🚪', 'hangar: the exit hint once everything is done');
   await t.page.setViewportSize({ width: 390, height: 844 });
   await t.ev(() => { Render.resize(); const R = CFG.AF_IN.ROOMS.afhangar; T.tp(R.TUG_SPOT.x - 60, R.TUG_SPOT.y, 'afhangar'); T.step(2); });

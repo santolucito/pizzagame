@@ -1,34 +1,61 @@
 'use strict';
 // Inside the airfield's buildings (js/airfield.js owns the airfield itself, its planes and the door spots in
 // CFG.AIRFIELD.DOORS). Walk up to a door and press '🚪 Go inside':
-//  - the TERMINAL (its south door, clear of the arrivals corridor): check-in desks with an agent ("Where to? ☁️"), a
-//    departures board whose letters flip, a baggage carousel with suitcases going round (one is the chef's: '🧳 Grab your
-//    bag' and carry it for half a minute), a security arch that beeps "Beep! 🍕" when the chef walks through, rows of
-//    waiting seats to sit in, a gift shop corner with a $3 toy plane, and a big window onto the apron;
+//  - the TERMINAL (its south door, clear of the arrivals corridor): a big hall in two parts with a glass wall between.
+//    The check-in hall: the check-in desk with an agent ("Where to? ☁️": '🎫 Check in' gets a boarding pass and your big
+//    suitcase rides off along the belt behind her), baggage claim with suitcases going round ('🧳 Grab your bag'), and
+//    SECURITY: a queue rope, the X-ray belt ('🧳 Put your bag on the belt': the bag rides into the X-ray and the screen
+//    shows a funny picture of what is inside, a pizza! a teddy!, then it comes out the far end: '🧳 Pick up your bag'),
+//    the scanner arch ('🚶 Walk through': its lights go green, "Beep! All clear ✅", and the guard waves). Past security,
+//    the departures lounge: the departures board whose letters flip, a big window onto the apron, seats to sit in, a gift
+//    shop corner with a $3 toy plane, and the way on to Gate 1 ('🛫 Go to Gate 1');
 //  - the PIZZA AIR HANGAR (the small door between its bays): a plane under repair with a mechanic under it (a wrench,
-//    sparks), tool walls, a tug to sit in ('🚜 Sit in the tug': it toots), parts on shelves, a stack of oil drums, a
-//    propeller hanging from the roof and a big PIZZA AIR banner;
+//    sparks), tool walls, the tug ('🚜 Drive the tug': toot toot, and you drive out at the wheel of the airfield's bag
+//    train, see js/airfield.js), parts on shelves, a stack of oil drums, a propeller hanging from the roof and a banner;
 //  - the CONTROL TOWER: the ground floor (a spiral stair, a sofa with a dozing pilot) and, '🪜 Climb up', the glass cab at
 //    the top: radar screens whose blips are the real planes, the controller in a headset, binoculars ('🔭 Look out': the
 //    runway and the planes, live) and a microphone ('🎙️ Clear for take-off!');
-//  - the WORKSHOP: a workbench with a vice, a propeller on a stand to spin, a mechanic who says hi, and a $4 toolbox.
+//  - the WORKSHOP: a workbench with a vice, a propeller on a stand to spin, a mechanic who says hi, and a $4 toolbox;
+//  - the FUEL FARM's pump room (the gate in its fence, by the workshop): a big tank with a sight glass, dials on the wall,
+//    a big red valve wheel ('🔴 Turn the valve': "Glug glug!", the fuel bubbles along the pipe and the tank fills), a fuel
+//    worker in a hi-vis vest who says hi, and the fuel truck ('🚚 Drive the fuel truck': honk honk, and you drive out at
+//    the wheel of the airfield's fuel truck, which fuels up the planes);
+//  - GATE 1 (the glass door in the gate pier's south side): seats by a huge window onto the jet at its gate (bags riding
+//    from the bag train into its hold), a moving walkway that carries you along, a juice machine ('🧃 Get a juice': clunk!)
+//    and the jet-bridge doorway: '✈️ Board the jet' steps into the jet's cabin (js/jetinside.js) while it waits there.
+// The Sky Terminal at Cloud Harbor lives in js/cloud-inside.js (it borrows this file's room shell).
 // Extension module: registered with Game.ext (first, so its doors beat the airfield's own hints) and Render.ext.
 
 CFG.AF_IN = {
   WALL: 24, FADE: 0.45, DOOR_R: 30, HINT_R: 60, NEAR: 34,
   CARRY: 30, CLIMB: 1.0, VIEW: 7, CLEAR: 3, STAND: 0.35,   // seconds: carrying a bag / toy / toolbox, the climb, the look-out, the radio call; stick-push to get up
   ROOMS: {
+    // the terminal is a big two-part hall: the check-in hall (south, by the door) and, through security, the departures
+    // lounge (north). A glass wall runs across between them; the only way through is the scanner arch.
     afterminal: {
       door: 'terminal', toast: '🧳 Welcome to the terminal!', hint: 'Go inside the terminal! 🧳', title: '✈️ AIRFIELD TERMINAL',
-      WORLD: { x0: 13000, y0: 4000, x1: 13600, y1: 4400 }, ROOM: { x0: 13040, y0: 4100, x1: 13560, y1: 4340 }, BACK_TOP: 4016,
-      EXIT: { x: 13300, y: 4322 },
-      WINDOW: { x0: 13054, y0: 4026, x1: 13228, y1: 4092 },    // the big window onto the apron (behind the check-in desk)
-      BOARD: { x0: 13250, y0: 4026, x1: 13444, y1: 4090 },     // the departures board on the back wall
-      DESK: { x0: 13058, y0: 4100, x1: 13190, y1: 4140 }, AGENT: { x: 13124, y: 4106 }, CHECKIN: { x: 13124, y: 4168 },
-      ARCH: { x0: 13206, x1: 13270, y: 4206 },                 // the security arch: two posts, walk between them (north–south)
-      CAROUSEL: { x: 13374, y: 4204, rx: 76, ry: 28 }, BAG_SPOT: { x: 13374, y: 4258 },
-      SEAT_XS: [13072, 13102, 13132, 13162], SEAT_YS: [4232, 4294],
-      SHELF: { x0: 13500, y0: 4100, x1: 13560, y1: 4214 }, TOY_PAD: { x: 13490, y: 4284 },
+      WORLD: { x0: 27000, y0: 4000, x1: 28040, y1: 4740 }, ROOM: { x0: 27040, y0: 4100, x1: 28000, y1: 4680 }, BACK_TOP: 4016,
+      EXIT: { x: 27200, y: 4662 },
+      PART_Y: 4400, PART_H: 8,                                 // the glass wall: its line and half its thickness
+      // the check-in hall: the desk (the agent behind it, the bag belt behind her into the wall), baggage claim
+      DESK: { x0: 27076, y0: 4470, x1: 27276, y1: 4508 }, AGENT: { x: 27176, y: 4462 }, CHECKIN: { x: 27176, y: 4552 },
+      SCALE: { x: 27252, y: 4470 }, BELT_Y: 4436,              // the bag scale on the desk; the little belt behind the agent
+      CAROUSEL: { x: 27862, y: 4560, rx: 86, ry: 30 }, BAG_SPOT: { x: 27862, y: 4622 },
+      // security: the queue rope, the X-ray belt (south end: the grey tray; north end: pick your bag up), the scanner arch,
+      // the X-ray screen on its stand, the guard just past the arch
+      ARCH: { x0: 27500, x1: 27560, y: 4400 }, ARCH_SPOT: { x: 27530, y: 4468 }, ARCH_BACK: { x: 27530, y: 4344 },
+      ROPE: { x: 27490, y0: 4408, y1: 4530 },
+      XBELT: { x0: 27582, x1: 27628, y0: 4282, y1: 4522 }, XRAY: { x0: 27572, x1: 27638, y0: 4362, y1: 4438 },
+      TRAY_SPOT: { x: 27605, y: 4552 }, PICK_SPOT: { x: 27605, y: 4254 },
+      SCREEN: { x: 27694, y: 4512 },
+      GUARD: { x: 27452, y: 4372 },
+      // the departures lounge: the board and the big window on the back wall, seats facing the window, the gift shop
+      // in the west corner, the way through to Gate 1 in the east wall
+      BOARD: { x0: 27170, y0: 4026, x1: 27370, y1: 4090 },
+      WINDOW: { x0: 27430, y0: 4026, x1: 27900, y1: 4092 },
+      SEAT_XS: [27694, 27724, 27754, 27784, 27814, 27844], SEAT_YS: [4222, 4292],
+      SHELF: { x0: 27040, y0: 4100, x1: 27100, y1: 4252 }, TEDDY: { x0: 27100, y0: 4100, x1: 27150, y1: 4134 }, TOY_PAD: { x: 27150, y: 4300 },
+      GATE_DOOR: { x: 27976, y: 4330 }, GATE_GAP: { y0: 4296, y1: 4364 },
     },
     afhangar: {
       door: 'hangar', toast: '✈️ Welcome to the Pizza Air hangar!', hint: 'Go inside the hangar! ✈️', title: '🍕 PIZZA AIR HANGAR',
@@ -64,16 +91,45 @@ CFG.AF_IN = {
       WING: { x0: 16058, y0: 4258, x1: 16200, y1: 4302 },
       TOOL_PAD: { x: 16478, y: 4286 },
     },
+    affuel: {
+      door: 'fuel', toast: '⛽ Welcome to the fuel farm!', hint: 'Go inside the fuel farm! ⛽', title: '⛽ FUEL FARM PUMP ROOM',
+      WORLD: { x0: 19000, y0: 4000, x1: 19600, y1: 4400 }, ROOM: { x0: 19040, y0: 4100, x1: 19560, y1: 4340 }, BACK_TOP: 4016,
+      EXIT: { x: 19300, y: 4322 },
+      TANK: { x0: 19052, y0: 4100, x1: 19142, y1: 4234 },      // the big round tank against the back wall, a sight glass on its front
+      VALVE: { x: 19214, y: 4124 }, VALVE_SPOT: { x: 19222, y: 4222 },   // the big red wheel on its pipe
+      GAUGES: [{ x: 19272, y: 4058 }, { x: 19322, y: 4058 }, { x: 19372, y: 4058 }],
+      WORKER: { x: 19470, y: 4160 }, HI_SPOT: { x: 19448, y: 4206 },
+      TRUCK: { x: 19470, y: 4296 }, TRUCK_SPOT: { x: 19414, y: 4244 },   // the fuel truck, side on, cab to the left
+      CANS: { x0: 19048, y0: 4290, x1: 19148, y1: 4340 },
+    },
+    afgate: {
+      door: 'gate', toast: '🛫 Welcome to Gate 1!', hint: 'Go inside Gate 1! 🛫', title: '🛫 GATE 1',
+      WORLD: { x0: 23000, y0: 4000, x1: 23600, y1: 4400 }, ROOM: { x0: 23040, y0: 4100, x1: 23560, y1: 4340 }, BACK_TOP: 4016,
+      EXIT: { x: 23300, y: 4322 },
+      WINDOW: { x0: 23118, y0: 4026, x1: 23436, y1: 4092 },    // the huge window onto the jet at its gate
+      BRIDGE: { x0: 23466, x1: 23536 }, BRIDGE_SPOT: { x: 23501, y: 4130 },   // the doorway to the jet-bridge in the back wall
+      AGENT: { x: 23540, y: 4170 },
+      VEND: { x0: 23048, y0: 4100, x1: 23102, y1: 4136 }, VEND_SPOT: { x: 23075, y: 4178 },
+      SEAT_XS: [23072, 23102, 23132, 23162], SEAT_YS: [4250, 4310],
+      WALK: { x0: 23200, x1: 23462, y0: 4194, y1: 4232 },     // the moving walkway (it carries you east, towards the jet)
+    },
   },
+  // what the X-ray screen finds in the chef's bag, two things a time
+  XRAY_ITEMS: [['pizza', 'A pizza! 🍕'], ['teddy', 'A teddy! 🧸'], ['duck', 'A rubber duck! 🦆'], ['plane', 'A toy plane! ✈️'], ['pin', 'A rolling pin!'], ['socks', 'Silly socks! 🧦']],
+  XRAY: { in: 0.9, scan: 2.6, out: 0.9 },   // seconds: the bag rides into the X-ray tunnel, sits inside on the screen, rides out
+  WALK_THRU: 1.1, SCAN: 1.8,                // seconds: the walk through the scanner arch; the green light and the guard's wave
   BOARD_DESTS: ['CLOUD HARBOR', 'PIZZA MOON', 'SAUCE BAY', 'CHEESE PEAK', 'OLIVE ISLE', 'BASIL TOWN', 'MOZZA CITY', 'PEPPERONI'],
   BOARD_STATES: [['ON TIME', '#8ef0a0'], ['BOARDING', '#ffd166'], ['GO!', '#8ef0a0'], ['LANDED', '#9fd8ff']],
   MECH_LINES: ['Need a hand? 🔧', 'Every plane needs a tune-up!', 'Spin that propeller! 🌀', 'Nice hat, Chef! 👨‍🍳'],
+  FUEL_LINES: ['Safety first! 🦺', 'Fuel makes planes go! ✈️', 'Turn the big red wheel! 🔴', 'Nice hat, Chef! 👨‍🍳'],
+  DRIVE_OUT: 0.9,   // seconds at the wheel indoors before the tug / the fuel truck drives out onto the apron
+  GLUG: 2.6, WALK_V: 90,   // seconds the fuel glugs after a turn of the valve; how fast the moving walkway goes (px/s)
 };
-for (const [k, R] of Object.entries(CFG.AF_IN.ROOMS)) CFG.AREAS[k] = { WORLD: R.WORLD };
+for (const [k, R] of Object.entries(CFG.AF_IN.ROOMS)) CFG.AREAS[k] = { WORLD: R.WORLD, place: 'town' };
 
 const AirfieldInsideExt = {
   name: 'airfieldInside',
-  defaults: { afIn: { seen: {}, checkins: 0, bags: 0, beeps: 0, sits: 0, toys: 0, tugs: 0, mechs: 0, climbs: 0, looks: 0, clears: 0, spins: 0, vices: 0, hellos: 0, toolboxes: 0 } },
+  defaults: { afIn: { seen: {}, checkins: 0, bags: 0, beeps: 0, sits: 0, toys: 0, tugs: 0, mechs: 0, climbs: 0, looks: 0, clears: 0, spins: 0, vices: 0, hellos: 0, toolboxes: 0, valves: 0, trucks: 0, fuelHellos: 0, juices: 0, walks: 0, gateSits: 0, boards: 0, xrays: 0, pickups: 0, walkThrus: 0, toGates: 0 } },
   st: null,
 
   // ---------- state ----------
@@ -83,8 +139,10 @@ const AirfieldInsideExt = {
     const C = CFG.AF_IN;
     this.st = {
       fade: 0, t: 0,
-      // terminal: sitting { x, y }, the check-in bubble, the arch's beep, the board's rows
-      seat: null, agent: 0, beep: 0, lastY: null, still: 0,
+      // terminal: sitting { x, y }, the check-in bubble (and the checked suitcase riding off { t }), the arch's all-clear
+      // beep and the guard's wave, the scripted walk through the arch { t, pts, len }, the chef's bag in the X-ray { t, items }
+      // and waiting at the far end of the belt, the board's rows
+      seat: null, agent: 0, checkBag: null, beep: 0, lastY: null, still: 0, walk: null, xray: null, bagReady: false,
       rows: C.BOARD_DESTS.slice(0, 4).map((d, i) => ({ dest: d, time: (10 + i) + ':' + (i % 2 ? '30' : '00'), state: i % C.BOARD_STATES.length, flip: 0 })), flipT: 2.5, flipN: 4,
       // hangar: the tug { t }, the mechanic's sparks and bubble
       tug: null, sparks: [], sparkT: 0.6, mech: 0,
@@ -92,8 +150,12 @@ const AirfieldInsideExt = {
       up: false, climb: null, viewing: null, clear: 0, thumbs: 0,
       // workshop: the propeller's spin, the vice, the mechanic's hello { t, i }
       propA: 0, propV: 0, vice: 0, hello: null, helloN: 0,
+      // fuel farm: the glugging after a turn of the valve, the big tank's level (0..1), the valve wheel's angle, the truck { t }, the worker's hello { t, i }
+      glug: 0, fuel: 0.35, valveA: 0, truck: null, honk: 0, worker: null, workerN: 0,
+      // gate: on the moving walkway (and has it said wheee yet this ride), the juice dropping out of the machine
+      onWalk: false, walkSaid: false, drop: 0,
       // things the chef carries for a while (in any map)
-      bag: 0, toy: 0, toolbox: 0,
+      bag: 0, toy: 0, toolbox: 0, juice: 0,
       obs: {},
     };
     for (const k of Object.keys(C.ROOMS)) this.st.obs[k] = this.roomObstacles(k, false);
@@ -107,11 +169,17 @@ const AirfieldInsideExt = {
     o.push({ x: A.x0 - w, y: A.y0, w, h: A.y1 - A.y0 }, { x: A.x1, y: A.y0, w, h: A.y1 - A.y0 });
     const rect = (q) => box(q.x0, q.y0, q.x1, q.y1);
     if (k === 'afterminal') {
-      rect(R.DESK);
-      const Ar = R.ARCH; box(Ar.x0 - 6, Ar.y - 6, Ar.x0 + 6, Ar.y + 6); box(Ar.x1 - 6, Ar.y - 6, Ar.x1 + 6, Ar.y + 6);
+      // the glass wall between the check-in hall and the lounge: solid but for the gap between the arch's posts
+      const P = R.PART_Y, h = R.PART_H, Ar = R.ARCH;
+      box(A.x0, P - h, Ar.x0 + 6, P + h); box(Ar.x1 - 6, P - h, A.x1, P + h);
+      rect(R.XBELT); rect(R.XRAY);
+      box(R.ROPE.x - 4, R.ROPE.y0, R.ROPE.x + 4, R.ROPE.y1);   // the queue rope
+      box(A.x0, P + h, R.DESK.x1, R.DESK.y1);                   // the check-in desk, the agent and the bag belt behind it
       const C = R.CAROUSEL; box(C.x - C.rx, C.y - C.ry, C.x + C.rx, C.y + C.ry);
       for (const y of R.SEAT_YS) box(R.SEAT_XS[0] - 16, y - 26, R.SEAT_XS[R.SEAT_XS.length - 1] + 16, y - 16);   // the seat backs (you sit on the cushions)
-      rect(R.SHELF);
+      rect(R.SHELF); rect(R.TEDDY);
+      box(R.SCREEN.x - 14, R.SCREEN.y - 10, R.SCREEN.x + 14, R.SCREEN.y + 6);
+      box(R.GUARD.x - 12, R.GUARD.y - 8, R.GUARD.x + 12, P - h);
     } else if (k === 'afhangar') {
       const P = R.PLANE, s = P.s;
       box(P.x - 46 * s, P.y - 11 * s, P.x + 44 * s, P.y + 11 * s);   // fuselage
@@ -128,6 +196,15 @@ const AirfieldInsideExt = {
         box(R.CTRL.x - 16, R.CTRL.y - 12, R.CTRL.x + 16, R.CTRL.y + 8);
         box(R.BINO.x - 10, R.BINO.y - 8, R.BINO.x + 10, R.BINO.y + 8);
       } else { rect(R.SOFA); rect(R.TABLE); rect(R.COOLER); }
+    } else if (k === 'affuel') {
+      rect(R.TANK); rect(R.CANS);
+      box(R.VALVE.x - 16, R.VALVE.y + 6, R.VALVE.x + 16, R.VALVE.y + 34);    // the pipe the wheel sits on
+      box(R.WORKER.x - 12, R.WORKER.y - 8, R.WORKER.x + 12, R.WORKER.y + 6);
+      const T = R.TRUCK; box(T.x - 78, T.y - 26, T.x + 84, T.y + 14);
+    } else if (k === 'afgate') {
+      rect(R.VEND);
+      for (const y of R.SEAT_YS) box(R.SEAT_XS[0] - 16, y - 26, R.SEAT_XS[R.SEAT_XS.length - 1] + 16, y - 16);
+      box(R.AGENT.x - 12, R.AGENT.y - 8, R.AGENT.x + 12, R.AGENT.y + 6);
     } else if (k === 'afworkshop') {
       rect(R.BENCH); rect(R.CABINET); rect(R.WING);
       box(R.PROP.x - 16, R.PROP.y - 8, R.PROP.x + 16, R.PROP.y + 10);
@@ -155,15 +232,16 @@ const AirfieldInsideExt = {
     for (const k of Object.keys(CFG.AF_IN.ROOMS)) { const d = this.doorSpot(k); if (!d) continue; const dd = U.dist(p.x, p.y, d.x, d.y); if (dd < bd) { bd = dd; best = k; } }
     return best;
   },
-  busy() { const st = this.st; return !!(st.seat || st.tug || st.climb || st.viewing); },
-  // the nearest seat cushion within reach, or null
+  busy() { const st = this.st; return !!(st.seat || st.tug || st.climb || st.viewing || st.truck || st.walk); },
+  // the nearest seat cushion within reach (in the terminal or at the gate), or null
   seatNear(g, r = 18) {
-    const R = CFG.AF_IN.ROOMS.afterminal, p = g.player; let best = null, bd = r;
+    const R = CFG.AF_IN.ROOMS[g.area], p = g.player; let best = null, bd = r;
+    if (!R || !R.SEAT_XS) return null;
     for (const y of R.SEAT_YS) for (const x of R.SEAT_XS) { const d = U.dist(p.x, p.y, x, y); if (d < bd) { bd = d; best = { x, y }; } }
     return best;
   },
   nearestSeat(g) {
-    const R = CFG.AF_IN.ROOMS.afterminal, p = g.player; let best = null, bd = Infinity;
+    const R = CFG.AF_IN.ROOMS[g.area], p = g.player; let best = null, bd = Infinity;
     for (const y of R.SEAT_YS) for (const x of R.SEAT_XS) { const d = U.dist(p.x, p.y, x, y); if (d < bd) { bd = d; best = { x, y }; } }
     return best;
   },
@@ -177,17 +255,21 @@ const AirfieldInsideExt = {
     if (dk) return { label: '🚪 Go inside', run: (gg) => this.enter(gg, dk) };
     const k = this.room(g); if (!k || !this.onFoot(g)) return null;
     const R = CFG.AF_IN.ROOMS[k];
-    if (st.climb) return null;
+    if (st.climb || st.walk) return null;
     if (st.seat) return { label: '🚶 Stand up', run: (gg) => this.standUp(gg) };
-    if (st.tug) return { label: '🚶 Hop out', run: (gg) => this.hopOut(gg) };
+    if (st.tug || st.truck) return null;   // a moment at the wheel, then out through the big doors
     if (st.viewing) return { label: '🚶 Done looking', run: (gg) => this.doneLooking(gg) };
     if (!(k === 'aftower' && st.up) && this.near(g, R.EXIT, CFG.AF_IN.DOOR_R)) return { label: '🚪 Go outside', run: (gg) => this.leave(gg) };
     if (k === 'afterminal') {
       if (this.near(g, R.CHECKIN, 36)) return { label: '🎫 Check in', run: (gg) => this.checkIn(gg) };
+      if (!st.xray && !st.bagReady && this.near(g, R.TRAY_SPOT, 34)) return { label: '🧳 Put your bag on the belt', run: (gg) => this.putBag(gg) };
+      if (st.bagReady && this.near(g, R.PICK_SPOT, 36)) return { label: '🧳 Pick up your bag', run: (gg) => this.pickBag(gg) };
+      if (this.near(g, R.ARCH_SPOT, 30) || this.near(g, R.ARCH_BACK, 30)) return { label: '🚶 Walk through', run: (gg) => this.walkThrough(gg) };
       if (st.bag <= 0 && this.near(g, R.BAG_SPOT, 40)) return { label: '🧳 Grab your bag', run: (gg) => this.grabBag(gg) };
+      if (this.near(g, R.GATE_DOOR, 34)) return { label: '🛫 Go to Gate 1', run: (gg) => this.toGate(gg) };
       const s = this.seatNear(g); if (s) return { label: '💺 Sit down', run: (gg) => this.sitDown(gg, s) };
     } else if (k === 'afhangar') {
-      if (this.near(g, R.TUG_SPOT, 40)) return { label: '🚜 Sit in the tug', run: (gg) => this.sitTug(gg) };
+      if (this.near(g, R.TUG_SPOT, 40)) return { label: '🚜 Drive the tug', run: (gg) => this.sitTug(gg) };
       if (this.near(g, R.MECH_SPOT, 40)) return { label: '👋 Say hi', run: (gg) => this.hiMech(gg) };
     } else if (k === 'aftower') {
       if (this.near(g, R.FOOT, 36)) return st.up ? { label: '🪜 Go down', run: (gg) => this.startClimb(gg, false) } : { label: '🪜 Climb up', run: (gg) => this.startClimb(gg, true) };
@@ -195,6 +277,14 @@ const AirfieldInsideExt = {
         if (this.near(g, R.BINO_SPOT, 36)) return { label: '🔭 Look out', run: (gg) => this.lookOut(gg) };
         if (this.near(g, R.MIC_SPOT, 36)) return { label: '🎙️ Clear for take-off!', run: (gg) => this.clearTakeOff(gg) };
       }
+    } else if (k === 'affuel') {
+      if (this.near(g, R.VALVE_SPOT, 36)) return { label: '🔴 Turn the valve', run: (gg) => this.turnValve(gg) };
+      if (this.near(g, R.TRUCK_SPOT, 36)) return { label: '🚚 Drive the fuel truck', run: (gg) => this.sitTruck(gg) };
+      if (this.near(g, R.HI_SPOT, 36)) return { label: '👋 Say hi', run: (gg) => this.hiWorker(gg) };
+    } else if (k === 'afgate') {
+      if (this.canBoard(g) && this.near(g, R.BRIDGE_SPOT, 34)) return { label: '✈️ Board the jet', run: (gg) => this.boardJet(gg) };
+      if (st.drop <= 0 && this.near(g, R.VEND_SPOT, 34)) return { label: '🧃 Get a juice', run: (gg) => this.getJuice(gg) };
+      const s = this.seatNear(g); if (s) return { label: '💺 Sit down', run: (gg) => this.sitDown(gg, s) };
     } else if (k === 'afworkshop') {
       if (this.near(g, R.PROP_SPOT, 36)) return { label: '🌀 Spin the propeller', run: (gg) => this.spinProp(gg) };
       if (this.near(g, R.VICE_SPOT, 36)) return { label: '🗜️ Squeeze the vice', run: (gg) => this.squeeze(gg) };
@@ -214,8 +304,8 @@ const AirfieldInsideExt = {
     g.area = 'town'; p.x = d.x; p.y = d.y; p.moving = false; p.facing = 1; p.hasMoved = true; g.cameraSnap = true;
     this.resetRoom(); this.st.fade = CFG.AF_IN.FADE; Sfx.drop();
   },
-  resetRoom() { const st = this.st; st.seat = null; st.tug = null; st.up = false; st.climb = null; st.viewing = null; st.clear = 0; st.hello = null; st.mech = 0; st.agent = 0; st.still = 0; },
-  home(g) { if (!this.st) return; const st = this.st; this.resetRoom(); st.fade = 0; st.beep = 0; st.bag = 0; st.toy = 0; st.toolbox = 0; st.vice = 0; st.propV = 0; st.thumbs = 0; st.sparks = []; st.lastY = null; },
+  resetRoom() { const st = this.st; st.walk = null; st.seat = null; st.tug = null; st.up = false; st.climb = null; st.viewing = null; st.clear = 0; st.hello = null; st.mech = 0; st.agent = 0; st.still = 0; st.truck = null; st.worker = null; st.onWalk = false; st.walkSaid = false; },
+  home(g) { if (!this.st) return; const st = this.st; this.resetRoom(); st.fade = 0; st.beep = 0; st.bag = 0; st.toy = 0; st.toolbox = 0; st.juice = 0; st.drop = 0; st.vice = 0; st.propV = 0; st.thumbs = 0; st.sparks = []; st.lastY = null; st.glug = 0; st.honk = 0; st.xray = null; st.bagReady = false; st.checkBag = null; },
   // a save or a push that left the chef in a wall or inside the furniture goes back onto the door mat (or the stair top)
   rescue(g) {
     const p = g.player, k = this.room(g);
@@ -231,6 +321,7 @@ const AirfieldInsideExt = {
   checkIn(g) {
     const st = this.st, R = CFG.AF_IN.ROOMS.afterminal, p = g.player;
     st.agent = 3; g.s.afIn.checkins++; p.facing = 1;
+    st.checkBag = { t: 0 };   // the big suitcase goes on the scale and rides off along the belt behind the desk, to the plane
     this.float(g, p.x, p.y - 74, '🎫 Boarding pass!');
     for (let i = 0; i < 4; i++) g.fx.push({ kind: 'sparkle', x0: R.AGENT.x + U.rand(-20, 20), y0: R.AGENT.y - 30 + U.rand(-14, 10), x1: 0, y1: 0, t: -i * 0.06, dur: 0.5 });
     Sfx.ding(); Haptics.tap();
@@ -243,7 +334,7 @@ const AirfieldInsideExt = {
   },
   sitDown(g, s) {
     const st = this.st, p = g.player;
-    st.seat = { x: s.x, y: s.y, t: 0 }; st.still = 0; g.s.afIn.sits++;
+    st.seat = { x: s.x, y: s.y, t: 0 }; st.still = 0; if (g.area === 'afgate') g.s.afIn.gateSits++; else g.s.afIn.sits++;
     p.x = s.x; p.y = s.y; p.moving = false; p.facing = 1;
     this.float(g, p.x, p.y - 70, 'Ahh, comfy! 💺');
     Sfx.drop(); Haptics.tap();
@@ -253,12 +344,37 @@ const AirfieldInsideExt = {
     if (st.seat) { p.x = st.seat.x; p.y = st.seat.y; }
     st.seat = null; st.still = 0; p.moving = false; Sfx.drop();
   },
+  // through the scanner arch: its lights flash green, "Beep! All clear ✅", the guard waves
   beep(g) {
     const st = this.st;
-    st.beep = 1.6; g.s.afIn.beeps++;
-    Sfx.tone(1320, 0.12, 'square', 0.03); setTimeout(() => Sfx.tone(1320, 0.12, 'square', 0.03), 170);
+    st.beep = CFG.AF_IN.SCAN; g.s.afIn.beeps++;
+    Sfx.tone(880, 0.1, 'sine', 0.04); setTimeout(() => Sfx.tone(1320, 0.16, 'sine', 0.04), 140);
     Haptics.tap();
   },
+  // '🚶 Walk through': the chef steps into line with the arch and walks right through it, to the other side
+  walkThrough(g) {
+    const st = this.st, R = CFG.AF_IN.ROOMS.afterminal, p = g.player, up = p.y > R.PART_Y, x = (R.ARCH.x0 + R.ARCH.x1) / 2;
+    const a = up ? R.ARCH_SPOT : R.ARCH_BACK, b = up ? R.ARCH_BACK : R.ARCH_SPOT;
+    const pts = [{ x: p.x, y: p.y }, { x, y: a.y }, { x, y: b.y }];
+    st.walk = { t: 0, pts, len: U.dist(p.x, p.y, x, a.y) + Math.abs(b.y - a.y) }; st.seat = null; p.moving = true;
+    if (up) g.s.afIn.walkThrus++;
+    Haptics.tap();
+  },
+  // '🧳 Put your bag on the belt': the bag rides into the X-ray tunnel, the screen shows what is inside, it comes out the far end
+  putBag(g) {
+    const st = this.st, C = CFG.AF_IN, n = g.s.afIn.xrays, I = C.XRAY_ITEMS;
+    st.xray = { t: 0, items: [I[(n * 2) % I.length], I[(n * 2 + 1) % I.length]], beeped: false }; st.bag = 0; g.s.afIn.xrays++;
+    this.float(g, g.player.x, g.player.y - 74, 'On the belt! 🧳');
+    Sfx.drop(); Haptics.tap();
+  },
+  pickBag(g) {
+    const st = this.st, p = g.player;
+    st.bagReady = false; st.bag = CFG.AF_IN.CARRY; g.s.afIn.pickups++;
+    this.float(g, p.x, p.y - 70, 'Got my bag! 🧳');
+    Sfx.pickup(); Haptics.success();
+  },
+  toGate(g) { g.s.afIn.toGates++; this.enter(g, 'afgate'); },
+  xrayPhase() { const x = this.st.xray, X = CFG.AF_IN.XRAY; if (!x) return null; return x.t < X.in ? 'in' : x.t < X.in + X.scan ? 'scan' : 'out'; },
   // ---------- the hangar ----------
   sitTug(g) {
     const st = this.st, T = CFG.AF_IN.ROOMS.afhangar.TUG, p = g.player;
@@ -271,6 +387,12 @@ const AirfieldInsideExt = {
   hopOut(g) {
     const st = this.st, S = CFG.AF_IN.ROOMS.afhangar.TUG_SPOT, p = g.player;
     st.tug = null; st.still = 0; p.x = S.x; p.y = S.y; p.moving = false; Sfx.drop();
+  },
+  // out of the building at the wheel: the airfield's own tug (the bag train) / fuel truck, in its bay on the apron
+  driveOut(g, which) {
+    if (typeof AirfieldExt === 'undefined' || !AirfieldExt.rt) { if (which === 'tug') this.hopOut(g); else this.hopOutTruck(g); return; }
+    this.resetRoom(); this.st.fade = CFG.AF_IN.FADE; this.st.lastY = null;
+    AirfieldExt.driveOut(g, which);
   },
   hiMech(g) {
     const st = this.st, M = CFG.AF_IN.ROOMS.afhangar.MECH;
@@ -306,6 +428,48 @@ const AirfieldInsideExt = {
     st.hello = { t: 0, i: st.helloN++ % CFG.AF_IN.MECH_LINES.length }; g.s.afIn.hellos++;
     Sfx.chime(); Haptics.tap();
   },
+  // ---------- the fuel farm ----------
+  turnValve(g) {
+    const st = this.st, V = CFG.AF_IN.ROOMS.affuel.VALVE;
+    st.glug = CFG.AF_IN.GLUG; g.s.afIn.valves++;
+    this.float(g, V.x, V.y - 54, 'Glug glug! ⛽');
+    Sfx.tone(140, 0.18, 'sine', 0.05, -40); setTimeout(() => Sfx.tone(110, 0.2, 'sine', 0.05, -30), 260);
+    Haptics.tap();
+  },
+  sitTruck(g) {
+    const st = this.st, T = CFG.AF_IN.ROOMS.affuel.TRUCK, p = g.player;
+    st.truck = { t: 0 }; st.still = 0; st.honk = 1.2; g.s.afIn.trucks++;
+    p.x = T.x - 56; p.y = T.y - 2; p.moving = false; p.facing = -1;
+    this.float(g, T.x - 40, T.y - 92, 'Honk honk! 🚚');
+    Sfx.tone(330, 0.16, 'square', 0.035); setTimeout(() => Sfx.tone(330, 0.24, 'square', 0.035), 220);
+    Haptics.tap();
+  },
+  hopOutTruck(g) {
+    const st = this.st, S = CFG.AF_IN.ROOMS.affuel.TRUCK_SPOT, p = g.player;
+    st.truck = null; st.still = 0; p.x = S.x; p.y = S.y; p.moving = false; Sfx.drop();
+  },
+  hiWorker(g) {
+    const st = this.st;
+    st.worker = { t: 0, i: st.workerN++ % CFG.AF_IN.FUEL_LINES.length }; g.s.afIn.fuelHellos++;
+    Sfx.chime(); Haptics.tap();
+  },
+  // ---------- the gate ----------
+  // the jet waits at the end of the jet-bridge (parked at its own gate, nobody in it): js/jetinside.js boards it
+  canBoard(g) {
+    if (typeof JetInsideExt === 'undefined' || !JetInsideExt.st || !JetInsideExt.jet()) return false;
+    return JetInsideExt.jetParked(g) && JetInsideExt.atGate(JetInsideExt.jet());
+  },
+  jetAtGate() { const v = typeof AirfieldExt !== 'undefined' && AirfieldExt.rt ? AirfieldExt.rt.jet : null; return !!v && !v.away && v.lift <= 0 && U.dist(v.x, v.y, v.home.x, v.home.y) < 8; },
+  boardJet(g) {
+    g.s.afIn.boards++; this.resetRoom(); this.st.fade = 0;
+    JetInsideExt.board(g);
+  },
+  getJuice(g) {
+    const st = this.st, V = CFG.AF_IN.ROOMS.afgate.VEND;
+    st.drop = 0.7; st.juice = CFG.AF_IN.CARRY; g.s.afIn.juices++;
+    this.float(g, (V.x0 + V.x1) / 2, V.y0 - 70, 'Clunk! A juice! 🧃');
+    Sfx.pickup(); Haptics.success();
+  },
   pads(g) {
     if (g.area === 'afterminal') return [{ key: 'afToyPlane', label: 'Toy plane', ico: '✈️', pos: CFG.AF_IN.ROOMS.afterminal.TOY_PAD, price: 3, sub: 'zoom zoom!' }];
     if (g.area === 'afworkshop') return [{ key: 'afToolbox', label: 'Toolbox', ico: '🧰', pos: CFG.AF_IN.ROOMS.afworkshop.TOOL_PAD, price: 4, sub: 'for little fixers' }];
@@ -331,11 +495,21 @@ const AirfieldInsideExt = {
     const st = this.st, p = g.player, C = CFG.AF_IN;
     st.t += dt;
     st.fade = Math.max(0, st.fade - dt);
-    for (const key of ['bag', 'toy', 'toolbox', 'beep', 'agent', 'mech', 'clear', 'thumbs', 'vice']) st[key] = Math.max(0, st[key] - dt);
+    for (const key of ['bag', 'toy', 'toolbox', 'juice', 'drop', 'beep', 'agent', 'mech', 'clear', 'thumbs', 'vice', 'glug', 'honk']) st[key] = Math.max(0, st[key] - dt);
     if (st.propV > 0) { st.propA += st.propV * dt; st.propV = Math.max(0, st.propV - dt * 7); } else st.propA += dt * 0.15;
     if (st.hello) { st.hello.t += dt; if (st.hello.t > 2.6) st.hello = null; }
+    if (st.worker) { st.worker.t += dt; if (st.worker.t > 2.6) st.worker = null; }
+    // the big tank fills while the fuel glugs in, then slowly goes down again (the planes drink it)
+    if (st.glug > 0) { st.fuel = Math.min(1, st.fuel + dt * 0.3); st.valveA += dt * 5; } else st.fuel = Math.max(0.35, st.fuel - dt * 0.02);
     this.updateBoard(dt);
     const k = this.room(g);
+    // the terminal: the checked suitcase riding off behind the desk; the chef's bag riding through the X-ray machine
+    if (st.checkBag) { st.checkBag.t += dt; if (st.checkBag.t > 3.4) st.checkBag = null; }
+    if (st.xray) {
+      const X = C.XRAY, x = st.xray; x.t += dt;
+      if (!x.beeped && x.t >= X.in) { x.beeped = true; if (k === 'afterminal') Sfx.tone(520, 0.3, 'triangle', 0.03, 120); }   // the X-ray hums
+      if (x.t >= X.in + X.scan + X.out) { st.xray = null; st.bagReady = true; }
+    }
     if (!k) { if (this.busy() || st.up) this.resetRoom(); st.lastY = null; return; }
     const R = C.ROOMS[k];
     if (k === 'afhangar') this.updateSparks(g, dt, R);
@@ -356,17 +530,45 @@ const AirfieldInsideExt = {
       if (this.pushedAway(g, dt)) this.standUp(g);
       return;
     }
+    // at the wheel of the tug / the fuel truck for a moment (toot toot!), then off out of the doors to drive it on the apron
     if (st.tug) {
       const T = R.TUG; st.tug.t += dt; p.x = T.x - 10; p.y = T.y + 2; p.moving = false; p.facing = 1;
-      if (this.pushedAway(g, dt)) this.hopOut(g);
+      if (st.tug.t >= C.DRIVE_OUT) this.driveOut(g, 'tug');
       return;
+    }
+    if (st.truck) {
+      const T = R.TRUCK; st.truck.t += dt; p.x = T.x - 56; p.y = T.y - 2; p.moving = false; p.facing = -1;
+      if (st.truck.t >= C.DRIVE_OUT) this.driveOut(g, 'fuel');
+      return;
+    }
+    // the moving walkway carries the chef along (walking with it goes faster, against it slower)
+    if (k === 'afgate') {
+      const Wk = R.WALK, on = p.x > Wk.x0 && p.x < Wk.x1 && p.y > Wk.y0 && p.y < Wk.y1;
+      if (on) {
+        if (!st.onWalk) { st.onWalk = true; st.walkSaid = false; g.s.afIn.walks++; }
+        const nx = Math.min(p.x + C.WALK_V * dt, Wk.x1 + 2);
+        if (this.free(g, nx, p.y)) { p.x = nx; p.hasMoved = true; }
+        if (!st.walkSaid && p.x > Wk.x0 + 40) { st.walkSaid = true; this.float(g, p.x, p.y - 70, 'Wheee! 🚶'); Haptics.tap(); }
+      } else st.onWalk = false;
     }
     if (st.viewing) {
       st.viewing.t += dt; p.moving = false;
       if (st.viewing.t >= C.VIEW || this.pushedAway(g, dt)) this.doneLooking(g);
       return;
     }
-    // the security arch: walking between its posts (either way) beeps
+    // the scripted walk through the scanner arch (the button): along a little path at walking pace
+    if (st.walk) {
+      const W = st.walk, sp = 120; W.t += dt;
+      let d = Math.min(W.len, W.t * sp), q = W.pts[W.pts.length - 1];
+      for (let i = 1; i < W.pts.length; i++) {
+        const a = W.pts[i - 1], b = W.pts[i], L = U.dist(a.x, a.y, b.x, b.y);
+        if (d <= L) { const f = L ? d / L : 1; q = { x: U.lerp(a.x, b.x, f), y: U.lerp(a.y, b.y, f) }; break; }
+        d -= L;
+      }
+      p.x = q.x; p.y = q.y; p.moving = true; p.bob = (p.bob || 0) + dt * 12; p.hasMoved = true;
+      if (W.t * sp >= W.len) { st.walk = null; p.moving = false; }
+    }
+    // the security arch: walking between its posts (either way) beeps: all clear!
     if (k === 'afterminal') {
       const A = R.ARCH;
       if (st.lastY !== null && (st.lastY - A.y) * (p.y - A.y) <= 0 && st.lastY !== p.y && Math.abs(p.y - st.lastY) < 16 && p.x > A.x0 + 4 && p.x < A.x1 - 4 && st.beep <= 0.6) this.beep(g);
@@ -408,19 +610,29 @@ const AirfieldInsideExt = {
     const go = (text, spot, r = 36) => ({ text, target: this.near(g, spot, r) ? null : spot });
     const out = go('Back outside through the door 🚪', R.EXIT, 30);
     if (k === 'afterminal') {
+      const ph = this.xrayPhase(), air = p.y < R.PART_Y, arch = air ? R.ARCH_BACK : R.ARCH_SPOT;
       if (st.seat) return { text: 'Ding-dong! Your plane is boarding soon 🔔', target: null };
-      if (st.beep > 0) return { text: 'Beep! It found your pizza! 🍕', target: null };
+      if (st.walk) return { text: 'Walk through the scanner… 🚶', target: null };
+      if (st.beep > 0) return { text: 'Beep! All clear ✅', target: null };
+      if (ph === 'scan') return { text: 'Look! The X-ray sees inside your bag 👀', target: null };
       if (!s.checkins) return go('Check in at the desk! 🎫', R.CHECKIN);
-      if (!s.beeps) return go('Walk through the security arch! 🚨', { x: (R.ARCH.x0 + R.ARCH.x1) / 2, y: R.ARCH.y }, 20);
-      if (!s.bags && st.bag <= 0) return go('Grab your bag from the belt! 🧳', R.BAG_SPOT, 40);
+      if (!s.xrays && !st.xray && !st.bagReady) return go(air ? 'Put your bag on the belt at security! 🧳' : 'Put your bag on the belt! 🧳', air ? arch : R.TRAY_SPOT, air ? 30 : 34);
+      if (!s.beeps) return go('Walk through the scanner! 🚶', arch, 30);
+      if (st.bagReady) return go(air ? 'Pick up your bag! 🧳' : 'Your bag is waiting! Walk through 🚶', air ? R.PICK_SPOT : arch, air ? 36 : 30);
+      if (st.xray) return go('Your bag is riding through the X-ray… 🧳', air ? R.PICK_SPOT : arch, air ? 36 : 30);
+      if (!air) {   // back in the check-in hall: baggage claim, then the way out
+        if (!s.bags && st.bag <= 0) return go('Grab a bag from the baggage carousel! 🧳', R.BAG_SPOT, 40);
+        return out;
+      }
       if (!s.sits) { const n = this.nearestSeat(g); return { text: 'Have a seat and wait for your plane 💺', target: this.seatNear(g) ? null : n }; }
-      if (!s.toys && g.s.cash + (g.s.padPaid.afToyPlane || 0) >= 3) return go('Buy a toy plane at the gift shop! ✈️', C.ROOMS.afterminal.TOY_PAD, 30);
-      return out;
+      if (!s.toys && g.s.cash + (g.s.padPaid.afToyPlane || 0) >= 3) return go('Buy a toy plane at the gift shop! ✈️', R.TOY_PAD, 30);
+      if (!s.toGates) return go('Walk on to Gate 1 and the big jet! 🛫', R.GATE_DOOR, 34);
+      return go('Back through security to the way out 🚪', arch, 30);
     }
     if (k === 'afhangar') {
-      if (st.tug) return { text: 'Toot toot! Press the button to hop out 🚜', target: null };
-      if (!s.tugs) return go('Sit in the tug! 🚜', R.TUG_SPOT, 40);
+      if (st.tug) return { text: 'Toot toot! Off we go! 🚜', target: null };
       if (!s.mechs) return go('Say hi to the mechanic under the plane 🔧', R.MECH_SPOT, 40);
+      if (!s.tugs) return go('Drive the tug out to the planes! 🚜', R.TUG_SPOT, 40);
       return out;
     }
     if (k === 'aftower') {
@@ -431,6 +643,23 @@ const AirfieldInsideExt = {
       if (!s.looks) return go('Look out with the binoculars! 🔭', R.BINO_SPOT);
       if (!s.clears) return go('Clear a plane for take-off! 🎙️', R.MIC_SPOT);
       return go('Go back down the stairs 🪜', R.FOOT);
+    }
+    if (k === 'affuel') {
+      if (st.truck) return { text: 'Honk honk! Off we go! 🚚', target: null };
+      if (st.glug > 0) return { text: 'Glug glug! The big tank is filling up ⛽', target: null };
+      if (!s.valves) return go('Turn the big red wheel! 🔴', R.VALVE_SPOT);
+      if (!s.fuelHellos) return go('Say hi to the fuel worker 👋', R.HI_SPOT);
+      if (!s.trucks) return go('Drive the fuel truck out to the planes! 🚚', R.TRUCK_SPOT);
+      return out;
+    }
+    if (k === 'afgate') {
+      if (st.seat) return { text: 'Ding-dong! Your plane is boarding soon 🔔', target: null };
+      if (st.onWalk) return { text: 'Wheee! The floor is moving! 🚶', target: null };
+      if (!s.walks) return go('Ride the moving walkway! 🚶', { x: R.WALK.x0 + 24, y: (R.WALK.y0 + R.WALK.y1) / 2 }, 20);
+      if (!s.juices && st.juice <= 0) return go('Get a juice from the machine! 🧃', R.VEND_SPOT);
+      if (!s.gateSits) { const n = this.nearestSeat(g); return { text: 'Have a seat by the big window 💺', target: this.seatNear(g) ? null : n }; }
+      if (!s.boards && this.canBoard(g)) return go('Walk down the jet-bridge to the big jet! ✈️', R.BRIDGE_SPOT, 34);
+      return out;
     }
     if (k === 'afworkshop') {
       if (!s.spins) return go('Spin the propeller! 🌀', R.PROP_SPOT);
@@ -449,6 +678,8 @@ const AirfieldInsideExt = {
     afhangar(r, g) { AirfieldInsideExt.paintHangar(r, g); },
     aftower(r, g) { const E = AirfieldInsideExt; if (E.st && E.st.up) E.paintCab(r, g); else E.paintTowerFloor(r, g); },
     afworkshop(r, g) { AirfieldInsideExt.paintWorkshop(r, g); },
+    affuel(r, g) { AirfieldInsideExt.paintFuel(r, g); },
+    afgate(r, g) { AirfieldInsideExt.paintGate(r, g); },
   },
   // the doors seen from outside, on the airfield
   paintAfter(r, g, area) {
@@ -467,11 +698,28 @@ const AirfieldInsideExt = {
     // the tower and the workshop: mats in front of their doors
     mat(D.tower.x, D.tower.y - 10, 20);
     mat(D.workshop.x, D.workshop.y - 6, 30, '#5b3a1a');
+    // the fuel farm: a gate in the west side of its fence (open, with a yellow and black bar), a pump-house door on the pad and a mat
+    const F = A.FUEL_FARM, fd = D.fuel;
+    if (F && fd) {
+      ctx.fillStyle = '#7c8088'; ctx.fillRect(F.x0 - 8, fd.y - 16, 10, 32);   // the gap in the fence
+      ctx.fillStyle = '#5c6670'; ctx.fillRect(F.x0 - 9, fd.y - 19, 5, 6); ctx.fillRect(F.x0 - 9, fd.y + 13, 5, 6);   // the gate posts
+      for (let i = 0; i < 4; i++) { ctx.fillStyle = i % 2 ? '#2b1d14' : '#ffd166'; ctx.fillRect(F.x0 - 9 - (i + 1) * 6, fd.y - 19, 6, 4); }   // the bar, swung open
+      ctx.fillStyle = '#5b3a1a'; ctx.fillRect(F.x0, fd.y - 12, 6, 24); ctx.fillStyle = '#e4572e'; U.roundRect(ctx, F.x0 + 4, fd.y - 7, 10, 14, 3); ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(fd.x - 6, fd.y - 12, 14, 26); ctx.fillStyle = '#e4572e'; U.roundRect(ctx, fd.x - 7, fd.y - 13, 14, 26, 3); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.35)'; for (let y = fd.y - 10; y < fd.y + 11; y += 5) ctx.fillRect(fd.x - 5, y, 10, 2);
+    }
+    // the gate pier: a glass door with a striped canopy in its south side, and a mat
+    const G = A.GATE, gd = D.gate;
+    if (G && gd) {
+      ctx.fillStyle = '#9fe0ff'; ctx.fillRect(gd.x - 9, G.y1 - 6, 18, 6); ctx.fillStyle = '#3b7dd8'; ctx.fillRect(gd.x - 1, G.y1 - 6, 2, 6);
+      for (let i = 0; i < 4; i++) { ctx.fillStyle = i % 2 ? '#fff' : '#3b7dd8'; ctx.fillRect(gd.x - 14 + i * 7, G.y1, 7, 5); }
+      mat(gd.x, gd.y - 4, 24, '#3b7dd8');
+    }
   },
 
   // backdrop, floor, the tall back wall, side and bottom walls, the exit door with its mat and the name plate
-  shell(r, k, o) {
-    const ctx = r.ctx, R = CFG.AF_IN.ROOMS[k], W = R.WORLD, A = R.ROOM, w = CFG.AF_IN.WALL;
+  shell(r, k, o) {   // k: a room's name here, or a room object of the same shape (js/cloud-inside.js uses it too)
+    const ctx = r.ctx, R = typeof k === 'string' ? CFG.AF_IN.ROOMS[k] : k, W = R.WORLD, A = R.ROOM, w = CFG.AF_IN.WALL;
     ctx.fillStyle = o.out; ctx.fillRect(W.x0, W.y0, W.x1 - W.x0, W.y1 - W.y0);
     ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(A.x0 - w + 8, R.BACK_TOP + 10, A.x1 - A.x0 + 2 * w, A.y1 + w - R.BACK_TOP);
     o.floor(ctx, A);
@@ -534,31 +782,56 @@ const AirfieldInsideExt = {
 
   // ---------- the terminal ----------
   paintTerminal(r, g) {
-    const R = CFG.AF_IN.ROOMS.afterminal, E = this;
+    const R = CFG.AF_IN.ROOMS.afterminal, E = this, P = R.PART_Y;
     this.shell(r, 'afterminal', {
       out: '#2d3a4a', back: '#dfe7ef', wall: '#9aa6b4', title: R.title, mat: '#3b7dd8',
       floor: (ctx, A) => {
+        // the check-in hall: shiny white tiles; the lounge past security: a soft blue carpet with little dots
         E.tiles('#eef2f6', '#e2e8ef', 30)(ctx, A);
-        ctx.fillStyle = 'rgba(59,125,216,0.12)'; ctx.fillRect(A.x0, R.CHECKIN.y - 22, R.DESK.x1 - A.x0 + 10, 44);   // the queue lane
-        ctx.strokeStyle = '#3b7dd8'; ctx.lineWidth = 2; ctx.setLineDash([8, 6]); ctx.beginPath(); ctx.moveTo(A.x0, R.CHECKIN.y + 22); ctx.lineTo(R.DESK.x1 + 10, R.CHECKIN.y + 22); ctx.stroke(); ctx.setLineDash([]);
-        ctx.fillStyle = '#ffd166'; ctx.fillRect(R.ARCH.x0 + 8, R.ARCH.y - 54, 3, 108); ctx.fillRect(R.ARCH.x1 - 11, R.ARCH.y - 54, 3, 108);   // the yellow lines through security
+        ctx.fillStyle = '#5f8fcf'; ctx.fillRect(A.x0, A.y0, A.x1 - A.x0, P - A.y0);
+        for (let y = A.y0 + 10, j = 0; y < P - 4; y += 20, j++) for (let x = A.x0 + 10 + (j % 2) * 10; x < A.x1; x += 20) { ctx.fillStyle = (x + y) % 60 < 20 ? 'rgba(255,209,102,0.45)' : 'rgba(255,255,255,0.18)'; ctx.fillRect(x - 1.5, y - 1.5, 3, 3); }
+        // the check-in queue lane, the yellow footsteps up to the arch and the way on through it, baggage claim's ring
+        ctx.fillStyle = 'rgba(59,125,216,0.12)'; ctx.fillRect(R.DESK.x0, R.CHECKIN.y - 24, R.DESK.x1 - R.DESK.x0, 48);
+        ctx.strokeStyle = '#3b7dd8'; ctx.lineWidth = 2; ctx.setLineDash([8, 6]); ctx.beginPath(); ctx.moveTo(R.DESK.x0, R.CHECKIN.y + 24); ctx.lineTo(R.DESK.x1, R.CHECKIN.y + 24); ctx.stroke(); ctx.setLineDash([]);
+        const ax = (R.ARCH.x0 + R.ARCH.x1) / 2;
+        ctx.fillStyle = 'rgba(255,209,102,0.85)'; for (let y = R.ROPE.y1 + 6; y > P - 70; y -= 26) { if (Math.abs(y - P) < 14) continue; ctx.beginPath(); ctx.ellipse(ax - 7, y, 4, 7, 0, 0, Math.PI * 2); ctx.ellipse(ax + 7, y - 13, 4, 7, 0, 0, Math.PI * 2); ctx.fill(); }
+        ctx.strokeStyle = 'rgba(59,125,216,0.35)'; ctx.lineWidth = 6; const Cr = R.CAROUSEL; ctx.beginPath(); ctx.ellipse(Cr.x, Cr.y + 4, Cr.rx + 18, Cr.ry + 22, 0, 0, Math.PI * 2); ctx.stroke();
+        // an arrow on the carpet pointing on to Gate 1
+        ctx.fillStyle = 'rgba(255,255,255,0.35)'; const gd = R.GATE_DOOR; ctx.beginPath(); ctx.moveTo(gd.x - 90, gd.y - 8); ctx.lineTo(gd.x - 40, gd.y - 8); ctx.lineTo(gd.x - 40, gd.y - 20); ctx.lineTo(gd.x - 16, gd.y); ctx.lineTo(gd.x - 40, gd.y + 20); ctx.lineTo(gd.x - 40, gd.y + 8); ctx.lineTo(gd.x - 90, gd.y + 8); ctx.closePath(); ctx.fill();
       },
       backArt: (ctx, A) => {
         ctx.fillStyle = '#3b7dd8'; ctx.fillRect(A.x0 - 24, R.BACK_TOP, A.x1 - A.x0 + 48, 6);
-        // the departures board (its letters are drawn live)
+        // the departures board (its letters are drawn live) and the big window's frame (the view is drawn live)
         const B = R.BOARD; ctx.fillStyle = '#5c6670'; U.roundRect(ctx, B.x0 - 4, B.y0 - 4, B.x1 - B.x0 + 8, B.y1 - B.y0 + 8, 6); ctx.fill(); ctx.fillStyle = '#1e2733'; ctx.fillRect(B.x0, B.y0, B.x1 - B.x0, B.y1 - B.y0);
-        // the window frame (the view is drawn live)
         const Wn = R.WINDOW; ctx.fillStyle = '#fff8ee'; U.roundRect(ctx, Wn.x0 - 6, Wn.y0 - 6, Wn.x1 - Wn.x0 + 12, Wn.y1 - Wn.y0 + 12, 6); ctx.fill();
-        // the gift shop's sign and striped awning
-        ctx.fillStyle = '#e4572e'; U.roundRect(ctx, 13476, 4030, 80, 22, 6); ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = r.font(10); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🎁 GIFTS', 13516, 4041);
-        for (let i = 0; i < 6; i++) { ctx.fillStyle = i % 2 ? '#fff8ee' : '#e4572e'; ctx.fillRect(13484 + i * 13, 4062, 13, 14); ctx.beginPath(); ctx.arc(13490.5 + i * 13, 4076, 6.5, 0, Math.PI); ctx.fill(); }
+        // the gift shop's sign and striped awning, in the west corner
+        ctx.fillStyle = '#e4572e'; U.roundRect(ctx, A.x0 + 2, 4030, 104, 22, 6); ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = r.font(10); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🎁 GIFTS', A.x0 + 54, 4041);
+        for (let i = 0; i < 8; i++) { ctx.fillStyle = i % 2 ? '#fff8ee' : '#e4572e'; ctx.fillRect(A.x0 + 2 + i * 13, 4062, 13, 14); ctx.beginPath(); ctx.arc(A.x0 + 8.5 + i * 13, 4076, 6.5, 0, Math.PI * 2 * 0.5); ctx.fill(); }
+        // a clock between the board and the window
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(27400, 4050, 12, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(27400, 4050, 12, 0, Math.PI * 2); ctx.moveTo(27400, 4050); ctx.lineTo(27400, 4042); ctx.moveTo(27400, 4050); ctx.lineTo(27406, 4053); ctx.stroke();
+        // the security sign over the arch, on the back wall above everything (a big shield)
+        ctx.fillStyle = '#2d3a4a'; U.roundRect(ctx, 27908, 4030, 82, 46, 8); ctx.fill(); ctx.fillStyle = '#ffd166'; ctx.font = r.font(18); ctx.fillText('🛫', 27949, 4048); ctx.font = r.font(8); ctx.fillText('GATE 1 →', 27949, 4066);
+      },
+      sideArt: (ctx, A) => {   // the way through to Gate 1: an open doorway in the east wall
+        const G = R.GATE_GAP; ctx.fillStyle = '#2d3a4a'; ctx.fillRect(A.x1, G.y0, CFG.AF_IN.WALL, G.y1 - G.y0);
+        ctx.fillStyle = '#5f8fcf'; ctx.fillRect(A.x1, G.y0 + 6, CFG.AF_IN.WALL - 6, G.y1 - G.y0 - 12);
+        ctx.fillStyle = '#ffd166'; ctx.fillRect(A.x1 - 2, G.y0 - 4, CFG.AF_IN.WALL + 2, 4); ctx.fillRect(A.x1 - 2, G.y1, CFG.AF_IN.WALL + 2, 4);
       },
     });
     const ctx = r.ctx;
-    // the check-in desk's top (its front is drawn as an entity, over the agent's legs), a luggage scale beside it
+    // the check-in desk's shadow (its front is an entity, over the agent's legs); the little bag belt behind it running
+    // into rubber flaps in the west wall
     this.drawDesk(r, false);
-    // the security arch's floor plate and an X-ray tray table
-    ctx.fillStyle = '#9aa6b4'; ctx.fillRect(R.ARCH.x0 - 4, R.ARCH.y - 9, R.ARCH.x1 - R.ARCH.x0 + 8, 18);
+    const by = R.BELT_Y, A = R.ROOM;
+    ctx.fillStyle = '#5c6670'; ctx.fillRect(A.x0, by - 10, R.SCALE.x - A.x0 + 10, 20); ctx.fillStyle = '#3e424a'; ctx.fillRect(A.x0, by - 7, R.SCALE.x - A.x0 + 6, 14);
+    ctx.fillStyle = '#2b1d14'; ctx.fillRect(A.x0 - 6, by - 16, 8, 26); ctx.fillStyle = '#7d8591'; for (let i = 0; i < 4; i++) ctx.fillRect(A.x0 - 5 + i * 2, by - 14, 1.5, 22);   // the flaps
+    // the X-ray machine's belt: rollers in a steel frame from the tray in the hall to the far end in the lounge
+    const XB = R.XBELT;
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(XB.x0 + 4, XB.y0 + 4, XB.x1 - XB.x0, XB.y1 - XB.y0);
+    ctx.fillStyle = '#9aa0a8'; U.roundRect(ctx, XB.x0, XB.y0, XB.x1 - XB.x0, XB.y1 - XB.y0, 5); ctx.fill();
+    ctx.fillStyle = '#3e424a'; ctx.fillRect(XB.x0 + 5, XB.y0 + 4, XB.x1 - XB.x0 - 10, XB.y1 - XB.y0 - 8);
+    ctx.fillStyle = '#c9ccd2'; ctx.fillRect(XB.x0, XB.y1 - 26, XB.x1 - XB.x0, 26);   // the grey tray table at the start
+    ctx.fillStyle = '#9aa0a8'; U.roundRect(ctx, XB.x0 + 6, XB.y1 - 22, XB.x1 - XB.x0 - 12, 18, 3); ctx.fill(); ctx.fillStyle = '#7d8591'; ctx.fillRect(XB.x0 + 9, XB.y1 - 19, XB.x1 - XB.x0 - 18, 12);   // a spare tray
     // the baggage carousel: a steel rim, a rubber belt and the plate in the middle
     const C = R.CAROUSEL;
     ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(C.x + 4, C.y + 6, C.rx, C.ry, 0, 0, Math.PI * 2); ctx.fill();
@@ -566,32 +839,28 @@ const AirfieldInsideExt = {
     ctx.fillStyle = '#3e424a'; ctx.beginPath(); ctx.ellipse(C.x, C.y, C.rx - 4, C.ry - 4, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#c9ced6'; ctx.beginPath(); ctx.ellipse(C.x, C.y, C.rx - 26, C.ry - 16, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#2b1d14'; ctx.font = r.font(8); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('BAGS 🧳', C.x, C.y + 1);
-    // the waiting seats: blue cushions in two rows, chrome backs
-    for (const y of R.SEAT_YS) {
-      ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(R.SEAT_XS[0] - 16, y + 10, R.SEAT_XS[R.SEAT_XS.length - 1] - R.SEAT_XS[0] + 34, 6);
-      ctx.fillStyle = '#9aa0a8'; ctx.fillRect(R.SEAT_XS[0] - 16, y - 27, R.SEAT_XS[R.SEAT_XS.length - 1] - R.SEAT_XS[0] + 32, 4);
-      for (const x of R.SEAT_XS) {
-        ctx.fillStyle = '#2d5a8a'; U.roundRect(ctx, x - 13, y - 25, 26, 14, 4); ctx.fill();
-        ctx.fillStyle = '#3b7dd8'; U.roundRect(ctx, x - 13, y - 12, 26, 20, 5); ctx.fill();
-        ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(x - 10, y - 10, 20, 3);
-      }
-    }
-    // the gift shop: shelves of toy planes, snow globes, a pizza teddy; a postcard stand
+    // the waiting seats facing the big window
+    this.paintSeats(ctx, R);
+    // the gift shop: shelves of toy planes and snow globes along the west wall, the pizza teddy on its little table
     const S = R.SHELF;
     ctx.fillStyle = '#8d5a2b'; ctx.fillRect(S.x0, S.y0, S.x1 - S.x0, S.y1 - S.y0);
     ctx.fillStyle = '#b98a55'; for (let y = S.y0 + 8; y < S.y1 - 6; y += 36) ctx.fillRect(S.x0 + 3, y, S.x1 - S.x0 - 6, 30);
     const cols = ['#e4572e', '#3b7dd8', '#ffd166', '#41b883'];
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
       const y = S.y0 + 22 + i * 36;
-      if (i === 1) { for (let j = 0; j < 2; j++) { const x = S.x0 + 16 + j * 26; ctx.fillStyle = 'rgba(159,224,255,0.75)'; ctx.beginPath(); ctx.arc(x, y - 2, 9, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(x - 4, y - 4, 2, 2); ctx.fillRect(x + 2, y - 7, 2, 2); ctx.fillStyle = '#5b3a1a'; ctx.fillRect(x - 8, y + 5, 16, 5); } }
+      if (i % 2) { for (let j = 0; j < 2; j++) { const x = S.x0 + 16 + j * 26; ctx.fillStyle = 'rgba(159,224,255,0.75)'; ctx.beginPath(); ctx.arc(x, y - 2, 9, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(x - 4, y - 4, 2, 2); ctx.fillRect(x + 2, y - 7, 2, 2); ctx.fillStyle = '#5b3a1a'; ctx.fillRect(x - 8, y + 5, 16, 5); } }
       else for (let j = 0; j < 2; j++) { ctx.save(); ctx.translate(S.x0 + 17 + j * 26, y); ctx.scale(0.24, 0.24); r.drawVehicle('plane', g, cols[(i + j) % 4], { color: cols[(i + j) % 4], lift: 1 }); ctx.restore(); }
     }
-    ctx.fillStyle = '#c96a3f'; ctx.beginPath(); ctx.arc(13470, 4128, 11, 0, Math.PI * 2); ctx.arc(13462, 4118, 5, 0, Math.PI * 2); ctx.arc(13478, 4118, 5, 0, Math.PI * 2); ctx.fill(); r.drawPizza(13470, 4131, 6);   // the pizza teddy
-    ctx.fillStyle = '#2b1d14'; ctx.fillRect(13467, 4124, 2, 2); ctx.fillRect(13472, 4124, 2, 2);
-    this.plant(ctx, 13060, 4320); this.plant(ctx, 13446, 4110);
-    ctx.fillStyle = '#5c6670'; ctx.font = r.font(8); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('SECURITY', (R.ARCH.x0 + R.ARCH.x1) / 2, R.ARCH.y + 22);
+    const Td = R.TEDDY, tx = (Td.x0 + Td.x1) / 2;
+    ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(Td.x0 + 3, Td.y1 - 2, Td.x1 - Td.x0, 5); ctx.fillStyle = '#b98a55'; U.roundRect(ctx, Td.x0, Td.y0 + 8, Td.x1 - Td.x0, Td.y1 - Td.y0 - 8, 4); ctx.fill();
+    ctx.fillStyle = '#c96a3f'; ctx.beginPath(); ctx.arc(tx, Td.y0 + 14, 11, 0, Math.PI * 2); ctx.arc(tx - 8, Td.y0 + 4, 5, 0, Math.PI * 2); ctx.arc(tx + 8, Td.y0 + 4, 5, 0, Math.PI * 2); ctx.fill(); r.drawPizza(tx, Td.y0 + 17, 6);   // the pizza teddy
+    ctx.fillStyle = '#2b1d14'; ctx.fillRect(tx - 3, Td.y0 + 10, 2, 2); ctx.fillRect(tx + 2, Td.y0 + 10, 2, 2);
+    this.plant(ctx, 27060, 4660); this.plant(ctx, 27412, 4112); this.plant(ctx, 27980, 4440); this.plant(ctx, 27980, 4196);
+    ctx.fillStyle = '#5c6670'; ctx.font = r.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('🛂 SECURITY', 27530, R.ROPE.y1 + 34); ctx.fillText('BAGGAGE CLAIM', C.x, C.y + C.ry + 54);
+    ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillText('DEPARTURES LOUNGE', 27250, P - 76);
   },
-  // the check-in desk: its top (static) or its front (an entity, so the agent stands behind it)
+  // the check-in desk: its shadow (static) or its top and front (an entity, so the agent stands behind it)
   drawDesk(r, front) {
     const ctx = r.ctx, D = CFG.AF_IN.ROOMS.afterminal.DESK;
     if (!front) {
@@ -603,7 +872,7 @@ const AirfieldInsideExt = {
     ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(D.x0 + 4, D.y0 + 16, D.x1 - D.x0 - 8, 3);
     ctx.fillStyle = '#ffe08a'; ctx.font = r.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('✈️ CHECK-IN', (D.x0 + D.x1) / 2, D.y0 + 28);
     ctx.fillStyle = '#2d3a4a'; U.roundRect(ctx, D.x0 + 12, D.y0 - 2, 22, 12, 2); ctx.fill(); ctx.fillStyle = '#9fe0ff'; ctx.fillRect(D.x0 + 14, D.y0, 18, 7);   // a screen
-    ctx.fillStyle = '#9aa0a8'; ctx.fillRect(D.x1 - 30, D.y0 - 2, 24, 12); ctx.fillStyle = '#e4572e'; ctx.fillRect(D.x1 - 22, D.y0 + 1, 8, 4);   // the bag scale
+    ctx.fillStyle = '#9aa0a8'; ctx.fillRect(D.x1 - 34, D.y0 - 3, 28, 13); ctx.fillStyle = '#e4572e'; ctx.fillRect(D.x1 - 25, D.y0 + 1, 10, 4);   // the bag scale
   },
   drawAgent(r, g) {
     const ctx = r.ctx, st = this.st, R = CFG.AF_IN.ROOMS.afterminal, Ag = R.AGENT, p = g.player, d = U.dist(p.x, p.y, Ag.x, Ag.y), t = g.time;
@@ -614,17 +883,152 @@ const AirfieldInsideExt = {
       r.drawBubble(Ag.x, Ag.y - 78 + Math.sin(t * 4) * 3, () => { ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText(text, 0, 0); }, st.agent > 0 ? 136 : 96);
     }
   },
-  // the security arch: a frame you walk through (north–south), its light green, flashing red when it beeps
+  // the big suitcase you checked in: a bounce on the scale, a hop onto the belt behind the agent, off into the flaps
+  checkBagPos() {
+    const cb = this.st.checkBag, R = CFG.AF_IN.ROOMS.afterminal; if (!cb) return null;
+    const t = cb.t, S = R.SCALE, A = R.ROOM;
+    if (t < 0.6) return { x: S.x, y: S.y - 2 - Math.abs(Math.sin(t * 10)) * 3, front: true };
+    if (t < 1.0) { const k = (t - 0.6) / 0.4; return { x: S.x, y: U.lerp(S.y - 2, R.BELT_Y, k) - Math.sin(k * Math.PI) * 16, front: k < 0.5 }; }
+    const k = Math.min(1, (t - 1.0) / 2.2); return { x: U.lerp(S.x, A.x0 - 6, k), y: R.BELT_Y, front: false, gone: k >= 1 };
+  },
+  // the glass wall between the hall and the lounge (drawn as an entity: people in the lounge show through the glass)
+  drawPartition(r, g) {
+    const ctx = r.ctx, R = CFG.AF_IN.ROOMS.afterminal, A = R.ROOM, P = R.PART_Y, Ar = R.ARCH, X = R.XRAY, H = 50;
+    for (const [x0, x1] of [[A.x0, Ar.x0 - 7], [Ar.x1 + 7, X.x0], [X.x1, A.x1]]) {
+      ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(x0, P + 4, x1 - x0, 6);
+      ctx.fillStyle = 'rgba(159,224,255,0.38)'; ctx.fillRect(x0, P - H, x1 - x0, H + 4);
+      ctx.fillStyle = 'rgba(255,255,255,0.35)'; for (let x = x0 + 14; x < x1 - 20; x += 70) { ctx.beginPath(); ctx.moveTo(x, P - H + 4); ctx.lineTo(x + 10, P - H + 4); ctx.lineTo(x - 4, P); ctx.lineTo(x - 14, P); ctx.closePath(); ctx.fill(); }
+      ctx.fillStyle = '#9aa0a8'; ctx.fillRect(x0, P - H - 3, x1 - x0, 5); ctx.fillStyle = '#5c6670'; ctx.fillRect(x0, P, x1 - x0, 6);
+      ctx.fillStyle = '#9aa0a8'; for (let x = x0; x <= x1; x += 70) ctx.fillRect(Math.min(x, x1 - 3), P - H, 3, H + 4);
+    }
+  },
+  // the scanner arch: a frame you walk through (north–south); its lights flash green and it says "All clear" as you pass
   drawArch(r, g) {
-    const ctx = r.ctx, A = CFG.AF_IN.ROOMS.afterminal.ARCH, st = this.st, H = 72, t = g.time, cx = (A.x0 + A.x1) / 2;
+    const ctx = r.ctx, A = CFG.AF_IN.ROOMS.afterminal.ARCH, st = this.st, H = 78, t = g.time, cx = (A.x0 + A.x1) / 2, on = st.beep > 0;
     ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(A.x0 - 6, A.y + 3, A.x1 - A.x0 + 16, 6);
-    ctx.fillStyle = '#9aa0a8'; U.roundRect(ctx, A.x0 - 7, A.y - H, 14, H + 6, 4); ctx.fill(); U.roundRect(ctx, A.x1 - 7, A.y - H, 14, H + 6, 4); ctx.fill();
-    U.roundRect(ctx, A.x0 - 7, A.y - H - 6, A.x1 - A.x0 + 14, 16, 5); ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(A.x0 - 4, A.y - H + 8, 3, H - 8); ctx.fillRect(A.x1 - 4, A.y - H + 8, 3, H - 8); ctx.fillRect(A.x0, A.y - H - 4, A.x1 - A.x0, 3);
-    ctx.fillStyle = '#5c6670'; for (let i = 0; i < 5; i++) { ctx.fillRect(A.x0 - 3, A.y - H + 18 + i * 10, 6, 2); ctx.fillRect(A.x1 - 3, A.y - H + 18 + i * 10, 6, 2); }
-    const on = st.beep > 0;
-    ctx.fillStyle = on ? (Math.floor(t * 10) % 2 ? '#ff5252' : '#ffd166') : '#44d36a'; ctx.beginPath(); ctx.arc(cx, A.y - H + 2, 5, 0, Math.PI * 2); ctx.fill();
-    if (on) r.drawBubble(cx, A.y - H - 30 + Math.sin(t * 6) * 2, () => { ctx.font = r.font(14); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#e4572e'; ctx.fillText('Beep! 🍕', 0, 0); }, 84);
+    ctx.fillStyle = '#c9ccd2'; U.roundRect(ctx, A.x0 - 8, A.y - H, 15, H + 8, 4); ctx.fill(); U.roundRect(ctx, A.x1 - 7, A.y - H, 15, H + 8, 4); ctx.fill();
+    ctx.fillStyle = '#9aa0a8'; U.roundRect(ctx, A.x0 - 8, A.y - H - 8, A.x1 - A.x0 + 16, 18, 5); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fillRect(A.x0 - 5, A.y - H + 8, 3, H - 8); ctx.fillRect(A.x1 - 4, A.y - H + 8, 3, H - 8);
+    // a column of lights up each post: green chasing up while it scans
+    for (let i = 0; i < 6; i++) {
+      const lit = on && (Math.floor(t * 12) - i) % 6 === 0;
+      ctx.fillStyle = on ? (lit ? '#b6ff9e' : '#44d36a') : '#5c6670';
+      ctx.fillRect(A.x0 - 3, A.y - 12 - i * 11, 6, 6); ctx.fillRect(A.x1 - 2, A.y - 12 - i * 11, 6, 6);
+    }
+    ctx.fillStyle = on ? (Math.floor(t * 8) % 2 ? '#b6ff9e' : '#44d36a') : '#3b7dd8'; U.roundRect(ctx, cx - 14, A.y - H - 4, 28, 10, 4); ctx.fill();
+    if (on) r.drawBubble(cx, A.y - H - 34 + Math.sin(t * 6) * 2, () => { ctx.font = r.font(14); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2e8b3e'; ctx.fillText('Beep! All clear ✅', 0, 0); }, 150);
+  },
+  // the X-ray machine over the belt: a box with a dark tunnel mouth and rubber flaps, a lamp that glows while it scans
+  drawXrayBox(r, g) {
+    const ctx = r.ctx, R = CFG.AF_IN.ROOMS.afterminal, X = R.XRAY, t = g.time, on = this.xrayPhase() === 'scan', top = X.y0 - 26;
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(X.x0 + 5, X.y1 - 2, X.x1 - X.x0, 8);
+    ctx.fillStyle = '#7d8591'; U.roundRect(ctx, X.x0, top, X.x1 - X.x0, X.y1 - top, 6); ctx.fill();
+    ctx.fillStyle = '#c3c8d0'; U.roundRect(ctx, X.x0, top, X.x1 - X.x0, X.y0 - top + 12, 6); ctx.fill();   // the top
+    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, X.x0 + 8, X.y1 - 34, X.x1 - X.x0 - 16, 30, 4); ctx.fill();   // the tunnel mouth
+    ctx.fillStyle = '#5c6670'; for (let i = 0; i < 6; i++) ctx.fillRect(X.x0 + 10 + i * 8, X.y1 - 32, 6, 26 + Math.sin(t * 6 + i) * (on ? 1.5 : 0));   // the flaps
+    ctx.fillStyle = on ? (Math.floor(t * 6) % 2 ? '#ffd166' : '#ff8c42') : '#44d36a'; ctx.beginPath(); ctx.arc((X.x0 + X.x1) / 2, top + 10, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#2b1d14'; ctx.font = r.font(8); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('X-RAY', (X.x0 + X.x1) / 2, top + 24);
+  },
+  // the chef's bag on the X-ray belt (not while it is inside the tunnel), or waiting at the far end
+  xbagPos() {
+    const st = this.st, R = CFG.AF_IN.ROOMS.afterminal, XB = R.XBELT, X = R.XRAY, C = CFG.AF_IN.XRAY, x = (XB.x0 + XB.x1) / 2;
+    if (st.bagReady) return { x, y: XB.y0 + 18 };
+    const ph = this.xrayPhase(); if (!ph || ph === 'scan') return null;
+    if (ph === 'in') return { x, y: U.lerp(XB.y1 - 14, X.y1 - 6, st.xray.t / C.in) };
+    return { x, y: U.lerp(X.y0 - 10, XB.y0 + 18, (st.xray.t - C.in - C.scan) / C.out) };
+  },
+  // the X-ray screen on its stand: blue and scanning; while the bag is in the tunnel it shows what is inside
+  drawScreen(r, g) {
+    const ctx = r.ctx, R = CFG.AF_IN.ROOMS.afterminal, S = R.SCREEN, t = g.time, w = 84, h = 58, x0 = S.x - w / 2, y0 = S.y - 118;
+    ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(S.x + 2, S.y + 2, 16, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#5c6670'; ctx.fillRect(S.x - 3, y0 + h, 6, S.y - y0 - h); U.roundRect(ctx, S.x - 14, S.y - 6, 28, 10, 4); ctx.fill();
+    ctx.fillStyle = '#2d3a4a'; U.roundRect(ctx, x0 - 5, y0 - 5, w + 10, h + 10, 6); ctx.fill();
+    this.drawXrayView(r, g, x0, y0, w, h, this.xrayPhase() === 'scan' ? this.st.xray.items : null, t);
+  },
+  // the X-ray picture: a dark blue screen; the bag's outline and the funny things inside glowing orange and cyan
+  drawXrayView(r, g, x0, y0, w, h, items, t) {
+    const ctx = r.ctx;
+    ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, w, h); ctx.clip();
+    ctx.fillStyle = '#0c2a4a'; ctx.fillRect(x0, y0, w, h);
+    ctx.strokeStyle = 'rgba(120,220,255,0.12)'; ctx.lineWidth = 1; for (let y = y0 + 2; y < y0 + h; y += 4) { ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x0 + w, y); ctx.stroke(); }
+    if (items) {
+      const s = h / 60, cx = x0 + w / 2, cy = y0 + h / 2 + 2 * s;
+      ctx.strokeStyle = '#9fe8ff'; ctx.lineWidth = 2 * s; U.roundRect(ctx, cx - 38 * s, cy - 20 * s, 76 * s, 44 * s, 6 * s); ctx.stroke();   // the bag
+      ctx.beginPath(); ctx.moveTo(cx - 10 * s, cy - 20 * s); ctx.lineTo(cx - 10 * s, cy - 27 * s); ctx.lineTo(cx + 10 * s, cy - 27 * s); ctx.lineTo(cx + 10 * s, cy - 20 * s); ctx.stroke();
+      items.forEach(([kind], i) => this.drawXrayThing(ctx, kind, cx + (i ? 18 : -18) * s, cy + 2 * s, s, t));
+      const sx = x0 + ((t * 0.9) % 1) * w; ctx.fillStyle = 'rgba(160,255,200,0.35)'; ctx.fillRect(sx - 2, y0, 4, h);   // the scan line sweeping across
+    } else {
+      ctx.fillStyle = 'rgba(160,232,255,0.6)'; ctx.font = r.font(Math.max(8, h * 0.18)); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('X-RAY', x0 + w / 2, y0 + h / 2);
+      const sx = x0 + ((t * 0.4) % 1) * w; ctx.fillStyle = 'rgba(160,232,255,0.18)'; ctx.fillRect(sx - 1, y0, 2, h);
+    }
+    ctx.restore();
+  },
+  // the things the X-ray finds, glowing: soft things orange, hard things cyan (s: scale, about 1 on the little screen)
+  drawXrayThing(ctx, kind, x, y, s, t) {
+    const O = '#ffb35c', Of = 'rgba(255,179,92,0.35)', B = '#7fe0ff', Bf = 'rgba(127,224,255,0.3)';
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, s); ctx.lineWidth = 2; ctx.lineJoin = 'round';
+    const shape = (fill, stroke, f) => { ctx.fillStyle = fill; ctx.strokeStyle = stroke; ctx.beginPath(); f(); ctx.fill(); ctx.stroke(); };
+    if (kind === 'pizza') {
+      shape(Of, O, () => ctx.arc(0, 0, 13, 0, Math.PI * 2));
+      ctx.strokeStyle = O; ctx.lineWidth = 1.2; ctx.beginPath(); for (let i = 0; i < 4; i++) { const a = i * Math.PI / 4; ctx.moveTo(Math.cos(a) * 13, Math.sin(a) * 13); ctx.lineTo(-Math.cos(a) * 13, -Math.sin(a) * 13); } ctx.stroke();
+      ctx.fillStyle = O; for (const [px, py] of [[-5, -6], [6, -3], [-2, 6], [7, 6]]) { ctx.beginPath(); ctx.arc(px, py, 2.4, 0, Math.PI * 2); ctx.fill(); }
+    } else if (kind === 'teddy') {
+      shape(Of, O, () => { ctx.arc(-7, -11, 4, 0, Math.PI * 2); ctx.moveTo(11, -11); ctx.arc(7, -11, 4, 0, Math.PI * 2); });
+      shape(Of, O, () => ctx.arc(0, -6, 8, 0, Math.PI * 2));
+      shape(Of, O, () => ctx.ellipse(0, 9, 9, 9, 0, 0, Math.PI * 2));
+      ctx.fillStyle = O; ctx.fillRect(-4, -8, 2, 2); ctx.fillRect(2, -8, 2, 2); ctx.beginPath(); ctx.arc(0, -3, 1.6, 0, Math.PI * 2); ctx.fill();
+    } else if (kind === 'duck') {
+      shape(Of, O, () => ctx.ellipse(2, 6, 12, 7, 0, 0, Math.PI * 2));
+      shape(Of, O, () => ctx.arc(-6, -5, 6, 0, Math.PI * 2));
+      shape(Of, O, () => { ctx.moveTo(-12, -5); ctx.lineTo(-18, -3); ctx.lineTo(-12, -1); });
+      ctx.fillStyle = O; ctx.fillRect(-8, -7, 2, 2);
+    } else if (kind === 'plane') {
+      shape(Bf, B, () => { ctx.ellipse(0, 0, 14, 4, 0, 0, Math.PI * 2); });
+      shape(Bf, B, () => { ctx.moveTo(-2, 0); ctx.lineTo(-6, -14); ctx.lineTo(2, -14); ctx.lineTo(4, 0); ctx.lineTo(2, 14); ctx.lineTo(-6, 14); ctx.closePath(); });
+      shape(Bf, B, () => { ctx.moveTo(-12, 0); ctx.lineTo(-15, -6); ctx.lineTo(-11, -6); ctx.lineTo(-9, 0); ctx.lineTo(-11, 6); ctx.lineTo(-15, 6); ctx.closePath(); });
+    } else if (kind === 'pin') {
+      shape(Of, O, () => U.roundRect(ctx, -10, -5, 20, 10, 4));
+      shape(Bf, B, () => { U.roundRect(ctx, -17, -2, 7, 4, 2); });
+      shape(Bf, B, () => { U.roundRect(ctx, 10, -2, 7, 4, 2); });
+    } else {   // a pair of socks
+      for (const dx of [-7, 7]) shape(Of, O, () => { ctx.moveTo(dx - 4, -12); ctx.lineTo(dx + 4, -12); ctx.lineTo(dx + 4, 4); ctx.lineTo(dx + 9, 6); ctx.lineTo(dx + 9, 11); ctx.lineTo(dx - 4, 11); ctx.closePath(); });
+    }
+    ctx.restore();
+  },
+  // the security guard just past the arch: a cap and a badge; waves when the arch says all clear
+  drawGuard(r, g) {
+    const ctx = r.ctx, st = this.st, R = CFG.AF_IN.ROOMS.afterminal, Gd = R.GUARD, p = g.player, t = g.time, d = U.dist(p.x, p.y, Gd.x, Gd.y);
+    r.drawPerson(Gd.x, Gd.y, { shirt: '#2d5a8a', skin: '#c68642', hat: 'cap', capColor: '#1f2a38', facing: p.x < Gd.x ? -1 : 1, moving: false, bob: 0, carry: 0, pants: '#1f2a38' });
+    ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(Gd.x - 5, Gd.y - 30, 3, 0, Math.PI * 2); ctx.fill();   // the badge
+    if (st.beep > 0) {
+      ctx.save(); ctx.translate(Gd.x + 20, Gd.y - 50); ctx.rotate(Math.sin(t * 9) * 0.35); ctx.font = r.font(17); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('👋', 0, 0); ctx.restore();
+    } else if (d < 90 && !st.walk && !st.seat) {
+      r.drawBubble(Gd.x, Gd.y - 80 + Math.sin(t * 4) * 3, () => { ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('Hello! 👮', 0, 0); }, 84);
+    }
+  },
+  // the queue rope: shiny posts and a red rope swooping between them
+  drawRope(r, g) {
+    const ctx = r.ctx, Ro = CFG.AF_IN.ROOMS.afterminal.ROPE, posts = [];
+    for (let y = Ro.y0 + 10; y <= Ro.y1; y += 40) posts.push(y);
+    ctx.strokeStyle = '#d32f2f'; ctx.lineWidth = 3;
+    for (let i = 1; i < posts.length; i++) { ctx.beginPath(); ctx.moveTo(Ro.x, posts[i - 1] - 30); ctx.quadraticCurveTo(Ro.x + 4, (posts[i - 1] + posts[i]) / 2 - 22, Ro.x, posts[i] - 30); ctx.stroke(); }
+    for (const y of posts) {
+      ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(Ro.x + 2, y + 2, 8, 3, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#c9ccd2'; ctx.fillRect(Ro.x - 2, y - 32, 4, 32); ctx.beginPath(); ctx.ellipse(Ro.x, y, 7, 3, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(Ro.x, y - 33, 3.5, 0, Math.PI * 2); ctx.fill();
+    }
+  },
+  // the X-ray picture full size while the bag is in the tunnel (so it is easy to see on a phone too)
+  drawXrayPopup(r, g, W, H) {
+    const st = this.st, x = st.xray, C = CFG.AF_IN.XRAY, ctx = r.ctx; if (!x) return;
+    const k = (x.t - C.in) / C.scan, a = k < 0.12 ? k / 0.12 : k > 0.88 ? (1 - k) / 0.12 : 1;
+    const w = Math.min(W - 40, 300), h = w * 0.62, px = W / 2 - w / 2, py = Math.max(64, H * 0.16);
+    ctx.save(); ctx.globalAlpha = U.clamp(a, 0, 1);
+    ctx.fillStyle = '#2d3a4a'; U.roundRect(ctx, px - 10, py - 10, w + 20, h + 54, 14); ctx.fill();
+    this.drawXrayView(r, g, px, py, w, h, x.items, g.time);
+    ctx.fillStyle = '#ffe08a'; ctx.font = r.font(Math.min(16, w / 17)); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(x.items.map((it) => it[1]).join('   '), W / 2, py + h + 22);
+    ctx.restore();
   },
   // the departures board's rows, flipping letter by letter
   drawBoard(r, g) {
@@ -1025,6 +1429,244 @@ const AirfieldInsideExt = {
     } else if (d < 120) r.drawBubble(M.x - 10, M.y - 82 + Math.sin(t * 4) * 3, () => { ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('Hi, Chef! 🔧', 0, 0); }, 92);
   },
 
+  // ---------- the fuel farm's pump room ----------
+  paintFuel(r, g) {
+    const R = CFG.AF_IN.ROOMS.affuel, E = this, Tk = R.TANK, V = R.VALVE, PY = 4082;   // PY: the top of the big pipe along the back wall
+    this.shell(r, 'affuel', {
+      out: '#2d3a4a', back: '#d6dbe0', wall: '#8a929c', title: R.title, mat: '#e4572e',
+      floor: (ctx, A) => {
+        E.concrete('#c3c8cf')(ctx, A);
+        // yellow and black hazard stripes round the truck bay, a drain grate, a drip stain under the valve
+        const T = R.TRUCK; ctx.save(); ctx.beginPath(); ctx.rect(T.x - 92, T.y - 40, 182, 6); ctx.rect(T.x - 92, T.y - 40, 6, A.y1 - T.y + 40); ctx.clip();
+        for (let x = T.x - 120; x < T.x + 100; x += 12) { ctx.fillStyle = (x / 12) % 2 ? '#2b1d14' : '#ffd166'; ctx.beginPath(); ctx.moveTo(x, T.y - 40); ctx.lineTo(x + 6, T.y - 40); ctx.lineTo(x - 54, A.y1 + 40); ctx.lineTo(x - 60, A.y1 + 40); ctx.closePath(); ctx.fill(); }
+        ctx.restore();
+        ctx.fillStyle = '#7c8088'; U.roundRect(ctx, 19300 - 22, 4236, 44, 22, 4); ctx.fill(); ctx.fillStyle = '#4a5260'; for (let i = 0; i < 6; i++) ctx.fillRect(19300 - 18 + i * 7, 4240, 3, 14);
+        ctx.fillStyle = 'rgba(200,120,30,0.18)'; ctx.beginPath(); ctx.ellipse(V.x + 26, V.y + 52, 16, 6, 0.2, 0, Math.PI * 2); ctx.fill();
+      },
+      backArt: (ctx, A) => {
+        for (let x = A.x0 - 24; x < A.x1 + 24; x += 24) { ctx.fillStyle = (x / 24) % 2 ? '#2b1d14' : '#ffd166'; ctx.beginPath(); ctx.moveTo(x, R.BACK_TOP); ctx.lineTo(x + 12, R.BACK_TOP); ctx.lineTo(x + 4, R.BACK_TOP + 8); ctx.lineTo(x - 8, R.BACK_TOP + 8); ctx.closePath(); ctx.fill(); }
+        ctx.fillStyle = 'rgba(0,0,0,0.06)'; for (let x = A.x0 - 24; x < A.x1 + 24; x += 40) ctx.fillRect(x, R.BACK_TOP + 8, 2, A.y0 - R.BACK_TOP - 8);
+        // the gauge panel (the dials are drawn live), a big fuel badge, the fire extinguisher, a little window with the sky
+        ctx.fillStyle = '#7d8591'; U.roundRect(ctx, 19246, 4032, 152, 46, 6); ctx.fill(); ctx.fillStyle = '#9aa2ad'; U.roundRect(ctx, 19250, 4035, 144, 40, 5); ctx.fill();
+        ctx.fillStyle = '#5c6670'; for (const [x, y] of [[19252, 4038], [19390, 4038], [19252, 4071], [19390, 4071]]) { ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI * 2); ctx.fill(); }
+        ctx.fillStyle = '#e4572e'; U.roundRect(ctx, 19414, 4030, 54, 46, 10); ctx.fill(); ctx.fillStyle = '#fff'; U.roundRect(ctx, 19428, 4040, 20, 28, 3); ctx.fill(); ctx.fillStyle = '#e4572e'; ctx.fillRect(19431, 4044, 14, 8);
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(19448, 4046); ctx.lineTo(19456, 4050); ctx.lineTo(19456, 4064); ctx.stroke();   // a fuel pump picture
+        ctx.fillStyle = '#fff8ee'; U.roundRect(ctx, 19486, 4030, 58, 44, 4); ctx.fill(); const sk = ctx.createLinearGradient(0, 4034, 0, 4070); sk.addColorStop(0, '#49a8ea'); sk.addColorStop(1, '#bfe6fb'); ctx.fillStyle = sk; ctx.fillRect(19490, 4034, 50, 36); ctx.fillStyle = '#fff8ee'; ctx.fillRect(19513, 4034, 4, 36);
+        ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.beginPath(); ctx.arc(19500, 4048, 5, 0, Math.PI * 2); ctx.arc(19507, 4045, 6, 0, Math.PI * 2); ctx.fill();
+        // the big pipe: in through the right wall, along the back wall, into the top of the tank; glass windows show the fuel
+        ctx.fillStyle = '#f2b134'; ctx.fillRect(Tk.x1 - 30, PY, A.x1 + 24 - (Tk.x1 - 30), 14); ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(Tk.x1 - 30, PY + 2, A.x1 + 24 - (Tk.x1 - 30), 3);
+        ctx.fillStyle = '#c98e1c'; for (const x of [19150, 19232, 19300, 19404, 19480]) ctx.fillRect(x - 3, PY - 3, 6, 20);   // flanges
+        ctx.fillStyle = '#c3c8cf'; U.roundRect(ctx, 19158, PY + 1, 44, 12, 5); ctx.fill(); U.roundRect(ctx, 19316, PY + 1, 74, 12, 5); ctx.fill();   // the glass
+      },
+    });
+    const ctx = r.ctx;
+    // the big tank (its sight glass is drawn live), a ladder up its side
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(Tk.x0 + 6, Tk.y1 - 4, Tk.x1 - Tk.x0, 8);
+    ctx.fillStyle = '#e6e9ee'; U.roundRect(ctx, Tk.x0, 4040, Tk.x1 - Tk.x0, Tk.y1 - 4040, 18); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(Tk.x1 - 18, 4050, 14, Tk.y1 - 4060); ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.fillRect(Tk.x0 + 8, 4050, 8, Tk.y1 - 4060);
+    ctx.fillStyle = '#e4572e'; ctx.fillRect(Tk.x0, 4100, Tk.x1 - Tk.x0, 14); ctx.fillStyle = '#c9ccd2'; ctx.fillRect(Tk.x0, Tk.y1 - 10, Tk.x1 - Tk.x0, 10);
+    ctx.fillStyle = '#5c6670'; U.roundRect(ctx, Tk.x0 + 30, 4032, 30, 12, 4); ctx.fill();   // the hatch on top
+    ctx.fillStyle = '#2b1d14'; ctx.font = r.font(16); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('⛽', (Tk.x0 + Tk.x1) / 2 - 18, 4134);
+    ctx.strokeStyle = '#5c6670'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(Tk.x1 - 6, 4060); ctx.lineTo(Tk.x1 - 6, Tk.y1 - 10); ctx.moveTo(Tk.x1 + 4, 4060); ctx.lineTo(Tk.x1 + 4, Tk.y1 - 10); for (let y = 4068; y < Tk.y1 - 10; y += 12) { ctx.moveTo(Tk.x1 - 6, y); ctx.lineTo(Tk.x1 + 4, y); } ctx.stroke();
+    // the valve's pipe coming down from the big pipe to its stand on the floor (the wheel is drawn live)
+    ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(V.x + 3, V.y + 36, 20, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#f2b134'; ctx.fillRect(V.x - 7, PY + 10, 14, V.y + 34 - PY - 10); ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(V.x - 5, PY + 10, 3, V.y + 34 - PY - 10);
+    ctx.fillStyle = '#c98e1c'; ctx.fillRect(V.x - 12, V.y + 22, 24, 6); ctx.fillStyle = '#5c6670'; U.roundRect(ctx, V.x - 16, V.y + 28, 32, 8, 3); ctx.fill();
+    // the jerry cans on their low shelf
+    const Cn = R.CANS; ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(Cn.x0 + 4, Cn.y1 - 6, Cn.x1 - Cn.x0, 6);
+    ctx.fillStyle = '#8d5a2b'; ctx.fillRect(Cn.x0, Cn.y1 - 10, Cn.x1 - Cn.x0, 8);
+    ['#e4572e', '#41b883', '#ffd166', '#e4572e'].forEach((c, i) => { const x = Cn.x0 + 4 + i * 24; ctx.fillStyle = c; U.roundRect(ctx, x, Cn.y0 + 4, 20, 26, 3); ctx.fill(); ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.moveTo(x + 3, Cn.y0 + 10); ctx.lineTo(x + 17, Cn.y0 + 26); ctx.moveTo(x + 17, Cn.y0 + 10); ctx.lineTo(x + 3, Cn.y0 + 26); ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.stroke(); ctx.fillStyle = '#2b1d14'; ctx.fillRect(x + 4, Cn.y0, 8, 5); ctx.fillStyle = '#5c6670'; ctx.fillRect(x + 14, Cn.y0 + 1, 4, 4); });
+    // the fire extinguisher on the right wall, a hose reel, cones
+    ctx.fillStyle = '#d32f2f'; U.roundRect(ctx, 19540, 4108, 14, 30, 5); ctx.fill(); ctx.fillStyle = '#2b1d14'; ctx.fillRect(19544, 4102, 6, 6); ctx.fillStyle = '#fff'; ctx.fillRect(19542, 4118, 10, 4);
+    this.cone(ctx, 19370, 4128); this.cone(ctx, 19166, 4318);
+  },
+  cone(ctx, x, y) {
+    ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(x + 1, y + 3, 9, 4, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ff8c42'; ctx.beginPath(); ctx.moveTo(x - 8, y + 2); ctx.lineTo(x + 8, y + 2); ctx.lineTo(x + 2, y - 20); ctx.lineTo(x - 2, y - 20); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.fillRect(x - 5, y - 9, 10, 4);
+  },
+  // the valve wheel (it spins while the fuel glugs), the fuel in the glass windows, the tank's sight glass and the dials
+  drawFuelLive(r, g) {
+    const ctx = r.ctx, R = CFG.AF_IN.ROOMS.affuel, st = this.st, t = g.time, V = R.VALVE, Tk = R.TANK, PY = 4082, lvl = st.fuel;
+    // bubbles flowing left through the glass, towards the tank
+    for (const [x0, x1] of [[19160, 19200], [19318, 19388]]) {
+      ctx.save(); U.roundRect(ctx, x0, PY + 3, x1 - x0, 8, 4); ctx.clip();
+      ctx.fillStyle = st.glug > 0 ? '#f2b134' : 'rgba(242,177,52,0.25)'; ctx.fillRect(x0, PY + 3, x1 - x0, 8);
+      if (st.glug > 0) { ctx.fillStyle = 'rgba(255,255,255,0.8)'; for (let i = 0; i < 6; i++) { const x = x1 - ((t * 90 + i * 17) % (x1 - x0 + 10)); ctx.beginPath(); ctx.arc(x, PY + 7 + Math.sin(t * 9 + i) * 1.5, 2 + (i % 2), 0, Math.PI * 2); ctx.fill(); } }
+      ctx.restore();
+    }
+    // the sight glass on the tank: how full it is
+    const gx = Tk.x0 + 52, gy0 = 4054, gy1 = Tk.y1 - 20, gh = gy1 - gy0;
+    ctx.fillStyle = '#5c6670'; U.roundRect(ctx, gx - 8, gy0 - 4, 16, gh + 8, 6); ctx.fill();
+    ctx.fillStyle = '#eef6ff'; U.roundRect(ctx, gx - 5, gy0, 10, gh, 4); ctx.fill();
+    ctx.fillStyle = '#f2b134'; U.roundRect(ctx, gx - 5, gy0 + gh * (1 - lvl), 10, gh * lvl, 4); ctx.fill();
+    if (st.glug > 0) { ctx.fillStyle = 'rgba(255,255,255,0.75)'; for (let i = 0; i < 3; i++) { const k = (t * 1.5 + i / 3) % 1; ctx.beginPath(); ctx.arc(gx + Math.sin(t * 7 + i) * 2, gy1 - k * gh * lvl, 1.8, 0, Math.PI * 2); ctx.fill(); } }
+    // three dials: the needles swing up as the tank fills (red, yellow, green)
+    R.GAUGES.forEach((G, i) => {
+      ctx.fillStyle = '#2d3a4a'; ctx.beginPath(); ctx.arc(G.x, G.y, 19, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(G.x, G.y, 16, 0, Math.PI * 2); ctx.fill();
+      for (const [a0, a1, c] of [[Math.PI, Math.PI * 1.33, '#ff5252'], [Math.PI * 1.33, Math.PI * 1.66, '#ffd166'], [Math.PI * 1.66, Math.PI * 2, '#44d36a']]) { ctx.strokeStyle = c; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(G.x, G.y, 12, a0, a1); ctx.stroke(); }
+      const a = Math.PI + Math.PI * U.clamp(lvl + (st.glug > 0 ? Math.sin(t * 14 + i) * 0.04 : 0) - i * 0.05, 0.02, 0.98);
+      ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(G.x, G.y + 2); ctx.lineTo(G.x + Math.cos(a) * 12, G.y + 2 + Math.sin(a) * 12); ctx.stroke();
+      ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.arc(G.x, G.y + 2, 2.5, 0, Math.PI * 2); ctx.fill();
+    });
+    // the valve wheel: a red ring with spokes, turning while the fuel flows
+    ctx.save(); ctx.translate(V.x, V.y); ctx.rotate(st.valveA);
+    ctx.strokeStyle = '#b71c1c'; ctx.lineWidth = 7; ctx.beginPath(); ctx.arc(0, 0, 21, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = '#e4572e'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(0, 0, 21, 0, Math.PI * 2); ctx.stroke();
+    ctx.lineWidth = 4; for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a) * 20, Math.sin(a) * 20); ctx.stroke(); }
+    ctx.fillStyle = '#ffd166'; for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + Math.PI / 4; ctx.beginPath(); ctx.arc(Math.cos(a) * 21, Math.sin(a) * 21, 3, 0, Math.PI * 2); ctx.fill(); }
+    ctx.restore();
+    ctx.fillStyle = '#5c6670'; ctx.beginPath(); ctx.arc(V.x, V.y, 6, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.arc(V.x - 2, V.y - 2, 2, 0, Math.PI * 2); ctx.fill();
+  },
+  // the fuel truck, side on, nose to the left: its body behind the chef, then the cab's door and the wheels over the chef's legs
+  drawFuelTruck(r, g, front) {
+    const ctx = r.ctx, T = CFG.AF_IN.ROOMS.affuel.TRUCK, st = this.st, t = g.time, x = T.x, y = T.y, wob = st.truck ? Math.sin(t * 30) * 0.6 : 0;
+    ctx.save(); ctx.translate(0, wob);
+    if (!front) {
+      ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.beginPath(); ctx.ellipse(x + 4, y + 14, 92, 10, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#3e424a'; ctx.fillRect(x - 80, y - 4, 166, 10);   // the chassis
+      // the tank: a long red barrel with a white band and a fuel badge, a ladder and a hose reel at the back
+      ctx.fillStyle = '#e4572e'; U.roundRect(ctx, x - 26, y - 54, 112, 50, 22); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(x - 16, y - 48, 92, 6);
+      ctx.fillStyle = '#fff'; ctx.fillRect(x - 26, y - 30, 112, 9);
+      ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(x + 30, y - 32, 13, 0, Math.PI * 2); ctx.fill(); ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('⛽', x + 30, y - 31);
+      ctx.fillStyle = '#5c6670'; ctx.beginPath(); ctx.arc(x + 74, y - 16, 9, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.arc(x + 74, y - 16, 4, 0, Math.PI * 2); ctx.fill();
+      // the cab: yellow, a big window (the chef shows in it), the seat back inside, a beacon on the roof
+      ctx.fillStyle = '#ffd166'; U.roundRect(ctx, x - 82, y - 70, 54, 68, 8); ctx.fill();
+      ctx.fillStyle = '#bfe3ff'; U.roundRect(ctx, x - 76, y - 64, 42, 30, 5); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillRect(x - 72, y - 62, 6, 26);
+      ctx.fillStyle = '#2d3a4a'; U.roundRect(ctx, x - 50, y - 50, 14, 30, 4); ctx.fill();   // the seat back
+      const on = st.honk > 0 || st.truck; ctx.fillStyle = on ? (Math.floor(t * 6) % 2 ? '#ffd54f' : '#ff8f00') : '#ffa000'; ctx.beginPath(); ctx.arc(x - 55, y - 72, 4, Math.PI, 0); ctx.fill();
+    } else {
+      // the door's lower half (with a handle and a stripe), the bumper and headlight, three wheels
+      ctx.fillStyle = '#f2b134'; U.roundRect(ctx, x - 82, y - 30, 54, 30, 6); ctx.fill();
+      ctx.fillStyle = '#e4572e'; ctx.fillRect(x - 82, y - 20, 54, 5); ctx.fillStyle = '#2b1d14'; ctx.fillRect(x - 44, y - 27, 10, 3);
+      ctx.fillStyle = '#9aa0a8'; U.roundRect(ctx, x - 88, y - 10, 12, 10, 3); ctx.fill(); ctx.fillStyle = '#fff8ee'; ctx.beginPath(); ctx.arc(x - 84, y - 22, 4, 0, Math.PI * 2); ctx.fill();
+      for (const dx of [-60, 30, 62]) { ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.arc(x + dx, y + 6, 11, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#9aa0a8'; ctx.beginPath(); ctx.arc(x + dx, y + 6, 4.5, 0, Math.PI * 2); ctx.fill(); }
+      if (st.honk > 0) { ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 2; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(x - 92, y - 20, 8 + i * 6 + (t * 20) % 6, Math.PI * 0.75, Math.PI * 1.25); ctx.stroke(); } }
+    }
+    ctx.restore();
+  },
+  drawFuelWorker(r, g) {
+    const ctx = r.ctx, M = CFG.AF_IN.ROOMS.affuel.WORKER, st = this.st, p = g.player, t = g.time, d = U.dist(p.x, p.y, M.x, M.y);
+    const hop = st.worker && st.worker.t < 0.5 ? -Math.sin(st.worker.t / 0.5 * Math.PI) * 12 : 0;
+    if (hop) { ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(M.x, M.y + 4, 12, 5, 0, 0, Math.PI * 2); ctx.fill(); }
+    r.drawPerson(M.x, M.y + hop, { shirt: '#ff8c42', skin: '#e0ac69', hat: 'cap', capColor: '#ffd166', facing: p.x < M.x ? -1 : 1, moving: false, bob: 0, carry: 0, apron: '#d4ff3a', pants: '#2d5a8a' });
+    ctx.fillStyle = '#fff'; ctx.fillRect(M.x - 8, M.y + hop - 18, 16, 2);   // the reflective stripe on the vest
+    const bubble = (text) => r.drawBubble(M.x - 20, M.y - 82 + Math.sin(t * 4) * 3, () => { ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText(text, 0, 0); }, Math.max(96, text.length * 7.2));
+    if (st.worker) {
+      ctx.save(); ctx.translate(M.x + 22, M.y + hop - 48); ctx.rotate(Math.sin(t * 7) * 0.3); ctx.font = r.font(15); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('👍', 0, 0); ctx.restore();
+      bubble(CFG.AF_IN.FUEL_LINES[st.worker.i]);
+    } else if (d < 110 && !st.truck) bubble('Hi, Chef! ⛽');
+  },
+
+  // ---------- the gate lounge ----------
+  paintGate(r, g) {
+    const R = CFG.AF_IN.ROOMS.afgate, E = this, B = R.BRIDGE;
+    this.shell(r, 'afgate', {
+      out: '#2d3a4a', back: '#e8eef5', wall: '#9aa6b4', title: R.title, mat: '#3b7dd8',
+      floor: (ctx, A) => {   // a soft blue airport carpet with little dots
+        ctx.fillStyle = '#4f78b8'; ctx.fillRect(A.x0, A.y0, A.x1 - A.x0, A.y1 - A.y0);
+        for (let y = A.y0 + 10, j = 0; y < A.y1; y += 20, j++) for (let x = A.x0 + 10 + (j % 2) * 10; x < A.x1; x += 20) { ctx.fillStyle = (x + y) % 60 < 20 ? 'rgba(255,209,102,0.5)' : 'rgba(255,255,255,0.18)'; ctx.fillRect(x - 1.5, y - 1.5, 3, 3); }
+        ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.fillRect(B.x0, A.y0, B.x1 - B.x0, 60);   // a lighter path to the jet-bridge
+      },
+      backArt: (ctx, A) => {
+        ctx.fillStyle = '#3b7dd8'; ctx.fillRect(A.x0 - 24, R.BACK_TOP, A.x1 - A.x0 + 48, 6);
+        const Wn = R.WINDOW; ctx.fillStyle = '#fff8ee'; U.roundRect(ctx, Wn.x0 - 6, Wn.y0 - 6, Wn.x1 - Wn.x0 + 12, Wn.y1 - Wn.y0 + 12, 6); ctx.fill();
+        // the jet-bridge doorway: a tunnel with an accordion floor going off towards the jet, a sign with a plane over it
+        ctx.fillStyle = '#5c6670'; U.roundRect(ctx, B.x0 - 6, 4040, B.x1 - B.x0 + 12, A.y0 - 4040 + 4, 6); ctx.fill();
+        ctx.fillStyle = '#2d3a4a'; ctx.fillRect(B.x0, 4046, B.x1 - B.x0, A.y0 - 4046);
+        for (let i = 0; i < 5; i++) { const k = i / 5, inset = 4 + k * 18; ctx.fillStyle = i % 2 ? '#7d8591' : '#9aa2ad'; ctx.fillRect(B.x0 + inset, 4050 + k * 26, B.x1 - B.x0 - 2 * inset, A.y0 - 4050 - k * 26); }
+        ctx.fillStyle = '#bfe3ff'; ctx.fillRect(B.x0 + 24, 4074, B.x1 - B.x0 - 48, 14);   // light at the far end: the jet's door
+        ctx.fillStyle = '#ffd166'; U.roundRect(ctx, B.x0 - 2, 4022, B.x1 - B.x0 + 4, 20, 5); ctx.fill();
+        ctx.fillStyle = '#2b1d14'; ctx.font = r.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('✈️ 1', (B.x0 + B.x1) / 2, 4032);
+        // a clock between the window and the bridge
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(23451, 4050, 11, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(23451, 4050, 11, 0, Math.PI * 2); ctx.moveTo(23451, 4050); ctx.lineTo(23451, 4043); ctx.moveTo(23451, 4050); ctx.lineTo(23456, 4052); ctx.stroke();
+      },
+    });
+    const ctx = r.ctx;
+    // the moving walkway: a long rubber belt in a steel frame (its stripes roll by live), combs at both ends
+    const Wk = R.WALK;
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(Wk.x0 + 4, Wk.y1, Wk.x1 - Wk.x0, 5);
+    ctx.fillStyle = '#9aa0a8'; U.roundRect(ctx, Wk.x0 - 6, Wk.y0 - 6, Wk.x1 - Wk.x0 + 12, Wk.y1 - Wk.y0 + 12, 6); ctx.fill();
+    ctx.fillStyle = '#c9ccd2'; ctx.fillRect(Wk.x0 - 6, Wk.y0 - 6, Wk.x1 - Wk.x0 + 12, 4);
+    ctx.fillStyle = '#ffd166'; ctx.fillRect(Wk.x0 - 2, Wk.y0, 6, Wk.y1 - Wk.y0); ctx.fillRect(Wk.x1 - 4, Wk.y0, 6, Wk.y1 - Wk.y0);
+    // the seats facing the window (the same blue as the terminal's)
+    this.paintSeats(ctx, R);
+    // the vending machine against the back wall: juice boxes behind glass, a big green button, the tray at the bottom
+    const Vd = R.VEND;
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(Vd.x0 + 4, Vd.y1 - 2, Vd.x1 - Vd.x0, 6);
+    ctx.fillStyle = '#e4572e'; U.roundRect(ctx, Vd.x0, 4040, Vd.x1 - Vd.x0, Vd.y1 - 4040, 6); ctx.fill();
+    ctx.fillStyle = '#bfe3ff'; U.roundRect(ctx, Vd.x0 + 6, 4048, 30, 58, 3); ctx.fill();
+    const jc = ['#ffd166', '#41b883', '#ff8fab', '#8e5bd1', '#ff8c42', '#3b7dd8'];
+    for (let i = 0; i < 9; i++) { const x = Vd.x0 + 9 + (i % 3) * 9, y = 4052 + Math.floor(i / 3) * 18; ctx.fillStyle = jc[i % 6]; ctx.fillRect(x, y, 7, 12); ctx.fillStyle = '#fff'; ctx.fillRect(x + 4, y - 3, 1.5, 4); }
+    ctx.fillStyle = '#5c6670'; ctx.fillRect(Vd.x0 + 6, 4110, 30, 2); ctx.fillRect(Vd.x0 + 6, 4093, 30, 2); ctx.fillRect(Vd.x0 + 6, 4075, 30, 2);
+    ctx.fillStyle = '#44d36a'; ctx.beginPath(); ctx.arc(Vd.x1 - 9, 4064, 6, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.beginPath(); ctx.arc(Vd.x1 - 11, 4062, 2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, Vd.x0 + 8, Vd.y1 - 20, 34, 12, 3); ctx.fill();   // the tray
+    ctx.font = r.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🧃', Vd.x1 - 9, 4086);
+    this.plant(ctx, 23536, 4318); this.plant(ctx, 23200, 4120);
+  },
+  // two rows of terminal-style seats (blue cushions, chrome backs)
+  paintSeats(ctx, R) {
+    for (const y of R.SEAT_YS) {
+      ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(R.SEAT_XS[0] - 16, y + 10, R.SEAT_XS[R.SEAT_XS.length - 1] - R.SEAT_XS[0] + 34, 6);
+      ctx.fillStyle = '#9aa0a8'; ctx.fillRect(R.SEAT_XS[0] - 16, y - 27, R.SEAT_XS[R.SEAT_XS.length - 1] - R.SEAT_XS[0] + 32, 4);
+      for (const x of R.SEAT_XS) {
+        ctx.fillStyle = '#2d5a8a'; U.roundRect(ctx, x - 13, y - 25, 26, 14, 4); ctx.fill();
+        ctx.fillStyle = '#3b7dd8'; U.roundRect(ctx, x - 13, y - 12, 26, 20, 5); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(x - 10, y - 10, 20, 3);
+      }
+    }
+  },
+  // the big window: the jet at its gate (its jet-bridge reaching the door, bags hopping from the bag train into its hold),
+  // or, when it is off flying, an empty stand and a little plane in the sky
+  drawGateView(r, g) {
+    const ctx = r.ctx, Wn = CFG.AF_IN.ROOMS.afgate.WINDOW, x0 = Wn.x0, y0 = Wn.y0, w = Wn.x1 - Wn.x0, h = Wn.y1 - Wn.y0, t = g.time, here = this.jetAtGate();
+    ctx.save(); ctx.beginPath(); ctx.rect(x0, y0, w, h); ctx.clip();
+    const sky = ctx.createLinearGradient(0, y0, 0, y0 + h); sky.addColorStop(0, '#49a8ea'); sky.addColorStop(0.55, '#bfe6fb'); sky.addColorStop(0.56, '#7c8088'); sky.addColorStop(1, '#6b7078'); ctx.fillStyle = sky; ctx.fillRect(x0, y0, w, h);
+    ctx.fillStyle = 'rgba(255,255,255,0.85)'; for (let i = 0; i < 4; i++) { const cx = x0 + ((((i * 97 + t * 6) % (w + 80)) + w + 80) % (w + 80)) - 40, cy = y0 + 8 + (i % 2) * 8; ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.arc(cx + 7, cy - 3, 7, 0, Math.PI * 2); ctx.arc(cx + 14, cy, 5, 0, Math.PI * 2); ctx.fill(); }
+    const gy = y0 + h * 0.56; ctx.fillStyle = '#f2c94c'; ctx.fillRect(x0, gy + 18, w, 2);
+    const jx = x0 + w * 0.48, jy = gy + 4, s = 2.2;
+    if (here) {
+      // the bag train (the same yellow tug and blue luggage cart you can drive out there): bags hopping into the hold
+      const bc = ['#e4572e', '#41b883', '#ffd166', '#8e5bd1'];
+      ctx.fillStyle = '#3b7dd8'; U.roundRect(ctx, jx - 66, gy + 12, 22, 6, 1.5); ctx.fill(); ctx.fillStyle = '#2b1d14'; ctx.fillRect(jx - 64, gy + 18, 3, 3); ctx.fillRect(jx - 50, gy + 18, 3, 3); ctx.fillRect(jx - 44, gy + 14, 6, 1.5);
+      ctx.fillStyle = '#ffd166'; U.roundRect(ctx, jx - 90, gy + 9, 22, 10, 2); ctx.fill(); ctx.fillStyle = '#2b1d14'; ctx.fillRect(jx - 88, gy + 19, 4, 3); ctx.fillRect(jx - 75, gy + 19, 4, 3); ctx.fillRect(jx - 84, gy + 4, 2, 6);
+      for (let i = 0; i < 2; i++) { const k = ((t * 0.45) + i / 2) % 1, bx = U.lerp(jx - 58, jx - 28, k), by = U.lerp(gy + 9, jy + 4, k) - Math.sin(k * Math.PI) * 10; ctx.fillStyle = bc[(i + Math.floor(t * 0.45)) % 4]; U.roundRect(ctx, bx - 4, by - 3, 8, 6, 1.5); ctx.fill(); }
+      this.sidePlane(ctx, jx, jy, s, '#fff', -1, true);
+      // the jet-bridge from the right edge of the window to the jet's front door
+      ctx.fillStyle = '#9aa0a8'; ctx.fillRect(jx - 18 * s + 30, jy - 10, x0 + w - (jx - 18 * s + 30), 13); ctx.fillStyle = '#bfe3ff'; ctx.fillRect(jx - 18 * s + 34, jy - 7, x0 + w - (jx - 18 * s + 34), 3);
+      ctx.fillStyle = '#5c6670'; ctx.fillRect(jx - 18 * s + 24, jy - 12, 8, 17); ctx.fillRect(x0 + w * 0.86, jy + 3, 4, gy + 18 - jy - 3);
+    } else {
+      ctx.strokeStyle = '#f2c94c'; ctx.lineWidth = 2; ctx.strokeRect(jx - 70, gy + 4, 140, 12);
+      const k = (t % 9) / 9; this.sidePlane(ctx, x0 - 30 + k * (w + 60), y0 + 30 - k * 14, 0.5, '#f2b134', 1, false);
+    }
+    ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.beginPath(); ctx.moveTo(x0 + w * 0.1, y0); ctx.lineTo(x0 + w * 0.2, y0); ctx.lineTo(x0 + w * 0.12, y0 + h); ctx.lineTo(x0 + w * 0.02, y0 + h); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = '#fff8ee'; for (let x = x0 + 80; x < x0 + w - 10; x += 80) ctx.fillRect(x - 2, y0, 4, h);
+  },
+  // the walkway's stripes rolling along, the juice box dropping into the tray
+  drawGateLive(r, g) {
+    const ctx = r.ctx, R = CFG.AF_IN.ROOMS.afgate, Wk = R.WALK, st = this.st, t = g.time;
+    ctx.save(); ctx.beginPath(); ctx.rect(Wk.x0 + 4, Wk.y0, Wk.x1 - Wk.x0 - 8, Wk.y1 - Wk.y0); ctx.clip();
+    ctx.fillStyle = '#2d3a4a'; ctx.fillRect(Wk.x0, Wk.y0, Wk.x1 - Wk.x0, Wk.y1 - Wk.y0);
+    const off = (t * CFG.AF_IN.WALK_V) % 10; ctx.fillStyle = '#3e4756'; for (let x = Wk.x0 - 10 + off; x < Wk.x1; x += 10) ctx.fillRect(x, Wk.y0, 4, Wk.y1 - Wk.y0);
+    const yc = (Wk.y0 + Wk.y1) / 2, aoff = (t * CFG.AF_IN.WALK_V) % 60; ctx.fillStyle = '#ffd166';
+    for (let x = Wk.x0 - 60 + aoff; x < Wk.x1 + 10; x += 60) { ctx.beginPath(); ctx.moveTo(x, yc - 8); ctx.lineTo(x + 10, yc); ctx.lineTo(x, yc + 8); ctx.lineTo(x + 4, yc); ctx.closePath(); ctx.fill(); }
+    ctx.restore();
+    if (st.drop > 0) { const Vd = R.VEND, k = 1 - st.drop / 0.7, y = U.lerp(4060, Vd.y1 - 18, Math.min(1, k * 1.6)); ctx.fillStyle = '#ffd166'; ctx.fillRect(Vd.x0 + 20, y - 6, 8, 12); }
+  },
+  drawGateAgent(r, g) {
+    const ctx = r.ctx, R = CFG.AF_IN.ROOMS.afgate, Ag = R.AGENT, p = g.player, t = g.time, d = U.dist(p.x, p.y, Ag.x, Ag.y);
+    r.drawPerson(Ag.x, Ag.y, { shirt: '#3b7dd8', skin: '#8d5524', hair: '#2b1d14', hairStyle: 1, facing: p.x < Ag.x - 10 ? -1 : 1, moving: false, bob: 0, carry: 0, bowtie: '#ffd166', pants: '#2d3a4a' });
+    ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.moveTo(Ag.x - 12, Ag.y - 49); ctx.lineTo(Ag.x + 12, Ag.y - 49); ctx.lineTo(Ag.x + 8, Ag.y - 54); ctx.lineTo(Ag.x - 8, Ag.y - 54); ctx.closePath(); ctx.fill();
+    if (d < 100 && !this.st.seat) {
+      const text = this.jetAtGate() ? 'Boarding now! ✈️' : 'The jet is flying! ☁️';
+      r.drawBubble(Ag.x - 40, Ag.y - 78 + Math.sin(t * 4) * 3, () => { ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText(text, 0, 0); }, 132);
+    }
+  },
+
   // ---------- things the chef carries: the suitcase, the toy plane, the toolbox ----------
   drawCarried(r, g) {
     const ctx = r.ctx, st = this.st, p = g.player, f = p.facing || 1, bob = p.moving ? Math.sin(p.bob || 0) * 2 : 0, t = g.time;
@@ -1033,6 +1675,11 @@ const AirfieldInsideExt = {
       const x = p.x + f * 18, y = p.y - 8 + bob;
       ctx.fillStyle = '#d32f2f'; U.roundRect(ctx, x - 9, y - 6, 18, 12, 2); ctx.fill(); ctx.fillStyle = '#b71c1c'; ctx.fillRect(x - 9, y - 1, 18, 2);
       ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - 4, y - 6); ctx.lineTo(x - 4, y - 10); ctx.lineTo(x + 4, y - 10); ctx.lineTo(x + 4, y - 6); ctx.stroke();
+    }
+    if (st.juice > 0) {   // a juice box with a bendy straw
+      const x = p.x + f * 16, y = p.y - 22 + bob;
+      ctx.fillStyle = '#ffd166'; U.roundRect(ctx, x - 5, y - 7, 10, 14, 2); ctx.fill(); ctx.fillStyle = '#41b883'; ctx.fillRect(x - 5, y - 1, 10, 4);
+      ctx.strokeStyle = '#ff8fab'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x + 2, y - 7); ctx.lineTo(x + 2, y - 12); ctx.lineTo(x + 5, y - 14); ctx.stroke();
     }
     if (st.toy > 0) {   // the toy plane zooms in little circles round the chef's hat
       const a = t * 3, x = p.x + Math.cos(a) * 26, y = p.y - 78 + Math.sin(a) * 8 + bob;
@@ -1045,28 +1692,53 @@ const AirfieldInsideExt = {
     if (!this.st) return;
     const k = this.room(g); if (!k) return;
     const R = CFG.AF_IN.ROOMS[k];
-    if (k === 'afterminal') { this.apronView(r, g, R.WINDOW.x0, R.WINDOW.y0, R.WINDOW.x1 - R.WINDOW.x0, R.WINDOW.y1 - R.WINDOW.y0); this.drawWindowBars(r, R.WINDOW); this.drawBoard(r, g); this.drawBags(r, g); }
+    if (k === 'afterminal') { this.apronView(r, g, R.WINDOW.x0, R.WINDOW.y0, R.WINDOW.x1 - R.WINDOW.x0, R.WINDOW.y1 - R.WINDOW.y0); this.drawWindowBars(r, R.WINDOW); this.drawBoard(r, g); this.drawBags(r, g); this.drawTerminalBelts(r, g); }
     else if (k === 'afhangar') this.drawMech(r, g);
     else if (k === 'aftower' && this.st.up) this.drawCabLive(r, g);
     else if (k === 'afworkshop') this.drawVice(r, g);
+    else if (k === 'affuel') this.drawFuelLive(r, g);
+    else if (k === 'afgate') { this.drawGateView(r, g); this.drawGateLive(r, g); }
+  },
+  // the two belts rolling: the little one behind the check-in desk (while a suitcase rides off), the X-ray belt (north)
+  drawTerminalBelts(r, g) {
+    const ctx = r.ctx, st = this.st, R = CFG.AF_IN.ROOMS.afterminal, A = R.ROOM, t = g.time, XB = R.XBELT, ph = this.xrayPhase();
+    ctx.save(); ctx.beginPath(); ctx.rect(A.x0, R.BELT_Y - 7, R.SCALE.x - A.x0 + 6, 14); ctx.clip();
+    const o1 = st.checkBag ? (t * 60) % 14 : 0; ctx.fillStyle = '#5c6670'; for (let x = A.x0 + 14 - o1; x < R.SCALE.x + 10; x += 14) ctx.fillRect(x, R.BELT_Y - 7, 3, 14);
+    ctx.restore();
+    ctx.save(); ctx.beginPath(); ctx.rect(XB.x0 + 5, XB.y0 + 4, XB.x1 - XB.x0 - 10, XB.y1 - XB.y0 - 30); ctx.clip();
+    const o2 = ph && ph !== 'scan' ? (t * 60) % 12 : 0; ctx.fillStyle = '#5c6670'; for (let y = XB.y1 + o2 - 12; y > XB.y0; y -= 12) ctx.fillRect(XB.x0 + 5, y, XB.x1 - XB.x0 - 10, 3);
+    ctx.restore();
   },
   drawWindowBars(r, Wn) { const ctx = r.ctx; ctx.fillStyle = '#fff8ee'; for (let x = Wn.x0 + 55; x < Wn.x1 - 10; x += 55) ctx.fillRect(x - 2, Wn.y0, 4, Wn.y1 - Wn.y0); },
   entities(r, g, items) {
     if (!this.st) return;
     const st = this.st, p = g.player;
-    if ((st.bag > 0 || st.toy > 0 || st.toolbox > 0) && !g.driving && !g.onTrain && !g.travel) items.push({ y: p.y + 1, draw: () => this.drawCarried(r, g) });
+    if ((st.bag > 0 || st.toy > 0 || st.toolbox > 0 || st.juice > 0) && !g.driving && !g.onTrain && !g.travel) items.push({ y: p.y + 1, draw: () => this.drawCarried(r, g) });
     const k = this.room(g); if (!k) return;
     const R = CFG.AF_IN.ROOMS[k];
     if (k === 'afterminal') {
       items.push({ y: R.AGENT.y, draw: () => this.drawAgent(r, g) });
       items.push({ y: R.DESK.y1, draw: () => this.drawDesk(r, true) });
+      const cb = this.checkBagPos(); if (cb && !cb.gone) items.push({ y: cb.front ? R.DESK.y1 + 1 : R.BELT_Y, draw: () => this.drawSuitcase(r, cb.x, cb.y, '#e4572e', true, 0.9) });
+      items.push({ y: R.PART_Y + R.PART_H, draw: () => this.drawPartition(r, g) });
       items.push({ y: R.ARCH.y + 2, draw: () => this.drawArch(r, g) });
+      items.push({ y: R.XRAY.y1, draw: () => this.drawXrayBox(r, g) });
+      const xb = this.xbagPos(); if (xb) items.push({ y: xb.y + 6, draw: () => this.drawSuitcase(r, xb.x, xb.y, '#e4572e', true, 0.85) });
+      items.push({ y: R.SCREEN.y, draw: () => this.drawScreen(r, g) });
+      items.push({ y: R.GUARD.y, draw: () => this.drawGuard(r, g) });
+      items.push({ y: R.ROPE.y0 + 10, draw: () => this.drawRope(r, g) });
     } else if (k === 'afhangar') {
       items.push({ y: R.TUG.y - 4, draw: () => this.drawTug(r, g, false) });
       items.push({ y: R.TUG.y + 14, draw: () => this.drawTug(r, g, true) });
     } else if (k === 'aftower') {
       if (st.up) { items.push({ y: R.CTRL.y, draw: () => this.drawController(r, g) }); items.push({ y: R.BINO.y + 6, draw: () => this.drawBinoculars(r, g) }); }
       else items.push({ y: R.SOFA.y0 + 30, draw: () => this.drawPilotNap(r, g) });
+    } else if (k === 'affuel') {
+      items.push({ y: R.TRUCK.y - 30, draw: () => this.drawFuelTruck(r, g, false) });
+      items.push({ y: R.TRUCK.y + 14, draw: () => this.drawFuelTruck(r, g, true) });
+      items.push({ y: R.WORKER.y, draw: () => this.drawFuelWorker(r, g) });
+    } else if (k === 'afgate') {
+      items.push({ y: R.AGENT.y, draw: () => this.drawGateAgent(r, g) });
     } else if (k === 'afworkshop') {
       items.push({ y: R.PROP.y + 10, draw: () => this.drawProp(r, g) });
       items.push({ y: R.MECHANIC.y, draw: () => this.drawMechanic(r, g) });
@@ -1084,6 +1756,7 @@ const AirfieldInsideExt = {
     if (!this.st || g.travel) return;
     const st = this.st, ctx = r.ctx, W = r.canvas.width / r.dpr, H = r.canvas.height / r.dpr;
     if (g.area === 'aftower' && st.viewing) this.drawLookOut(r, g, W, H);
+    if (g.area === 'afterminal' && this.xrayPhase() === 'scan') this.drawXrayPopup(r, g, W, H);
     let a = st.fade > 0 ? st.fade / CFG.AF_IN.FADE : 0;
     if (st.climb) { const k = st.climb.t / CFG.AF_IN.CLIMB; a = Math.max(a, 1 - Math.abs(k * 2 - 1)); }
     if (a > 0) { ctx.fillStyle = `rgba(20,12,6,${Math.min(1, a).toFixed(3)})`; ctx.fillRect(0, 0, W, H); }

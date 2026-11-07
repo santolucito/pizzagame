@@ -19,6 +19,12 @@ draw a building, give it a door ('🚪 Go inside') and a small interior with a f
 something that looks like a vehicle or a house is not decoration. One button for everything, no reading needed, no
 failure states, everything drawn to the chef's scale (a person is about 70 px tall).
 
+The world map (js/worldmap.js) is generated from data, so keep it fed: a new ride between maps adds an entry to
+`CFG.LINKS` (`{ from, to, via, dir }`, `dir` = the way the ride moves across the screen going from → to: 'left',
+'right', 'up', 'down', 'up-right'…), and a new interior either sets `CFG.AREAS.<name>.place = '<outdoor map>'` or has
+a `DOOR_OUT` / `DOOR` spot in its config so the map can tell which town it belongs to. A new outdoor place can add its
+picture and name to `CFG.WORLDMAP.PLACES`.
+
 ## Maps ("areas")
 
 The whole game shares one coordinate space. Each map is a rectangle of it; nothing in one map can reach
@@ -92,6 +98,9 @@ while you are inside: the core only lists vehicles from `vehicles()` hooks, and 
 Reserved interior rectangles (all 600 × 400, y 3000..3400, 900 apart): City building `i` (its index in
 `CFG.CITY.BUILDINGS`) owns `x0 = -1300 + i * 900`. Other interiors: the barn `0..600 × 4000..4400`, Columbia
 `1000..1600 × 4000..4400`, Barnard `2000..2600 × 4000..4400`, more at `x0 = 3000 + k * 1000, y 4000..4400`.
+Bigger maps taken since: Snowy Peak `5000..7400 × 5000..6800`, Coney Island (map 'pizzapier') `8000..10400 ×
+5000..6400`, the aquarium `20200..22100 × 5100..6360`, the airfield terminal `27000..28040 × 4000..4740`; the slots at
+`x0 = 17000, 18000, 19000, 23000, 24000` (y 4000..4400) are taken too. Grep every `WORLD:` in js/ before picking a rectangle.
 
 ## Render hooks (`Render.ext`)
 

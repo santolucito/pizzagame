@@ -1,7 +1,8 @@
 'use strict';
-// Subway Line 2 to Pizza Pier (js/subway.js): the City station has two halls, Line 1's (red, 🎓, to Columbia) and through
-// the arch in the dividing wall Line 2's (purple, 🎡, to Pizza Pier), each with its own platform, waiting spot, track and
-// train. Line 1 still runs both ways; Line 2's train comes, you board it, the 'pierline' ride plays and lands on the pier;
+// The D train to Coney Island (js/subway.js, Line 2): the City station has two halls, Line 1's (red, 🎓, to Columbia) and
+// through the arch in the dividing wall the D train's (New York orange, 🎡, to Coney Island, map 'pizzapier'), each with
+// its own platform, waiting spot, track and train. Line 1 still runs both ways; the D train comes, you board it, the
+// 'pierline' ride plays and lands at Coney Island;
 // the ride home lands on Line 2's platform; at the Columbia end Line 2 is shut behind a gate; rescues and Take-me-home;
 // the stuck detector over Line 2's hall; screenshots of the station and of the ride both ways, by day and at dusk.
 const fs = require('fs');
@@ -28,6 +29,11 @@ module.exports = async (t) => {
   t.expectEq(JSON.stringify(reg.world), JSON.stringify([6400, 2100, 8200, 2500]), 'the station reaches east for Line 2');
   t.expectEq(reg.hit.join(','), '', 'the station overlaps no other map');
   t.expect(reg.ride, 'the pierline ride is registered');
+  const dline = await t.ev(() => ({ bullet: CFG.SUBWAY.LINE2, color: CFG.SUBWAY.COLOR2, last: CFG.SUBWAY.PIER_STOPS[CFG.SUBWAY.PIER_STOPS.length - 1], l2: SubwayExt.line(2) }));
+  t.expectEq(dline.bullet, 'D', 'Line 2 is the D train');
+  t.expectEq(dline.color, '#ff6319', 'the D train is New York orange');
+  t.expectEq(dline.last, 'CONEY ISLAND', 'the D train ends at Coney Island');
+  t.expect(dline.l2.color === '#ff6319' && dline.l2.bullet === 'D', `the D train's own colour and bullet ${JSON.stringify(dline.l2)}`);
 
   // ---- down the same stairs in the City; the concourse hint names both lines
   await t.ev(() => { const e = SubwayExt.cityEntrance(); T.tp(e.x, e.y + 16, 'city'); });
@@ -35,12 +41,12 @@ module.exports = async (t) => {
   await t.ev(() => { T.act(); T.step(30); });
   t.expect(await t.ev(() => Game.area === 'subway' && SubwayExt.st.end === 'city'), 'down in the City station');
   await t.ev(() => T.tp(6800, 2240));
-  t.expectEq(await t.ev(() => T.hint()), 'Red train 🎓 to Columbia, purple train 🎡 to Pizza Pier!', 'the concourse hint names both lines');
+  t.expectEq(await t.ev(() => T.hint()), 'Red train 🎓 to Columbia, orange D train 🎡 to Coney Island!', 'the concourse hint names both lines');
 
   // ---- walk from Line 1's concourse through the arch into Line 2's hall
   const walk = await t.ev(() => { const D = CFG.SUBWAY.STATION.divider; T.tp(D.x0 - 40, (D.arch.y0 + D.arch.y1) / 2); T.steer(1, 0); const n = T.until(() => Game.player.x > D.x1 + 60, 200); T.unsteer(); return { n, x: Game.player.x }; });
   t.expect(walk.n >= 0, `walked through the arch into Line 2's hall (x ${Math.round(walk.x)})`);
-  t.expectEq(await t.ev(() => T.hint()), 'Purple train 🎡 to Pizza Pier comes here!', "Line 2's hall hint");
+  t.expectEq(await t.ev(() => T.hint()), 'Orange D train 🎡 to Coney Island comes here!', "Line 2's hall hint");
   t.expect(await t.ev(() => { const h = Game.hint, s = CFG.SUBWAY.STATION.L2.stand; return !!h.target && h.target.x === s.x && h.target.y === s.y; }), "the hint points at Line 2's waiting spot");
   await t.ev(() => { T.tp(7300, 2260); T.step(2); });
   await t.shot('station-both-lines');
@@ -70,7 +76,7 @@ module.exports = async (t) => {
     return { gate, hint, x, rescued: Math.hypot(Game.player.x - f.x, Game.player.y - f.y) < 2, label: T.label() };
   });
   t.expect(shut.gate, 'a gate closes the arch at the Columbia end');
-  t.expectEq(shut.hint, '🎡 Line 2 goes from the City 🏙️', 'the hint by the gate says Line 2 goes from the City');
+  t.expectEq(shut.hint, '🎡 The D train goes from the City 🏙️', 'the hint by the gate says the D train goes from the City');
   t.expect(shut.x < 7270, `the chef cannot walk through the gate (x ${Math.round(shut.x)})`);
   t.expect(shut.rescued, "a chef put in Line 2's shut hall is rescued to the stairs");
   t.expect(await t.ev(() => SubwayExt.st.train2.state === 'away' || SubwayExt.st.end === 'campus'), 'Line 2 does not run at the Columbia end');
@@ -85,25 +91,25 @@ module.exports = async (t) => {
   t.expectEq(await t.ev(() => SubwayExt.st.end), 'city', 'Line 1 brought the chef back to the City end');
   t.expect(await t.ev(() => !Game.obstacles().some((o) => { const D = CFG.SUBWAY.STATION.divider; return Game.hitRect((D.x0 + D.x1) / 2, (D.arch.y0 + D.arch.y1) / 2, 2, o); })), 'the arch is open again at the City end');
 
-  // ---- Line 2: wait on its platform, the purple train comes, board, ride to Pizza Pier
+  // ---- the D train: wait on its platform, the orange train comes, board, ride to Coney Island
   await t.ev(() => { const s = CFG.SUBWAY.STATION.L2.stand; T.tp(s.x, s.y); T.until(() => SubwayExt.st.train2.state === 'away', 2000); });
-  t.expectEq(await t.ev(() => T.hint()), 'Purple train 🎡 to Pizza Pier comes here!', "hint on Line 2's platform");
+  t.expectEq(await t.ev(() => T.hint()), 'Orange D train 🎡 to Coney Island comes here!', "hint on Line 2's platform");
   const a2 = await t.ev(() => T.until(() => SubwayExt.st.train2.state === 'stopped' && SubwayExt.st.train2.doors >= 1, 1500));
   t.expect(a2 >= 0 && a2 <= 60 * 8, `Line 2's train pulls in within 8 s (took ${a2} steps)`);
   t.expectEq(await t.ev(() => SubwayExt.st.train2.x), await t.ev(() => CFG.SUBWAY.STATION.L2.stopX), "Line 2's train stops at its own platform");
-  t.expect(/Purple train leaves in \d+s/.test(await t.ev(() => T.hint())), 'countdown hint for the purple train');
-  t.expectEq(await t.ev(() => T.label()), '🎡 Ride to Pizza Pier', 'the waiting spot is right by a door');
+  t.expect(/^🎡 D train leaves in \d+s!$/.test(await t.ev(() => T.hint())), 'countdown hint for the D train');
+  t.expectEq(await t.ev(() => T.label()), '🎡 Ride to Coney Island', 'the waiting spot is right by a door');
   await t.ev(() => { const d = SubwayExt.doorSpots(undefined, 2)[4]; T.tp(d.x, d.y); });
-  t.expectEq(await t.ev(() => T.label()), '🎡 Ride to Pizza Pier', "Line 2's boarding label by its doors");
+  t.expectEq(await t.ev(() => T.label()), '🎡 Ride to Coney Island', "Line 2's boarding label by its doors");
   await t.ev(() => { const s = CFG.SUBWAY.STATION.L2.stand; T.tp(s.x - 60, s.y - 20); T.step(2); });
   await t.shot('station-line2-train');
   await t.ev(() => { const d = SubwayExt.doorSpots(undefined, 2)[2]; T.tp(d.x, d.y); T.act(); });
-  t.expectEq(await t.ev(() => T.hint()), '🎡 All aboard!', 'all aboard the purple train');
+  t.expectEq(await t.ev(() => T.hint()), '🎡 All aboard!', 'all aboard the D train');
   const go = await t.ev(() => { T.until(() => !!Game.travel, 120); return Game.travel && { via: Game.travel.via, to: Game.travel.to, from: Game.travel.from }; });
-  t.expectEq(JSON.stringify(go), JSON.stringify({ via: 'pierline', to: 'pizzapier', from: 'subway' }), 'boarding starts the pierline ride to Pizza Pier');
-  t.expectEq(await t.ev(() => SubwayExt.st.train2.state), 'leaving', 'the purple train pulls out with the chef');
+  t.expectEq(JSON.stringify(go), JSON.stringify({ via: 'pierline', to: 'pizzapier', from: 'subway' }), 'boarding starts the pierline ride to Coney Island');
+  t.expectEq(await t.ev(() => SubwayExt.st.train2.state), 'leaving', 'the D train pulls out with the chef');
   await t.ev(() => T.until(() => !Game.travel, 400));
-  t.expectEq(await t.ev(() => Game.area), 'pizzapier', 'the ride lands at Pizza Pier');
+  t.expectEq(await t.ev(() => Game.area), 'pizzapier', 'the ride lands at Coney Island');
 
   // ---- the ride home from the pier lands on Line 2's platform
   await t.ev(() => { const A = CFG.PIER.ARRIVE; T.tp(A.x, A.y, 'pizzapier'); T.toasts.length = 0; Game.startTravel('subway', 'pierline', 1); });
@@ -112,7 +118,7 @@ module.exports = async (t) => {
   const home = await t.ev(() => ({ area: Game.area, end: SubwayExt.st.end, t2: SubwayExt.st.train2.state, x2: SubwayExt.st.train2.x, hall: SubwayExt.hallOf(Game.player.x), toasts: T.toasts.slice() }));
   t.expectEq(home.area, 'subway', 'back in the station');
   t.expectEq(home.end, 'city', 'at the City end');
-  t.expectEq(home.t2, 'stopped', 'the purple train waits at its platform');
+  t.expectEq(home.t2, 'stopped', 'the D train waits at its platform');
   t.expectEq(home.hall, 2, "the chef gets off on Line 2's platform");
   t.expect(home.toasts.includes('🏙️ Back in the City!'), 'back-in-the-City toast');
   await t.ev(() => T.step(60));

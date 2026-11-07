@@ -1,5 +1,5 @@
 'use strict';
-// Pizza Pier, the park itself (js/pizzapier.js): arriving on Line 2 lands on the terminal platform (one welcome toast);
+// Coney Island, the park itself (js/pizzapier.js, map 'pizzapier'): arriving on the D train lands on the terminal platform (one welcome toast);
 // the boardwalk is walkable end to end; '🚇 Ride home' starts the ride back to the City; the Ferris wheel takes the chef
 // all the way round (the camera follows, "What a view!" at the top) and lets them off at the bottom; helping build the
 // Pizza Drop adds a piece (saved) and ends in a test run; the three food stands; the pizza coin by the sandcastle is
@@ -38,7 +38,7 @@ module.exports = async (t) => {
     Game.startTravel('pizzapier', 'pierline', 1);
     T.until(() => !Game.travel && Game.area === 'pizzapier', 600); T.step(2);
     const A = CFG.PIER.ARRIVE, p = Game.player;
-    return { area: Game.area, d: Math.hypot(p.x - A.x, p.y - A.y), toasts: T.toasts.filter((m) => m === '🎡 Welcome to Pizza Pier!').length, seen: Game.s.pizzapier.seen, hint: T.hint() };
+    return { area: Game.area, d: Math.hypot(p.x - A.x, p.y - A.y), toasts: T.toasts.filter((m) => m === '🎡 Welcome to Coney Island!').length, seen: Game.s.pizzapier.seen, hint: T.hint() };
   });
   t.expectEq(arr.area, 'pizzapier', 'arrived at the pier');
   t.expect(arr.d < 2, `standing at the arrival spot (${arr.d})`);
@@ -48,7 +48,7 @@ module.exports = async (t) => {
   await t.shot('arrive');
   const again = await t.ev(() => {
     Game.startTravel('pizzapier', 'pierline', 1); T.until(() => !Game.travel, 600); T.step(2);
-    return T.toasts.filter((m) => m === '🎡 Welcome to Pizza Pier!').length;
+    return T.toasts.filter((m) => m === '🎡 Welcome to Coney Island!').length;
   });
   t.expectEq(again, 1, 'no second welcome toast on the next visit');
 
@@ -92,7 +92,7 @@ module.exports = async (t) => {
 
   // ---- Ride home: at the boarding spot by the train
   await t.ev(() => { const B = CFG.PIERPARK.BOARD; T.tp(B.x, B.y + 50, 'pizzapier'); });
-  t.expectEq(await t.ev(() => T.hint()), 'Ride the train home 🚇', 'train hint near the boarding spot');
+  t.expectEq(await t.ev(() => T.hint()), 'Ride the D train home 🚇', 'train hint near the boarding spot');
   await t.ev(() => { const B = CFG.PIERPARK.BOARD; T.tp(B.x, B.y, 'pizzapier'); });
   t.expectEq(await t.ev(() => T.label()), '🚇 Ride home', 'ride-home label on the spot');
   await t.shot('terminal');
@@ -163,6 +163,184 @@ module.exports = async (t) => {
   await t.page.setViewportSize({ width: 1100, height: 720 });
   await t.ev(() => Render.resize());
 
+  // ---- the building site's tower crane (js/towercrane.js): climb in at its door, grab a beam from the pile, lift it onto
+  // the Pizza Drop (one more piece, like '🔨 Help build'), put one down elsewhere, climb down, Take me home, a rescue
+  const creg = await t.ev(() => {
+    const c = TowerCrane.get('pier'), B = CFG.PIERPARK.BUILD;
+    Game.area = 'pizzapier';
+    const mast = TowerCrane.mastBox(c), inObs = Game.obstacles().some((o) => o.x === mast.x && o.y === mast.y && o.w === mast.w);
+    return { ok: !!c && c === PizzaPierExt.crane && c.area === 'pizzapier', inObs, base: [c.C.x, c.C.y], want: [B.CRANE.x, B.CRANE.y], seatFree: PizzaPierExt.free(Game, c.seat.x, c.seat.y), reachTower: TowerCrane.reaches(c, { x: B.TOWER.x, y: B.TOWER.y }), reachPile: TowerCrane.reaches(c, TowerCrane.pileSpot(TowerCrane.piles(Game, c)[0])) };
+  });
+  t.expect(creg.ok && creg.inObs && creg.seatFree && creg.reachTower && creg.reachPile && creg.base.join() === creg.want.join(), `the park's crane is a real tower crane on the building site ${JSON.stringify(creg)}`);
+  const defineHelpers = () => {
+    window.steerHook = (c, P, label, max) => {
+      let n = 0;
+      for (; n < (max || 400); n++) {
+        if (T.label() === label) break;
+        const G = TowerCrane.hook(c), dx = P.x - G.x, dy = P.y - G.y, d = Math.hypot(dx, dy) || 1;
+        T.steer(dx / d, dy / d); T.step(1);
+      }
+      T.unsteer(); return T.label() === label ? n : -1;
+    };
+    window.driveTo = (P, near, max) => {
+      let n = 0;
+      for (; n < (max || 600); n++) {
+        const v = Game.vehicle, dx = P.x - v.x, dy = P.y - v.y, d = Math.hypot(dx, dy);
+        if (d < (near || 12)) break;
+        T.steer(dx / d, dy / d); T.step(1);
+      }
+      T.unsteer(); T.step(20); return n;
+    };
+  };
+  await t.ev(defineHelpers);
+  const cdoor = await t.ev(() => { const c = TowerCrane.get('pier'), S = c.seat; T.tp(S.x + 10, S.y + 20, 'pizzapier'); T.step(3); return { near: Game.nearVehicle === c.v, hint: T.hint() }; });
+  t.expect(cdoor.near && cdoor.hint === 'Drive the crane! 🏗️', `the crane's door ${JSON.stringify(cdoor)}`);
+  await t.wait(200);
+  t.expectEq(await t.page.textContent('#btn-car'), '🏗️ Drive the crane', 'the vehicle button reads Drive the crane');
+  await t.shot('crane-door');
+  const lift = await t.ev(() => {
+    const c = TowerCrane.get('pier'), B = CFG.PIERPARK.BUILD, s = Game.s.pizzapier, b0 = s.built, l0 = s.lifts;
+    Game.enterCar(); T.step(30);
+    const r = { b0, driving: Game.vehicle === c.v, ride: TowerCrane.ride === c, up: Game.floats.some((f) => f.text === 'Up in the crane! 🏗️'), parkHint: PizzaPierExt.hint(Game), parkAct: PizzaPierExt.action(Game) };
+    const P = TowerCrane.pileSpot(TowerCrane.piles(Game, c)[0]);
+    r.n1 = window.steerHook(c, P, '🪝 Grab a beam'); r.grabHint = T.hint();
+    T.act(); T.until(() => !c.cyc, 120); r.load = c.load; r.kind = c.kind; r.carry = T.hint();
+    r.n2 = window.steerHook(c, { x: B.TOWER.x, y: B.TOWER.y }, '🏗️ Put it on the tower'); r.putHint = T.hint();
+    return r;
+  });
+  t.expect(lift.driving && lift.ride && lift.up, `up in the crane ${JSON.stringify(lift)}`);
+  t.expect(lift.parkHint === undefined && !lift.parkAct, 'the park itself is quiet while the chef drives the crane');
+  t.expect(lift.n1 >= 0 && lift.grabHint === 'Grab a beam! 🪝' && lift.load && lift.kind === 'beam', `the joystick moved the hook to the beams and one button grabbed one ${JSON.stringify(lift)}`);
+  t.expect(['Move it over to the tower! 🏗️', 'Put it on the Pizza Drop! 🏗️'].includes(lift.carry), `carrying hint (${lift.carry})`);
+  t.expect(lift.n2 >= 0 && lift.putHint === 'Put it on the Pizza Drop! 🏗️', `steered the beam over the tower ${JSON.stringify(lift)}`);
+  await t.shot('crane-carry');
+  await t.ev(() => { T.act(); T.step(26); });
+  await t.shot('crane-lifting');
+  const placed = await t.ev(() => {
+    const c = TowerCrane.get('pier'), s = Game.s.pizzapier; T.until(() => !c.cyc, 120);
+    return { built: s.built, lifts: s.lifts, load: c.load, click: Game.floats.some((f) => f.text === 'Click! ✨'), hooray: Game.floats.some((f) => String(f.text).includes('Hooray')), count: Game.floats.some((f) => /^\d \/ 8/.test(String(f.text))), label: T.label() };
+  });
+  t.expectEq(placed.built, lift.b0 + 1, 'the lifted beam counts as one more piece of the Pizza Drop');
+  t.expect(placed.lifts === 1 && !placed.load && placed.click && placed.hooray && placed.count, `click, the worker cheers, the count shows ${JSON.stringify(placed)}`);
+  // a second beam, put down on the ground: it slides back to the pile
+  const down = await t.ev(() => {
+    const c = TowerCrane.get('pier'), P = TowerCrane.pileSpot(TowerCrane.piles(Game, c)[0]);
+    const n = window.steerHook(c, P, '🪝 Grab a beam'); T.act(); T.until(() => !c.cyc, 120);
+    T.steer(0.3, -1); T.step(40); T.unsteer(); const label = T.label(); T.act(); T.until(() => !c.cyc, 120);
+    return { n, label, loose: c.loose.length, built: Game.s.pizzapier.built };
+  });
+  t.expect(down.n >= 0 && down.label === '⬇️ Put it down' && down.loose === 1 && down.built === placed.built, `a beam put down on the ground ${JSON.stringify(down)}`);
+  // climb down: the chef stands by the mast on free ground
+  const off = await t.ev(() => { const c = TowerCrane.get('pier'); Game.exitCar(); T.step(3); const p = Game.player; return { driving: Game.driving, ride: TowerCrane.ride, free: PizzaPierExt.free(Game, p.x, p.y), d: Math.hypot(p.x - c.seat.x, p.y - c.seat.y), area: Game.area }; });
+  t.expect(!off.driving && !off.ride && off.free && off.d < 80 && off.area === 'pizzapier', `climbed down beside the crane ${JSON.stringify(off)}`);
+  // Take me home from the cab with a beam on the hook: in town, nobody in the crane, nothing hanging or lying about
+  const cgh = await t.ev(() => {
+    const c = TowerCrane.get('pier'); T.tp(c.seat.x, c.seat.y + 10, 'pizzapier'); Game.enterCar(); T.step(5);
+    window.steerHook(c, TowerCrane.pileSpot(TowerCrane.piles(Game, c)[0]), '🪝 Grab a beam'); T.act(); T.until(() => !c.cyc, 120); const had = c.load;
+    Game.goHome(); T.step(2);
+    return { had, area: Game.area, driving: Game.driving, ride: TowerCrane.ride, load: c.load, loose: c.loose.length };
+  });
+  t.expect(cgh.had && cgh.area === 'town' && !cgh.driving && !cgh.ride && !cgh.load && !cgh.loose, `Take me home from the crane ${JSON.stringify(cgh)}`);
+  // rescue: a chef left inside the mast is put on free ground
+  const cres = await t.ev(() => { const c = TowerCrane.get('pier'); T.tp(9700, 5560, 'pizzapier'); Game.player.x = c.C.x; Game.player.y = c.C.y; T.step(3); const p = Game.player; return { free: PizzaPierExt.free(Game, p.x, p.y), at: [Math.round(p.x), Math.round(p.y)] }; });
+  t.expect(cres.free, `rescued out of the crane's mast ${JSON.stringify(cres)}`);
+
+  // ---- the concrete mixer: hop in, drive it round the yard (fenced in: never onto the boardwalk), '🌀 Pour' anywhere
+  // makes a puddle, by the tower it fills the foundation forms (three pours), hop out, Take me home, rescues
+  const mdoor = await t.ev(() => {
+    const v = PizzaPierExt.mixer, M = CFG.PIERPARK.BUILD.MIXER;
+    T.tp(v.x + 46, v.y + 10, 'pizzapier'); T.step(3);
+    return { kind: v.kind, parked: v.x === M.x && v.y === M.y, near: Game.nearVehicle === v, hint: T.hint(), inVeh: Game.vehicles().includes(v), spec: !!CFG.VEHICLES.mixer };
+  });
+  t.expect(mdoor.kind === 'mixer' && mdoor.spec && mdoor.parked && mdoor.near && mdoor.inVeh, `the mixer is a rideable 'mixer' vehicle, parked in its bay ${JSON.stringify(mdoor)}`);
+  t.expectEq(mdoor.hint, 'Drive the concrete mixer! 🚛', 'hint by the mixer');
+  await t.wait(200);
+  t.expectEq(await t.page.textContent('#btn-car'), '🚛 Drive the mixer', 'the vehicle button reads Drive the mixer');
+  await t.shot('mixer-parked');
+  const drive = await t.ev(() => {
+    const v = PizzaPierExt.mixer, Z = CFG.PIERPARK.BUILD.ZONE, rad = CFG.VEHICLES.mixer.radius;
+    Game.enterCar(); T.step(2);
+    const r = { in: Game.vehicle === v, label: T.label(), drum0: v.drum };
+    // drive off towards the far corner of the yard: the hint says where to pour
+    r.n = window.driveTo({ x: 9880, y: 5210 }, 14, 600); r.at = [Math.round(v.x), Math.round(v.y)]; r.farHint = T.hint(); r.farTarget = !!(Game.hint && Game.hint.target);
+    r.drum = v.drum - r.drum0;
+    // push hard against every side of the yard: it never leaves it
+    const pushes = [[0, 1], [1, 0], [0, -1], [-1, 0], [1, 1], [-1, 1]], hits = [];
+    for (const [ax, ay] of pushes) { T.steer(ax, ay); T.step(240); T.unsteer(); hits.push([Math.round(v.x), Math.round(v.y)]); }
+    r.hits = hits; r.inside = hits.every(([x, y]) => x >= Z.x0 + rad - 1 && x <= Z.x1 - rad + 1 && y >= Z.y0 + rad - 1 && y <= Z.y1 - rad + 1);
+    r.maxY = Math.max(...hits.map((h) => h[1])); r.player = Math.hypot(Game.player.x - v.x, Game.player.y - v.y);
+    return r;
+  });
+  t.expect(drive.in && drive.label === '🌀 Pour', `in the mixer, one button: Pour ${JSON.stringify(drive)}`);
+  t.expect(drive.at[0] > 9840 && drive.at[1] < 5260 && drive.drum > 0, `drove across the yard, the drum turning ${JSON.stringify(drive)}`);
+  t.expect(drive.farHint === 'Drive to the tower to pour concrete! 🌀' && drive.farTarget, `far from the tower the hint points the way (${drive.farHint})`);
+  t.expect(drive.inside && drive.maxY < CFG_BW_Y0() - 300 && drive.player < 1, `the mixer stays in the building site's yard ${JSON.stringify(drive.hits)}`);
+  // a pour away from the tower: a puddle under the chute, the foundation unchanged
+  const puddle = await t.ev(() => {
+    const v = PizzaPierExt.mixer, s = Game.s.pizzapier; window.driveTo({ x: 9880, y: 5220 }, 14, 600);
+    const f0 = s.found, p0 = s.pours; T.act(); const busy = T.label(), hint = T.hint(); T.step(60);
+    const q = PizzaPierExt.st.puddles[PizzaPierExt.st.puddles.length - 1], tip = PizzaPierExt.chuteTip(v);
+    const r = { busy, hint, pours: s.pours - p0, flowing: !!v.pour, puddle: !!q && !q.found, under: q && Math.abs(q.x - tip.x) < 2, splosh: Game.floats.some((f) => String(f.text).startsWith('Splosh')) };
+    T.until(() => !v.pour, 300); r.found = s.found - f0; return r;
+  });
+  t.expect(puddle.busy === '🌀 Pour' && puddle.hint === 'Splosh! Fresh concrete 🌀' && puddle.pours === 1 && puddle.puddle && puddle.under && puddle.splosh && puddle.found === 0, `a pour away from the tower makes a puddle ${JSON.stringify(puddle)}`);
+  // to the tower, and pour into the forms three times
+  const found = await t.ev(() => {
+    const v = PizzaPierExt.mixer, B = CFG.PIERPARK.BUILD, F = B.FOUND, s = Game.s.pizzapier, out = { pours: [] };
+    window.driveTo(Game.hint.target, 150, 800); out.nearHint = T.hint();
+    for (let i = 0; i < F.N; i++) {
+      const f0 = s.found; T.act(); const T0 = v.pour && v.pour.T;
+      T.until(() => v.pour && v.pour.puddle, 120);
+      const tip = PizzaPierExt.chuteTip(v), q = v.pour.puddle;
+      const rec = { into: !!T0 && q.found, gap: Math.round(Math.hypot(tip.x - q.x, tip.y + 30 - q.y)), inForms: q.x > F.x0 && q.x < F.x1 && q.y > F.y0 && q.y < F.y1, mixerOk: PizzaPierExt.inYard(v.x, v.y) };
+      if (i === 0) { T.step(20); return Object.assign(out, { first: rec, f0 }); }
+      T.until(() => !v.pour, 300); rec.found = s.found - f0; out.pours.push(rec);
+    }
+    return out;
+  });
+  t.expectEq(found.nearHint, 'Pour the concrete for the tower! 🌀', 'by the tower the hint says pour');
+  t.expect(found.first.into && found.first.inForms && found.first.gap < 40 && found.first.mixerOk, `the mixer backs up to the forms and pours into them ${JSON.stringify(found.first)}`);
+  await t.shot('mixer-pour');
+  const found2 = await t.ev(() => {
+    const v = PizzaPierExt.mixer, F = CFG.PIERPARK.BUILD.FOUND, s = Game.s.pizzapier;
+    T.until(() => !v.pour, 300); const r = { after1: s.found, smooth: Game.floats.some((f) => String(f.text).startsWith('Nice and smooth')) };
+    for (let i = 1; i < F.N; i++) { T.act(); T.until(() => !v.pour, 300); }
+    r.after = s.found; r.done = Game.floats.some((f) => f.text === 'The foundation is done! 🎉'); r.max = F.N; r.label = T.label();
+    return r;
+  });
+  t.expect(found2.after1 === 1 && found2.smooth, `the first pour fills a third of the forms ${JSON.stringify(found2)}`);
+  t.expect(found2.after === found2.max && found2.done && found2.label === '🌀 Pour', `three pours fill the foundation ${JSON.stringify(found2)}`);
+  await t.ev(() => { T.step(200); });
+  await t.shot('mixer-foundation');
+  // hop out: beside the truck, on free ground, the truck stays in the yard
+  const mout = await t.ev(() => { const v = PizzaPierExt.mixer; Game.exitCar(); T.step(3); const p = Game.player; return { driving: Game.driving, free: PizzaPierExt.free(Game, p.x, p.y), d: Math.hypot(p.x - v.x, p.y - v.y), yard: PizzaPierExt.inYard(v.x, v.y), hint: T.hint(), back: Game.nearVehicle === v }; });
+  t.expect(!mout.driving && mout.free && mout.d < 60 && mout.yard && mout.back, `hopped out beside the mixer ${JSON.stringify(mout)}`);
+  // the saved foundation is kept across a reload
+  await t.ev(() => Game.save());
+  await t.reload();
+  t.expectEq(await t.ev(() => Game.s.pizzapier.found), found2.max, 'the foundation stays poured across a reload');
+  await t.ev(defineHelpers);
+  // Take me home while it pours: in town, the mixer parked again with its chute folded
+  const mgh = await t.ev(() => {
+    const v = PizzaPierExt.mixer, M = CFG.PIERPARK.BUILD.MIXER; T.tp(v.x + 40, v.y, 'pizzapier'); Game.enterCar(); T.step(2); window.driveTo({ x: 9800, y: 5250 }, 20, 600); T.act(); T.step(40);
+    const was = !!v.pour; Game.goHome(); T.step(2);
+    return { was, area: Game.area, driving: Game.driving, pour: v.pour, parked: v.x === M.x && v.y === M.y && v.angle === M.angle, puddles: PizzaPierExt.st.puddles.length };
+  });
+  t.expect(mgh.was && mgh.area === 'town' && !mgh.driving && !mgh.pour && mgh.parked && !mgh.puddles, `Take me home from the mixer ${JSON.stringify(mgh)}`);
+  // rescue: a mixer left outside the yard (an old save, a push) goes back to its bay
+  const mres = await t.ev(() => { const v = PizzaPierExt.mixer, M = CFG.PIERPARK.BUILD.MIXER; T.tp(9300, 5980, 'pizzapier'); v.x = 9300; v.y = 6000; T.step(2); return { parked: v.x === M.x && v.y === M.y }; });
+  t.expect(mres.parked, 'a mixer found outside the yard is put back in its bay');
+  // a phone-sized look at both machines at work
+  await t.page.setViewportSize({ width: 390, height: 844 });
+  await t.ev(() => Render.resize());
+  await t.ev(() => { const c = TowerCrane.get('pier'); T.tp(c.seat.x, c.seat.y + 10, 'pizzapier'); Game.enterCar(); T.step(5); window.steerHook(c, TowerCrane.pileSpot(TowerCrane.piles(Game, c)[0]), '🪝 Grab a beam'); T.act(); T.until(() => !c.cyc, 120); window.steerHook(c, { x: CFG.PIERPARK.BUILD.TOWER.x, y: CFG.PIERPARK.BUILD.TOWER.y }, '🏗️ Put it on the tower'); Game.cameraSnap = true; T.step(2); });
+  await t.shot('crane-phone');
+  await t.ev(() => { Game.goHome(); T.step(2); const v = PizzaPierExt.mixer; T.tp(v.x + 40, v.y, 'pizzapier'); Game.enterCar(); T.step(2); T.act(); T.step(55); Game.cameraSnap = true; T.step(1); });
+  await t.shot('mixer-phone');
+  await t.ev(() => { Game.goHome(); T.step(2); });
+  await t.page.setViewportSize({ width: 1100, height: 720 });
+  await t.ev(() => Render.resize());
+
   // ---- the Pizza Drop: help build, a piece is added (and saved), and at the top a test run
   await t.ev(() => { const H = CFG.PIERPARK.BUILD.HELP; T.tp(H.x, H.y + 50, 'pizzapier'); });
   t.expectEq(await t.ev(() => T.hint()), 'Help the workers build the Pizza Drop! 🔨', 'help hint by the site');
@@ -225,12 +403,13 @@ module.exports = async (t) => {
     T.steer(Math.sign(c.x - Game.player.x), 0); T.until(() => Math.abs(Game.player.x - c.x) < 3, 600); T.unsteer();
     T.steer(0, -1); T.until(() => Game.player.y <= c.y, 120); T.unsteer();
     const got = !!(Game.s.pizzacoins && Game.s.pizzacoins.got && Game.s.pizzacoins.got.pizzapier);
-    return { free, got, at: [Math.round(Game.player.x), Math.round(Game.player.y)], c: [c.x, c.y], place: CFG.PIZZACOINS.PLACES.pizzapier };
+    return { free, got, at: [Math.round(Game.player.x), Math.round(Game.player.y)], c: [c.x, c.y], place: CFG.PIZZACOINS.PLACES.pizzapier, note: c.note };
   });
   t.expect(!coin.missing, 'a pizza coin hides at the pier');
   t.expect(coin.free, 'the coin sits on free sand');
   t.expect(coin.got, `walked to it and picked it up (${JSON.stringify(coin)})`);
-  t.expect(!!coin.place, 'the pier has a name in the coins panel');
+  t.expectEq(JSON.stringify(coin.place), JSON.stringify(['🎡', 'Coney Island']), 'the park is called Coney Island in the coins panel');
+  t.expect(/Coney Island/.test(coin.note || ''), `the coin's note names Coney Island (${coin.note})`);
 
   // ---- rescues: pushed into the terminal, into the wheel, into the sea
   const rescue = await t.ev(() => {

@@ -9,49 +9,90 @@
 // The map draws into its own canvas with its own requestAnimationFrame loop, which runs only while the map is open.
 // Opening it, like any modal, only turns the game's input off (UI.show); the town keeps simulating behind it.
 // Extension module: Game.ext.push (it only remembers which places the chef has been to). See js/EXTENSIONS.md.
+//
+// THE MAP IS GENERATED FROM THE GAME'S OWN DATA (nothing is positioned by hand):
+//  * Rides: CFG.LINKS, one entry per ride between two outdoor maps, { from, to, via, dir }, where `via` is the
+//    Game.startTravel kind and `dir` the way the ride travels ON SCREEN going from → to (right, left, up, down,
+//    up-right, down-left, ...). A new ride adds one entry (from its own file: `CFG.LINKS.push(...)`, or here); the
+//    world map test greps every Game.startTravel( call in js/ and fails if a ride has no link.
+//  * Places: Home Town plus every map a link arrives at. Everything else in CFG.AREAS is an interior.
+//  * Membership (which place an interior belongs to), in order: `CFG.AREAS.x.place` (a place or another area) →
+//    its door: a DOOR / DOOR_OUT / MAT_OUT point in the config that owns its WORLD (or a `DOORS` table entry naming
+//    it), and the place of the map whose WORLD holds that point → the old hand table LEGACY_PLACE (old interiors).
+//  * Layout: Home Town starts in the middle and each linked place goes one step away in its link's direction; the
+//    steps are stretched onto the canvas (wide or tall), then relaxed: bubbles and labels are pushed apart, every
+//    ride keeps within a cone of its direction, paths keep clear of other bubbles, seaside places sit in the sea at
+//    the bottom, space and sky places up top, and everything stays on the canvas with room for the hat and labels.
+//  * Scenery comes from the places' `scene`: sea under 'sea'/'shore' places, snowy mountains behind 'snow', a hill
+//    under 'hill', a starry patch around 'space', clouds around 'sky'; the trees, boats and balloon fill empty room.
+//  * Sub-places (little icons by each bubble): the place's interiors (their picture and name from INSIDE, or from
+//    their own config's name / toast) plus its outdoor landmarks (`marks`), the most notable few, then "+N".
+
+(() => {
+  // the rides between the places (every Game.startTravel kind). `dir`: where the ride goes on screen, from → to.
+  const LINKS = [
+    { from: 'town', to: 'site', via: 'train', dir: 'right' },          // the train pulls out of town to the right
+    { from: 'site', to: 'snow', via: 'skilift', dir: 'up' },           // the ski lift climbs the mountain
+    { from: 'town', to: 'city', via: 'bus', dir: 'left' },             // the bus drives right to left to the City
+    { from: 'city', to: 'campus', via: 'subway', dir: 'up' },          // red Line 1 uptown to Columbia
+    { from: 'city', to: 'pizzapier', via: 'pierline', dir: 'left' },   // the orange D train rolls in LEFT by the sea
+    { from: 'town', to: 'islands', via: 'ferry', dir: 'down-left' },   // the ferry sails left across the sea
+    { from: 'islands', to: 'moon', via: 'rocket', dir: 'up' },         // the rocket lifts straight up
+    { from: 'town', to: 'cloud', via: 'flight', dir: 'up-right' },     // the plane climbs up and away to the right
+  ];
+  const have = Array.isArray(CFG.LINKS) ? CFG.LINKS : [];   // links another file pushed before this one loaded stay
+  for (const l of LINKS) if (!have.some((q) => q.via === l.via && q.from === l.from && q.to === l.to)) have.push(l);
+  CFG.LINKS = have;
+})();
 
 CFG.WORLDMAP = {
-  // the places on the map: picture, name, colour, how to get there, and the little sub-places drawn beside them
-  PLACES: {
-    town: {
-      ico: '🍕', name: 'Home Town', col: '#ffd6a0', how: '🏡 Home! Your pizzeria is here.',
-      subs: [['🐄', 'Farm', 'The farm and the barn'], ['🚒', 'Fire Station', 'The fire station'], ['🌲', 'Woods', 'The secret woods and the cabin']],
-    },
-    site: {
-      ico: '🏗️', name: 'Construction Town', short: 'Construction', col: '#ffe08a', how: '🚂 Take the train from the station by the farm',
-      subs: [['⛏️', 'Pizza Mine', 'The Pizza Mine'], ['🥞', 'Diner', 'The diner'], ['🔧', 'Hardware', 'The hardware store']],
-    },
-    snow: {
-      ico: '⛷️', name: 'Snowy Peak', col: '#e3f4ff', how: '🚡 Ride the ski lift by the Pizza Mine',
-      subs: [['🛷', 'Sledding', 'The sledding hill'], ['☕', 'Cocoa Cabin', 'The Cocoa Cabin']],
-    },
-    city: {
-      ico: '🏙️', name: 'The City', col: '#d7d2ff', how: '🚌 Take the bus from Main Street',
-      subs: [['🛍️', 'Shops', 'Lots of shops to go inside'], ['🌭', 'Hot dogs', 'The hot dog cart in Pizza Square']],
-    },
-    campus: {
-      ico: '🎓', name: 'Columbia', col: '#cfe3ff', how: '🚇 Ride the subway from the City',
-      subs: [['🏛️', 'Library', 'Low Library'], ['🐻', 'Barnard', 'Barnard Hall']],
-    },
-    islands: {
-      ico: '🏝️', name: 'The Islands', col: '#c9f3e8', how: '⛴️ Take the ferry from the dock by River House',
-      subs: [['🏖️', 'Sunny Beach', 'Sunny Beach'], ['🗼', 'Lighthouse', 'The Lighthouse'], ['⭐', 'Starfish Cove', 'Starfish Cove']],
-    },
-    pizzapier: {
-      ico: '🎡', name: 'Pizza Pier', col: '#ffd6ec', how: '🚇 Ride the purple subway (Line 2) from the City',
-      subs: [['🎢', 'Coaster', 'The roller coaster'], ['🚗', 'Bumper cars', 'The bumper cars'], ['🎯', 'Games', 'The midway games']],
-    },
-    moon: {
-      ico: '🌕', name: 'Pizza Moon', col: '#3d3f78', dark: true, how: '🚀 Fly the rocket from Rocket Island',
-      subs: [['👽', 'Alien', 'The friendly alien']],
-    },
-    cloud: {
-      ico: '☁️', name: 'Cloud Harbor', col: '#ffffff', how: '✈️ Hop in a plane at the airfield',
-      subs: [['🎈', 'Balloons', 'Hot-air balloon rides'], ['🧁', 'Sky Café', 'The Sky Café']],
-    },
+  // how each kind of ride looks on the map: its vehicle, its path, its name (unknown kinds get a road and a car)
+  RIDES: {
+    train: { ico: '🚂', style: 'rail', name: 'train' },
+    skilift: { ico: '🚡', style: 'cable', name: 'ski lift' },
+    bus: { ico: '🚌', style: 'road', name: 'bus' },
+    subway: { ico: '🚇', style: 'tunnel', name: 'subway', col: '#d42a2a' },
+    pierline: { ico: '🚇', style: 'tunnel', name: 'orange D train', col: '#ff6319' },
+    ferry: { ico: '⛴️', style: 'water', name: 'ferry' },
+    rocket: { ico: '🚀', style: 'space', name: 'rocket', loop: true },
+    flight: { ico: '✈️', style: 'air', name: 'plane', loop: true },
   },
-  // every map (CFG.AREAS key) belongs to one place; a new map may also say `CFG.AREAS.x.place = 'city'` itself
-  AREA_PLACE: {
+  // a little data for each place: picture, name, colour, how to get there, its scenery, and landmarks that are not
+  // interiors ([emoji, name, words, how notable]). A place missing here still shows, with a pin and its map's name.
+  PLACES: {
+    town: { ico: '🍕', name: 'Home Town', col: '#ffd6a0', scene: 'land', how: '🏡 Home! Your pizzeria is here.' },
+    site: { ico: '🏗️', name: 'Construction Town', short: 'Construction', col: '#ffe08a', scene: 'land', how: '🚂 Take the train from the station by the farm' },
+    snow: { ico: '⛷️', name: 'Snowy Peak', col: '#e3f4ff', scene: 'snow', how: '🚡 Ride the ski lift by the Pizza Mine', marks: [['🛷', 'Sledding', 'The sledding hill', 3]] },
+    city: { ico: '🏙️', name: 'The City', col: '#d7d2ff', scene: 'land', how: '🚌 Take the bus from Main Street', marks: [['🌭', 'Hot dogs', 'The hot dog cart in Pizza Square', 2]] },
+    campus: { ico: '🎓', name: 'Columbia', col: '#cfe3ff', scene: 'hill', how: '🚇 Ride the subway from the City' },
+    islands: { ico: '🏝️', name: 'The Islands', col: '#c9f3e8', scene: 'sea', how: '⛴️ Take the ferry from the dock by River House', marks: [['🏖️', 'Sunny Beach', 'Sunny Beach', 2]] },
+    pizzapier: {
+      ico: '🎡', name: 'Coney Island', col: '#ffd6ec', scene: 'shore', how: '🚇 Ride the orange D train from the City',
+      marks: [['🎢', 'Coaster', 'The roller coaster', 3], ['🚗', 'Bumper cars', 'The bumper cars', 3], ['🎯', 'Games', 'The midway games', 2]],
+    },
+    moon: { ico: '🌕', name: 'Pizza Moon', col: '#3d3f78', dark: true, scene: 'space', how: '🚀 Fly the rocket from Rocket Island', marks: [['👽', 'Alien', 'The friendly alien', 3]] },
+    cloud: { ico: '☁️', name: 'Cloud Harbor', col: '#ffffff', scene: 'sky', how: '✈️ Hop in a plane at the airfield', marks: [['🎈', 'Balloons', 'Hot-air balloon rides', 3]] },
+  },
+  // pictures, names and words for interiors whose own config has none, and how notable each is (3 = shown first)
+  INSIDE: {
+    barn: ['🐄', 'Farm', 'The farm and the barn', 3], firestation: ['🚒', 'Fire Station', 'The fire station', 3],
+    cabin: ['🌲', 'Woods', 'The secret woods and the cabin', 3], upstairs: ['🛏️', 'Upstairs', 'Your room upstairs', 1],
+    pizzarain: ['🌧️', 'Pizza Rain', 'The room where it rains pizza', 1], jetcabin: ['✈️', 'Jet', 'Inside the big jet', 2],
+    mines: ['⛏️', 'Pizza Mine', 'The Pizza Mine', 3], diner: ['🥞', 'Diner', 'The diner', 3], hardware: ['🔧', 'Hardware', 'The hardware store', 3],
+    cocoacabin: ['☕', 'Cocoa Cabin', 'The Cocoa Cabin', 3],
+    subway: ['🚇', 'Subway', 'The subway station', 1], barber: ['💈', 'Barber', 'The barber shop', 1], toyshop: ['🧸', 'Toys', 'The toy shop', 2],
+    petshop: ['🐶', 'Pets', 'The pet shop', 1], bakery: ['🥐', 'Bakery', 'The bakery', 1], hotel: ['🏨', 'Hotel', 'The hotel', 1],
+    arcade: ['🕹️', 'Arcade', 'The arcade', 1], candy: ['🍭', 'Candy', 'The candy shop', 1], books: ['📚', 'Books', 'The book shop', 1],
+    catcafe: ['🐱', 'Cat Café', 'The cat café', 1], gym: ['🤸', 'Gym', 'The gym', 1], flowers: ['🌷', 'Flowers', 'The flower shop', 1],
+    music: ['🎸', 'Music', 'The music shop', 1], cinema: ['🎬', 'Cinema', 'The cinema', 1], post: ['📮', 'Post Office', 'The post office', 1],
+    grocery: ['🛒', 'Grocery', 'The grocery store', 1], school: ['🏫', 'School', 'The school', 1], bank: ['🏦', 'Bank', 'The bank', 1],
+    cafe: ['☕', 'Café', 'The café', 1], aquarium: ['🐠', 'Aquarium', 'The aquarium', 2], firedept: ['🚒', 'Fire Dept', 'The fire department', 1],
+    lowlibrary: ['🏛️', 'Library', 'Low Library', 3], barnardhall: ['🐻', 'Barnard', 'Barnard Hall', 3],
+    lighthouse: ['🗼', 'Lighthouse', 'The Lighthouse', 3], rocketinside: ['🚀', 'Rocket', 'Inside the rocket', 1],
+    skycafe: ['🧁', 'Sky Café', 'The Sky Café', 3],
+  },
+  // the old hand-made "which place is this map in" table: only a fallback for interiors with no `place` and no door data
+  LEGACY_PLACE: {
     town: 'town', upstairs: 'town', pizzarain: 'town', barn: 'town', firestation: 'town', cabin: 'town',
     jetcabin: 'town', afterminal: 'town', afhangar: 'town', aftower: 'town', afworkshop: 'town',
     site: 'site', mines: 'site', diner: 'site', hardware: 'site',
@@ -61,41 +102,12 @@ CFG.WORLDMAP = {
     grocery: 'city', school: 'city', bank: 'city', cafe: 'city', aquarium: 'city', firedept: 'city',
     campus: 'campus', lowlibrary: 'campus', barnardhall: 'campus',
     islands: 'islands', lighthouse: 'islands', crabshack: 'islands', coconuthut: 'islands', missionctl: 'islands', beachhut: 'islands', rocketinside: 'islands',
-    moon: 'moon',
-    pizzapier: 'pizzapier',
-    cloud: 'cloud', skycafe: 'cloud',
+    moon: 'moon', pizzapier: 'pizzapier', cloud: 'cloud', skycafe: 'cloud',
   },
-  // how the places are joined (every Game.startTravel in js/): the path style and the vehicle riding it
-  ROUTES: [
-    { a: 'town', b: 'site', via: 'train', ico: '🚂', style: 'rail', loop: false },
-    { a: 'site', b: 'snow', via: 'skilift', ico: '🚡', style: 'cable', loop: false },
-    { a: 'town', b: 'city', via: 'bus', ico: '🚌', style: 'road', loop: false },
-    { a: 'city', b: 'campus', via: 'subway', ico: '🚇', style: 'tunnel', loop: false },
-    { a: 'city', b: 'pizzapier', via: 'pierline', ico: '🚇', style: 'tunnel', loop: false },
-    { a: 'town', b: 'islands', via: 'ferry', ico: '⛴️', style: 'water', loop: false },
-    { a: 'islands', b: 'moon', via: 'rocket', ico: '🚀', style: 'space', loop: true },
-    { a: 'town', b: 'cloud', via: 'flight', ico: '✈️', style: 'air', loop: true },
-  ],
-  // two hand-made layouts (fractions of the canvas): a wide one for desktops and tablets, a tall one for phones
-  // Laid out to match the rides: the train heads RIGHT out of town (Construction Town, then the ski lift up and right to
-  // Snowy Peak), the bus and the ferry head LEFT (the City; the Islands across the sea), the plane climbs up and right
-  // (Cloud Harbor), the purple subway runs left from the City down to Pizza Pier by the sea, the rocket climbs to the Moon.
-  LAYOUTS: {
-    wide: {
-      pos: { town: [0.47, 0.5], site: [0.75, 0.53], snow: [0.885, 0.2], cloud: [0.655, 0.19], city: [0.21, 0.5], campus: [0.29, 0.2], pizzapier: [0.085, 0.72], islands: [0.36, 0.83], moon: [0.47, 0.14] },
-      bend: { 'town-site': -0.06, 'site-snow': 0.0, 'town-city': 0.08, 'city-campus': -0.1, 'city-pizzapier': 0.12, 'town-islands': -0.12, 'islands-moon': -0.1, 'town-cloud': -0.12 },
-      horizon: 0.34, sea: [-0.05, 0.76, 1.05, 1.1], space: [0.39, -0.05, 0.56, 0.3],
-      mountains: [[0.76, 0.13, 0.12], [0.88, 0.06, 0.16], [1.0, 0.15, 0.12]], hill: [0.29, 0.26, 0.13],
-      decor: [['🐳', 0.86, 0.9, 1.0], ['⛵', 0.6, 0.91, 0.8], ['🌳', 0.6, 0.42, 0.75], ['🌳', 0.34, 0.6, 0.7], ['🌻', 0.95, 0.66, 0.55], ['🐟', 0.18, 0.95, 0.55], ['🎈', 0.57, 0.08, 0.7]],
-    },
-    tall: {
-      pos: { moon: [0.47, 0.125], campus: [0.18, 0.26], cloud: [0.57, 0.29], snow: [0.78, 0.15], city: [0.2, 0.47], town: [0.52, 0.47], site: [0.78, 0.44], pizzapier: [0.18, 0.7], islands: [0.4, 0.87] },
-      bend: { 'town-site': -0.08, 'site-snow': 0.0, 'town-city': 0.1, 'city-campus': 0.1, 'city-pizzapier': -0.1, 'town-islands': 0.12, 'islands-moon': 0.14, 'town-cloud': -0.1 },
-      horizon: 0.3, sea: [-0.05, 0.75, 1.05, 1.1], space: [0.3, -0.05, 0.64, 0.2],
-      mountains: [[0.7, 0.1, 0.14], [0.86, 0.04, 0.18], [1.0, 0.11, 0.12]], hill: [0.2, 0.3, 0.16],
-      decor: [['🌳', 0.36, 0.6, 0.7], ['🌻', 0.92, 0.6, 0.55], ['🐳', 0.85, 0.93, 0.85], ['⛵', 0.25, 0.92, 0.7], ['🌳', 0.68, 0.62, 0.6], ['🎈', 0.36, 0.33, 0.6]],
-    },
-  },
+  // scenery a new place gets from the ride that reaches it, when the place table does not say
+  VIA_SCENE: { ferry: 'sea', rocket: 'space', flight: 'sky', skilift: 'snow' },
+  COLOURS: ['#ffd6a0', '#d7f5c8', '#ffe0f0', '#d6ecff', '#fff1b8', '#e8dcff'],
+  SUBS: { wide: 4, tall: 3 },   // at most this many little sub-place icons per place (the last one may be "+N")
 };
 
 const WorldMapExt = {
@@ -104,16 +116,154 @@ const WorldMapExt = {
   dom: null, raf: null, running: false, frames: 0, t: 0, last: 0,
   sel: null,       // { kind: 'place' | 'sub', key, i, t } : the thing tapped last, with its speech bubble
   lay: null,       // the computed layout for the canvas's current size (positions in CSS px)
+  _mem: null,      // the generated membership (rebuilt when maps or links are added)
 
-  // ---------- which place is a map in ----------
-  placeOf(area) {
-    const t = CFG.WORLDMAP.AREA_PLACE;
-    if (t[area]) return t[area];
-    const A = CFG.AREAS && CFG.AREAS[area];
-    if (A && A.place && CFG.WORLDMAP.PLACES[A.place]) return A.place;
-    return null;
+  // ======================= the places and rides, from the data =======================
+  links() { return (CFG.LINKS || []).filter((l) => l && CFG.AREAS[l.from] && CFG.AREAS[l.to] && l.from !== l.to); },
+  ride(via) { return Object.assign({ ico: '🚗', style: 'road', name: via, loop: false }, CFG.WORLDMAP.RIDES[via] || {}); },
+  // the outdoor places: Home Town and every map a ride arrives at (a map that names its `place` is an interior)
+  placeKeys() {
+    const out = ['town'];
+    for (const l of this.links()) for (const k of [l.from, l.to]) if (!out.includes(k) && !CFG.AREAS[k].place) out.push(k);
+    return out;
   },
+  places() { return this.membership().keys; },
+  // a place's picture, name, colour, words and scenery (defaults for a place missing from the table)
+  place(k) {
+    const P = CFG.WORLDMAP.PLACES[k] || {}, m = this.membership();
+    if (m.info[k]) return m.info[k];
+    const into = this.links().find((l) => l.to === k) || this.links().find((l) => l.from === k);
+    const r = into ? this.ride(into.via) : null, from = into ? (into.to === k ? into.from : into.to) : null;
+    const nice = k.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    const fromName = from ? ((CFG.WORLDMAP.PLACES[from] || {}).name || from) : '';
+    const info = Object.assign({
+      ico: '📍', name: nice, col: CFG.WORLDMAP.COLOURS[m.keys.indexOf(k) % CFG.WORLDMAP.COLOURS.length],
+      how: r ? `${r.ico} Take the ${r.name} from ${fromName}` : '🗺️ Somewhere to explore!',
+      scene: (into && CFG.WORLDMAP.VIA_SCENE[into.via]) || 'land', marks: [],
+    }, P);
+    if (!info.marks) info.marks = [];
+    m.info[k] = info;
+    return info;
+  },
+  // the way a link's `dir` points, as a unit vector on screen (y grows down)
+  dirVec(dir) {
+    let x = 0, y = 0;
+    for (const p of String(dir || 'right').toLowerCase().split(/[-\s]+/)) { if (p === 'right') x++; else if (p === 'left') x--; else if (p === 'up') y--; else if (p === 'down') y++; }
+    const l = Math.hypot(x, y);
+    return l ? [x / l, y / l] : [1, 0];
+  },
+
+  // ---------- which place is a map in (generated, cached until a map or a link is added) ----------
+  membership() {
+    const sig = Object.keys(CFG.AREAS).length + '|' + (CFG.LINKS || []).length;
+    if (this._mem && this._mem.sig === sig) return this._mem;
+    const keys = this.placeKeys(), map = {}, how = {}, idx = this.cfgIndex();
+    for (const k of keys) { map[k] = k; how[k] = 'outdoor'; }
+    const resolve = (a, depth) => {
+      if (a in map) return map[a];
+      const A = CFG.AREAS[a]; if (!A || depth > 6) return null;
+      map[a] = null;   // (guards against a loop of interiors naming each other)
+      let pl = null, src = null;
+      if (A.place) {
+        if (keys.includes(A.place)) pl = A.place;
+        else if (CFG.AREAS[A.place] && A.place !== a) pl = resolve(A.place, depth + 1);
+        if (pl) src = 'place';
+      }
+      if (!pl) { const par = this.doorParent(a, idx); if (par) { pl = resolve(par, depth + 1); if (pl) src = 'door'; } }
+      if (!pl) { const p = CFG.WORLDMAP.LEGACY_PLACE[a]; if (p && keys.includes(p)) { pl = p; src = 'legacy'; } }
+      map[a] = pl; how[a] = src;
+      return pl;
+    };
+    for (const a of Object.keys(CFG.AREAS)) resolve(a, 0);
+    this._mem = { sig, keys, map, how, idx, info: {} };
+    return this._mem;
+  },
+  // one walk over CFG: which config objects own each map's WORLD, and every DOORS table
+  cfgIndex() {
+    const owners = new Map(), doors = [], seen = new Set();
+    const walk = (o, d, name) => {
+      if (!o || typeof o !== 'object' || seen.has(o) || d > 5) return;
+      seen.add(o);
+      if (/doors$/i.test(name)) doors.push(o);
+      if (Array.isArray(o)) return;
+      if (o.WORLD && typeof o.WORLD === 'object') { const l = owners.get(o.WORLD) || []; l.push(o); owners.set(o.WORLD, l); }
+      for (const [k, v] of Object.entries(o)) if (v && typeof v === 'object' && k !== 'AREAS' && k !== 'WORLDMAP' && k !== 'LINKS') walk(v, d + 1, k);
+    };
+    walk(CFG, 0, 'CFG');
+    return { owners, doors };
+  },
+  // the config objects that describe a map (the ones holding its WORLD, or CFG.<NAME>)
+  ownersOf(a, idx) {
+    const A = CFG.AREAS[a], out = (A && idx.owners.get(A.WORLD) || []).filter((o) => o !== A);
+    const up = CFG[a.toUpperCase()];
+    if (up && typeof up === 'object' && !Array.isArray(up) && !out.includes(up)) out.push(up);
+    return out;
+  },
+  // where an interior's door is (points in the outer map), from its config or a DOORS table
+  doorSpots(a, idx) {
+    const isPt = (v) => v && typeof v === 'object' && typeof v.x === 'number' && typeof v.y === 'number';
+    const pts = [], owners = this.ownersOf(a, idx), names = [a];
+    for (const o of owners) {
+      for (const [k, v] of Object.entries(o)) if (isPt(v) && /^(door|door_?out|mat_?out|door_?spot|entrance|entry|outside)$/i.test(k)) pts.push(v);
+      if (typeof o.door === 'string') names.push(o.door);
+    }
+    for (const D of idx.doors) {
+      const list = Array.isArray(D) ? D : Object.entries(D).map(([k, v]) => (isPt(v) ? Object.assign({ key: k }, v) : null));
+      for (const e of list) if (isPt(e) && (names.includes(e.key) || e.room === a || e.area === a)) pts.push(e);
+    }
+    return pts;
+  },
+  // the map holding most of an interior's door spots
+  doorParent(a, idx) {
+    const votes = {};
+    for (const p of this.doorSpots(a, idx || this.cfgIndex())) {
+      let best = null, ba = Infinity;
+      for (const [k, A] of Object.entries(CFG.AREAS)) {
+        const W = A.WORLD; if (k === a || !W) continue;
+        if (p.x >= W.x0 && p.x <= W.x1 && p.y >= W.y0 && p.y <= W.y1) { const ar = (W.x1 - W.x0) * (W.y1 - W.y0); if (ar < ba) { ba = ar; best = k; } }
+      }
+      if (best) votes[best] = (votes[best] || 0) + 1;
+    }
+    let win = null;
+    for (const k of Object.keys(votes)) if (!win || votes[k] > votes[win]) win = k;
+    return win;
+  },
+  placeOf(area) { return this.membership().map[area] || null; },
+  mappedBy(area) { return this.membership().how[area] || null; },   // 'outdoor' | 'place' | 'door' | 'legacy' | null
   unmapped() { return Object.keys(CFG.AREAS).filter((k) => !this.placeOf(k)); },
+
+  // ---------- the little sub-places by each bubble: its interiors and landmarks, the most notable first ----------
+  interiorInfo(a) {
+    const T = CFG.WORLDMAP.INSIDE[a];
+    if (T) return { ico: T[0], name: T[1], text: T[2], rank: T[3] == null ? 1 : T[3] };
+    const m = this.membership(), EMO = /\p{Extended_Pictographic}️?(‍\p{Extended_Pictographic}️?)*/u;
+    let ico = null, name = null;
+    for (const o of this.ownersOf(a, m.idx)) {
+      for (const f of ['ico', 'icon', 'emoji', 'toast', 'title', 'hint', 'name']) { const v = o[f]; if (!ico && typeof v === 'string') { const e = v.match(EMO); if (e) ico = e[0]; } }
+      if (!name && typeof o.name === 'string') name = o.name;
+      if (!name && typeof o.toast === 'string') { const w = o.toast.match(/welcome to (?:the )?(.+?)[!.]/i); if (w) name = w[1]; }
+      if (!name && typeof o.title === 'string') name = o.title.replace(EMO, '').trim().toLowerCase();
+    }
+    name = (name || a).replace(/^\w/, (c) => c.toUpperCase());
+    return { ico: ico || '🚪', name, text: name, rank: 1 };
+  },
+  subsOf(place, cap) {
+    cap = cap || CFG.WORLDMAP.SUBS.wide;
+    const items = [], P = this.place(place);
+    for (const a of Object.keys(CFG.AREAS)) {
+      if (a === place || this.placeOf(a) !== place) continue;
+      const W = CFG.AREAS[a].WORLD, size = W ? (W.x1 - W.x0) * (W.y1 - W.y0) : 0;
+      items.push(Object.assign(this.interiorInfo(a), { area: a, size, order: items.length }));
+    }
+    (P.marks || []).forEach((s, i) => items.push({ ico: s[0], name: s[1], text: s[2] || s[1], rank: s[3] == null ? 2 : s[3], size: 0, order: -100 + i }));
+    // the most notable first: the rank, then the biggest map, then the oldest
+    items.sort((p, q) => (q.rank - p.rank) || (q.size - p.size) || (p.order - q.order));
+    if (items.length <= cap) return items;
+    const shown = items.slice(0, cap - 1), rest = items.slice(cap - 1);
+    shown.push({ ico: '🚪', name: `+${rest.length}`, text: rest.slice(0, 10).map((s) => s.ico).join(' '), more: true, rank: 0 });
+    return shown;
+  },
+
   here(g) { return this.placeOf(g.area) || 'town'; },
   seenState(g) {
     if (!g.s.worldmap || typeof g.s.worldmap !== 'object') g.s.worldmap = { seen: { town: true } };
@@ -127,7 +277,7 @@ const WorldMapExt = {
     if (pc) for (const a of Object.keys(pc)) if (pc[a] && this.placeOf(a) === place) return true;
     return false;
   },
-  // Pizza Coins found / hidden per place (every coin's map mapped with the same table)
+  // Pizza Coins found / hidden per place (every coin's map mapped the same way)
   coins(g) {
     const out = {}, P = CFG.PIZZACOINS, got = (g.s.pizzacoins && g.s.pizzacoins.got) || {};
     if (!P || !P.SPOTS) return out;
@@ -222,65 +372,227 @@ const WorldMapExt = {
     this.raf = null; this.running = false;
   },
 
-  // ======================= layout =======================
+  // ======================= layout (generated from the links, once per canvas size) =======================
   fit() {
     const c = this.dom.canvas, W = Math.max(1, c.clientWidth), H = Math.max(1, c.clientHeight);
     const dpr = Math.min(2, window.devicePixelRatio || 1), bw = Math.round(W * dpr), bh = Math.round(H * dpr);
     if (c.width !== bw || c.height !== bh) { c.width = bw; c.height = bh; }
-    if (!this.lay || this.lay.W !== W || this.lay.H !== H) this.lay = this.layout(W, H);
+    if (!this.lay || this.lay.W !== W || this.lay.H !== H) this.lay = this.layout(W, H, this.dom.canvas.getContext('2d'));
     return dpr;
   },
-  layout(W, H) {
-    const C = CFG.WORLDMAP, wide = W / H >= 1.05, L = wide ? C.LAYOUTS.wide : C.LAYOUTS.tall;
+  // the hat's height over a bubble at its highest hop (it must stay on the canvas)
+  hatRoom(R) { const s = U.clamp(R * 0.44, 12, 24); return s * 0.55 + R * 0.28 + s * 1.2; },
+  layout(W, H, ctx) {
+    const wide = W / H >= 1.05;
     const R = Math.round(U.clamp(wide ? Math.min(W * 0.05, H * 0.085) : Math.min(W * 0.1, H * 0.052), 24, 58));
-    const fs = U.clamp(Math.round(R * 0.36), 12, 18);
-    const lay = { W, H, wide, L, R, fs, places: {}, routes: [], subs: [], obs: [] };
-    const ctx = this.dom.canvas.getContext('2d');
+    const fs = U.clamp(Math.round(R * 0.36), 12, 18), lh = fs + 10;
+    const lay = { W, H, wide, R, fs, places: {}, routes: [], subs: [], obs: [], decor: [] };
+    const keys = this.places(), links = this.links().filter((l) => keys.includes(l.from) && keys.includes(l.to));
     ctx.font = this.font(fs);
-    for (const k of Object.keys(C.PLACES)) {
-      const P = C.PLACES[k], [fx, fy] = L.pos[k], x = fx * W, y = fy * H;
+    // each place's footprint around its centre: the bubble, the name label below, the coin badge to the right
+    const N = {};
+    for (const k of keys) {
+      const P = this.place(k);
       const name = (P.short && ctx.measureText(P.name).width + 22 > R * 3.2) ? P.short : P.name;
-      const lw = ctx.measureText(name).width + 20, lh = fs + 10, ly = y + R + 4;
-      lay.places[k] = { key: k, x, y, name, label: { x0: x - lw / 2, y0: ly, x1: x + lw / 2, y1: ly + lh } };
+      const lw = ctx.measureText(name).width + 20, half = Math.max(R, lw / 2);
+      N[k] = { key: k, name, lw, scene: P.scene, x: 0, y: 0, l: half + 4, r: Math.max(half + 4, R * 1.14 + fs * 2.2 + 10), t: R + Math.max(8, this.hatRoom(R) * 0.7), b: R + 4 + lh + 4 };
     }
-    for (const r of C.ROUTES) {
-      const a = lay.places[r.a], b = lay.places[r.b], dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
-      const bend = L.bend[r.a + '-' + r.b] || 0;
-      const cx = (a.x + b.x) / 2 - dy / len * bend * len, cy = (a.y + b.y) / 2 + dx / len * bend * len;
-      const pts = [];
-      for (let i = 0; i <= 40; i++) { const u = i / 40, v = 1 - u; pts.push([v * v * a.x + 2 * v * u * cx + u * u * b.x, v * v * a.y + 2 * v * u * cy + u * u * b.y]); }
-      lay.routes.push({ r, a, b, cx, cy, pts });
+    const list = keys.map((k) => N[k]);
+    // the bands: hat room at the top, labels at the bottom, the sea along the bottom, the horizon
+    const top = R + this.hatRoom(R) + 4, bottom = H - 6 - (R + 4 + lh);
+    const sea = (n) => n.scene === 'sea' || n.scene === 'shore', high = (n) => ['sky', 'space', 'snow', 'hill'].includes(n.scene);
+    const hasSea = list.some(sea), seaTop = hasSea ? H - Math.max(H * 0.24, 2.1 * R + lh + 10) : null;
+    const horizon = (wide ? 0.34 : 0.3) * H, landFloor = hasSea ? seaTop + 6 : H;
+
+    // 1. the ideal spots: Home Town at (0, 0), each linked place one step away in its link's direction (breadth first)
+    const ideal = { town: [0, 0] }, queue = ['town'];
+    while (queue.length) {
+      const cur = queue.shift();
+      for (const l of links) {
+        const other = l.from === cur ? l.to : l.to === cur ? l.from : null;
+        if (!other || ideal[other]) continue;
+        const [dx, dy] = this.dirVec(l.dir), s = l.from === cur ? 1 : -1;
+        ideal[other] = [ideal[cur][0] + dx * s, ideal[cur][1] + dy * s];
+        queue.push(other);
+      }
     }
-    // what the little sub-place icons must keep clear of: bubbles, labels, coin badges, the hat, the paths, the decor
+    let far = Math.max(...Object.values(ideal).map((p) => p[0]));
+    for (const k of keys) if (!ideal[k]) ideal[k] = [++far, 0];   // not linked to anything: off to the side
+    // 2. stretched onto the canvas
+    const ix = keys.map((k) => ideal[k][0]), iy = keys.map((k) => ideal[k][1]);
+    const minX = Math.min(...ix), maxX = Math.max(...ix), minY = Math.min(...iy), maxY = Math.max(...iy);
+    const bx0 = W * 0.12, bx1 = W * 0.88, by0 = top, by1 = hasSea ? seaTop - R - lh - 8 : bottom;
+    for (const n of list) {
+      const [x, y] = ideal[n.key];
+      // Home Town in the middle: each side stretched to its own edge
+      n.ix = x < 0 ? W / 2 - x / minX * (W / 2 - bx0) : x > 0 ? W / 2 + x / maxX * (bx1 - W / 2) : W / 2;
+      n.iy = maxY > minY ? by0 + (y - minY) / (maxY - minY) * (by1 - by0) : (by0 + by1) / 2;
+      if (n.scene === 'space') n.iy = top;
+      if (n.scene === 'sea') n.iy = bottom;
+      if (n.scene === 'shore') n.iy = seaTop;
+      n.x = n.ix; n.y = n.iy;
+    }
+    // the rules every place keeps: on the canvas, in its band
+    const zone = (n) => {
+      if (n.scene === 'sea') n.y = Math.max(n.y, seaTop + R * 0.7);
+      else if (n.scene === 'shore') n.y = U.clamp(n.y, seaTop - R * 0.45, seaTop + R * 0.3);
+      else {
+        n.y = Math.min(n.y, landFloor - n.b + 4);
+        if (n.scene === 'space') n.y = Math.min(n.y, top + R * 0.4);
+        else if (high(n)) n.y = Math.min(n.y, horizon + R * (n.scene === 'hill' ? 0.6 : 0.3));
+        else n.y = Math.max(n.y, horizon + R * 0.4);
+      }
+      n.x = U.clamp(n.x, n.l + 4, W - n.r - 4); n.y = U.clamp(n.y, top, bottom);
+    };
+    const sideA = (wide ? 38 : 58) * Math.PI / 180, slopeA = 38 * Math.PI / 180,   // how far a ride may stray from its direction (a side-to-side ride on a phone needs more)
+      minLen = 2 * R + (wide ? 56 : 34), gap = wide ? 12 : 6;
+    const spaceW = (n) => Math.max(2.05 * R, n.lw / 2 + 14);
+    // 3. relax
+    // each ride keeps to a cone around its direction, and is long enough to see the vehicle on it
+    const cones = (k) => {
+      for (const l of links) {
+        const a = N[l.from], b = N[l.to], [dx, dy] = this.dirVec(l.dir), maxA = Math.abs(dy) < 0.3 ? sideA : slopeA;
+        const vx = b.x - a.x, vy = b.y - a.y, len = Math.hypot(vx, vy);
+        const ang = len > 0.01 ? Math.atan2(dx * vy - dy * vx, dx * vx + dy * vy) : 0;
+        if (Math.abs(ang) <= maxA && len >= minLen) continue;
+        const th = U.clamp(ang, -maxA, maxA), tx = dx * Math.cos(th) - dy * Math.sin(th), ty = dx * Math.sin(th) + dy * Math.cos(th);
+        const L = Math.max(len, minLen), ex = tx * L - vx, ey = ty * L - vy;
+        a.x -= ex * 0.5 * k; a.y -= ey * 0.5 * k; b.x += ex * 0.5 * k; b.y += ey * 0.5 * k;
+      }
+    };
+    // bubbles, labels and badges never overlap
+    const apart = (k) => {
+      for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+        const p = list[i], q = list[j];
+        const ox = Math.min(p.x + p.r, q.x + q.r) - Math.max(p.x - p.l, q.x - q.l) + gap;
+        const oy = Math.min(p.y + p.b, q.y + q.b) - Math.max(p.y - p.t, q.y - q.t) + gap;
+        if (ox <= 0 || oy <= 0) continue;
+        // apart along the line between them (measured in box sizes), always with a little up/down in it so that two
+        // places side by side against an edge can slide past each other
+        let ux = (q.x - p.x) / (p.l + p.r + q.l + q.r), uy = (q.y - p.y) / (p.t + p.b + q.t + q.b);
+        uy += (uy > 0 || (uy === 0 && i % 2 === 0) ? 1 : -1) * 0.12;
+        if (Math.abs(ux) < 1e-6 && Math.abs(uy) < 1e-6) ux = 1;
+        const ul = Math.hypot(ux, uy), m = Math.min(ox, oy) * 0.5 * k;
+        p.x -= ux / ul * m; p.y -= uy / ul * m; q.x += ux / ul * m; q.y += uy / ul * m;
+      }
+    };
+    // the paths keep clear of the other bubbles and labels
+    const paths = (k) => {
+      for (const l of links) {
+        const a = N[l.from], b = N[l.to], bl = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+        for (const n of list) {
+          if (n === a || n === b) continue;
+          for (const [py, need] of [[n.y, R + 18], [n.y + R + 4 + lh / 2, lh / 2 + 10]]) {
+            const c = this.nearestOnSeg(a.x, a.y, b.x, b.y, n.x, py), d = Math.hypot(n.x - c.x, py - c.y);
+            if (d >= need) continue;
+            const ux = d > 0.01 ? (n.x - c.x) / d : -(b.y - a.y) / bl, uy = d > 0.01 ? (py - c.y) / d : (b.x - a.x) / bl;
+            n.x += ux * (need - d) * 0.5 * k; n.y += uy * (need - d) * 0.5 * k;
+          }
+        }
+      }
+    };
+    // the starry patch around a space place keeps everyone else out
+    const space = (k) => {
+      for (const s of list) {
+        if (s.scene !== 'space') continue;
+        const w = spaceW(s), x0 = s.x - w, x1 = s.x + w, y1 = s.y + R + 4 + lh + 14;
+        for (const n of list) {
+          if (n === s) continue;
+          const ox = Math.min(n.x + n.r, x1) - Math.max(n.x - n.l, x0) + 8, oy = y1 - (n.y - n.t) + 8;
+          if (ox <= 0 || oy <= 0) continue;
+          if (ox < oy) { const sg = n.x < s.x ? -1 : 1; n.x += sg * ox * 0.6 * k; s.x -= sg * ox * 0.25 * k; } else n.y += oy * 0.6 * k;
+        }
+      }
+    };
+    for (let it = 0; it < 400; it++) {
+      const k = it < 300 ? 0.5 : 0.8;
+      if (it < 240) for (const n of list) { n.x += (n.ix - n.x) * 0.03; n.y += (n.iy - n.y) * 0.03; }
+      cones(k); paths(k); space(k); apart(k); apart(k);
+      for (const n of list) zone(n);
+    }
+    // and a last tidy-up where the overlaps, the directions, the bands and the edges count
+    for (let it = 0; it < 80; it++) { apart(0.9); apart(0.9); space(0.9); cones(0.9); for (const n of list) zone(n); }
+
+    // the places, with their name labels
+    for (const n of list) {
+      const ly = n.y + R + 4;
+      lay.places[n.key] = { key: n.key, x: n.x, y: n.y, name: n.name, scene: n.scene, label: { x0: n.x - n.lw / 2, y0: ly, x1: n.x + n.lw / 2, y1: ly + lh } };
+    }
+    const ps = Object.values(lay.places);
+    // the scenery, from the places
+    lay.scene = { horizon, seaTop, spaces: [], mountains: [], hills: [], skies: [] };
+    for (const p of ps) {
+      if (p.scene === 'space') { const w = spaceW(N[p.key]); lay.scene.spaces.push({ key: p.key, x0: p.x - w, y0: -0.05 * H, x1: p.x + w, y1: p.label.y1 + 14 }); }
+      if (p.scene === 'snow') {
+        const base = Math.max(horizon + 30, p.y + R * 1.2);
+        lay.scene.mountains.push([p.x - 2.6 * R, Math.max(6, p.y - 0.8 * R), 2.5 * R, base], [p.x + 2.5 * R, Math.max(6, p.y - 0.6 * R), 2.5 * R, base], [p.x, Math.max(4, p.y - 1.6 * R), 3.4 * R, base]);
+      }
+      if (p.scene === 'hill') lay.scene.hills.push([p.x, p.y + R * 0.55, R * 2.7, Math.max(horizon + 20, p.y + R * 1.5)]);
+      if (p.scene === 'sky') lay.scene.skies.push(p.key);
+    }
+    // the rides: a gentle curve, bent the way that keeps clearest of the other places
+    links.forEach((l, i) => {
+      const a = lay.places[l.from], b = lay.places[l.to], r = Object.assign({ a: l.from, b: l.to, via: l.via, dir: l.dir }, this.ride(l.via));
+      const twin = links.slice(0, i).filter((q) => (q.from === l.from && q.to === l.to) || (q.from === l.to && q.to === l.from)).length;
+      let best = null;
+      for (const bend of r.style === 'cable' ? [0] : [0.1, -0.1, 0.16, -0.16, 0.05, -0.05, 0]) {
+        const rt = this.curve(a, b, bend + twin * 0.12);
+        let cl = R;
+        for (const p of ps) {
+          if (p === a || p === b) continue;
+          for (const [x, y] of rt.pts) { cl = Math.min(cl, Math.hypot(p.x - x, p.y - y) - R - 6, this.clear({ rect: p.label }, x, y) - 6); }
+        }
+        const score = Math.min(cl, R * 0.8) - Math.abs(bend) * 30 + (bend ? 3 : 0);
+        if (!best || score > best.score) best = Object.assign(rt, { score });
+      }
+      lay.routes.push(Object.assign(best, { r, a, b }));
+    });
+    // what the little sub-place icons and the decorations must keep clear of
     const obs = lay.obs;
-    for (const p of Object.values(lay.places)) {
+    for (const p of ps) {
       obs.push({ x: p.x, y: p.y, r: R + 4 });
       obs.push({ rect: p.label });
       obs.push({ x: p.x, y: p.y - R - 16, r: 18 });                                  // the chef hat
-      obs.push({ rect: { x0: p.x + R * 0.42 - 2, y0: p.y + R * 0.26 - 2, x1: p.x + R * 1.14 + lay.fs * 2.2 + 10, y1: p.y + R * 0.98 + 2 } });   // the coin badge
+      obs.push({ rect: { x0: p.x + R * 0.42 - 2, y0: p.y + R * 0.26 - 2, x1: p.x + R * 1.14 + fs * 2.2 + 10, y1: p.y + R * 0.98 + 2 } });   // the coin badge
     }
     for (const rt of lay.routes) for (let i = 4; i <= 36; i += 2) obs.push({ x: rt.pts[i][0], y: rt.pts[i][1], r: 10 });
-    for (const d of L.decor) obs.push({ x: d[1] * W, y: d[2] * H, r: R * 0.55 * d[3] });
-    // place each sub-icon in the roomiest spot around its bubble (it is skipped if there is no room at all)
+    this.placeSubs(lay, ctx);
+    this.placeDecor(lay);
+    return lay;
+  },
+  nearestOnSeg(ax, ay, bx, by, x, y) {
+    const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy, u = l2 ? U.clamp(((x - ax) * dx + (y - ay) * dy) / l2, 0, 1) : 0;
+    return { x: ax + dx * u, y: ay + dy * u };
+  },
+  // a quadratic curve from a to b, bowed sideways by `bend` (a fraction of its length)
+  curve(a, b, bend) {
+    const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
+    const cx = (a.x + b.x) / 2 - dy / len * bend * len, cy = (a.y + b.y) / 2 + dx / len * bend * len, pts = [];
+    for (let i = 0; i <= 40; i++) { const u = i / 40, v = 1 - u; pts.push([v * v * a.x + 2 * v * u * cx + u * u * b.x, v * v * a.y + 2 * v * u * cy + u * u * b.y]); }
+    return { cx, cy, pts, bend };
+  },
+  // each sub-icon goes in the roomiest spot around its bubble (it is skipped if there is no room at all)
+  placeSubs(lay, ctx) {
+    const { W, H, R, obs } = lay, S = lay.scene;
     const rs = Math.round(U.clamp(R * 0.36, 11, 19)), sfs = U.clamp(Math.round(R * 0.22), 9, 12), labelled = R >= 40;
+    const cap = lay.wide ? CFG.WORLDMAP.SUBS.wide : CFG.WORLDMAP.SUBS.tall;
     ctx.font = this.font(sfs);
-    const sea = { x0: L.sea[0] * W, y0: L.sea[1] * H, x1: L.sea[2] * W }, space = { x0: L.space[0] * W, x1: L.space[2] * W, y1: L.space[3] * H };
-    for (const k of Object.keys(C.PLACES)) {
-      const p = lay.places[k];
-      C.PLACES[k].subs.forEach((s, i) => {
-        const tw = labelled ? ctx.measureText(s[1]).width + 8 : 0;
+    const others = Object.values(lay.places);
+    for (const k of Object.keys(lay.places)) {
+      const p = lay.places[k], own = S.spaces.find((q) => q.key === k);
+      this.subsOf(k, cap).forEach((s, i) => {
+        const tw = labelled ? ctx.measureText(s.name).width + 8 : 0;
         let best = null;
         for (let a = 0; a < 360; a += 10) {
           for (const d of labelled ? [R + rs + 8, R + rs * 2 + 16, R + rs * 3 + 26] : [R + rs + 6, R + rs + 14]) {
             const x = p.x + Math.cos(a * Math.PI / 180) * d, y = p.y + Math.sin(a * Math.PI / 180) * d;
             // it must sit clearly nearer its own place than any other
-            const own = Math.hypot(p.x - x, p.y - y), other = Math.min(...Object.values(lay.places).filter((q) => q !== p).map((q) => Math.hypot(q.x - x, q.y - y)));
-            if (other < own + R * 0.6) continue;
-            // land things stay on land (the islands' things in the sea), the moon's things in space and nobody else's
-            const inSea = x + rs > sea.x0 && x - rs < sea.x1 && y + rs + (labelled ? sfs : 0) > sea.y0 - 6;
-            const inSpace = x + rs > space.x0 - 4 && x - rs < space.x1 && y - rs < space.y1 + 4;
-            if (k !== 'islands' && inSea) continue;
-            if (k === 'moon' ? !(x - rs > space.x0 + 4 && x + rs < space.x1 - 4 && y + rs + (labelled ? sfs + 4 : 0) < space.y1 - 4) : inSpace) continue;
+            const mine = Math.hypot(p.x - x, p.y - y), other = Math.min(Infinity, ...others.filter((q) => q !== p).map((q) => Math.hypot(q.x - x, q.y - y)));
+            if (other < mine + R * 0.9) continue;
+            // land things stay on land (a sea place's things may float), a space place's things in its patch, nobody else's
+            const bot = y + rs + (labelled ? sfs + 4 : 0);
+            if (S.seaTop != null && p.scene !== 'sea' && bot > S.seaTop - 6) continue;
+            if (own ? !(x - rs > own.x0 + 4 && x + rs < own.x1 - 4 && bot < own.y1 - 4) : S.spaces.some((q) => x + rs > q.x0 - 4 && x - rs < q.x1 + 4 && y - rs < q.y1 + 4)) continue;
             const lab = labelled ? { x0: x - tw / 2, y0: y + rs + 1, x1: x + tw / 2, y1: y + rs + sfs + 4 } : null;
             let cl = Math.min(x - rs - 4, W - 4 - rs - x, y - rs - 4, H - 4 - (lab ? lab.y1 - y : rs) - y);
             if (lab) cl = Math.min(cl, lab.x0 - 4, W - 4 - lab.x1);
@@ -289,18 +601,45 @@ const WorldMapExt = {
               if (lab) cl = Math.min(cl, this.clearRect(o, lab));
               if (cl < 0) break;
             }
-            const score = Math.min(cl, 24) - (d - R - rs) * 0.6 + Math.min(other / own, 2.5) * 10;   // roomy, close, and away from the neighbours
+            const score = Math.min(cl, 24) - (d - R - rs) * 0.6 + Math.min(other / mine, 2.5) * 10;   // roomy, close, and away from the neighbours
             if (cl >= 2 && (!best || score > best.score)) best = { x, y, score, lab };
           }
         }
         if (!best) return;
-        const sub = { place: k, i, ico: s[0], name: s[1], text: s[2], x: best.x, y: best.y, r: rs, fs: sfs, lab: best.lab };
+        const sub = { place: k, i, ico: s.ico, name: s.name, text: s.text, more: !!s.more, x: best.x, y: best.y, r: rs, fs: sfs, lab: best.lab };
         lay.subs.push(sub);
         obs.push({ x: sub.x, y: sub.y, r: rs + 3 });
         if (sub.lab) obs.push({ rect: sub.lab });
       });
     }
-    return lay;
+  },
+  // a few friendly things in the empty room: a whale, a boat and a fish in the sea, trees and a flower on the land,
+  // a balloon in the sky
+  placeDecor(lay) {
+    const { W, H, R, obs } = lay, S = lay.scene, hz = S.horizon, sea = S.seaTop;
+    const inSpace = (x, y, r) => S.spaces.some((q) => x + r > q.x0 - 6 && x - r < q.x1 + 6 && y - r < q.y1 + 6);
+    const regions = {
+      sea: (x, y, r) => sea != null && y - r > sea + 14 && y + r < H - 4,
+      land: (x, y, r) => y - r > hz + 14 && y + r < (sea != null ? sea - 8 : H - 4),
+      sky: (x, y, r) => y + r < hz - 12 && y - r > 6 && !inSpace(x, y, r),
+    };
+    const want = [['🐳', 1.0, 'sea'], ['⛵', 0.8, 'sea'], ['🌳', 0.75, 'land'], ['🌳', 0.7, 'land'], ['🐟', 0.55, 'sea'], ['🌻', 0.55, 'land'], ['🎈', 0.7, 'sky']];
+    const step = Math.max(10, R * 0.4);
+    for (const [ch, k, where] of want) {
+      const r = R * 0.75 * k * 0.55;
+      let best = null;
+      for (let y = step / 2; y < H; y += step) for (let x = step / 2; x < W; x += step) {
+        if (x - r < 4 || x + r > W - 4 || !regions[where](x, y, r)) continue;
+        let cl = Infinity;
+        for (const o of obs) { cl = Math.min(cl, this.clear(o, x, y) - r); if (cl < 4) break; }
+        if (cl < 4) continue;
+        const score = Math.min(cl, R * 2.5) + ((x * 7 + y * 13) % 17) * 0.01;
+        if (!best || score > best.score) best = { x, y, score };
+      }
+      if (!best) continue;
+      lay.decor.push([ch, best.x, best.y, k]);
+      obs.push({ x: best.x, y: best.y, r: r + 6 });
+    }
   },
   // clearance from an obstacle to a point (minus the obstacle's own size)
   clear(o, x, y) {
@@ -341,10 +680,11 @@ const WorldMapExt = {
   },
   // the words in the speech bubble for the current selection
   bubbleLines(g, sel) {
-    const P = CFG.WORLDMAP.PLACES[sel.key];
+    const P = this.place(sel.key);
     if (sel.kind === 'sub') {
-      const s = P.subs[sel.i];
-      return [`${s[0]} ${s[2]}`, `in ${P.ico} ${P.name}`];
+      const s = this.lay && this.lay.subs.find((q) => q.place === sel.key && q.i === sel.i);
+      if (s && s.more) return [`🚪 ${s.name.slice(1)} more to find`, s.text, `in ${P.ico} ${P.name}`];
+      return s ? [`${s.ico} ${s.text}`, `in ${P.ico} ${P.name}`] : [`${P.ico} ${P.name}`];
     }
     const lines = [`${P.ico} ${P.name}`, P.how];
     if (this.here(g) === sel.key) lines.push('👨‍🍳 You are here!');
@@ -385,7 +725,7 @@ const WorldMapExt = {
     ctx.fill(); ctx.fillRect(x - s * 0.9, y - s * 0.05, s * 1.8, s * 0.6);
   },
   drawScenery(ctx, lay, t) {
-    const { W, H, L, R } = lay, hz = L.horizon * H;
+    const { W, H, R } = lay, S = lay.scene, hz = S.horizon;
     // sky
     const sky = ctx.createLinearGradient(0, 0, 0, hz + 40);
     sky.addColorStop(0, '#8fd3ff'); sky.addColorStop(1, '#d9f2ff');
@@ -395,9 +735,8 @@ const WorldMapExt = {
       const s = R * (0.35 + (i % 2) * 0.12), x = ((i * 0.29 + t * 0.008 * (1 + i * 0.3)) % 1.2 - 0.1) * W, y = hz * (0.25 + 0.17 * i);
       this.cloudPuff(ctx, x, y, s, 0.7);
     }
-    // mountains with snowy caps
-    for (const [fx, fy, fw] of L.mountains) {
-      const x = fx * W, base = hz + 30, top = fy * H, w = fw * W;
+    // snowy mountains behind the snowy places
+    for (const [x, top, w, base] of S.mountains) {
       ctx.fillStyle = '#8aa0c8'; ctx.beginPath(); ctx.moveTo(x - w, base); ctx.lineTo(x, top); ctx.lineTo(x + w, base); ctx.closePath(); ctx.fill();
       ctx.fillStyle = '#7189b6'; ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x + w, base); ctx.lineTo(x + w * 0.25, base); ctx.closePath(); ctx.fill();
       const k = 0.32; ctx.fillStyle = '#ffffff'; ctx.beginPath();
@@ -405,45 +744,53 @@ const WorldMapExt = {
       ctx.lineTo(x + w * k * 0.4, top + (base - top) * k * 0.8); ctx.lineTo(x, top + (base - top) * k * 1.05);
       ctx.lineTo(x - w * k * 0.4, top + (base - top) * k * 0.8); ctx.lineTo(x - w * k, top + (base - top) * k); ctx.closePath(); ctx.fill();
     }
-    // a green hill (the campus sits on it in the wide map)
-    if (L.hill) { const [fx, fy, fw] = L.hill; ctx.fillStyle = '#8fd46a'; ctx.beginPath(); ctx.ellipse(fx * W, hz + 20, fw * W, hz + 20 - fy * H, 0, Math.PI, 0); ctx.fill(); }
+    // a green hill under each hill place (rising from the horizon, or a mound on the land when it is lower down)
+    const hill = ([x, top, w, base]) => { ctx.fillStyle = '#8fd46a'; ctx.beginPath(); ctx.ellipse(x, base, w, Math.max(4, base - top), 0, Math.PI, 0); ctx.fill(); };
+    for (const h of S.hills) if (h[3] <= hz + 25) hill(h);
     // the land, with a soft wavy horizon
     ctx.fillStyle = '#a6e07a'; ctx.beginPath(); ctx.moveTo(0, H);
     for (let x = 0; x <= W + 20; x += 20) ctx.lineTo(x, hz + Math.sin(x / 70) * 6);
     ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,0.18)';
     for (let i = 0; i < 26; i++) { const x = ((i * 137) % 997) / 997 * W, y = hz + 20 + ((i * 71) % 487) / 487 * (H - hz - 20); ctx.beginPath(); ctx.ellipse(x, y, 10, 4, 0, 0, Math.PI * 2); ctx.fill(); }
-    // the sea, with a sandy beach and moving waves
-    const [sx0, sy0, sx1, sy1] = L.sea, X0 = sx0 * W, Y0 = sy0 * H, X1 = sx1 * W, Y1 = sy1 * H;
-    ctx.fillStyle = '#ffe6a8'; U.roundRect(ctx, X0 - 10, Y0 - 10, X1 - X0 + 20, Y1 - Y0 + 20, 60); ctx.fill();
-    const sea = ctx.createLinearGradient(0, Y0, 0, H); sea.addColorStop(0, '#5cc6f2'); sea.addColorStop(1, '#2f97d9');
-    ctx.fillStyle = sea; U.roundRect(ctx, X0, Y0, X1 - X0, Y1 - Y0, 54); ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 2; ctx.lineCap = 'round';
-    for (let i = 0; i < 12; i++) {
-      const x = X0 + 30 + (((i * 0.37 + t * 0.012) % 1) * (Math.min(X1, W) - X0 - 60)), y = Y0 + 22 + ((i * 53) % 97) / 97 * (Math.min(Y1, H) - Y0 - 34);
-      ctx.beginPath(); ctx.arc(x - 6, y, 6, Math.PI * 1.1, Math.PI * 1.9); ctx.arc(x + 6, y, 6, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+    for (const h of S.hills) if (h[3] > hz + 25) hill(h);
+    // the sea along the bottom (when there are seaside places), with a sandy beach and moving waves
+    if (S.seaTop != null) {
+      const X0 = -0.05 * W, Y0 = S.seaTop, X1 = 1.05 * W, Y1 = H * 1.1;
+      ctx.fillStyle = '#ffe6a8'; U.roundRect(ctx, X0 - 10, Y0 - 10, X1 - X0 + 20, Y1 - Y0 + 20, 60); ctx.fill();
+      const sea = ctx.createLinearGradient(0, Y0, 0, H); sea.addColorStop(0, '#5cc6f2'); sea.addColorStop(1, '#2f97d9');
+      ctx.fillStyle = sea; U.roundRect(ctx, X0, Y0, X1 - X0, Y1 - Y0, 54); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      for (let i = 0; i < 12; i++) {
+        const x = X0 + 30 + (((i * 0.37 + t * 0.012) % 1) * (Math.min(X1, W) - X0 - 60)), y = Y0 + 22 + ((i * 53) % 97) / 97 * (Math.min(Y1, H) - Y0 - 34);
+        ctx.beginPath(); ctx.arc(x - 6, y, 6, Math.PI * 1.1, Math.PI * 1.9); ctx.arc(x + 6, y, 6, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+      }
     }
-    // the space corner, with twinkling stars and a ringed planet
-    const [px0, py0, px1, py1] = L.space, Q = { x0: px0 * W, y0: py0 * H, x1: px1 * W, y1: py1 * H };
-    const sp = ctx.createRadialGradient(lay.places.moon.x, lay.places.moon.y, 10, lay.places.moon.x, lay.places.moon.y, Math.max(Q.x1 - Q.x0, Q.y1 - Q.y0));
-    sp.addColorStop(0, '#3a2f7a'); sp.addColorStop(1, '#151a3d');
-    ctx.fillStyle = sp; U.roundRect(ctx, Q.x0, Q.y0, Q.x1 - Q.x0, Q.y1 - Q.y0, 40); ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 3; ctx.setLineDash([2, 8]); U.roundRect(ctx, Q.x0, Q.y0, Q.x1 - Q.x0, Q.y1 - Q.y0, 40); ctx.stroke(); ctx.setLineDash([]);
-    ctx.save(); U.roundRect(ctx, Q.x0, Q.y0, Q.x1 - Q.x0, Q.y1 - Q.y0, 40); ctx.clip();
-    for (let i = 0; i < 18; i++) {
-      const x = Q.x0 + 8 + ((i * 89) % 101) / 101 * (Q.x1 - Q.x0 - 16), y = Q.y0 + 8 + ((i * 47) % 103) / 103 * (Q.y1 - Q.y0 - 16);
-      const a = 0.45 + 0.55 * Math.abs(Math.sin(t * (1.2 + (i % 5) * 0.35) + i));
-      this.star(ctx, x, y, 2 + (i % 3) * 1.3 * a, `rgba(255,${240 - (i % 3) * 20},${200 + (i % 2) * 55},${a.toFixed(3)})`);
+    // a starry patch around each space place, with twinkling stars
+    for (const Q of S.spaces) {
+      const p = lay.places[Q.key], rr = 40;
+      const sp = ctx.createRadialGradient(p.x, p.y, 10, p.x, p.y, Math.max(Q.x1 - Q.x0, Q.y1 - Q.y0));
+      sp.addColorStop(0, '#3a2f7a'); sp.addColorStop(1, '#151a3d');
+      ctx.fillStyle = sp; U.roundRect(ctx, Q.x0, Q.y0, Q.x1 - Q.x0, Q.y1 - Q.y0, rr); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 3; ctx.setLineDash([2, 8]); U.roundRect(ctx, Q.x0, Q.y0, Q.x1 - Q.x0, Q.y1 - Q.y0, rr); ctx.stroke(); ctx.setLineDash([]);
+      ctx.save(); U.roundRect(ctx, Q.x0, Q.y0, Q.x1 - Q.x0, Q.y1 - Q.y0, rr); ctx.clip();
+      for (let i = 0; i < 18; i++) {
+        const x = Q.x0 + 8 + ((i * 89) % 101) / 101 * (Q.x1 - Q.x0 - 16), y = Q.y0 + 8 + ((i * 47) % 103) / 103 * (Q.y1 - Q.y0 - 16);
+        const a = 0.45 + 0.55 * Math.abs(Math.sin(t * (1.2 + (i % 5) * 0.35) + i));
+        this.star(ctx, x, y, 2 + (i % 3) * 1.3 * a, `rgba(255,${240 - (i % 3) * 20},${200 + (i % 2) * 55},${a.toFixed(3)})`);
+      }
+      ctx.restore();
     }
-    ctx.restore();
     // a few friendly things to look at (gently bobbing)
-    for (const [ch, fx, fy, k] of L.decor) {
-      const bob = Math.sin(t * 1.6 + fx * 10) * 3;
-      this.emoji(ctx, ch, fx * W, fy * H + bob, R * 0.75 * k);
+    for (const [ch, x, y, k] of lay.decor) {
+      const bob = Math.sin(t * 1.6 + x * 0.01) * 3;
+      this.emoji(ctx, ch, x, y + bob, R * 0.75 * k);
     }
-    // Cloud Harbor floats on a bed of clouds
-    const cp = lay.places.cloud;
-    this.cloudPuff(ctx, cp.x - R * 0.95, cp.y + R * 0.55, R * 0.42, 0.9); this.cloudPuff(ctx, cp.x + R * 0.95, cp.y + R * 0.5, R * 0.46, 0.9);
+    // the sky places float on a bed of clouds
+    for (const key of S.skies) {
+      const cp = lay.places[key];
+      this.cloudPuff(ctx, cp.x - R * 0.95, cp.y + R * 0.55, R * 0.42, 0.9); this.cloudPuff(ctx, cp.x + R * 0.95, cp.y + R * 0.5, R * 0.46, 0.9);
+    }
   },
 
   drawRoute(ctx, lay, rt) {
@@ -469,8 +816,8 @@ const WorldMapExt = {
       ctx.fillStyle = '#8d5a2b';
       for (const u of [0.33, 0.66]) { const [x, y] = pts[Math.round(u * 40)]; ctx.fillRect(x - 2.5, y - 2, 5, 22); }
     } else {
-      const col = { tunnel: '#7a52c7', water: '#ffffff', space: '#ffd84a', air: '#ffffff' }[s] || '#fff';
-      ctx.strokeStyle = s === 'air' ? 'rgba(80,140,200,0.35)' : s === 'tunnel' ? 'rgba(122,82,199,0.25)' : 'rgba(0,0,0,0.12)';
+      const col = rt.r.col || { tunnel: '#7a52c7', water: '#ffffff', space: '#ffd84a', air: '#ffffff' }[s] || '#fff';
+      ctx.strokeStyle = s === 'air' ? 'rgba(80,140,200,0.35)' : s === 'tunnel' ? col + '44' : 'rgba(0,0,0,0.12)';
       ctx.lineWidth = s === 'tunnel' ? 12 : 8; line(); ctx.stroke();
       ctx.strokeStyle = col; ctx.lineWidth = 4; ctx.setLineDash([1, 11]); line(); ctx.stroke(); ctx.setLineDash([]);
     }
@@ -510,7 +857,7 @@ const WorldMapExt = {
     }
   },
   drawPlace(ctx, lay, p, t, here, seen, coins) {
-    const P = CFG.WORLDMAP.PLACES[p.key], R = lay.R;
+    const P = this.place(p.key), R = lay.R;
     const sel = this.sel && this.sel.kind === 'place' && this.sel.key === p.key;
     const sc = sel ? 1 + 0.18 * Math.exp(-this.sel.t * 4) * Math.abs(Math.sin(this.sel.t * 12)) : 1;
     const bob = Math.sin(t * 1.3 + p.x * 0.01) * 1.5;

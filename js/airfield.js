@@ -12,6 +12,12 @@
 // window), a blimp and parachute jumpers. The plane you came in waits on the cloud runway and flies you home
 // again, landing and rolling back to its own stand. The jet is big: it turns slowly and its wings never
 // pass through buildings.
+// Two ground vehicles park in bays on the apron, and both are drivable like any car: the BAG TRAIN (a yellow baggage tug
+// pulling two luggage carts that follow it round corners: drive it to the jet and press '🧳 Load the bags', the suitcases
+// hop into the hold; refill at the yellow box by the arrivals hall, '🧳 Get more bags') and the FUEL TRUCK (drive up to
+// any plane or the helicopter and press '⛽ Fuel up': a hose, "Glug glug!", a gauge filling up, "Full tank!"). The
+// hangar's tug and the fuel farm's truck indoors drive you out to them (js/airfield-inside.js). A plane about to roll down
+// the runway or a taxi route sends any of them left parked in its way back to their bays; Take-me-home parks them too.
 
 // ---------- config ----------
 CFG.AIRFIELD = {
@@ -33,8 +39,15 @@ CFG.AIRFIELD = {
   CARPARK: { x0: 1600, y0: 700, x1: 1720, y1: 860 },
   TOWER: { x: 1640, y: 400 },
   WINDSOCK: { x: 1700, y: 250 },
-  FUEL: { x: 2230, y: 380 },
-  CART: { x: 2420, y: 380 },
+  FUEL: { x: 2230, y: 380 },                             // the fuel pump (a pump, not a vehicle: the fuel truck parks beside it)
+  // the ground vehicles on the apron, all drivable (CFG.VEHICLES.bagtug / fuelbowser): where each one parks, nose first.
+  // The baggage tug pulls a little train of two luggage carts; the fuel truck fuels up any plane ('⛽ Fuel up').
+  GSE: { tug: { x: 2352, y: 446, angle: Math.PI }, fuel: { x: 2238, y: 446, angle: 0 } },
+  CARS: [{ x: 1660, y: 772, angle: 0, color: '#41b883' }, { x: 1660, y: 832, angle: 0, color: '#8e5bd1' }],   // the visitors' cars in the car park (drivable)
+  CART_BAGS: 4,                                         // suitcases a full train carries (two per cart)
+  BAG_PICKUP: { x: 1734, y: 604 },                      // airside of the arrivals hall: the bag train fills up here
+  GSE_NEAR: { load: 80, pickup: 60, fuel: 95 },         // how close: the tug to the jet's body / the pickup spot, the fuel truck to a plane's filler
+  FUEL_TIME: 2.6, LOAD_STEP: 0.32,                      // seconds the fuel glugs in; between two bags hopping across
   HELI: { x: 2080, y: 510 },                              // the helipad on the hangar apron
   PARKED: [{ x: 2270, y: 792, color: '#3b7dd8' }, { x: 2390, y: 792, color: '#e4572e' }],   // visitors' little planes on stands 2 and 3, nose south (rideable)
   JET: { x: 2300, y: 568 },                              // the passenger jet at GATE 1, nose west to the taxiway (rideable)
@@ -45,10 +58,11 @@ CFG.AIRFIELD = {
   RADAR: { x: 2400, y: 1000 },
   HEDGE: { x0: 1560, y0: 106, x1: 2440, y1: 118 },
   BENCH: { x: 2200, y: 920 },
-  SIGNS: [[2250, 926, '🔭 PLANE SPOTTING'], [1566, 530, '✈️ AIRFIELD'], [1660, 880, '🅿️ CAR PARK'], [2300, 398, '🔧 WORKSHOP'], [2430, 300, '⛽ FUEL FARM']],   // all walk-through (the workshop's stands clear of its door)
+  SIGNS: [[2250, 926, '🔭 PLANE SPOTTING'], [1566, 530, '✈️ AIRFIELD'], [1660, 912, '🅿️ CAR PARK'], [2300, 398, '🔧 WORKSHOP'], [2430, 300, '⛽ FUEL FARM']],   // all walk-through (the workshop's stands clear of its door)
   // where you stand to go inside the buildings (the interiors live in js/airfield-inside.js): the terminal's south door
-  // (clear of the arrivals corridor), the small door between the hangar's two bays, the tower's door, the workshop's sliding door
-  DOORS: { terminal: { x: 1650, y: 686 }, hangar: { x: 2010, y: 436 }, tower: { x: 1640, y: 428 }, workshop: { x: 2300, y: 336 } },
+  // (clear of the arrivals corridor), the small door between the hangar's two bays, the tower's door, the workshop's sliding door,
+  // the fuel farm's pump-house door (its west side, in the gap by the workshop) and the gate pier's lounge door (its south side)
+  DOORS: { terminal: { x: 1650, y: 686 }, hangar: { x: 2010, y: 436 }, tower: { x: 1640, y: 428 }, workshop: { x: 2300, y: 336 }, fuel: { x: 2382, y: 212 }, gate: { x: 2432, y: 626 } },
   CONES: [[1750, 132], [1892, 132], [1750, 1268], [1892, 1268], [1895, 418], [1895, 572], [2210, 850], [2320, 850], [2440, 850], [2205, 320]],
   RUNUP: 1.2,                                           // seconds the plane races down the runway before it lifts off
   FLIGHT: 8,                                            // seconds the flight takes
@@ -74,6 +88,7 @@ CFG.CLOUD = {
   LANDING: [{ x: 7330, y: 690 }, { x: 7780, y: 690 }],
   WINDSOCK: { x: 7290, y: 600 },
   TERMINAL: { x0: 7300, y0: -90, x1: 7560, y1: 40 },
+  DOORS: { terminal: { x: 7430, y: 56 } },     // where you stand to go inside the Sky Terminal (the interior lives in js/cloud-inside.js)
   BOARD: { x: 7430, y: 120 },
   CAFE: { x0: 7580, y0: 140, x1: 7700, y1: 240 },
   TABLES: [[7560, 310], [7700, 310]],
@@ -111,10 +126,14 @@ CFG.VEHICLES.plane = { speed: 300, radius: 20, label: '✈️ Taxi', exit: '🚶
 CFG.VEHICLES.jet = { speed: 240, radius: 30, label: '✈️ Taxi', exit: '🚶 Hop out' };   // slower on the ground; its wings are checked separately (jetHits)
 CFG.VEHICLES.heli = { speed: 380, radius: 20, label: '🚁 Fly', exit: '🛬 Land', flies: true };   // flies over everything in town
 CFG.VEHICLES.balloonride = { speed: 140, radius: 20, label: '🎈 Ride', exit: '🚶 Hop out' };
+CFG.VEHICLES.bagtug = { speed: 230, radius: 18, label: '🧳 Drive the bag train', exit: '🚶 Hop out' };   // the baggage tug and its two luggage carts
+CFG.VEHICLES.visitorcar = { speed: 330, radius: 22, label: '🚗 Drive', exit: '🚶 Get out' };                   // the two cars in the airfield's car park
+CFG.VEHICLES.fuelbowser = { speed: 220, radius: 22, label: '⛽ Drive the fuel truck', exit: '🚶 Hop out' };    // the airfield's fuel truck
 CFG.COINS.push(...CFG.AIRFIELD.coins, ...CFG.CLOUD.coins);
 
 const AirfieldExt = {
   name: 'airfield',
+  defaults: { afGse: { tugRides: 0, fuelRides: 0, carRides: 0, loads: 0, pickups: 0, fuelups: 0 } },
   rt: null,   // runtime (not saved): the planes, the balloon, the scripted take-off / landing / rides, sky props
 
   // ---------- small helpers ----------
@@ -172,10 +191,154 @@ const AirfieldExt = {
   // ======================= game hooks =======================
   home(g) { const rt = this.rt; if (rt) { rt.ride = null; const H = CFG.AIRFIELD.HELI; rt.heli.x = H.x; rt.heli.y = H.y; rt.heli.angle = Math.PI; rt.heli.vx = 0; rt.heli.vy = 0; rt.heli.lift = 0;   // the helicopter goes back to its pad too, so it can never be stranded
  if (rt.runup) { rt.runup.plane.free = false; rt.runup.plane.lift = 0; } rt.runup = null; rt.roll = null; rt.cafe.seat = null; rt.cafe.view = 0; rt.cafe.fade = 0;
- this.parkAway(); } },
+ this.parkAway(); this.homeGse(); } },
   // a plane that flew off to Cloud Harbor is back on its own stand once the chef is home some other way (Take me home)
   parkAway() { for (const v of this.rt.planes) if (v.away) { v.away = false; this.park(v, v.home); } },
   park(v, at) { v.x = at.x; v.y = at.y; v.angle = at.angle; v.vx = 0; v.vy = 0; v.lift = 0; v.free = false; v.px = undefined; },
+
+  // ---------- the ground vehicles: the bag train and the fuel truck (both drivable, parked in their bays) ----------
+  gseList() { const G = this.rt && this.rt.gse; return G ? [G.tug, G.fuel, ...G.cars] : []; },
+  mkGse() {
+    const A = CFG.AIRFIELD.GSE;
+    const tug = { kind: 'bagtug', key: 'tug', x: 0, y: 0, angle: 0, vx: 0, vy: 0, home: A.tug, carts: [{ x: 0, y: 0, a: 0 }, { x: 0, y: 0, a: 0 }], bags: CFG.AIRFIELD.CART_BAGS };
+    const fuel = { kind: 'fuelbowser', key: 'fuel', x: 0, y: 0, angle: 0, vx: 0, vy: 0, home: A.fuel };
+    const cars = CFG.AIRFIELD.CARS.map((H, i) => ({ kind: 'visitorcar', key: 'car' + i, x: 0, y: 0, angle: 0, vx: 0, vy: 0, home: H, color: H.color }));
+    for (const v of [tug, fuel, ...cars]) this.parkGse(v);
+    return { tug, fuel, cars };
+  },
+  TUG_HITCH: 18, CART_TONGUE: 22, CART_HITCH: 17,   // tug centre → its hitch, a cart's tongue tip → its centre, its centre → its own hitch
+  // back in its own bay, nose first, the carts lined up straight behind the tug
+  parkGse(v) {
+    const H = v.home; v.x = H.x; v.y = H.y; v.angle = H.angle; v.vx = 0; v.vy = 0;
+    if (v.carts) { let d = this.TUG_HITCH; for (const c of v.carts) { d += this.CART_TONGUE; c.x = H.x - Math.cos(H.angle) * d; c.y = H.y - Math.sin(H.angle) * d; c.a = H.angle; d += this.CART_HITCH; } }
+  },
+  // the carts follow the tug like a little train: each is pulled by its tongue from the hitch of the one in front
+  pullCarts(v) {
+    let hx = v.x - Math.cos(v.angle) * this.TUG_HITCH, hy = v.y - Math.sin(v.angle) * this.TUG_HITCH;
+    for (const c of v.carts) {
+      const dx = c.x - hx, dy = c.y - hy, d = Math.hypot(dx, dy) || 1;
+      c.x = hx + dx / d * this.CART_TONGUE; c.y = hy + dy / d * this.CART_TONGUE; c.a = Math.atan2(hy - c.y, hx - c.x);
+      hx = c.x - Math.cos(c.a) * this.CART_HITCH; hy = c.y - Math.sin(c.a) * this.CART_HITCH;
+    }
+  },
+  homeGse() {
+    const rt = this.rt; if (!rt || !rt.gse) return;
+    rt.load = null; rt.fuelup = null; rt.flyBags = []; rt.gseWas = null;
+    for (const v of this.gseList()) this.parkGse(v);
+    rt.gse.tug.bags = CFG.AIRFIELD.CART_BAGS;
+  },
+  // a plane is about to roll along the runway or a taxi route: any ground vehicle left parked on the way goes home to its bay
+  clearForPlanes(g) {
+    const A = CFG.AIRFIELD, rt = this.rt, R = A.RUNWAY;
+    const segD = (px, py, a, b) => { const dx = b.x - a.x, dy = b.y - a.y, L = dx * dx + dy * dy, k = L ? U.clamp(((px - a.x) * dx + (py - a.y) * dy) / L, 0, 1) : 0; return Math.hypot(px - a.x - dx * k, py - a.y - dy * k); };
+    const paths = rt.planes.flatMap((v) => [v.out, v.land].filter(Boolean));
+    const homes = rt.planes.map((v) => v.home).concat([A.HELI]);
+    for (const v of this.gseList()) {
+      if (g.driving && g.vehicle === v) continue;
+      const pts = [v].concat(v.carts || []);
+      const inWay = pts.some((q) => (q.x > R.x0 - 40 && q.x < R.x1 + 40 && q.y > R.y0 - 60 && q.y < R.y1 + 60)
+        || homes.some((h) => U.dist(q.x, q.y, h.x, h.y) < 90)
+        || paths.some((P) => P.some((a, i) => i > 0 && segD(q.x, q.y, P[i - 1], a) < 56)));
+      if (inWay) this.parkGse(v);
+    }
+  },
+  // driving out of the hangar / the fuel farm's pump room: the chef is at the wheel of that vehicle in its bay outside
+  driveOut(g, which) {
+    const rt = this.rt; if (!rt) return;
+    const v = rt.gse[which], p = g.player;
+    this.parkGse(v);
+    g.area = 'town'; g.driving = true; g.vehicle = v; v.vx = 0; v.vy = 0;
+    p.x = v.x; p.y = v.y; p.moving = false; p.hasMoved = true; g.cameraSnap = true;
+  },
+  inGse(g, which) { const G = this.rt && this.rt.gse; return !!G && g.driving && g.vehicle === G[which]; },
+  // the jet near enough to the bag train to load its bags (on the ground, not off flying)
+  jetForBags(g) {
+    const rt = this.rt, v = rt.gse.tug, j = rt.jet;
+    if (j.away || j.lift > 0 || (g.driving && g.vehicle === j)) return null;
+    // how far the tug is from the jet's long body (its nose-to-tail line), not just from its middle
+    const c = Math.cos(j.angle), s = Math.sin(j.angle), along = U.clamp((v.x - j.x) * c + (v.y - j.y) * s, -92, 92);
+    return U.dist(v.x, v.y, j.x + along * c, j.y + along * s) < CFG.AIRFIELD.GSE_NEAR.load ? j : null;
+  },
+  atBagPickup(g) { const v = this.rt.gse.tug, P = CFG.AIRFIELD.BAG_PICKUP; return U.dist(v.x, v.y, P.x, P.y) < CFG.AIRFIELD.GSE_NEAR.pickup; },
+  // the plane (or the helicopter) the fuel truck is parked next to, or null
+  planeToFuel(g) {
+    const rt = this.rt, t = rt.gse.fuel; let best = null, bd = Infinity;
+    for (const v of rt.planes.concat([rt.heli])) {
+      if (v.away || v.lift > 0) continue;
+      const fp = this.fuelPoint(v), d = U.dist(t.x, t.y, fp.x, fp.y); if (d < CFG.AIRFIELD.GSE_NEAR.fuel && d < bd) { bd = d; best = v; }
+    }
+    return best;
+  },
+  // where the hose clips on: a wing's filler cap (the helicopter's is on its side)
+  fuelPoint(v) {
+    const [lx, ly] = v.kind === 'jet' ? [-24, 44] : v.kind === 'heli' ? [-4, 13] : [5, 30], c = Math.cos(v.angle), s = Math.sin(v.angle);
+    return { x: v.x + lx * c - ly * s, y: v.y + lx * s + ly * c };
+  },
+  cartPoint(v, i) { const c = v.carts[Math.min(v.carts.length - 1, Math.floor(i / 2))]; return { x: c.x + Math.cos(c.a) * (i % 2 ? -7 : 7), y: c.y + Math.sin(c.a) * (i % 2 ? -7 : 7) }; },
+  loadBags(g, jet) {
+    const rt = this.rt, v = rt.gse.tug;
+    rt.load = { kind: 'load', t: 0, n: v.bags, done: 0, x: v.x, y: v.y, a: v.angle };
+    g.floats.push({ x: jet.x, y: jet.y - 70, text: 'Bags for the big jet! 🧳', color: '#ffe08a', t: 0, dur: 1.4, big: true });
+    Haptics.tap();
+  },
+  getBags(g) {
+    const rt = this.rt, v = rt.gse.tug;
+    rt.load = { kind: 'get', t: 0, n: CFG.AIRFIELD.CART_BAGS - v.bags, done: 0, x: v.x, y: v.y, a: v.angle };
+    Haptics.tap();
+  },
+  fuelUp(g, plane) {
+    const rt = this.rt, v = rt.gse.fuel, fp = this.fuelPoint(plane);
+    rt.fuelup = { plane, t: 0, x: v.x, y: v.y, a: v.angle };
+    g.floats.push({ x: fp.x, y: fp.y - 60, text: 'Glug glug! ⛽', color: '#ffe08a', t: 0, dur: 1.6, big: true });
+    Sfx.tone(140, 0.18, 'sine', 0.05, -40); setTimeout(() => Sfx.tone(110, 0.2, 'sine', 0.05, -30), 260);
+    Haptics.tap();
+  },
+  updateGse(g, dt) {
+    const rt = this.rt, G = rt.gse, A = CFG.AIRFIELD, p = g.player, s = g.s.afGse || (g.s.afGse = JSON.parse(JSON.stringify(this.defaults.afGse)));
+    const drv = g.driving && this.gseList().includes(g.vehicle) ? g.vehicle : null;
+    // the train and the hose sit still while the bags hop across / the fuel glugs in (the core already moved the vehicle this step)
+    const hold = (v, q) => { v.x = q.x; v.y = q.y; v.angle = q.a; v.vx = 0; v.vy = 0; if (g.vehicle === v) { p.x = v.x; p.y = v.y; p.moving = false; } };
+    if (rt.load && drv === G.tug) hold(G.tug, rt.load); else if (rt.load) rt.load = null;
+    if (rt.fuelup && drv === G.fuel) hold(G.fuel, rt.fuelup); else if (rt.fuelup) rt.fuelup = null;
+    this.pullCarts(G.tug);
+    // hopping in: a beep beep (or a vroom) the first moment of every ride
+    if (drv && drv !== rt.gseWas) {
+      if (drv === G.tug) s.tugRides++; else if (drv === G.fuel) s.fuelRides++; else s.carRides = (s.carRides || 0) + 1;
+      g.floats.push({ x: drv.x, y: drv.y - 60, text: drv === G.tug ? 'Beep beep! 🧳' : drv === G.fuel ? 'Vroom! ⛽' : 'Vroom vroom! 🚗', color: '#ffe08a', t: 0, dur: 1.3, big: true });
+      Sfx.tone(392, 0.12, 'square', 0.03); setTimeout(() => Sfx.tone(392, 0.16, 'square', 0.03), 180);
+    }
+    rt.gseWas = drv;
+    // bags hopping one by one: from the carts into the jet's hold, or from the terminal's door onto the carts
+    const L = rt.load;
+    if (L) {
+      L.t += dt;
+      while (L.done < L.n && L.t >= L.done * A.LOAD_STEP) {
+        const v = G.tug, jet = rt.jet, cols = ['#e4572e', '#3b7dd8', '#41b883', '#8e5bd1'];
+        if (L.kind === 'load') { const i = v.bags - 1, from = this.cartPoint(v, i); v.bags--; rt.flyBags.push({ x0: from.x, y0: from.y, x1: jet.x - Math.cos(jet.angle) * 30, y1: jet.y - Math.sin(jet.angle) * 30, t: 0, dur: 0.5, col: cols[i % 4] }); }
+        else { const i = v.bags, to = this.cartPoint(v, i), P = A.BAG_PICKUP; v.bags++; rt.flyBags.push({ x0: P.x - 34, y0: P.y - 6, x1: to.x, y1: to.y, t: 0, dur: 0.45, col: cols[i % 4] }); }
+        L.done++; Sfx.tone(L.kind === 'load' ? 330 + L.done * 40 : 520 - L.done * 40, 0.08, 'triangle', 0.035);
+      }
+      if (L.done >= L.n && L.t >= L.n * A.LOAD_STEP + 0.4) {
+        rt.load = null;
+        if (L.kind === 'load') { s.loads++; g.floats.push({ x: rt.jet.x, y: rt.jet.y - 80, text: 'All aboard! 🧳✈️', color: '#ffe08a', t: 0, dur: 1.6, big: true }); }
+        else { s.pickups++; g.floats.push({ x: G.tug.x, y: G.tug.y - 64, text: 'More bags! 🧳', color: '#ffe08a', t: 0, dur: 1.4, big: true }); }
+        Sfx.ding(); Haptics.success();
+      }
+    }
+    for (const b of rt.flyBags) b.t += dt;
+    rt.flyBags = rt.flyBags.filter((b) => b.t < b.dur);
+    // the fuel glugs along the hose into the plane's wing
+    const F = rt.fuelup;
+    if (F) {
+      F.t += dt;
+      if (F.t >= A.FUEL_TIME) {
+        rt.fuelup = null; s.fuelups++;
+        const fp = this.fuelPoint(F.plane);
+        g.floats.push({ x: fp.x, y: fp.y - 64, text: 'Full tank! ✈️', color: '#ffe08a', t: 0, dur: 1.5, big: true });
+        Sfx.ding(); Haptics.success();
+      }
+    }
+  },
   build(g) {
     const A = CFG.AIRFIELD, C = CFG.CLOUD, J = A.JET, L = A.LANE_Y, RX = (A.RUNWAY.x0 + A.RUNWAY.x1) / 2, TX = A.JET_TURN_X, TD = A.LANDING[0].y;
     // every plane on the airfield is rideable. Each knows its own stand (`home`), the taxi route from the stand out to the
@@ -202,7 +365,12 @@ const AirfieldExt = {
       jumpers: [], jumpT: 3, blimpX: C.WORLD.x0 + 300,
       townObs: null, townCarObs: null, cloudObs: null, void: null, land: null,
       cafe: { seat: null, view: 0, fade: 0, cocoa: 0, cocoaHand: 0, obs: null },   // the Sky Café: a chair you sit on, the big window view, a cocoa to carry
+      // the ground vehicles (the bag train, the fuel truck), which one the chef was driving last step, bags hopping
+      // between the train and the jet / the terminal { kind, t, n, done }, the fuel hose on a plane { plane, truck, t, x, y }
+      gse: null, gseWas: null, load: null, fuelup: null, flyBags: [],
     };
+    if (!g.s.afGse) g.s.afGse = JSON.parse(JSON.stringify(this.defaults.afGse));
+    this.rt.gse = this.mkGse();
     this.buildObstacles();
   },
 
@@ -223,7 +391,6 @@ const AirfieldExt = {
     foot.push({ x: T.x0, y: T.y0, w: T.x1 - T.x0, h: T.door.y - T.doorHalf - T.y0 }, { x: T.x0, y: T.door.y + T.doorHalf, w: T.x1 - T.x0, h: T.y1 - (T.door.y + T.doorHalf) });
     // the small solid props (signs, benches, cones and cars are walk-through; the planes are vehicles, nothing solid on the stands)
     solid(A.FUEL.x - 12, A.FUEL.y - 14, A.FUEL.x + 12, A.FUEL.y + 10);
-    solid(A.CART.x - 22, A.CART.y - 12, A.CART.x + 22, A.CART.y + 10);
     solid(A.RADAR.x - 18, A.RADAR.y - 14, A.RADAR.x + 18, A.RADAR.y + 12);
     rt.townObs = foot; rt.townCarObs = car;
 
@@ -267,13 +434,14 @@ const AirfieldExt = {
     if (forCar && g.driving && g.vehicle === rt.balloon) return [];   // the balloon floats over everything
     return rt.cloudObs;
   },
-  vehicles(g) { const rt = this.rt; return rt ? rt.planes.filter((v) => !v.away).concat([rt.cloudPlane, rt.balloon, rt.heli]) : []; },
+  vehicles(g) { const rt = this.rt; return rt ? rt.planes.filter((v) => !v.away).concat([rt.cloudPlane, rt.balloon, rt.heli], this.gseList()) : []; },
   flyingHeli(g) { return !!this.rt && g.driving && g.vehicle === this.rt.heli; },
 
   action(g) {
     const rt = this.rt;
     if (!rt || rt.runup || rt.roll || g.travel) return null;
     if (this.readyToFly(g)) return { label: g.area === 'town' ? '🛫 Take off!' : '🛫 Fly home!', run: (gg) => this.takeOff(gg) };
+    const ga = this.gseAction(g); if (ga) return ga;
     if (g.driving || g.onTrain || g.ride || rt.ride) return null;
     const p = g.player, K = CFG.SKYCAFE;
     if (g.area === 'cloud' && U.dist(p.x, p.y, K.DOOR_OUT.x, K.DOOR_OUT.y) < 30) return { label: '☕ Go inside', run: (gg) => this.enterCafe(gg) };
@@ -281,6 +449,19 @@ const AirfieldExt = {
     if (rt.cafe.seat) return { label: '🚶 Stand up', run: (gg) => this.standUp(gg) };
     if (U.dist(p.x, p.y, K.EXIT.x, K.EXIT.y) < 30) return { label: '☕ Go outside', run: (gg) => this.leaveCafe(gg) };
     const chair = this.nearChair(g); if (chair) return { label: '🪑 Sit down', run: (gg) => this.sitDown(gg, chair) };
+    return null;
+  },
+  // driving the bag train: load the bags into the jet, or fetch more at the terminal; the fuel truck: fuel up a plane
+  gseAction(g) {
+    const rt = this.rt, G = rt.gse;
+    if (g.area !== 'town' || !g.driving || rt.load || rt.fuelup) return null;
+    if (g.vehicle === G.tug) {
+      const jet = this.jetForBags(g);
+      if (jet && G.tug.bags > 0) return { label: '🧳 Load the bags', run: (gg) => this.loadBags(gg, jet) };
+      if (G.tug.bags < CFG.AIRFIELD.CART_BAGS && this.atBagPickup(g)) return { label: '🧳 Get more bags', run: (gg) => this.getBags(gg) };
+    } else if (g.vehicle === G.fuel) {
+      const pl = this.planeToFuel(g); if (pl) return { label: '⛽ Fuel up', run: (gg) => this.fuelUp(gg, pl) };
+    }
     return null;
   },
   // ---------- the Sky Café ----------
@@ -346,6 +527,7 @@ const AirfieldExt = {
       taxi = Object.assign(P, { t: 0, dur: U.clamp(P.len / (v.kind === 'jet' ? 200 : 240), 0.6, 3.4), route: true });
       const end = v.out[v.out.length - 1]; dir.y = end.y > (R.y0 + R.y1) / 2 ? -1 : 1;
     }
+    if (town) this.clearForPlanes(g);
     rt.runup = { plane: v, t: 0, dur: CFG.AIRFIELD.RUNUP, dir, centre: town ? (R.x0 + R.x1) / 2 : (R.y0 + R.y1) / 2, to: town ? 'cloud' : 'town', taxi };
     g.floats.push({ x: v.x, y: v.y - 60, text: town ? 'Up, up and away! ✈️' : 'Home we go! ✈️', color: '#ffe08a', t: 0, dur: 1.4, big: true });
     Sfx.tone(110, 1.1, 'sawtooth', 0.03, 260); Haptics.success();
@@ -389,7 +571,7 @@ const AirfieldExt = {
     // at Cloud Harbor the plane on the runway is the one you came in (same kind, same colour); back home that plane
     // lands and rolls to its own stand, and every other plane stays just where it was
     if (tr.to === 'cloud') { cp.kind = f.kind; cp.color = f.color; this.startRoll(g, cp, C.LANDING, 1.8); g.toast('☁️ Welcome to Cloud Harbor!', true); }
-    else { f.away = false; this.park(f, f.home); const P = this.mkPath(f.land); this.startRoll(g, f, f.land, f === rt.plane ? 2.8 : 2.8 * Math.sqrt(P.len / 400)); g.toast('🍕 Home sweet home!', true); }
+    else { f.away = false; this.park(f, f.home); this.clearForPlanes(g); const P = this.mkPath(f.land); this.startRoll(g, f, f.land, f === rt.plane ? 2.8 : 2.8 * Math.sqrt(P.len / 400)); g.toast('🍕 Home sweet home!', true); }
     g.floats.push({ x: p.x, y: p.y - 60, text: 'Touchdown! 🛬', color: '#ffe08a', t: 0, dur: 1.4, big: true });
     p.hasMoved = true; p.moving = false; Haptics.success();
   },
@@ -405,6 +587,7 @@ const AirfieldExt = {
     const rt = this.rt; if (!rt) return;
     const p = g.player;
     rt.wave += dt;
+    this.updateGse(g, dt);
     rt.cafe.fade = Math.max(0, rt.cafe.fade - dt); rt.cafe.cocoa = Math.max(0, rt.cafe.cocoa - dt);
     // the helicopter: the rotor spins up when you fly it and winds down when it is parked
     const hl = rt.heli, flying = this.flyingHeli(g);
@@ -568,12 +751,16 @@ const AirfieldExt = {
       if (g.onTrain || g.fishing || g.ride) return undefined;
       if (this.flyingHeli(g)) return p.carry > 0 && g.houses.some((h) => h.order) ? undefined : { text: 'Whirrr! Fly anywhere you like 🚁', target: null };
       if (!g.driving && U.dist(p.x, p.y, rt.heli.x, rt.heli.y) < 120 && !(p.carry > 0 && g.houses.some((h) => h.order))) return { text: 'Fly the helicopter! 🚁', target: U.dist(p.x, p.y, rt.heli.x, rt.heli.y) < 70 ? null : rt.heli };
+      const gh = this.gseHint(g); if (gh !== undefined) return gh;
       if (!this.inStrip(p.x, p.y)) return undefined;
       if (g.driving) return rt.planes.includes(g.vehicle) ? { text: '🛫 Press the button to take off!', target: null } : undefined;
       if (p.carry > 0 && g.houses.some((h) => h.order)) return undefined;   // a delivery is more urgent
-      // the nearest plane still on the airfield (the jet has its own words)
+      // the nearest plane still on the airfield (the jet has its own words), or the bag train / the fuel truck if nearer
       let near = null, nd = Infinity;
       for (const v of rt.planes) { if (v.away) continue; const d = U.dist(p.x, p.y, v.x, v.y); if (d < nd) { nd = d; near = v; } }
+      let gv = null, gd = Infinity;
+      for (const v of this.gseList()) { const d = U.dist(p.x, p.y, v.x, v.y); if (d < gd) { gd = d; gv = v; } }
+      if (gv && gd < 120 && gd < nd) return { text: gv.kind === 'bagtug' ? 'Drive the bag train! 🧳' : gv.kind === 'fuelbowser' ? 'Drive the fuel truck! ⛽' : 'Drive a car! 🚗', target: gd < 70 ? null : gv };
       const hop = near && { text: near.kind === 'jet' ? 'Hop in the big jet! ✈️' : 'Hop in a plane! ✈️', target: nd < 70 ? null : near };
       if (hop && nd < 120) return hop;
       const coin = this.nearCoin(g, A.STRIP, 300); if (coin) return { text: 'Grab the shiny coin!', target: coin };
@@ -599,6 +786,25 @@ const AirfieldExt = {
     if (!rt.glided) return { text: 'Try the glider ramp!', target: C.GLIDER.top };
     const coin = this.nearCoin(g, C.WORLD, 420); if (coin) return { text: 'Grab the shiny coin!', target: coin };
     return { text: 'Fly home from the runway ✈️', target: U.dist(p.x, p.y, rt.cloudPlane.x, rt.cloudPlane.y) < 70 ? null : rt.cloudPlane };
+  },
+
+  // driving the bag train or the fuel truck: what to do next (undefined when the chef is in neither)
+  gseHint(g) {
+    const rt = this.rt, G = rt.gse, p = g.player, A = CFG.AIRFIELD;
+    if (!g.driving || (g.vehicle !== G.tug && g.vehicle !== G.fuel)) return undefined;
+    if (p.carry > 0 && g.houses.some((h) => h.order)) return undefined;   // a delivery is more urgent
+    if (g.vehicle === G.tug) {
+      if (rt.load) return { text: rt.load.kind === 'load' ? 'Thump, thump! In go the bags 🧳' : 'Here come more bags! 🧳', target: null };
+      const jet = rt.jet, jetHere = !jet.away && jet.lift <= 0;
+      if (G.tug.bags > 0 && jetHere) return this.jetForBags(g) ? { text: 'Press the button to load the bags! 🧳', target: null } : { text: 'Drive the bags to the big jet! 🧳', target: jet };
+      if (G.tug.bags > 0) return { text: 'Beep beep! Drive the bag train 🧳', target: null };
+      return this.atBagPickup(g) ? { text: 'Press the button for more bags! 🧳', target: null } : { text: 'Get more bags at the terminal! 🧳', target: A.BAG_PICKUP };
+    }
+    if (rt.fuelup) return { text: 'Glug glug! Filling up the plane ⛽', target: null };
+    if (this.planeToFuel(g)) return { text: 'Press the button to fuel up! ⛽', target: null };
+    let best = null, bd = Infinity;
+    for (const v of rt.planes.concat([rt.heli])) { if (v.away || v.lift > 0) continue; const d = U.dist(p.x, p.y, v.x, v.y); if (d < bd) { bd = d; best = v; } }
+    return { text: 'Drive to a plane and fuel it up! ⛽', target: best };
   },
 
   // ======================= render hooks =======================
@@ -705,13 +911,16 @@ const AirfieldExt = {
     ctx.fillStyle = '#fff'; ctx.fillRect(F.x - 7, F.y - 10, 14, 8); ctx.fillStyle = '#2b1d14'; ctx.fillRect(F.x - 5, F.y - 8, 10, 2); ctx.fillRect(F.x - 5, F.y - 5, 6, 2);
     ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(F.x + 11, F.y - 8); ctx.quadraticCurveTo(F.x + 22, F.y - 10, F.x + 20, F.y + 4); ctx.stroke();
     ctx.font = r.font(11); ctx.fillStyle = '#2b1d14'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('⛽', F.x, F.y - 26);
-    // luggage cart with two suitcases
-    const Ct = A.CART;
-    ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(Ct.x - 18, Ct.y + 6, 40, 6);
-    ctx.fillStyle = '#2b1d14'; ctx.fillRect(Ct.x - 18, Ct.y + 4, 8, 6); ctx.fillRect(Ct.x + 10, Ct.y + 4, 8, 6);
-    ctx.fillStyle = '#3b7dd8'; U.roundRect(ctx, Ct.x - 22, Ct.y - 6, 44, 12, 3); ctx.fill(); ctx.fillRect(Ct.x + 20, Ct.y - 16, 3, 14);
-    ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, Ct.x - 18, Ct.y - 16, 18, 12, 2); ctx.fill(); ctx.fillStyle = '#f06292'; U.roundRect(ctx, Ct.x + 2, Ct.y - 18, 16, 14, 2); ctx.fill();
-    ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(Ct.x - 12, Ct.y - 18, 6, 3); ctx.fillRect(Ct.x + 7, Ct.y - 20, 6, 3);
+    // the ground vehicles' parking bays (the tug train and the fuel truck park in them: they are vehicles, drawn live)
+    for (const [k, len] of [['tug', 132], ['fuel', 108]]) {
+      const P = A.GSE[k], x0 = k === 'tug' ? P.x - 26 : P.x - len / 2, w = k === 'tug' ? len : len;
+      ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 2; ctx.setLineDash([7, 5]); ctx.strokeRect(x0, P.y - 26, w, 52); ctx.setLineDash([]);
+    }
+    ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.font = r.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('🧳 BAG TRAIN', A.GSE.tug.x + 40, A.GSE.tug.y + 34); ctx.fillText('⛽ FUEL TRUCK', A.GSE.fuel.x, A.GSE.fuel.y + 34);
+    // the bag train's pickup spot by the arrivals hall's airside door: a yellow box with a suitcase
+    const BP = A.BAG_PICKUP; ctx.strokeStyle = '#f2c94c'; ctx.lineWidth = 3; ctx.strokeRect(BP.x - 22, BP.y - 30, 44, 60);
+    ctx.fillStyle = '#f2c94c'; ctx.font = r.font(14); ctx.fillText('🧳', BP.x, BP.y);
     // the radar dish's base (the dish turns live), the plane spotting bench, signs (all walk-through)
     const Rd = A.RADAR;
     ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(Rd.x + 3, Rd.y + 10, 22, 9, 0, 0, Math.PI * 2); ctx.fill();
@@ -724,9 +933,9 @@ const AirfieldExt = {
     const ctx = r.ctx;
     ctx.fillStyle = '#5a5d63'; ctx.fillRect(C.x0, C.y0, C.x1 - C.x0, C.y1 - C.y0);
     ctx.fillStyle = 'rgba(255,255,255,0.05)'; for (let i = 0; i < 80; i++) ctx.fillRect(C.x0 + ((i * 37) % (C.x1 - C.x0)), C.y0 + ((i * 53) % (C.y1 - C.y0)), 2, 2);
-    ctx.strokeStyle = '#f3efe3'; ctx.lineWidth = 3; for (let k = 0; k < 3; k++) { const y = C.y0 + 12 + k * 60; ctx.beginPath(); ctx.moveTo(C.x0 + 14, y); ctx.lineTo(C.x1 - 14, y); ctx.stroke(); }
-    ctx.fillStyle = '#f3efe3'; ctx.font = r.font(14); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('P', C.x1 - 16, C.y0 + 150);
-    for (const [i, col] of [[0, '#41b883'], [1, '#8e5bd1']]) { ctx.save(); ctx.translate((C.x0 + C.x1) / 2, C.y0 + 42 + i * 60); r.drawVehicle('car', g, col); ctx.restore(); }
+    ctx.strokeStyle = '#f3efe3'; ctx.lineWidth = 3; for (let k = 0; k < 2; k++) { const y = C.y0 + 42 + k * 60; ctx.beginPath(); ctx.moveTo(C.x0 + 14, y); ctx.lineTo(C.x1 - 14, y); ctx.stroke(); }
+    ctx.fillStyle = '#f3efe3'; ctx.font = r.font(14); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('P', C.x1 - 14, C.y0 + 20);
+    // (the two cars parked here are vehicles, drawn live: CFG.AIRFIELD.CARS)
   },
   paintHangar(r, g, H) {
     const ctx = r.ctx, w = H.x1 - H.x0, h = H.y1 - H.y0, cx = (H.x0 + H.x1) / 2;
@@ -1145,6 +1354,11 @@ const AirfieldExt = {
       const T = CFG.AIRFIELD.TOWER; items.push({ y: T.y + 14, draw: () => this.drawTower(r, g, T.x, T.y) });
       if (rt.cafe.cocoa > 0 && !g.driving) items.push({ y: g.player.y + 1, draw: () => this.drawCocoa(r, g) });
       if (!this.flyingHeli(g)) items.push({ y: rt.heli.y + 12, draw: () => this.drawHeli(r, g) });
+      const G = rt.gse;
+      items.push({ y: G.fuel.y + 14, draw: () => this.drawGse(r, g, G.fuel) });
+      for (const c of G.cars) items.push({ y: c.y + 14, draw: () => this.drawGse(r, g, c) });
+      items.push({ y: G.tug.y + 10, draw: () => this.drawGse(r, g, G.tug) });
+      G.tug.carts.forEach((c, i) => items.push({ y: c.y + 10, draw: () => this.drawCart(r, g, c, Math.max(0, Math.min(2, G.tug.bags - i * 2))) }));
       return;
     }
     if (rt.cafe.cocoa > 0 && !g.driving && !g.onTrain) items.push({ y: g.player.y + 1, draw: () => this.drawCocoa(r, g) });
@@ -1156,6 +1370,33 @@ const AirfieldExt = {
     const rd = rt.ride, p = g.player;
     if (rd && rd.kind === 'glide') items.push({ y: p.y + 1, draw: () => { const ctx = r.ctx; ctx.save(); ctx.translate(p.x, p.y - 58); this.drawGliderWing(r); ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(-10, 6); ctx.lineTo(-14, 40); ctx.moveTo(10, 6); ctx.lineTo(14, 40); ctx.stroke(); ctx.restore(); } });
     if (rd && rd.kind === 'chute') items.push({ y: p.y + 1, draw: () => this.drawChute(r, p.x, p.y) });
+  },
+  // the bag tug and the fuel truck: their art, the chef at the wheel when driving, the "hop in" bubble
+  drawGse(r, g, v) {
+    const ctx = r.ctx, riding = g.driving && g.vehicle === v;
+    ctx.save(); ctx.translate(v.x, v.y); ctx.rotate(v.angle);
+    r.drawVehicle(v.kind, g, g.s.paint[v.kind], v);
+    if (riding) {   // the chef's white hat and face, in the tug's seat / the truck's cab
+      const hx = v.kind === 'bagtug' ? -8 : v.kind === 'fuelbowser' ? 30 : -4;
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(hx - 2, 0, 8, 10, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(hx + 1, 0, 5.5, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(hx - 1, 0, 5, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+    r.drawRidingExtras(g, v, 30);
+  },
+  // a luggage cart behind the tug (nose +x towards its tongue), with up to two suitcases on it
+  drawCart(r, g, c, n) {
+    const ctx = r.ctx; ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.a);
+    ctx.fillStyle = 'rgba(0,0,0,0.22)'; U.roundRect(ctx, -14, -10, 32, 25, 4); ctx.fill();
+    ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(13, 0); ctx.lineTo(this.CART_TONGUE, 0); ctx.stroke();   // the tongue up to the hitch
+    ctx.fillStyle = '#1e1e1e'; for (const [x, y] of [[-9, -13], [7, -13], [-9, 10], [7, 10]]) { U.roundRect(ctx, x - 4, y, 8, 4, 1.5); ctx.fill(); }
+    ctx.fillStyle = '#3b7dd8'; U.roundRect(ctx, -15, -12, 30, 24, 4); ctx.fill();
+    ctx.fillStyle = '#2d5a8a'; ctx.fillRect(-15, -12, 30, 3); ctx.fillRect(-15, 9, 30, 3); ctx.fillRect(-15, -12, 3, 24); ctx.fillRect(12, -12, 3, 24);   // the rails
+    const cols = ['#e4572e', '#41b883', '#ffd166', '#8e5bd1'];
+    for (let i = 0; i < n; i++) {   // suitcases seen from above: a body, a darker lid seam and a handle
+      const x = i ? -7 : 6; ctx.fillStyle = cols[(i + (c === this.rt.gse.tug.carts[1] ? 2 : 0)) % 4]; U.roundRect(ctx, x - 6, -8, 12, 16, 2); ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(x - 6, -1, 12, 2); ctx.fillStyle = '#2b1d14'; ctx.fillRect(x - 2, -10, 4, 2);
+    }
+    ctx.restore();
   },
   // parked (or just landing): a normal y-sorted entity; flying: drawn in the overlay, lifted, above the tree tops
   drawHeli(r, g) {
@@ -1223,7 +1464,7 @@ const AirfieldExt = {
   // ---------- things in the sky above everybody ----------
   overlay(r, g) {
     const rt = this.rt; if (!rt) return;
-    if (g.area === 'town') { if (this.flyingHeli(g)) this.drawHeli(r, g); return; }
+    if (g.area === 'town') { this.drawGseFx(r, g); if (this.flyingHeli(g)) this.drawHeli(r, g); return; }
     if (g.area === 'skycafe') { this.drawCafeOutside(r, g); return; }
     if (g.area !== 'cloud') return;
     const ctx = r.ctx, t = g.time, C = CFG.CLOUD;
@@ -1261,6 +1502,31 @@ const AirfieldExt = {
     }
   },
 
+  // the fuel hose from the truck's reel to the plane's wing (fuel blobs glugging along it, a gauge filling up over the
+  // plane), and the suitcases hopping between the bag train and the jet / the terminal
+  drawGseFx(r, g) {
+    const rt = this.rt, ctx = r.ctx, t = g.time, F = rt.fuelup;
+    if (F) {
+      const tr = rt.gse.fuel, c = Math.cos(tr.angle), s = Math.sin(tr.angle), a = { x: tr.x - 44 * c, y: tr.y - 44 * s }, b = this.fuelPoint(F.plane);
+      const mx = (a.x + b.x) / 2, my = Math.max(a.y, b.y) + 26, at = (k) => ({ x: (1 - k) * (1 - k) * a.x + 2 * (1 - k) * k * mx + k * k * b.x, y: (1 - k) * (1 - k) * a.y + 2 * (1 - k) * k * my + k * k * b.y });
+      ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.quadraticCurveTo(mx, my, b.x, b.y); ctx.stroke();
+      ctx.strokeStyle = '#5c6670'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(a.x, a.y - 1); ctx.quadraticCurveTo(mx, my - 1, b.x, b.y - 1); ctx.stroke();
+      ctx.fillStyle = '#f2b134'; for (let i = 0; i < 4; i++) { const q = at(((t * 0.9) + i / 4) % 1); ctx.beginPath(); ctx.arc(q.x, q.y, 2.6, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = '#e4572e'; U.roundRect(ctx, b.x - 5, b.y - 5, 10, 10, 3); ctx.fill();   // the nozzle
+      const k = Math.min(1, F.t / CFG.AIRFIELD.FUEL_TIME), gx = F.plane.x, gy = F.plane.y - (F.plane.kind === 'jet' ? 74 : 56);
+      ctx.fillStyle = 'rgba(43,29,20,0.85)'; U.roundRect(ctx, gx - 40, gy - 12, 80, 24, 8); ctx.fill();
+      ctx.fillStyle = '#5c6670'; U.roundRect(ctx, gx - 18, gy - 6, 52, 12, 5); ctx.fill();
+      ctx.fillStyle = k < 0.35 ? '#ff8c42' : k < 0.7 ? '#ffd166' : '#44d36a'; U.roundRect(ctx, gx - 17, gy - 5, 50 * k, 10, 4); ctx.fill();
+      ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('⛽', gx - 29, gy + 1);
+    }
+    for (const bg of rt.flyBags) {
+      const k = Math.min(1, bg.t / bg.dur), x = U.lerp(bg.x0, bg.x1, k), y = U.lerp(bg.y0, bg.y1, k) - Math.sin(k * Math.PI) * 34;
+      ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(x, U.lerp(bg.y0, bg.y1, k) + 6, 7, 3, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = bg.col; U.roundRect(ctx, x - 7, y - 6, 14, 11, 2); ctx.fill(); ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(x - 7, y - 1, 14, 2);
+      ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x - 3, y - 6); ctx.lineTo(x - 3, y - 9); ctx.lineTo(x + 3, y - 9); ctx.lineTo(x + 3, y - 6); ctx.stroke();
+    }
+  },
+
   // the fade at the end of the take-off run
   screen(r, g) {
     const rt = this.rt; if (!rt || g.travel) return;
@@ -1271,6 +1537,34 @@ const AirfieldExt = {
 
   // ---------- vehicle art (drawn at the origin, nose +x) ----------
   vehicleArt: {
+    // the baggage tug, nose +x: a low yellow tractor with a bonnet, one seat, a steering wheel, a beacon and a tow hitch
+    bagtug(r, g, color, v, h) {
+      const ctx = r.ctx, c = color && color !== '#ffffff' ? color : '#ffd166', t = g.time;
+      h.shadow(42, 15); h.wheels([-11, 11], 12, 7, 14);
+      ctx.fillStyle = '#5c6670'; ctx.fillRect(-24, -2.5, 8, 5);   // the hitch
+      ctx.fillStyle = c; U.roundRect(ctx, -20, -14, 40, 28, 6); ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,0.12)'; U.roundRect(ctx, 4, -12, 15, 24, 4); ctx.fill();   // the bonnet
+      ctx.fillStyle = 'rgba(0,0,0,0.25)'; for (let i = 0; i < 3; i++) ctx.fillRect(9 + i * 4, -8, 2, 16);
+      ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, -17, -9, 13, 18, 4); ctx.fill();   // the seat
+      ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(1, -6); ctx.lineTo(1, 6); ctx.stroke();   // the steering wheel, seen edge on
+      ctx.fillStyle = Math.floor(t * 3) % 2 && g.driving && g.vehicle === v ? '#ffd54f' : '#ff8f00'; ctx.beginPath(); ctx.arc(-17, -11, 3, 0, Math.PI * 2); ctx.fill();   // the beacon
+      ctx.fillStyle = '#fff6b0'; ctx.beginPath(); ctx.arc(19, -8, 2.5, 0, Math.PI * 2); ctx.arc(19, 8, 2.5, 0, Math.PI * 2); ctx.fill();
+    },
+    // the fuel truck, nose +x: the yellow cab up front, a long red tank with a white band and a fuel badge, the hose reel at the back
+    fuelbowser(r, g, color, v, h) {
+      const ctx = r.ctx, c = color && color !== '#ffffff' ? color : '#e4572e';
+      h.shadow(100, 20); h.wheels([-34, -14, 30], 13, 8, 20);
+      ctx.fillStyle = '#3e424a'; ctx.fillRect(-50, -12, 72, 24);   // the chassis
+      ctx.fillStyle = c; U.roundRect(ctx, -48, -17, 68, 34, 15); ctx.fill();   // the tank
+      ctx.fillStyle = 'rgba(255,255,255,0.3)'; U.roundRect(ctx, -42, -13, 58, 6, 3); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.fillRect(-26, -17, 7, 34); ctx.fillRect(4, -17, 5, 34);
+      ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(-9, 0, 9, 0, Math.PI * 2); ctx.fill(); ctx.font = r.font(10); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('⛽', -9, 0.5);
+      ctx.fillStyle = '#5c6670'; ctx.beginPath(); ctx.arc(-46, 0, 8, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.arc(-46, 0, 3.5, 0, Math.PI * 2); ctx.fill();   // the hose reel
+      ctx.fillStyle = '#ffd166'; U.roundRect(ctx, 20, -19, 30, 38, 7); ctx.fill();   // the cab
+      ctx.fillStyle = '#bfe3ff'; U.roundRect(ctx, 41, -15, 7, 30, 2); ctx.fill();
+      ctx.fillStyle = '#ff8f00'; ctx.beginPath(); ctx.arc(26, 0, 3, 0, Math.PI * 2); ctx.fill();   // the beacon on the cab roof
+      h.lights(100, 20);
+    },
     // the helicopter, nose +x: skids, tail boom, cockpit glass, the main rotor turning as fast as it is spun up
     heli(r, g, color, v, h) {
       const ctx = r.ctx, c = color && color !== '#ffffff' ? color : '#41b883', lift = v ? v.lift || 0 : 0, rot = v ? v.rotorA || 0 : 0, spin = v ? v.rotor || 0 : 0;
@@ -1288,6 +1582,8 @@ const AirfieldExt = {
       ctx.beginPath(); ctx.moveTo(-40, 0); ctx.lineTo(40, 0); ctx.moveTo(0, -40); ctx.lineTo(0, 40); ctx.stroke(); ctx.restore();
       if (spin > 0.3) { ctx.fillStyle = `rgba(255,255,255,${(spin - 0.3) * 0.3})`; ctx.beginPath(); ctx.arc(0, 0, 40, 0, Math.PI * 2); ctx.fill(); }
     },
+    // a visitor's car: the town's car, in its own colour (or the paint bay's)
+    visitorcar(r, g, color, v, h) { r.drawVehicle('car', g, color || (v && v.color) || '#41b883', v); },
     // the passenger jet (its art lives in paintJet)
     jet(r, g, color, v, h) { AirfieldExt.paintJet(r, g, v, !(v && v.lift > 0)); },
     plane(r, g, color, v, h) {

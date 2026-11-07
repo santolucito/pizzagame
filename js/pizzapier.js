@@ -1,21 +1,24 @@
 'use strict';
-// Pizza Pier (the park itself): a Coney Island style seaside amusement park at the end of subway Line 2. This file
+// Coney Island (the park itself, map 'pizzapier'): a seaside amusement park at the end of the orange D train. This file
 // paints the whole 'pizzapier' map (sky and far skyline, the back fence, the plazas, the colourful paths, the wide
 // boardwalk with its railing, lamps and bunting, the beach and the sea), and runs the parts the park agent owns:
-//   - the open-air Line 2 terminal (west end): the purple train waits at its platform; '🚇 Ride home' takes it back to
-//     the City ('pierline'); arriving puts the chef on the platform under the "🍕 PIZZA PIER 🎡" arch;
+//   - the open-air D train terminal (west end): the orange D train waits at its platform; '🚇 Ride home' takes it back
+//     to the City ('pierline'); arriving puts the chef on the platform under the "🎡 CONEY ISLAND" arch;
 //   - the big Ferris wheel (east end): '🎡 Ride the Ferris wheel' seats the chef in a gondola for one slow turn
 //     (the camera follows; "What a view! 🌊" at the top; off at the bottom by itself);
 //   - the Pizza Drop, a ride still being built: '🔨 Help build' and the crane lowers one more piece of the tower (the
-//     count is saved); once it reaches the top, every help gives a little test run;
+//     count is saved); once it reaches the top, every help gives a little test run. Its building site has a tower crane
+//     to drive (js/towercrane.js: lift a beam from the pile onto the tower, which counts as one more piece) and a
+//     concrete mixer to drive round the yard ('🌀 Pour' by the tower fills the foundation forms);
 //   - three free food stands on the boardwalk's north edge (cotton candy, pizza slice, lemonade), carried for a while;
 //   - life: visitors strolling the boardwalk, people on benches and in the gondolas, seagulls, the odd balloon.
 // The other plots (coaster, bumper cars, games) are left as light paved plazas for js/pier-*.js to paint over.
 // Layout: CFG.PIER (js/pier-layout.js). Extension module: Game.ext (unshift) and Render.ext. See js/EXTENSIONS.md.
+const PIER_D_ORANGE = '#ff6319';   // the D train's New York orange (js/subway.js has it as CFG.SUBWAY.COLOR2)
 CFG.PIERPARK = {
   STATION: { x0: 8000, y0: 5110, x1: 8420, y1: 5530 },          // the terminal hall behind the track (solid)
   TRACK: { x0: 8000, x1: 8404, y0: 5530, y1: 5642 },             // the track bed and the train on it (solid)
-  TRAIN: { x0: 8022, x1: 8380, y: 5630, car: 116 },              // three purple cars, the front at the east end
+  TRAIN: { x0: 8022, x1: 8380, y: 5630, car: 116 },              // three orange D train cars, the front at the east end
   PLATFORM: { x0: 8000, x1: 8384, y0: 5642, y1: 5880 },
   POSTS: [8066, 8190, 8326], POST_Y: 5662,                        // the canopy's posts along the platform edge
   BOARD: { x: 8258, y: 5694 },                                    // '🚇 Ride home', by the train's door
@@ -34,8 +37,14 @@ CFG.PIERPARK = {
   WHEEL_ZONE: { x0: 9950, y0: 5110, x1: 10400, y1: 5852 },        // under and behind the wheel (solid)
   BUILD: {
     TOWER: { x: 9662, y: 5432 }, SEG: 30, START: 3, MAX: 8, HALF: 30,
-    CRANE: { x: 9852, y: 5404, top: 5096, jib0: 9580, jib1: 9930 },
-    MIXER: { x: 9538, y: 5508 }, PILE: { x: 9880, y: 5506 }, HELP: { x: 9688, y: 5486 },
+    // the tower crane (js/towercrane.js): its mast's foot, the jib's height, reach and counter-jib; its hook stays over LAND
+    CRANE: { x: 9852, y: 5404, top: 5096, REACH: 290, COUNTER: 70 },
+    LAND: { x0: 9500, y0: 5160, x1: 9936, y1: 5545 },
+    // the concrete mixer (vehicle kind 'mixer' from js/sitetown.js): where it parks, the yard it may drive in (its
+    // centre stays inside ZONE), the foundation forms round the tower's foot (filled in N pours) and how near counts
+    MIXER: { x: 9548, y: 5462, angle: -Math.PI / 2 }, ZONE: { x0: 9496, y0: 5150, x1: 9938, y1: 5520 },
+    FOUND: { x0: 9592, y0: 5398, x1: 9732, y1: 5458, N: 3 }, POUR_NEAR: 210, PUDDLE_T: 20,
+    PILE: { x: 9880, y: 5506 }, HELP: { x: 9688, y: 5486 },
     SIGN: { x: 9790, y: 5548 }, CONES: [9512, 9590, 9706, 9874, 9926], CONE_Y: 5554,
     WORKERS: [{ x: 9620, y: 5476 }, { x: 9740, y: 5470 }],
     LOWER_T: 1.3, SHOW_T: 4.2,
@@ -51,7 +60,7 @@ CFG.PIERPARK = {
 const PizzaPierExt = {
   name: 'pizzapier',
   st: null,
-  defaults: { pizzapier: { seen: false, visits: 0, wheel: 0, built: 3, helps: 0, shows: 0, treats: 0 } },
+  defaults: { pizzapier: { seen: false, visits: 0, wheel: 0, built: 3, helps: 0, shows: 0, treats: 0, lifts: 0, pours: 0, found: 0 } },
 
   // ---------- state ----------
   build(g) {
@@ -59,7 +68,9 @@ const PizzaPierExt = {
     const s = Object.assign(d, g.s.pizzapier || {});
     const B = CFG.PIERPARK.BUILD;
     s.built = U.clamp(Math.round(+s.built || B.START), 0, B.MAX);
+    s.found = U.clamp(Math.round(+s.found || 0), 0, B.FOUND.N);
     g.s.pizzapier = s;
+    this.parkMixer();
     const looks = [
       { shirt: '#3b7dd8', hair: '#2b1d14', hairStyle: 0, skin: '#f1c27d', pants: '#2d3a4a' },
       { shirt: '#ff7eb6', hair: '#8a4b20', hairStyle: 1, skin: '#c68642', pants: '#4a4a4a', stripes: true },
@@ -73,7 +84,7 @@ const PizzaPierExt = {
       wheelA: 0, ride: null, treat: null, piece: null, show: null, fade: 0,
       walkers: looks.map((look, i) => ({ x: 8100 + ((i * 677) % 2200), y: 5935 + (i % 4) * 30, dir: i % 2 ? -1 : 1, sp: 38 + (i % 3) * 10, wait: 0, bob: 0, look, balloon: i % 3 === 0 ? ['#ff5252', '#3b7dd8', '#ffd23f'][i % 3 === 0 ? (i / 3) % 3 : 0] : null })),
       gulls: [0, 1, 2, 3, 4].map((i) => ({ cx: 8300 + i * 480, cy: 6180 + (i % 2) * 60, ax: 160 + i * 20, w: 0.12 + i * 0.03, ph: i * 1.7 })),
-      balloons: [], balloonT: 4,
+      balloons: [], balloonT: 4, puddles: [],
       worker: { x: CFG.PIERPARK.BUILD.WORKERS[1].x, y: CFG.PIERPARK.BUILD.WORKERS[1].y, to: 1, wait: 1, carry: true, bob: 0 },
     };
     this.st.obs = this.buildObs();
@@ -98,11 +109,11 @@ const PizzaPierExt = {
     // the beach: umbrella poles and the sandcastle
     for (const [ux, uy] of P.UMBRELLAS) o.push({ x: ux - 4, y: uy - 4, w: 8, h: 8 });
     o.push({ x: P.CASTLE.x - 34, y: P.CASTLE.y - 16, w: 68, h: 22 });
-    // the building site: the tower, the crane, the cement mixer, the pile of parts
+    // the building site: the tower, the crane's mast (the same box js/towercrane.js uses), the pile of parts
+    // (the concrete mixer is a vehicle: never in the way)
     const B = P.BUILD;
     o.push({ x: B.TOWER.x - 36, y: B.TOWER.y - 40, w: 72, h: 44 });
-    o.push({ x: B.CRANE.x - 20, y: B.CRANE.y - 22, w: 40, h: 26 });
-    o.push({ x: B.MIXER.x - 58, y: B.MIXER.y - 24, w: 116, h: 26 });
+    o.push({ x: B.CRANE.x - 20, y: B.CRANE.y - 18, w: 40, h: 36 });
     o.push({ x: B.PILE.x - 32, y: B.PILE.y - 18, w: 64, h: 22 });
     // the sea
     o.push({ x: 8000, y: CFG.PIER.SEA_Y, w: 2400, h: 6400 - CFG.PIER.SEA_Y + 40 });
@@ -131,16 +142,27 @@ const PizzaPierExt = {
   pivot(i, A) { const W = CFG.PIERPARK.WHEEL, a = A + i * Math.PI * 2 / W.N; return { x: W.x + Math.cos(a) * W.R, y: W.y + Math.sin(a) * W.R }; },
   seat(i, A) { const p = this.pivot(i, A); return { x: p.x, y: p.y + 84 }; },
   ease(k) { k = U.clamp(k, 0, 1); return k * k * (3 - 2 * k); },
+  lerpA(a, b, k) { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return a + d * k; },
   rideK() { const r = this.st && this.st.ride; return r && r.phase === 'ride' ? U.clamp(r.t / CFG.PIERPARK.WHEEL.RIDE, 0, 1) : 0; },
 
   // ---------- game hooks ----------
-  obstacles(g) {
+  obstacles(g, forCar) {
     if (!this.st) this.build(g);
     if (!this.here(g)) return [];
+    // driving the concrete mixer: the building site's yard is fenced in all round (it never reaches the boardwalk or the sea)
+    if (forCar && this.inMixer(g)) return this.st.obs.concat(this.yardFence());
     return this.st.obs;
+  },
+  vehicles(g) {
+    if (!this.mixer) return [];
+    return this.here(g) || this.inMixer(g) ? [this.mixer] : [];
   },
   action(g) {
     if (!this.st) this.build(g);
+    if (this.inMixer(g)) {
+      if (g.travel) return null;
+      return { label: '🌀 Pour', run: (gg) => this.startPour(gg) };   // pressing again while it pours does nothing
+    }
     if (!this.onFoot(g)) return null;
     const P = CFG.PIERPARK, st = this.st;
     if (this.near(g, P.BOARD, 40)) return { label: '🚇 Ride home', run: (gg) => this.rideHome(gg) };
@@ -154,6 +176,7 @@ const PizzaPierExt = {
   },
   hint(g) {
     if (!this.st || !this.here(g) || g.travel) return undefined;
+    if (this.inMixer(g)) return this.mixerHint(g);
     if (this.busy(g)) return undefined;
     const P = CFG.PIERPARK, st = this.st, p = g.player, s = this.save(g);
     if (st.ride) {
@@ -162,7 +185,7 @@ const PizzaPierExt = {
       if (st.ride.phase === 'off') return { text: 'Wasn\'t that fun? 🎡', target: null };
       return { text: 'Wheee! Round and round 🎡', target: null };
     }
-    if (this.near(g, P.BOARD, 70)) return { text: 'Ride the train home 🚇', target: this.near(g, P.BOARD, 34) ? null : P.BOARD };
+    if (this.near(g, P.BOARD, 70)) return { text: 'Ride the D train home 🚇', target: this.near(g, P.BOARD, 34) ? null : P.BOARD };
     if (this.near(g, P.WHEEL.BOARD, 70)) return { text: 'Ride the Ferris wheel! 🎡', target: this.near(g, P.WHEEL.BOARD, 34) ? null : P.WHEEL.BOARD };
     if (this.near(g, P.BUILD.HELP, 70)) {
       if (st.piece) return { text: 'Here comes the next piece! 🏗️', target: null };
@@ -170,6 +193,7 @@ const PizzaPierExt = {
       return { text: s.built >= P.BUILD.MAX ? 'Help again for a test run! 🎢' : 'Help the workers build the Pizza Drop! 🔨', target: this.near(g, P.BUILD.HELP, 34) ? null : P.BUILD.HELP };
     }
     for (const sd of P.STANDS) { const sp = this.standSpot(sd); if (this.near(g, sp, 60)) return { text: sd.hint, target: this.near(g, sp, 30) ? null : sp }; }
+    if (this.mixer && this.near(g, this.mixer, 70)) return { text: 'Drive the concrete mixer! 🚛', target: this.near(g, this.mixer, 34) ? null : { x: this.mixer.x, y: this.mixer.y } };
     return this.generalHint(g);
   },
   // the park-wide hint is the least important one: a later extension with something to say (a ride's entrance,
@@ -181,7 +205,7 @@ const PizzaPierExt = {
     if (st.treat) return { text: { candy: 'Yum, cotton candy! 🍭', pizza: 'Yum, pizza! 🍕', lemon: 'Ahh, lemonade! 🍋' }[st.treat.key], target: null };
     if (!s.wheel) return { text: 'Ride the big Ferris wheel! 🎡', target: P.WHEEL.BOARD };
     if (!s.helps) return { text: 'Help build the new ride! 🔨', target: P.BUILD.HELP };
-    return { text: 'Have fun at Pizza Pier! 🎡', target: null };
+    return { text: 'Have fun at Coney Island! 🎡', target: null };
   },
   arrive(g, tr) {
     if (!this.st) this.build(g);
@@ -191,14 +215,15 @@ const PizzaPierExt = {
     p.x = A.x; p.y = A.y; p.facing = 1; p.moving = false; p.hasMoved = true;
     g.cameraSnap = true;
     s.visits++;
-    if (!s.seen) { s.seen = true; g.toast('🎡 Welcome to Pizza Pier!', true); }
-    else this.say(g, A.x, A.y - 80, 'Pizza Pier! 🎡', '#ffffff', true, 1.6);
+    if (!s.seen) { s.seen = true; g.toast('🎡 Welcome to Coney Island!', true); }
+    else this.say(g, A.x, A.y - 80, 'Coney Island! 🎡', '#ffffff', true, 1.6);
     if (g.save) g.save();
   },
   home(g) {
     if (!this.st) return;
     const st = this.st;
-    st.ride = null; st.treat = null; st.piece = null; st.show = null; st.fade = 0;
+    st.ride = null; st.treat = null; st.piece = null; st.show = null; st.fade = 0; st.puddles = [];
+    this.parkMixer();   // the mixer back in its spot, chute folded (the crane module empties the crane's hook itself)
   },
 
   // ---------- the terminal ----------
@@ -300,6 +325,164 @@ const PizzaPierExt = {
     else { w.moving = true; w.bob += dt * 10; w.facing = tg.x < w.x ? -1 : 1; }
   },
 
+  // ---------- the tower crane (js/towercrane.js) ----------
+  // Left alone it hangs the next piece of the tower over its top (and lowers it while a worker is helped); once the
+  // tower is finished it parks, turned away. Driven, the chef grabs a beam from the pile and lifts it onto the tower's
+  // top: that counts as one more piece, exactly like '🔨 Help build'.
+  craneIdle(g, c) {
+    if (!this.st) return null;
+    const B = CFG.PIERPARK.BUILD, s = this.save(g), st = this.st, P = TowerCrane.polar(c, B.TOWER.x, B.TOWER.y), base = s.built * B.SEG;
+    if (s.built >= B.MAX && !st.piece) return { th: P.th - 0.9, d: 110, z: c.H - 40, load: false, ph: 'parked' };
+    let z = base + 64 + Math.sin(g.time * 1.3) * 3;
+    if (st.piece) z = U.lerp(base + 64, base + 42, this.ease(st.piece.t / B.LOWER_T));
+    return { th: P.th, d: P.d, z, load: s.built < B.MAX, kind: 'segment', ph: 'rest' };
+  },
+  craneTarget() {
+    const B = CFG.PIERPARK.BUILD, T = B.TOWER, PP = this;
+    return {
+      x: T.x - 46, y: T.y - 40, w: 92, h: 60,
+      label: '🏗️ Put it on the tower', hint: 'Put it on the Pizza Drop! 🏗️', carryHint: 'Move it over to the tower! 🏗️',
+      spot(g) { const s = PP.save(g); return { x: T.x, y: T.y, z: Math.min(s.built, B.MAX) * B.SEG }; },
+      onPlace(g) { PP.cranePlaced(g); },
+    };
+  },
+  // a piece lifted onto the tower: one more piece (and the test run once it is finished), a worker cheers
+  cranePlaced(g) {
+    const B = CFG.PIERPARK.BUILD, s = this.save(g), st = this.st, w = B.WORKERS[0];
+    s.lifts++; s.helps++;
+    st.piece = null;
+    if (s.built < B.MAX) {
+      s.built++;
+      const top = B.TOWER.y - s.built * B.SEG;
+      if (s.built >= B.MAX) this.startShow(g, 'The Pizza Drop is built! 🎉');
+      else this.say(g, B.TOWER.x, top - 60, `${s.built} / ${B.MAX} 🏗️`, '#ffffff', true, 1.4);
+    } else this.startShow(g, 'Test run! 🎢');
+    this.say(g, w.x, w.y - 84, 'Hooray! 🎉', '#ffffff', true, 1.6);
+  },
+  // the next tower piece hanging on the hook in two slings (y: the hook's bottom)
+  drawCraneLoad(r, g, c, kind, x, y) {
+    if (kind !== 'segment') return false;
+    const ctx = r.ctx, B = CFG.PIERPARK.BUILD, s = this.save(g), col = s.built % 2 ? '#ffcf4d' : '#e4572e', hw = B.HALF, py = y + 8;
+    ctx.strokeStyle = '#3e424a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - hw + 3, py); ctx.moveTo(x, y); ctx.lineTo(x + hw - 3, py); ctx.stroke();
+    ctx.fillStyle = col; ctx.fillRect(x - hw, py, 6, B.SEG); ctx.fillRect(x + hw - 6, py, 6, B.SEG); ctx.fillRect(x - hw, py, hw * 2, 4);
+    ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x - hw + 4, py + B.SEG); ctx.lineTo(x + hw - 4, py + 2); ctx.moveTo(x + hw - 4, py + B.SEG); ctx.lineTo(x - hw + 4, py + 2); ctx.stroke();
+    return true;
+  },
+
+  // ---------- the concrete mixer (vehicle kind 'mixer', drawn by js/sitetown.js) ----------
+  // Hop in, drive it round the building site (a fence keeps it in the yard), and '🌀 Pour': near the tower it backs up to
+  // the foundation forms, swings its chute out and pours a big grey stream into them (N pours fill the foundation);
+  // anywhere else it pours a puddle under its chute. Its drum turns all the time, fast while it pours.
+  inMixer(g) { return !!(g.driving && this.mixer && g.vehicle === this.mixer); },
+  parkMixer() {
+    const M = CFG.PIERPARK.BUILD.MIXER;
+    if (!CFG.VEHICLES.mixer) { this.mixer = null; return; }
+    const v = this.mixer || (this.mixer = { kind: 'mixer', x: 0, y: 0, angle: 0, vx: 0, vy: 0, drum: 0, pour: null });
+    Object.assign(v, { x: M.x, y: M.y, angle: M.angle, vx: 0, vy: 0, pour: null });
+  },
+  yardFence() {
+    const Z = CFG.PIERPARK.BUILD.ZONE, m = 400;
+    return [{ x: Z.x0 - m, y: Z.y0 - m, w: m, h: Z.y1 - Z.y0 + 2 * m }, { x: Z.x1, y: Z.y0 - m, w: m, h: Z.y1 - Z.y0 + 2 * m },
+      { x: Z.x0 - m, y: Z.y0 - m, w: Z.x1 - Z.x0 + 2 * m, h: m }, { x: Z.x0 - m, y: Z.y1, w: Z.x1 - Z.x0 + 2 * m, h: m }];
+  },
+  inYard(x, y) { const Z = CFG.PIERPARK.BUILD.ZONE, r = CFG.VEHICLES.mixer.radius; return x >= Z.x0 + r - 0.5 && x <= Z.x1 - r + 0.5 && y >= Z.y0 + r - 0.5 && y <= Z.y1 - r + 0.5; },
+  mixerFree(g, x, y) {
+    const r = CFG.VEHICLES.mixer.radius, Z = CFG.PIERPARK.BUILD.ZONE;
+    if (x < Z.x0 + r + 2 || x > Z.x1 - r - 2 || y < Z.y0 + r + 2 || y > Z.y1 - r - 2) return false;   // in the yard, clear of its fence
+    const obs = this.st.obs.concat(typeof TowerCrane !== 'undefined' ? TowerCrane.boxes(g, 'pizzapier') : []);
+    return !obs.some((o) => g.hitRect(x, y, r, o));
+  },
+  // the chute's tip when it is all the way out (vehicle frame): its direction and length, and how far the stream drops
+  pourGeom() {
+    if (this._pg) return this._pg;
+    const P = CFG.SITETOWN && CFG.SITETOWN.POUR, ch = typeof SiteTownExt !== 'undefined' && P ? SiteTownExt.chute({ x: 0, y: 0, angle: 0, pour: { t: P.OUT + 0.1 } }) : null;
+    const L = ch ? ch.local : { x: -100, y: 37 };
+    this._pg = { phi: Math.atan2(L.y, L.x), rho: Math.hypot(L.x, L.y), drop: P ? P.DROP : 30, out: P ? P.OUT : 0.5, flow: P ? P.FLOW : 1.5, dur: P ? P.OUT + P.FLOW + P.FOLD : 2.5 };
+    return this._pg;
+  },
+  // where a pour here would go: the next empty part of the foundation (or the nearest part once it is done), if near
+  pourTarget(g, v) {
+    const B = CFG.PIERPARK.BUILD, F = B.FOUND, s = this.save(g), w = (F.x1 - F.x0) / F.N;
+    const parts = []; for (let k = 0; k < F.N; k++) parts.push({ x: F.x0 + w * (k + 0.5), y: F.y1 - 12, k });
+    const T = s.found < F.N ? parts[s.found] : parts.sort((a, b) => U.dist(v.x, v.y, a.x, a.y) - U.dist(v.x, v.y, b.x, b.y))[0];
+    return U.dist(v.x, v.y, T.x, T.y) < B.POUR_NEAR ? T : null;
+  },
+  startPour(g) {
+    const v = this.mixer;
+    if (!v || v.pour) return;
+    const G = this.pourGeom(), F = CFG.PIERPARK.BUILD.FOUND, T = this.pourTarget(g, v), from = { x: v.x, y: v.y, angle: v.angle };
+    let to = from;
+    if (T) {
+      // back up to the forms from the front (south) side, the chute's tip right over the part being filled: the nearest
+      // free spot in the yard from which the tip (reaching back over the forms) drops the stream exactly there
+      const ax = T.x, ay = T.y - G.drop;
+      let best = null, bd = Infinity;
+      for (let deg = -170; deg <= -10; deg += 5) {
+        const th = deg * Math.PI / 180, x = ax - Math.cos(th) * G.rho, y = ay - Math.sin(th) * G.rho;
+        if (y < F.y1 + 24 || !this.mixerFree(g, x, y)) continue;
+        const d = U.dist(v.x, v.y, x, y); if (d < bd) { bd = d; best = { x, y, th }; }
+      }
+      if (best) to = { x: best.x, y: best.y, angle: best.th - G.phi };
+      else to = { x: v.x, y: v.y, angle: Math.atan2(ay - v.y, ax - v.x) - G.phi };   // nowhere to back up to: turn on the spot
+    }
+    const mv = U.clamp(U.dist(from.x, from.y, to.x, to.y) / 220, 0.35, 1);   // the drive to the spot, before the chute swings out
+    v.pour = { t: -mv, mv, from, to, T, puddle: null, done: false };
+    v.vx = 0; v.vy = 0;
+    this.save(g).pours++;
+    Sfx.pickup(); Haptics.tap();
+  },
+  stepMixer(g, dt) {
+    const v = this.mixer; if (!v) return;
+    const st = this.st, G = this.pourGeom(), mine = this.inMixer(g);
+    v.drum += dt * (v.pour ? 14 : mine ? 3.5 : 0.8);
+    for (const q of st.puddles) q.t += dt;
+    st.puddles = st.puddles.filter((q) => q.t < CFG.PIERPARK.BUILD.PUDDLE_T);
+    if (v.pour) {
+      const p = v.pour; p.t += dt;
+      const k = this.ease((p.t + p.mv) / p.mv);
+      v.x = U.lerp(p.from.x, p.to.x, k); v.y = U.lerp(p.from.y, p.to.y, k); v.angle = this.lerpA(p.from.angle, p.to.angle, k); v.vx = 0; v.vy = 0;
+      if (mine) { g.player.x = v.x; g.player.y = v.y; g.player.moving = false; }
+      if (p.t >= G.out && !p.puddle) {
+        // the stream reaches the forms (or the ground under the chute): a puddle grows there
+        const tip = this.chuteTip(v), L = p.T ? { x: p.T.x, y: p.T.y } : { x: tip.x, y: tip.y + G.drop };
+        p.puddle = { x: L.x, y: L.y, t: 0, r: p.T ? 40 : 22 + Math.random() * 6, grow: G.flow, found: !!p.T };
+        st.puddles.push(p.puddle); if (st.puddles.length > 16) st.puddles.shift();
+        this.say(g, L.x, L.y - 50, 'Splosh! 🌀', '#ffe08a', true, 1.4);
+        for (let i = 0; i < 6; i++) g.fx.push({ kind: 'dirt', x0: L.x, y0: L.y - 4, x1: L.x + U.rand(-24, 24), y1: L.y + U.rand(-8, 10), t: -i * 0.05, dur: 0.4 });
+        Sfx.drop();
+      }
+      if (p.puddle && !p.done && p.t >= G.out + G.flow) {
+        p.done = true;
+        if (p.T) this.foundationPoured(g, p.T);
+      }
+      if (p.t >= G.dur) v.pour = null;
+    } else if (!mine && !this.inYard(v.x, v.y)) this.parkMixer();   // a save or a push left it outside the yard
+    if (mine && !v.pour && !this.inYard(v.x, v.y)) {   // the fence's safety net: keep the truck (and the chef in it) in the yard
+      const Z = CFG.PIERPARK.BUILD.ZONE, r = CFG.VEHICLES.mixer.radius;
+      v.x = U.clamp(v.x, Z.x0 + r + 1, Z.x1 - r - 1); v.y = U.clamp(v.y, Z.y0 + r + 1, Z.y1 - r - 1); g.player.x = v.x; g.player.y = v.y;
+    }
+  },
+  chuteTip(v) { return typeof SiteTownExt !== 'undefined' ? SiteTownExt.chute(v).tip : { x: v.x, y: v.y }; },
+  foundationPoured(g, T) {
+    const B = CFG.PIERPARK.BUILD, F = B.FOUND, s = this.save(g), w = B.WORKERS[0], was = s.found;
+    s.found = Math.min(F.N, s.found + 1);
+    this.sparkle(g, T.x, T.y - 10, 8, 30);
+    if (was < F.N && s.found >= F.N) {
+      this.say(g, (F.x0 + F.x1) / 2, F.y0 - 40, 'The foundation is done! 🎉', '#ffffff', true, 2);
+      this.say(g, w.x, w.y - 84, 'Hooray! 🎉', '#ffffff', true, 1.6);
+      this.sparkle(g, (F.x0 + F.x1) / 2, F.y1 - 20, 12, 60);
+      Sfx.ding(); Haptics.success();
+    } else this.say(g, T.x, T.y - 70, was < F.N ? 'Nice and smooth! ✨' : 'Extra smooth! ✨', '#ffffff', true, 1.4);
+  },
+  mixerHint(g) {
+    const v = this.mixer;
+    if (v.pour) return { text: v.pour.T ? 'Splosh! Concrete for the tower 🌀' : 'Splosh! Fresh concrete 🌀', target: null };
+    const T = this.pourTarget(g, v), F = CFG.PIERPARK.BUILD.FOUND;
+    if (T) return { text: this.save(g).found < F.N ? 'Pour the concrete for the tower! 🌀' : 'Pour some more concrete! 🌀', target: null };
+    const s = this.save(g), w = (F.x1 - F.x0) / F.N, k = s.found < F.N ? s.found : 1;
+    return { text: 'Drive to the tower to pour concrete! 🌀', target: { x: F.x0 + w * (k + 0.5), y: F.y1 } };
+  },
+
   // ---------- the food stands ----------
   getTreat(g, s) {
     const st = this.st, p = g.player;
@@ -334,12 +517,13 @@ const PizzaPierExt = {
   update(g, dt) {
     if (!this.st) this.build(g);
     const st = this.st, p = g.player, P = CFG.PIERPARK;
-    if (!this.here(g)) { if (st.ride && !g.travel) st.ride = null; st.piece = null; st.show = null; if (st.treat && !g.travel) st.treat = null; return; }
+    if (!this.here(g)) { if (st.ride && !g.travel) st.ride = null; st.piece = null; st.show = null; if (st.treat && !g.travel) st.treat = null; if (this.mixer && this.mixer.pour) this.mixer.pour = null; return; }
     st.fade = Math.max(0, st.fade - dt);
     if (st.treat) { st.treat.t -= dt; if (st.treat.t <= 0) { st.treat = null; this.say(g, p.x, p.y - 74, 'All gone! 😋', '#ffffff', false, 1.2); } }
     if (!st.ride) st.wheelA += dt * Math.PI * 2 / P.WHEEL.IDLE;
     this.stepLife(g, dt);
     this.stepBuild(g, dt);
+    this.stepMixer(g, dt);
     if (g.travel) return;
     if (st.ride) {
       if (this.busy(g)) { st.ride = null; return; }
@@ -423,7 +607,7 @@ const PizzaPierExt = {
       for (let k = 0; k < 4; k++) { ctx.fillStyle = k % 2 ? '#b98a55' : '#c99a63'; ctx.fillRect(x - P.STAIR_HALF + 4, BW.y1 + 4 + k * 9, P.STAIR_HALF * 2 - 8, 9); ctx.fillStyle = 'rgba(90,55,25,0.4)'; ctx.fillRect(x - P.STAIR_HALF + 4, BW.y1 + 12 + k * 9, P.STAIR_HALF * 2 - 8, 1); }
     }
     // the spots
-    this.paintSpot(r, P.BOARD, '🚇', '#8e44ad');
+    this.paintSpot(r, P.BOARD, '🚇', PIER_D_ORANGE);
     this.paintSpot(r, P.WHEEL.BOARD, '🎡', '#e4572e');
     this.paintSpot(r, P.BUILD.HELP, '🔨', '#ff8c1a');
     for (const s of P.STANDS) this.paintSpot(r, this.standSpot(s), s.ico, s.awn);
@@ -499,9 +683,9 @@ const PizzaPierExt = {
     ctx.fillStyle = '#ffd23f'; ctx.fillRect(PF.x0, PF.y0, PF.x1 - PF.x0, 10);
     ctx.fillStyle = 'rgba(160,120,0,0.4)'; for (let x = PF.x0 + 3; x < PF.x1; x += 8) ctx.fillRect(x, PF.y0 + 3, 3, 4);
     ctx.fillStyle = '#9b958a'; ctx.fillRect(PF.x1 - 4, PF.y0, 4, PF.y1 - PF.y0);
-    // a purple "2" on the platform floor
-    ctx.fillStyle = 'rgba(142,68,173,0.18)'; ctx.beginPath(); ctx.arc(8110, 5780, 30, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = 'rgba(142,68,173,0.45)'; ctx.font = r.font(34); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('2', 8110, 5782);
+    // an orange "D" on the platform floor
+    ctx.fillStyle = 'rgba(255,99,25,0.2)'; ctx.beginPath(); ctx.arc(8110, 5780, 30, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,99,25,0.55)'; ctx.font = r.font(34); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('D', 8110, 5782);
     // the track: gravel, sleepers and two rails running in from the west edge to the buffer stop
     ctx.fillStyle = '#9a8f82'; ctx.fillRect(T.x0, T.y0 + 30, T.x1 - T.x0, T.y1 - T.y0 - 30);
     for (let i = 0; i < 200; i++) { ctx.fillStyle = i % 2 ? 'rgba(255,255,255,0.18)' : 'rgba(60,50,40,0.2)'; ctx.fillRect(T.x0 + h(i + 3000) * (T.x1 - T.x0), T.y0 + 32 + h(i + 3100) * (T.y1 - T.y0 - 34), 3, 2); }
@@ -518,10 +702,10 @@ const PizzaPierExt = {
     ctx.fillStyle = 'rgba(255,255,255,0.18)'; for (let y = S.y1 - 36; y < S.y1; y += 8) for (let x = S.x0 + ((y / 8) % 2) * 10; x < S.x1; x += 20) ctx.fillRect(x, y, 18, 1.5);
     for (let i = 0; i < 4; i++) {
       const wx = S.x0 + 40 + i * 92, ww = 62, wy = fy + 52, wh = 100;
-      ctx.fillStyle = '#8e44ad'; U.roundRect(ctx, wx - 4, wy - 4, ww + 8, wh + 8, 30); ctx.fill();
+      ctx.fillStyle = PIER_D_ORANGE; U.roundRect(ctx, wx - 4, wy - 4, ww + 8, wh + 8, 30); ctx.fill();
       ctx.fillStyle = '#bfe6ff'; U.roundRect(ctx, wx, wy, ww, wh, 28); ctx.fill();
       ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillRect(wx + 8, wy + 10, 8, wh - 22);
-      ctx.strokeStyle = '#8e44ad'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(wx + ww / 2, wy); ctx.lineTo(wx + ww / 2, wy + wh); ctx.moveTo(wx, wy + 44); ctx.lineTo(wx + ww, wy + 44); ctx.stroke();
+      ctx.strokeStyle = PIER_D_ORANGE; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(wx + ww / 2, wy); ctx.lineTo(wx + ww / 2, wy + wh); ctx.moveTo(wx, wy + 44); ctx.lineTo(wx + ww, wy + 44); ctx.stroke();
     }
     // the roof: a teal vault with ribs, seen from above, and a cornice
     const rg = ctx.createLinearGradient(0, S.y0, 0, fy); rg.addColorStop(0, '#2f8f84'); rg.addColorStop(1, '#55b9a8');
@@ -529,16 +713,16 @@ const PizzaPierExt = {
     ctx.fillStyle = 'rgba(255,255,255,0.22)'; for (let x = S.x0 + 26; x < S.x1; x += 34) ctx.fillRect(x, S.y0, 4, fy - S.y0);
     ctx.fillStyle = 'rgba(255,255,255,0.35)'; for (let x = S.x0 + 60; x < S.x1 - 20; x += 120) { U.roundRect(ctx, x, S.y0 + 40, 60, 120, 10); ctx.fill(); }
     ctx.fillStyle = '#f7ead0'; ctx.fillRect(S.x0, fy - 10, S.x1 - S.x0, 14);
-    ctx.fillStyle = '#8e44ad'; ctx.fillRect(S.x0, fy + 2, S.x1 - S.x0, 6);
-    // the sign: a purple "2" bullet and the name
+    ctx.fillStyle = PIER_D_ORANGE; ctx.fillRect(S.x0, fy + 2, S.x1 - S.x0, 6);
+    // the sign: the orange "D" bullet and the name
     const sx = (S.x0 + S.x1) / 2, sy = fy + 22;
     ctx.fillStyle = '#2d3a4a'; U.roundRect(ctx, sx - 120, sy - 16, 240, 30, 8); ctx.fill();
     ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 2; U.roundRect(ctx, sx - 120, sy - 16, 240, 30, 8); ctx.stroke();
-    ctx.fillStyle = '#8e44ad'; ctx.beginPath(); ctx.arc(sx - 96, sy - 1, 11, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#ffffff'; ctx.font = r.font(14); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('2', sx - 96, sy);
-    ctx.fillText('PIZZA PIER  🎡', sx + 10, sy);
+    ctx.fillStyle = PIER_D_ORANGE; ctx.beginPath(); ctx.arc(sx - 96, sy - 1, 11, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ffffff'; ctx.font = r.font(14); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('D', sx - 96, sy);
+    ctx.fillText('CONEY ISLAND  🎡', sx + 12, sy);
     // a clock over the middle windows
-    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(sx, fy - 30, 18, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = '#8e44ad'; ctx.lineWidth = 4; ctx.stroke();
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(sx, fy - 30, 18, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = PIER_D_ORANGE; ctx.lineWidth = 4; ctx.stroke();
     ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(sx, fy - 30); ctx.lineTo(sx, fy - 42); ctx.moveTo(sx, fy - 30); ctx.lineTo(sx + 8, fy - 27); ctx.stroke();
   },
   paintSite(r) {
@@ -552,13 +736,18 @@ const PizzaPierExt = {
     ctx.beginPath(); ctx.moveTo(9500, 5540); ctx.quadraticCurveTo(9560, 5440, 9520, 5300); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(9530, 5545); ctx.quadraticCurveTo(9590, 5440, 9550, 5300); ctx.stroke(); ctx.setLineDash([]);
     ctx.fillStyle = 'rgba(110,170,220,0.6)'; ctx.beginPath(); ctx.ellipse(9790, 5300, 34, 12, 0, 0, Math.PI * 2); ctx.fill();
-    // the tower's concrete footing and chalk marks
-    ctx.fillStyle = '#b8b3aa'; ctx.fillRect(B.TOWER.x - 46, B.TOWER.y - 18, 92, 26);
-    ctx.fillStyle = '#d0ccc4'; ctx.fillRect(B.TOWER.x - 46, B.TOWER.y - 18, 92, 5);
-    ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 2; ctx.setLineDash([6, 5]); ctx.strokeRect(B.TOWER.x - 70, B.TOWER.y - 34, 140, 60); ctx.setLineDash([]);
+    // the foundation forms round the tower's foot: a gravel bed inside a frame of wooden boards (the mixer fills it)
+    const F = B.FOUND;
+    ctx.fillStyle = '#a89c8a'; ctx.fillRect(F.x0, F.y0, F.x1 - F.x0, F.y1 - F.y0);
+    for (let i = 0; i < 70; i++) { ctx.fillStyle = i % 2 ? 'rgba(255,255,255,0.35)' : 'rgba(80,70,60,0.35)'; ctx.fillRect(F.x0 + 3 + h(i + 4300) * (F.x1 - F.x0 - 6), F.y0 + 3 + h(i + 4400) * (F.y1 - F.y0 - 6), 3, 2); }
+    ctx.fillStyle = '#b07a45'; ctx.fillRect(F.x0 - 6, F.y0 - 6, F.x1 - F.x0 + 12, 6); ctx.fillRect(F.x0 - 6, F.y1, F.x1 - F.x0 + 12, 6); ctx.fillRect(F.x0 - 6, F.y0, 6, F.y1 - F.y0); ctx.fillRect(F.x1, F.y0, 6, F.y1 - F.y0);
+    ctx.fillStyle = '#8a5a2b'; for (const [x, y] of [[F.x0 - 6, F.y0 - 6], [F.x1, F.y0 - 6], [F.x0 - 6, F.y1], [F.x1, F.y1]]) ctx.fillRect(x, y, 6, 6);
+    ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillRect(F.x0 - 6, F.y1, F.x1 - F.x0 + 12, 2);
+    // the mixer's parking bay
+    ctx.strokeStyle = 'rgba(255,255,255,0.65)'; ctx.lineWidth = 3; ctx.setLineDash([10, 7]); U.roundRect(ctx, B.MIXER.x - 34, B.MIXER.y - 64, 68, 128, 8); ctx.stroke(); ctx.setLineDash([]);
     // the crane's footing
     ctx.fillStyle = '#b8b3aa'; ctx.fillRect(B.CRANE.x - 26, B.CRANE.y - 16, 52, 22);
-    // a big "2" style dashed outline where the drop tower's queue will go
+    // a dashed outline where the drop tower's queue will go
     ctx.strokeStyle = 'rgba(255,140,26,0.6)'; ctx.lineWidth = 3; ctx.setLineDash([8, 6]); U.roundRect(ctx, 9500, 5180, 220, 120, 14); ctx.stroke(); ctx.setLineDash([]);
     ctx.font = r.font(12); ctx.fillStyle = 'rgba(160,80,10,0.7)'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('QUEUE HERE SOON', 9610, 5240);
   },
@@ -603,6 +792,9 @@ const PizzaPierExt = {
       }
       ctx.lineCap = 'butt';
     }
+    // the building site's foundation forms and the concrete poured into them, and the mixer's puddles
+    const F = CFG.PIERPARK.BUILD.FOUND;
+    if (r.camX < F.x1 + 600 && r.camX + r.viewW > F.x0 - 300 && r.camY < F.y1 + 200 && r.camY + r.viewH > F.y0 - 200) this.drawFoundation(r, g);
   },
   entities(r, g, items) {
     if (!this.st || !this.here(g)) return;
@@ -629,8 +821,6 @@ const PizzaPierExt = {
     const B = P.BUILD;
     if (vis(9480, 9960, B.TOWER.y)) {
       items.push({ y: B.TOWER.y, draw: () => this.drawTower(r, g) });
-      items.push({ y: B.CRANE.y, draw: () => this.drawCrane(r, g) });
-      items.push({ y: B.MIXER.y, draw: () => this.drawMixer(r, g) });
       items.push({ y: B.PILE.y, draw: () => this.drawPile(r) });
       items.push({ y: B.SIGN.y, draw: () => this.drawSign(r) });
       for (const cx of B.CONES) items.push({ y: B.CONE_Y, draw: () => this.drawCone(r.ctx, cx, B.CONE_Y) });
@@ -639,6 +829,9 @@ const PizzaPierExt = {
       const w = st.worker;
       items.push({ y: w.y, draw: () => this.drawWorker(r, g, w.x, w.y, { facing: w.facing || 1, moving: w.moving, bob: w.bob, beam: w.carry }) });
     }
+    // the concrete mixer (the crane draws itself: js/towercrane.js), with its stream when it pours
+    const v = this.mixer;
+    if (v && vis(v.x - 80, v.x + 80, v.y)) items.push({ y: v.y + 12, draw: () => { r.drawSiteVehicle(g, v, 30); this.drawStream(r, g, v); } });
     // strollers
     for (const w of st.walkers) if (vis(w.x - 30, w.x + 30, w.y)) items.push({ y: w.y, draw: () => this.drawWalker(r, g, w) });
     // a few visitors queuing by the wheel's gate
@@ -750,16 +943,18 @@ const PizzaPierExt = {
     for (let c = 0; c < cars; c++) {
       const x = T.x0 + c * (cw + gap), front = c === cars - 1;
       ctx.fillStyle = '#2b2f36'; for (const wx of [x + 20, x + 36, x + cw - 36, x + cw - 20]) { ctx.beginPath(); ctx.arc(wx, y - 2, 7, 0, Math.PI * 2); ctx.fill(); }
-      ctx.fillStyle = '#8e44ad'; U.roundRect(ctx, x, top, cw, 64, front ? 14 : 8); ctx.fill();
-      ctx.fillStyle = '#a861c4'; ctx.fillRect(x + 4, top + 4, cw - 8, 6);
+      ctx.fillStyle = PIER_D_ORANGE; U.roundRect(ctx, x, top, cw, 64, front ? 14 : 8); ctx.fill();
+      ctx.fillStyle = '#ff8f57'; ctx.fillRect(x + 4, top + 4, cw - 8, 6);
       ctx.fillStyle = '#ffffff'; ctx.fillRect(x, top + 40, cw, 6);
-      ctx.fillStyle = '#d7c3e6'; ctx.fillRect(x, top + 50, cw, 10);
+      ctx.fillStyle = '#ffd3bd'; ctx.fillRect(x, top + 50, cw, 10);
       // windows, doors
       for (let wx = x + 10; wx < x + cw - 20; wx += 24) { ctx.fillStyle = k > 0.3 ? '#fff1b8' : '#cfe9ff'; U.roundRect(ctx, wx, top + 12, 18, 22, 4); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.fillRect(wx + 3, top + 14, 4, 16); }
-      ctx.fillStyle = '#6c3483'; ctx.fillRect(x + cw / 2 - 12, top + 10, 24, 50); ctx.fillStyle = k > 0.3 ? '#fff1b8' : '#cfe9ff'; ctx.fillRect(x + cw / 2 - 10, top + 13, 9, 22); ctx.fillRect(x + cw / 2 + 1, top + 13, 9, 22);
+      ctx.fillStyle = '#c7470c'; ctx.fillRect(x + cw / 2 - 12, top + 10, 24, 50); ctx.fillStyle = k > 0.3 ? '#fff1b8' : '#cfe9ff'; ctx.fillRect(x + cw / 2 - 10, top + 13, 9, 22); ctx.fillRect(x + cw / 2 + 1, top + 13, 9, 22);
       if (front) {
-        ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(x + cw - 20, top + 26, 13, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#8e44ad'; ctx.font = r.font(16); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('2', x + cw - 20, top + 27);
+        // the round "D" bullet: an orange circle with a white D, on a white ring so it shows on the orange car
+        ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(x + cw - 20, top + 26, 14, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = PIER_D_ORANGE; ctx.beginPath(); ctx.arc(x + cw - 20, top + 26, 11, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#ffffff'; ctx.font = r.font(15); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('D', x + cw - 20, top + 27);
         ctx.fillStyle = '#ffe14d'; ctx.beginPath(); ctx.arc(x + cw - 6, top + 52, 4, 0, Math.PI * 2); ctx.fill();
         this.glow(ctx, x + cw - 6, top + 52, 26, '255,230,120', k);
       }
@@ -770,14 +965,14 @@ const PizzaPierExt = {
     const ctx = r.ctx, P = CFG.PIERPARK, y = P.POST_Y, rt = 5468, k = this.dusk(), t = g.time;
     for (const x of P.POSTS) {
       ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(x + 3, y + 3, 9, 4, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#6c3483'; ctx.fillRect(x - 5, rt + 30, 10, y - rt - 30); ctx.fillStyle = '#a861c4'; ctx.fillRect(x - 5, rt + 30, 3, y - rt - 30);
-      ctx.fillStyle = '#8e44ad'; ctx.fillRect(x - 9, y - 10, 18, 10);
+      ctx.fillStyle = '#c7470c'; ctx.fillRect(x - 5, rt + 30, 10, y - rt - 30); ctx.fillStyle = '#ff8f57'; ctx.fillRect(x - 5, rt + 30, 3, y - rt - 30);
+      ctx.fillStyle = PIER_D_ORANGE; ctx.fillRect(x - 9, y - 10, 18, 10);
     }
-    // the roof: a shallow purple and white vault over the track
+    // the roof: a shallow orange and white vault over the track
     ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(8000, rt + 34, 404, 8);
     ctx.fillStyle = '#ffffff'; U.roundRect(ctx, 8000, rt, 404, 36, 8); ctx.fill();
-    for (let x = 8004, i = 0; x < 8400; x += 26, i++) { ctx.fillStyle = i % 2 ? '#8e44ad' : '#b07cc6'; ctx.fillRect(x, rt + 4, 13, 24); }
-    ctx.fillStyle = '#6c3483'; ctx.fillRect(8000, rt + 28, 404, 8);
+    for (let x = 8004, i = 0; x < 8400; x += 26, i++) { ctx.fillStyle = i % 2 ? PIER_D_ORANGE : '#ffa06e'; ctx.fillRect(x, rt + 4, 13, 24); }
+    ctx.fillStyle = '#c7470c'; ctx.fillRect(8000, rt + 28, 404, 8);
     for (let x = 8012, i = 0; x < 8400; x += 20, i++) { const on = k > 0.2 ? (Math.floor(t * 3 + i) % 3 !== 0) : i % 2 === 0; this.bulb(ctx, x, rt + 32, '#ffe14d', on); }
     if (k > 0.2) for (const x of P.POSTS) this.glow(ctx, x, rt + 50, 50, '255,230,140', k);
   },
@@ -787,7 +982,7 @@ const PizzaPierExt = {
     // the low fence along the platform's edge, either side of the gate
     const fence = (x0, x1) => {
       ctx.fillStyle = '#ffffff'; ctx.fillRect(x0, P.FENCE_Y - 22, x1 - x0, 4); ctx.fillRect(x0, P.FENCE_Y - 12, x1 - x0, 4);
-      for (let x = x0 + 2; x < x1; x += 16) { ctx.fillStyle = '#8e44ad'; ctx.fillRect(x, P.FENCE_Y - 26, 5, 28); }
+      for (let x = x0 + 2; x < x1; x += 16) { ctx.fillStyle = PIER_D_ORANGE; ctx.fillRect(x, P.FENCE_Y - 26, 5, 28); }
     };
     fence(PF.x0, xl - 12); fence(xr + 12, PF.x1);
     // the pillars: red and white like a barber's pole, with gold caps
@@ -805,7 +1000,7 @@ const PizzaPierExt = {
     for (let i = 0; i <= 14; i++) { const u = i / 14, bx = (1 - u) * (1 - u) * xl + 2 * u * (1 - u) * A.x + u * u * xr, by = (1 - u) * (1 - u) * (top + 20) + 2 * u * (1 - u) * (top - 50) + u * u * (top + 20); this.bulb(ctx, bx, by, ['#ff5252', '#ffe14d', '#5ec8f2'][i % 3], k > 0.2 ? Math.floor(t * 4 + i) % 2 === 0 : true); }
     ctx.fillStyle = '#e4572e'; U.roundRect(ctx, A.x - 104, top + 2, 208, 40, 12); ctx.fill();
     ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; U.roundRect(ctx, A.x - 104, top + 2, 208, 40, 12); ctx.stroke();
-    ctx.fillStyle = '#ffffff'; ctx.font = r.font(18); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🍕 PIZZA PIER 🎡', A.x, top + 23);
+    ctx.fillStyle = '#ffffff'; ctx.font = r.font(18); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🎡 CONEY ISLAND', A.x, top + 23);
     // a big pizza on top of the arch
     r.drawPizza(A.x, top - 22, 16);
     if (k > 0.2) this.glow(ctx, A.x, top + 22, 120, '255,200,120', k * 0.7);
@@ -1042,54 +1237,48 @@ const PizzaPierExt = {
       ctx.fillStyle = '#ff8c1a'; ctx.beginPath(); ctx.moveTo(x + hw - 4, top - 26); ctx.lineTo(x + hw + 12 + Math.sin(t * 5) * 2, top - 21); ctx.lineTo(x + hw - 4, top - 16); ctx.closePath(); ctx.fill();
     }
   },
-  drawCrane(r, g) {
-    const ctx = r.ctx, B = CFG.PIERPARK.BUILD, C = B.CRANE, s = this.save(g), st = this.st, t = g.time;
-    const top = C.top, mx = C.x;
-    // the mast: a yellow lattice
-    ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(mx - 18, C.y - 4, 40, 8);
-    ctx.fillStyle = '#ffc107'; ctx.fillRect(mx - 12, top, 4, C.y - top); ctx.fillRect(mx + 8, top, 4, C.y - top);
-    ctx.strokeStyle = '#ffc107'; ctx.lineWidth = 2; ctx.beginPath();
-    for (let y = C.y; y > top + 12; y -= 20) { ctx.moveTo(mx - 10, y); ctx.lineTo(mx + 10, y - 20); ctx.moveTo(mx - 10, y - 20); ctx.lineTo(mx + 10, y - 20); }
-    ctx.stroke();
-    ctx.fillStyle = '#5c6670'; ctx.fillRect(mx - 20, C.y - 10, 40, 12);
-    // the jib along the top, the counterweight, the cab
-    ctx.fillStyle = '#ffc107'; ctx.fillRect(C.jib0, top - 2, C.jib1 - C.jib0, 5); ctx.fillRect(C.jib0, top + 10, mx - C.jib0, 3);
-    ctx.strokeStyle = '#ffc107'; ctx.lineWidth = 1.5; ctx.beginPath(); for (let x = C.jib0; x < mx; x += 16) { ctx.moveTo(x, top + 11); ctx.lineTo(x + 8, top); ctx.lineTo(x + 16, top + 11); } ctx.stroke();
-    ctx.strokeStyle = '#5c6670'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(mx, top - 30); ctx.lineTo(C.jib0 + 40, top); ctx.moveTo(mx, top - 30); ctx.lineTo(C.jib1, top); ctx.stroke();
-    ctx.fillStyle = '#ffc107'; ctx.fillRect(mx - 3, top - 32, 6, 32);
-    ctx.fillStyle = '#8a8f99'; ctx.fillRect(C.jib1 - 34, top + 2, 30, 18);
-    ctx.fillStyle = '#ff8c1a'; U.roundRect(ctx, mx - 16, top + 4, 26, 22, 4); ctx.fill(); ctx.fillStyle = '#cfe9ff'; ctx.fillRect(mx - 12, top + 8, 12, 10);
-    // the trolley over the tower, the cable and the hook with the next piece hanging on it
-    const tx = B.TOWER.x, towerTop = B.TOWER.y - s.built * B.SEG;
-    let hookY = towerTop - 64, sway = Math.sin(t * 1.3) * 3, piece = s.built < B.MAX;
-    if (st.piece) { const k = this.ease(st.piece.t / B.LOWER_T); hookY = U.lerp(towerTop - 64, towerTop - B.SEG - 12, k); sway *= 1 - k; }
-    ctx.fillStyle = '#5c6670'; ctx.fillRect(tx - 8, top + 1, 16, 7);
-    ctx.strokeStyle = '#3e424a'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(tx, top + 8); ctx.lineTo(tx + sway, hookY); ctx.stroke();
-    ctx.fillStyle = '#e4572e'; ctx.fillRect(tx + sway - 5, hookY, 10, 6);
-    ctx.strokeStyle = '#3e424a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(tx + sway, hookY + 9, 4, 0, Math.PI); ctx.stroke();
-    if (piece) {
-      const px = tx + sway, py = hookY + 12, col = s.built % 2 ? '#ffcf4d' : '#e4572e', hw = B.HALF;
-      ctx.strokeStyle = '#3e424a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px - hw + 3, py + 8); ctx.moveTo(px, py); ctx.lineTo(px + hw - 3, py + 8); ctx.stroke();
-      ctx.fillStyle = col; ctx.fillRect(px - hw, py + 8, 6, B.SEG); ctx.fillRect(px + hw - 6, py + 8, 6, B.SEG); ctx.fillRect(px - hw, py + 8, hw * 2, 4);
-      ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(px - hw + 4, py + 8 + B.SEG); ctx.lineTo(px + hw - 4, py + 10); ctx.moveTo(px + hw - 4, py + 8 + B.SEG); ctx.lineTo(px - hw + 4, py + 10); ctx.stroke();
+  // the foundation inside its forms: the parts already poured (dry, pale and smooth), the wet concrete going in now
+  // (glossy, filling its part of the forms), and the mixer's puddles elsewhere on the site (fading after a while)
+  drawFoundation(r, g) {
+    const ctx = r.ctx, B = CFG.PIERPARK.BUILD, F = B.FOUND, s = this.save(g), w = (F.x1 - F.x0) / F.N, t = g.time;
+    for (let k = 0; k < s.found; k++) {
+      const x = F.x0 + k * w;
+      ctx.fillStyle = '#c9c5bc'; ctx.fillRect(x, F.y0, w, F.y1 - F.y0);
+      ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(x, F.y0, w, 3);
+      ctx.fillStyle = 'rgba(120,115,105,0.25)'; for (let i = 0; i < 6; i++) ctx.fillRect(x + 5 + ((i * 17 + k * 7) % (w - 10)), F.y0 + 8 + ((i * 23) % (F.y1 - F.y0 - 14)), 3, 2);
     }
+    if (s.found >= F.N) { ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 2; for (let k = 1; k < F.N; k++) { ctx.beginPath(); ctx.moveTo(F.x0 + k * w, F.y0 + 2); ctx.lineTo(F.x0 + k * w, F.y1 - 2); ctx.stroke(); } }
+    for (const q of this.st.puddles) {
+      const k = q.grow ? 0.25 + 0.75 * Math.sqrt(Math.min(1, q.t / q.grow)) : 1;
+      const a = q.found ? (q.t > q.grow ? Math.max(0, 1 - (q.t - q.grow) / 3) : 1) : (q.t > B.PUDDLE_T - 2 ? (B.PUDDLE_T - q.t) / 2 : 1);
+      if (a <= 0) continue;
+      ctx.save(); ctx.globalAlpha = a;
+      if (q.found) { const kx = Math.floor((q.x - F.x0) / w); ctx.beginPath(); ctx.rect(F.x0 + kx * w, F.y0, w, F.y1 - F.y0); ctx.clip(); }
+      ctx.fillStyle = '#8a8d93'; ctx.beginPath(); ctx.ellipse(q.x, q.y, q.r * k, q.r * 0.6 * k, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#a3a6ab'; ctx.beginPath(); ctx.ellipse(q.x - q.r * 0.2, q.y - q.r * 0.15, q.r * 0.5 * k, q.r * 0.25 * k, 0, 0, Math.PI * 2); ctx.fill();
+      if (q.t < q.grow + 0.6) { const ph = (t * 3) % 1; ctx.strokeStyle = 'rgba(200,203,208,0.9)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(q.x, q.y, 8 + ph * 16, 3 + ph * 7, 0, 0, Math.PI * 2); ctx.stroke(); }
+      ctx.restore();
+    }
+    // the tower's own concrete footing, on top of it all
+    ctx.fillStyle = '#b8b3aa'; ctx.fillRect(B.TOWER.x - 46, B.TOWER.y - 18, 92, 26);
+    ctx.fillStyle = '#d0ccc4'; ctx.fillRect(B.TOWER.x - 46, B.TOWER.y - 18, 92, 5);
   },
-  drawMixer(r, g) {
-    const ctx = r.ctx, M = CFG.PIERPARK.BUILD.MIXER, x = M.x, y = M.y, t = g.time;
-    ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(x - 56, y - 2, 118, 8);
-    ctx.fillStyle = '#2b2f36'; for (const wx of [x - 38, x - 14, x + 38]) { ctx.beginPath(); ctx.arc(wx, y - 4, 10, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#8a8f99'; ctx.beginPath(); ctx.arc(wx, y - 4, 4, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#2b2f36'; }
-    ctx.fillStyle = '#5c6670'; ctx.fillRect(x - 54, y - 18, 100, 8);
-    // the cab
-    ctx.fillStyle = '#ffc107'; U.roundRect(ctx, x + 22, y - 54, 34, 40, 6); ctx.fill();
-    ctx.fillStyle = '#cfe9ff'; ctx.fillRect(x + 32, y - 48, 18, 14);
-    // the drum, turning (its stripes slide round)
-    ctx.save(); ctx.translate(x - 16, y - 40); ctx.rotate(-0.18);
-    ctx.fillStyle = '#ff8c1a'; ctx.beginPath(); ctx.ellipse(0, 0, 38, 22, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.save(); ctx.beginPath(); ctx.ellipse(0, 0, 38, 22, 0, 0, Math.PI * 2); ctx.clip();
-    ctx.fillStyle = '#ffffff'; const off = (t * 30) % 24; for (let k = -60; k < 60; k += 24) { ctx.beginPath(); ctx.moveTo(k + off, -24); ctx.lineTo(k + off + 10, -24); ctx.lineTo(k + off - 2, 24); ctx.lineTo(k + off - 12, 24); ctx.closePath(); ctx.fill(); }
-    ctx.restore();
-    ctx.fillStyle = '#5c6670'; ctx.beginPath(); ctx.ellipse(-36, 0, 6, 12, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
+  // the mixer's concrete stream: from the chute's tip, out and down into the forms (or straight down), thick and wobbly
+  drawStream(r, g, v) {
+    const p = v.pour, G = this.pourGeom(); if (!p || !p.puddle) return;
+    const u = p.t - G.out; if (u < 0 || u > G.flow) return;
+    const ctx = r.ctx, t = g.time, tip = this.chuteTip(v), L = p.puddle, front = Math.min(1, u / 0.15), thin = Math.min(1, (G.flow - u) / 0.2), w = 7 + 6 * thin;
+    const cx = L.x, cy = tip.y, at = (k) => ({ x: (1 - k) * (1 - k) * tip.x + 2 * k * (1 - k) * cx + k * k * L.x, y: (1 - k) * (1 - k) * tip.y + 2 * k * (1 - k) * cy + k * k * L.y });
+    const n = 12, wob = Math.sin(t * 30) * 1.4;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    for (const [col, lw] of [['#3f4248', w + 3], ['#5d6168', w], ['#9da1a8', 3]]) {
+      ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.beginPath();
+      for (let i = 0; i <= n; i++) { const P = at(front * i / n), o = i && i < n ? wob * Math.sin(i * 1.7) : 0; if (i) ctx.lineTo(P.x + o, P.y); else ctx.moveTo(P.x, P.y); }
+      ctx.stroke();
+    }
+    ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
+    ctx.fillStyle = '#6b6e75';
+    for (let i = 0; i < 5; i++) { const k = ((t * 2.2 + i * 0.2) % 1) * front, P = at(k), dx = (i % 2 ? 1 : -1) * (w / 2 + 3 + k * 6); ctx.beginPath(); ctx.arc(P.x + dx, P.y, 2 + (i % 2), 0, Math.PI * 2); ctx.fill(); }
   },
   drawPile(r) {
     const ctx = r.ctx, P = CFG.PIERPARK.BUILD.PILE;
@@ -1116,3 +1305,17 @@ const PizzaPierExt = {
 };
 Game.ext.unshift(PizzaPierExt);   // ahead of the outer maps: at the pier its buttons and hints count
 Render.ext.push(PizzaPierExt);
+// the building site's tower crane, rideable (js/towercrane.js, loaded first): the pile of beams by its foot, the Pizza
+// Drop's top as its target; left alone it does the park's own work (see craneIdle)
+PizzaPierExt.crane = typeof TowerCrane === 'undefined' ? null : (() => {
+  const B = CFG.PIERPARK.BUILD, C = B.CRANE, L = B.LAND;
+  return TowerCrane.create({
+    id: 'pier', area: 'pizzapier', base: { x: C.x, y: C.y }, seat: { x: C.x, y: C.y + 38 },
+    height: C.y - C.top, reach: C.REACH, counter: C.COUNTER, driver: '#8d5524',
+    piles: [{ x: B.PILE.x, y: B.PILE.y - 4, kind: 'beam' }], fetchHint: 'Move the hook to the beams! 🪝',
+    land: (x, y) => x > L.x0 && x < L.x1 && y > L.y0 && y < L.y1,
+    targets: (g) => [PizzaPierExt.craneTarget(g)],
+    idle: (g, c) => PizzaPierExt.craneIdle(g, c),
+    drawLoad: (r, g, c, kind, x, y) => PizzaPierExt.drawCraneLoad(r, g, c, kind, x, y),
+  });
+})();

@@ -30,7 +30,7 @@ module.exports = async (t) => {
 
   // ---- every route on the map is a real ride (Game.startTravel destinations), and each ride has its route
   const routes = await t.ev(() => CFG.WORLDMAP.ROUTES.map((r) => r.a + '-' + r.b + ':' + r.via));
-  for (const r of ['town-site:train', 'site-snow:skilift', 'town-city:bus', 'city-campus:subway', 'town-islands:ferry', 'islands-moon:rocket', 'town-cloud:flight']) {
+  for (const r of ['town-site:train', 'site-snow:skilift', 'town-city:bus', 'city-campus:subway', 'town-islands:ferry', 'islands-moon:rocket', 'town-cloud:flight', 'city-pizzapier:pierline']) {
     t.expect(routes.includes(r), 'the map has the route ' + r);
   }
 
@@ -97,13 +97,13 @@ module.exports = async (t) => {
   }
   // tapping empty sea clears the bubble
   {
-    const r = await t.ev(() => { const r = document.querySelector('#modal-worldmap canvas').getBoundingClientRect(); return { x: r.left + r.width * 0.3, y: r.top + r.height * 0.97 }; });
+    const r = await t.ev(() => { const r = document.querySelector('#modal-worldmap canvas').getBoundingClientRect(); return { x: r.left + r.width * 0.72, y: r.top + r.height * 0.97 }; });
     await t.page.mouse.click(r.x, r.y); await t.wait(100);
     t.expect(await t.ev(() => WorldMapExt.sel === null), 'tapping empty map clears the bubble');
   }
 
   // ---- you are here in other maps and interiors
-  const cases = { site: 'site', snow: 'snow', city: 'city', bakery: 'city', arcade: 'city', subway: 'city', moon: 'moon', mines: 'site', cocoacabin: 'snow', barn: 'town', upstairs: 'town', lighthouse: 'islands', skycafe: 'cloud', lowlibrary: 'campus', rocketinside: 'islands', jetcabin: 'town' };
+  const cases = { site: 'site', snow: 'snow', city: 'city', bakery: 'city', arcade: 'city', subway: 'city', moon: 'moon', mines: 'site', cocoacabin: 'snow', barn: 'town', upstairs: 'town', lighthouse: 'islands', skycafe: 'cloud', lowlibrary: 'campus', rocketinside: 'islands', jetcabin: 'town', pizzapier: 'pizzapier' };
   for (const [a, want] of Object.entries(cases)) t.expectEq(await hereIn(a), want, `in ${a} the hat is on ${want}`);
   await hereIn('bakery'); await t.wait(200); await t.shot('here-bakery-1100');
   await hereIn('moon'); await t.wait(200); await t.shot('here-moon-1100');

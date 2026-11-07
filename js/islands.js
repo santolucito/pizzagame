@@ -1263,6 +1263,9 @@ const IslandsExt = {
       const k = tr.t / tr.dur, ease = k < 0.12 ? k / 0.12 : k > 0.88 ? (1 - k) / 0.12 : 1;
       const dist = (tr.t < 1.2 ? tr.t * tr.t / 2.4 : tr.t - 0.6) * 260;
       const toIslands = tr.to === 'islands';
+      // the Islands lie to the left of town (as on the world map): heading out the boat sails left, coming home it
+      // sails right, so the scene is mirrored on the way out (the banner below is drawn unmirrored)
+      ctx.save(); if (toIslands) { ctx.translate(W, 0); ctx.scale(-1, 1); }
       const sky = ctx.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#79c6f2'); sky.addColorStop(0.55, '#d9f0ff'); sky.addColorStop(1, '#eaf7ff');
       ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
       r.skySun(ctx, W * 0.78, H * 0.16, Math.min(W, H) * 0.06);
@@ -1296,6 +1299,7 @@ const IslandsExt = {
       // gulls
       ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
       for (let i = 0; i < 3; i++) { const gx = ((W * 0.3 + i * 300 - dist * 0.5) % (W + 200) + W + 200) % (W + 200) - 100, gy = H * (0.18 + i * 0.07) + Math.sin(t * 1.5 + i) * 10, flap = Math.sin(t * 8 + i) * 4; ctx.beginPath(); ctx.moveTo(gx - 10, gy + flap); ctx.quadraticCurveTo(gx - 5, gy - 4, gx, gy); ctx.quadraticCurveTo(gx + 5, gy - 4, gx + 10, gy + flap); ctx.stroke(); }
+      ctx.restore();
       // banner and progress bar, like the train ride
       const msg = toIslands ? '⛴️ Next stop: the Islands! 🏝️' : '⛴️ Next stop: home! 🍕';
       ctx.fillStyle = 'rgba(43,29,20,0.85)'; const bw = Math.min(W - 24, 360); U.roundRect(ctx, W / 2 - bw / 2, 60, bw, 44, 12); ctx.fill();

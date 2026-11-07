@@ -21,7 +21,7 @@ module.exports = async (t) => {
 
   // ---- the train arrives soon after you reach the platform
   await t.ev(() => T.tp(CFG.SUBWAY.STATION.stand.x, CFG.SUBWAY.STATION.stand.y));
-  t.expectEq(await t.ev(() => T.hint()), 'Wait on the platform for the subway', 'hint on the platform');
+  t.expectEq(await t.ev(() => T.hint()), 'Red train 🎓 to Columbia comes here!', 'hint on the platform');
   const arrived = await t.ev(() => T.until(() => SubwayExt.st.train.state === 'stopped' && SubwayExt.st.train.doors >= 1, 1500));
   t.expect(arrived >= 0 && arrived <= 60 * 8, `the subway pulls in within 8 s of reaching the platform (took ${arrived} steps)`);
   t.expect(/Subway leaves in \d+s/.test(await t.ev(() => T.hint())), 'countdown hint while the train waits');

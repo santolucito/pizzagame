@@ -258,7 +258,7 @@ const AtmosphereExt = {
         ctx.drawImage(cv, 0, 0, W, H);
       } else {
         tint(ctx);
-        if (k > 0.5 && g.travel.via !== 'subway') this.drawStars(ctx, g, W, H);
+        if (k > 0.5 && g.travel.via !== 'subway' && !g.travel.indoors) this.drawStars(ctx, g, W, H);
       }
     }
     ctx.restore();

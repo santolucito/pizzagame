@@ -37,6 +37,10 @@ CFG.WORLDMAP = {
       ico: '🏝️', name: 'The Islands', col: '#c9f3e8', how: '⛴️ Take the ferry from the dock by River House',
       subs: [['🏖️', 'Sunny Beach', 'Sunny Beach'], ['🗼', 'Lighthouse', 'The Lighthouse'], ['⭐', 'Starfish Cove', 'Starfish Cove']],
     },
+    pizzapier: {
+      ico: '🎡', name: 'Pizza Pier', col: '#ffd6ec', how: '🚇 Ride the purple subway (Line 2) from the City',
+      subs: [['🎢', 'Coaster', 'The roller coaster'], ['🚗', 'Bumper cars', 'The bumper cars'], ['🎯', 'Games', 'The midway games']],
+    },
     moon: {
       ico: '🌕', name: 'Pizza Moon', col: '#3d3f78', dark: true, how: '🚀 Fly the rocket from Rocket Island',
       subs: [['👽', 'Alien', 'The friendly alien']],
@@ -58,6 +62,7 @@ CFG.WORLDMAP = {
     campus: 'campus', lowlibrary: 'campus', barnardhall: 'campus',
     islands: 'islands', lighthouse: 'islands', crabshack: 'islands', coconuthut: 'islands', missionctl: 'islands', beachhut: 'islands', rocketinside: 'islands',
     moon: 'moon',
+    pizzapier: 'pizzapier',
     cloud: 'cloud', skycafe: 'cloud',
   },
   // how the places are joined (every Game.startTravel in js/): the path style and the vehicle riding it
@@ -66,25 +71,29 @@ CFG.WORLDMAP = {
     { a: 'site', b: 'snow', via: 'skilift', ico: '🚡', style: 'cable', loop: false },
     { a: 'town', b: 'city', via: 'bus', ico: '🚌', style: 'road', loop: false },
     { a: 'city', b: 'campus', via: 'subway', ico: '🚇', style: 'tunnel', loop: false },
+    { a: 'city', b: 'pizzapier', via: 'pierline', ico: '🚇', style: 'tunnel', loop: false },
     { a: 'town', b: 'islands', via: 'ferry', ico: '⛴️', style: 'water', loop: false },
     { a: 'islands', b: 'moon', via: 'rocket', ico: '🚀', style: 'space', loop: true },
     { a: 'town', b: 'cloud', via: 'flight', ico: '✈️', style: 'air', loop: true },
   ],
   // two hand-made layouts (fractions of the canvas): a wide one for desktops and tablets, a tall one for phones
+  // Laid out to match the rides: the train heads RIGHT out of town (Construction Town, then the ski lift up and right to
+  // Snowy Peak), the bus and the ferry head LEFT (the City; the Islands across the sea), the plane climbs up and right
+  // (Cloud Harbor), the purple subway runs left from the City down to Pizza Pier by the sea, the rocket climbs to the Moon.
   LAYOUTS: {
     wide: {
-      pos: { town: [0.42, 0.55], site: [0.15, 0.56], snow: [0.135, 0.2], cloud: [0.405, 0.2], campus: [0.655, 0.21], city: [0.665, 0.53], islands: [0.765, 0.79], moon: [0.915, 0.21] },
-      bend: { 'town-site': 0.06, 'site-snow': 0.0, 'town-city': -0.08, 'city-campus': 0.1, 'town-islands': 0.2, 'islands-moon': 0.2, 'town-cloud': 0.12 },
-      horizon: 0.34, sea: [-0.05, 0.75, 1.05, 1.1], space: [0.82, -0.05, 1.05, 0.38],
-      mountains: [[0.03, 0.12, 0.13], [0.15, 0.06, 0.16], [0.27, 0.16, 0.11]], hill: [0.655, 0.26, 0.13],
-      decor: [['🐳', 0.12, 0.89, 1.0], ['⛵', 0.52, 0.9, 0.8], ['🌳', 0.28, 0.44, 0.75], ['🌳', 0.545, 0.62, 0.7], ['🌻', 0.04, 0.68, 0.55], ['🐟', 0.64, 0.95, 0.55], ['🎈', 0.54, 0.09, 0.7]],
+      pos: { town: [0.47, 0.5], site: [0.75, 0.53], snow: [0.885, 0.2], cloud: [0.655, 0.19], city: [0.21, 0.5], campus: [0.29, 0.2], pizzapier: [0.085, 0.72], islands: [0.36, 0.83], moon: [0.47, 0.14] },
+      bend: { 'town-site': -0.06, 'site-snow': 0.0, 'town-city': 0.08, 'city-campus': -0.1, 'city-pizzapier': 0.12, 'town-islands': -0.12, 'islands-moon': -0.1, 'town-cloud': -0.12 },
+      horizon: 0.34, sea: [-0.05, 0.76, 1.05, 1.1], space: [0.39, -0.05, 0.56, 0.3],
+      mountains: [[0.76, 0.13, 0.12], [0.88, 0.06, 0.16], [1.0, 0.15, 0.12]], hill: [0.29, 0.26, 0.13],
+      decor: [['🐳', 0.86, 0.9, 1.0], ['⛵', 0.6, 0.91, 0.8], ['🌳', 0.6, 0.42, 0.75], ['🌳', 0.34, 0.6, 0.7], ['🌻', 0.95, 0.66, 0.55], ['🐟', 0.18, 0.95, 0.55], ['🎈', 0.57, 0.08, 0.7]],
     },
     tall: {
-      pos: { moon: [0.19, 0.115], cloud: [0.5, 0.125], snow: [0.81, 0.135], site: [0.79, 0.335], town: [0.43, 0.5], city: [0.79, 0.565], campus: [0.74, 0.8], islands: [0.25, 0.84] },
-      bend: { 'town-site': 0.08, 'site-snow': 0.0, 'town-city': -0.1, 'city-campus': 0.1, 'town-islands': -0.14, 'islands-moon': -0.07, 'town-cloud': -0.1 },
-      horizon: 0.245, sea: [-0.05, 0.69, 0.56, 1.1], space: [-0.05, -0.05, 0.36, 0.225],
-      mountains: [[0.68, 0.1, 0.14], [0.84, 0.04, 0.18], [0.98, 0.11, 0.12]], hill: null,
-      decor: [['🌳', 0.17, 0.42, 0.7], ['🌻', 0.12, 0.6, 0.55], ['🐳', 0.42, 0.93, 0.85], ['⛵', 0.1, 0.75, 0.7], ['🌳', 0.94, 0.68, 0.6], ['🎈', 0.66, 0.035, 0.6]],
+      pos: { moon: [0.47, 0.125], campus: [0.18, 0.26], cloud: [0.57, 0.29], snow: [0.78, 0.15], city: [0.2, 0.47], town: [0.52, 0.47], site: [0.78, 0.44], pizzapier: [0.18, 0.7], islands: [0.4, 0.87] },
+      bend: { 'town-site': -0.08, 'site-snow': 0.0, 'town-city': 0.1, 'city-campus': 0.1, 'city-pizzapier': -0.1, 'town-islands': 0.12, 'islands-moon': 0.14, 'town-cloud': -0.1 },
+      horizon: 0.3, sea: [-0.05, 0.75, 1.05, 1.1], space: [0.3, -0.05, 0.64, 0.2],
+      mountains: [[0.7, 0.1, 0.14], [0.86, 0.04, 0.18], [1.0, 0.11, 0.12]], hill: [0.2, 0.3, 0.16],
+      decor: [['🌳', 0.36, 0.6, 0.7], ['🌻', 0.92, 0.6, 0.55], ['🐳', 0.85, 0.93, 0.85], ['⛵', 0.25, 0.92, 0.7], ['🌳', 0.68, 0.62, 0.6], ['🎈', 0.36, 0.33, 0.6]],
     },
   },
 };

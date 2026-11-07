@@ -11,13 +11,18 @@ CFG.SUBWAY = {
   SEAL_IMG: 'icons/barnard-seal.png',   // Barnard's real seal, drawn in place of the hand-drawn crest
   EVERY: 20, CALL: 3, DWELL: 10, RIDE: 6, DOOR_T: 0.5,
   LINE: '1', COLOR: '#e4572e', BLUE: '#1f3b63',
+  // Line 2 (purple, 🎡) runs from the City station to Pizza Pier; it has its own platform and track east of Line 1's
+  LINE2: '2', COLOR2: '#8e44ad', PIER_STOPS: ['CITY', 'OCEAN AV', 'PIZZA PIER'],
   STATION: {
-    WORLD: { x0: 6400, y0: 2100, x1: 7300, y1: 2500 },
+    // one station, two halls side by side: Line 1's (with the stairs, the booth and the snack stand) and, through the
+    // arch in the dividing wall, Line 2's. At the Columbia end there is no Line 2: a friendly gate closes the arch.
+    WORLD: { x0: 6400, y0: 2100, x1: 8200, y1: 2500 },
+    L1: { x0: 6400, x1: 7300 },   // Line 1's hall: its train runs in from 400 px west of it and out 400 px east of it
     wallTop: 2144, wallSide: 30,
     floor: { x0: 6430, y0: 2144, x1: 7270, y1: 2404 },
     stairs: { x0: 6456, y0: 2144, x1: 6534, y1: 2218, foot: { x: 6495, y: 2234 } },
     booth: { x0: 6590, y0: 2152, x1: 6700, y1: 2214, clerk: { x: 6645, y: 2210 } },
-    board: { x0: 6760, y0: 2150, x1: 6910, y1: 2196 },
+    board: { x0: 6750, y0: 2150, x1: 6920, y1: 2204 },   // the route board: both lines, with their pictures
     snack: { x0: 7110, y0: 2152, x1: 7230, y1: 2214, vendor: { x: 7170, y: 2210 } },
     turnstiles: { y: 2290, xs: [6600, 6680, 6760, 6840, 6920, 7000, 7080] },
     pillars: [[6620, 2342], [6820, 2342], [7020, 2342], [7220, 2342]],
@@ -26,6 +31,17 @@ CFG.SUBWAY = {
     edge: 2404, track: { y0: 2418, y1: 2500 }, trackY: 2460,
     stopX: 6850, cars: 3, carLen: 150, gap: 10,
     stand: { x: 6850, y: 2388 },
+    // the wall between the two halls: an arch in the concourse joins them, below it the wall runs on down between the tracks
+    divider: { x0: 7270, x1: 7340, arch: { y0: 2196, y1: 2300 } },
+    L2: {
+      x0: 7340, x1: 8200,
+      floor: { x0: 7340, y0: 2144, x1: 8170, y1: 2404 },
+      stopX: 7755, stand: { x: 7755, y: 2388 },
+      turnstiles: { y: 2290, xs: [7480, 7560, 7640, 7720, 7800, 7880, 7960] },
+      pillars: [[7440, 2342], [7640, 2342], [7870, 2342], [8070, 2342]],
+      benches: [[7540, 2356], [7970, 2356]],
+      candy: { x0: 7990, y0: 2152, x1: 8110, y1: 2214, vendor: { x: 8050, y: 2210 } },
+    },
   },
   CAMPUS: {
     WORLD: { x0: 9000, y0: -170, x1: 10700, y1: 1100 },
@@ -145,15 +161,36 @@ const SubwayExt = {
   nearCityEntrance(g) { const p = g.player, e = this.cityEntrance(); return g.area === 'city' && this.onFoot(g) && !this.cityBusy() && U.dist(p.x, p.y, e.x, e.y) < 40; },
   nearCampusEntrance(g) { const p = g.player, e = this.campusEntrance(); return g.area === 'campus' && this.onFoot(g) && U.dist(p.x, p.y, e.x, e.y) < 40; },
   nearStairs(g) { const p = g.player, f = CFG.SUBWAY.STATION.stairs.foot; return g.area === 'subway' && this.onFoot(g) && U.dist(p.x, p.y, f.x, f.y) < 40; },
+  // the two lines: which train, where it stops, where it runs in from and out to, the slice of the station it is seen in
+  // (its own track, between the tunnel mouths) and its colour and bullet
+  line(n) {
+    const S = CFG.SUBWAY.STATION, K = CFG.SUBWAY;
+    return n === 2
+      ? { n: 2, train: this.st.train2, stopX: S.L2.stopX, from: S.L2.x0 - 400, to: S.L2.x1 + 400, clip0: S.divider.x1, clip1: S.WORLD.x1 - 22, color: K.COLOR2, bullet: K.LINE2, pic: '🎡' }
+      : { n: 1, train: this.st.train, stopX: S.stopX, from: S.L1.x0 - 400, to: S.L1.x1 + 400, clip0: S.WORLD.x0 + 10, clip1: S.divider.x0, color: K.COLOR, bullet: K.LINE, pic: this.st.end === 'campus' ? '🏙️' : '🎓' };
+  },
+  // which hall of the station a spot is in (1: Line 1's, west of the dividing wall; 2: Line 2's, east of it)
+  hallOf(x) { const D = CFG.SUBWAY.STATION.divider; return x < (D.x0 + D.x1) / 2 ? 1 : 2; },
+  line2Open() { return !this.st || this.st.end === 'city'; },
+  // the archway between the halls: a spot just west and just east of it
+  archSpots() { const D = CFG.SUBWAY.STATION.divider, y = (D.arch.y0 + D.arch.y1) / 2; return { w: { x: D.x0 - 20, y }, e: { x: D.x1 + 20, y } }; },
   // the train: its centre x, each car's left edge, and the platform spots in front of its doors
   carX(i, cx = this.st.train.x) { const S = CFG.SUBWAY.STATION, total = S.cars * S.carLen + (S.cars - 1) * S.gap; return cx - total / 2 + i * (S.carLen + S.gap); },
-  doorSpots(cx) {
+  doorSpots(cx, n = 1) {
     const S = CFG.SUBWAY.STATION, out = [];
+    if (cx === undefined) cx = this.line(n).train.x;
     for (let i = 0; i < S.cars; i++) { const x = this.carX(i, cx); out.push({ x: x + 35, y: S.edge - 14 }, { x: x + 115, y: S.edge - 14 }); }
     return out;
   },
-  nearestDoor(g) { const p = g.player; let best = null, bd = 1e9; for (const d of this.doorSpots()) { const dd = U.dist(p.x, p.y, d.x, d.y); if (dd < bd) { bd = dd; best = d; } } return { door: best, d: bd }; },
-  canBoard(g) { const t = this.st.train; if (g.area !== 'subway' || !this.onFoot(g) || this.st.boarding || this.st.alight || t.state !== 'stopped' || t.doors < 1) return false; return this.nearestDoor(g).d < 60; },
+  // the train of the hall the chef is in (Line 2's only while it runs, i.e. at the City end)
+  hallLine(g) { return this.hallOf(g.player.x) === 2 && this.line2Open() ? 2 : 1; },
+  nearestDoor(g, n = this.hallLine(g)) { const p = g.player; let best = null, bd = 1e9; for (const d of this.doorSpots(undefined, n)) { const dd = U.dist(p.x, p.y, d.x, d.y); if (dd < bd) { bd = dd; best = d; } } return { door: best, d: bd }; },
+  canBoard(g) {
+    const n = this.hallLine(g), t = this.line(n).train;
+    if (g.area !== 'subway' || !this.onFoot(g) || this.st.boarding || this.st.alight || t.state !== 'stopped' || t.doors < 1) return false;
+    if (n === 1 && this.hallOf(g.player.x) !== 1) return false;
+    return this.nearestDoor(g, n).d < 60;
+  },
   otherEnd() { return this.st.end === 'city' ? 'campus' : 'city'; },
   stationName() { return this.st.end === 'city' ? 'CITY STATION' : 'COLUMBIA – 116 ST'; },
 
@@ -178,6 +215,8 @@ const SubwayExt = {
     // commuters wait on the platform, climb aboard when the train is in, and new ones come up the stairs
     const commuters = [];
     for (let i = 0; i < 3; i++) commuters.push(Object.assign({ state: 'wait', x: U.rand(6600, 7200), y: U.rand(2376, 2392), tx: 0, ty: 0, t: U.rand(0.5, 3), moving: false, facing: 1, bob: 0, hidden: false, paper: i === 0, phones: i === 1 }, look(), { pack: i === 2 ? '#3b7dd8' : null }));
+    // a family off to the seaside waits for Line 2, balloons and all
+    for (let i = 0; i < 2; i++) commuters.push(Object.assign({ line: 2, state: 'wait', x: U.rand(7440, 8080), y: U.rand(2376, 2392), tx: 0, ty: 0, t: U.rand(0.5, 3), moving: false, facing: -1, bob: 0, hidden: false }, look(), { pack: null, balloon: ['#ff5fa2', '#ffd166'][i] }));
     // students wander about Barnard Hall
     const BL = CFG.SUBWAY.BARNARD.LINES, hallPeds = [];
     for (let i = 0; i < 2; i++) { const ln = BL[i], t = U.rand(ln.a + 30, ln.b - 30); hallPeds.push(Object.assign({ ln, dir: i ? 1 : -1, x: ln.h ? t : ln.x, y: ln.h ? ln.y : t, speed: U.rand(36, 50), pause: 0, moving: true, facing: 1, bob: Math.random() * 6 }, look())); }
@@ -185,7 +224,8 @@ const SubwayExt = {
     if (g.s.subway.seenBarnard === undefined) g.s.subway.seenBarnard = false;
     this.st = {
       end: g.s.subway.end === 'campus' ? 'campus' : 'city',
-      train: { x: S.WORLD.x0 - 400, state: 'away', timer: U.rand(6, 12), speed: 0, dwell: 0, doors: 0, rumble: 0 },
+      train: { x: S.L1.x0 - 400, state: 'away', timer: U.rand(6, 12), speed: 0, dwell: 0, doors: 0, rumble: 0 },
+      train2: { x: S.L2.x0 - 400, state: 'away', timer: U.rand(6, 12), speed: 0, dwell: 0, doors: 0, rumble: 0 },
       boarding: null, alight: null, fade: 0, justArrived: false, arrivedAt: 0,
       commuters, riders: [], rat: { on: false, x: 0, dir: 1, t: U.rand(6, 14) },
       peds, taxis, squirrel: { tree: 0, to: null, t: U.rand(1, 3), x: C.CU.trees[0][0], y: C.CU.trees[0][1], facing: 1, hop: 0 },
@@ -201,7 +241,8 @@ const SubwayExt = {
   rescue(g) {
     const st = this.st, p = g.player, W = CFG.AREAS[g.area].WORLD;
     if (st.boarding || st.alight || st.low.read) return false;
-    const bad = p.x < W.x0 + 4 || p.x > W.x1 - 4 || p.y < W.y0 + 4 || p.y > W.y1 - 4 || this.obstacles(g).some((o) => p.x > o.x && p.x < o.x + o.w && p.y > o.y && p.y < o.y + o.h);
+    const bad = p.x < W.x0 + 4 || p.x > W.x1 - 4 || p.y < W.y0 + 4 || p.y > W.y1 - 4 || this.obstacles(g).some((o) => p.x > o.x && p.x < o.x + o.w && p.y > o.y && p.y < o.y + o.h)
+      || (g.area === 'subway' && !this.line2Open() && this.hallOf(p.x) === 2);   // Line 2's hall is shut at the Columbia end
     if (!bad) return false;
     const K = this.interior(g.area);
     const spot = K ? K.EXIT : g.area === 'subway' ? CFG.SUBWAY.STATION.stairs.foot : CFG.SUBWAY.CAMPUS.ARRIVE;
@@ -222,6 +263,13 @@ const SubwayExt = {
       for (const [x, y] of S.pillars) o.push({ x: x - 13, y: y - 13, w: 26, h: 26 });
       for (const [x, y] of S.benches) o.push({ x: x - 26, y: y - 10, w: 52, h: 20 });
       o.push({ x: S.bin.x - 9, y: S.bin.y - 12, w: 18, h: 20 });
+      // the dividing wall (above and below the arch), Line 2's hall, and the gate across the arch at the Columbia end
+      const D = S.divider, L = S.L2;
+      o.push({ x: D.x0, y: S.wallTop, w: D.x1 - D.x0, h: D.arch.y0 - S.wallTop }, { x: D.x0, y: D.arch.y1, w: D.x1 - D.x0, h: W.y1 - D.arch.y1 });
+      o.push(rect(L.candy));
+      for (const [x, y] of L.pillars) o.push({ x: x - 13, y: y - 13, w: 26, h: 26 });
+      for (const [x, y] of L.benches) o.push({ x: x - 26, y: y - 10, w: 52, h: 20 });
+      if (!this.line2Open()) o.push({ x: D.x0, y: D.arch.y0, w: D.x1 - D.x0, h: D.arch.y1 - D.arch.y0 });
     } else if (g.area === 'campus') {
       const C = CFG.SUBWAY.CAMPUS, W = C.WORLD, CU = C.CU, BC = C.BC;
       const rect = (q) => ({ x: q.x0, y: q.y0, w: q.x1 - q.x0, h: q.y1 - q.y0 });
@@ -275,7 +323,7 @@ const SubwayExt = {
     if (g.area === 'barnardhall') return this.barnardAction(g);
     if (g.area !== 'subway') return null;
     if (this.nearStairs(g)) return { label: '🚶 Go up the stairs', run: (gg) => this.goUp(gg) };
-    if (this.canBoard(g)) return { label: '🚇 Ride the subway', run: (gg) => this.board(gg) };
+    if (this.canBoard(g)) return this.hallLine(g) === 2 ? { label: '🎡 Ride to Pizza Pier', run: (gg) => this.board(gg) } : { label: '🚇 Ride the subway', run: (gg) => this.board(gg) };
     return null;
   },
 
@@ -346,7 +394,7 @@ const SubwayExt = {
     st.end = end; g.s.subway.end = end; st.justArrived = false;
     g.area = 'subway'; p.x = S.stairs.foot.x; p.y = S.stairs.foot.y; p.moving = false; p.facing = 1; p.hasMoved = true; g.cameraSnap = true;
     st.fade = 0.45; Sfx.drop(); Haptics.tap();
-    const t = st.train; if (t.state === 'away' && t.timer > CFG.SUBWAY.CALL + 2) t.timer = CFG.SUBWAY.CALL + 2;
+    for (const t of end === 'city' ? [st.train, st.train2] : [st.train]) if (t.state === 'away' && t.timer > CFG.SUBWAY.CALL + 2) t.timer = CFG.SUBWAY.CALL + 2;
   },
   goUp(g) {
     const st = this.st, p = g.player;
@@ -356,13 +404,13 @@ const SubwayExt = {
     if (g.area === 'campus' && !g.s.subway.seenCampus) { g.s.subway.seenCampus = true; g.toast('🎓 Columbia campus! Find the lion and the bear 🦁🐻', true); }
   },
   board(g) {
-    const d = this.nearestDoor(g).door;
-    this.st.boarding = { t: 0, x: d.x, y0: g.player.y, y1: CFG.SUBWAY.STATION.edge + 18 };
+    const n = this.hallLine(g), d = this.nearestDoor(g, n).door;
+    this.st.boarding = { t: 0, x: d.x, y0: g.player.y, y1: CFG.SUBWAY.STATION.edge + 18, line: n };
     this.st.justArrived = false;
     g.player.moving = false; g.player.hasMoved = true;
     this.chime(g); Haptics.tap();
   },
-  chime(g) { if (g.area !== 'subway' && !(g.travel && g.travel.via === 'subway')) return; if (!Sfx.throttle('subchime', 1500)) return; Sfx.tone(784, 0.22, 'sine', 0.05); setTimeout(() => Sfx.tone(659, 0.34, 'sine', 0.05), 240); },
+  chime(g) { if (g.area !== 'subway' && !(g.travel && (g.travel.via === 'subway' || g.travel.via === 'pierline'))) return; if (!Sfx.throttle('subchime', 1500)) return; Sfx.tone(784, 0.22, 'sine', 0.05); setTimeout(() => Sfx.tone(659, 0.34, 'sine', 0.05), 240); },
 
   update(g, dt) {
     const st = this.st; if (!st) return;
@@ -375,24 +423,29 @@ const SubwayExt = {
       p.x = b.x; p.y = U.lerp(b.y0, b.y1, k); p.moving = k < 1; p.bob += dt * 14; p.facing = 1;
       if (b.t >= 0.85) {
         st.boarding = null;
-        g.startTravel(this.otherEnd(), 'subway', K.RIDE);
-        t.state = 'leaving'; t.speed = 0; t.doors = 0;
-        for (const c of st.commuters) if (c.state === 'board') { c.hidden = true; c.state = 'gone'; c.t = U.rand(5, 12); }
+        const n = b.line || 1, bt = this.line(n).train;
+        if (n === 2) g.startTravel('pizzapier', 'pierline', K.RIDE); else g.startTravel(this.otherEnd(), 'subway', K.RIDE);
+        bt.state = 'leaving'; bt.speed = 0; bt.doors = 0;
+        for (const c of st.commuters) if (c.state === 'board' && (c.line || 1) === n) { c.hidden = true; c.state = 'gone'; c.t = U.rand(5, 12); }
       }
     }
     // keep the chef put while the ride plays (the core still reads the joystick)
-    if (g.travel && g.travel.via === 'subway') {
-      p.x = S.stopX; p.y = S.edge + 18; p.moving = false;
+    const tr = g.travel;
+    if (tr && (tr.via === 'subway' || (tr.via === 'pierline' && tr.from === 'subway'))) {
+      p.x = tr.via === 'pierline' ? S.L2.stopX : S.stopX; p.y = S.edge + 18; p.moving = false;
       t.rumble -= dt; if (t.rumble <= 0) { Sfx.chuff(0.5); t.rumble = 0.16; }
       return;
     }
+    if (tr && tr.via === 'pierline') { t.rumble -= dt; if (t.rumble <= 0) { Sfx.chuff(0.5); t.rumble = 0.16; } }   // the ride home from the pier
     // stepping out of the train onto the platform
+    if (st.alight && (g.area !== 'subway' || g.travel)) st.alight = null;   // left the station (Take-me-home, a ride): stop steering the chef
     if (st.alight) {
       const a = st.alight; a.t += dt; const k = Math.min(1, a.t / 0.55);
       p.x = a.x; p.y = U.lerp(S.edge + 18, S.edge - 14, k); p.moving = k < 1; p.bob += dt * 14;
       if (k >= 1) { st.alight = null; p.moving = false; }
     }
-    this.updateTrain(g, dt);
+    this.updateTrain(g, dt, this.line(1));
+    if (this.line2Open()) this.updateTrain(g, dt, this.line(2));   // Line 2 only runs from the City end
     // things that keep going wherever you are: the globe slowing down, the bear's paw, the notice fading, the cocoa cooling
     const L = st.low, B = st.bc;
     L.globe.a += L.globe.v * dt; L.globe.v *= Math.exp(-dt * 0.7); if (L.globe.v < 0.05) L.globe.v = 0;
@@ -442,44 +495,56 @@ const SubwayExt = {
     g.fx.push({ kind: 'sparkle', x0: p.x, y0: p.y - 30, x1: p.x, y1: p.y - 30, t: 0, dur: 0.6 });
   },
 
-  // the train: timetable, pulling in, doors, countdown, pulling out
-  updateTrain(g, dt) {
-    const st = this.st, t = st.train, S = CFG.SUBWAY.STATION, K = CFG.SUBWAY, here = g.area === 'subway', p = g.player;
+  // a train (L = this.line(n)): timetable, pulling in, doors, countdown, pulling out
+  updateTrain(g, dt, L) {
+    const st = this.st, t = L.train, K = CFG.SUBWAY, p = g.player, here = g.area === 'subway' && this.hallOf(p.x) === L.n;
     if (t.state === 'away') {
       t.timer -= dt;
       // a kid waiting on the platform never waits long
       if (here && p.y > 2300 && this.onFoot(g) && t.timer > K.CALL) t.timer = K.CALL;
-      if (t.timer <= 0) { t.state = 'arriving'; t.x = S.WORLD.x0 - 400; t.speed = 320; t.doors = 0; if (here) g.floats.push({ x: p.x, y: p.y - 64, text: 'Rrrumble… here it comes! 🚇', color: '#ffe08a', t: 0, dur: 1.6, big: true }); }
+      if (t.timer <= 0) { t.state = 'arriving'; t.x = L.from; t.speed = 320; t.doors = 0; if (here) g.floats.push({ x: p.x, y: p.y - 64, text: L.n === 2 ? 'Rrrumble… the purple train! 🎡' : 'Rrrumble… here it comes! 🚇', color: '#ffe08a', t: 0, dur: 1.6, big: true }); }
     } else if (t.state === 'arriving') {
-      const d = S.stopX - t.x;
+      const d = L.stopX - t.x;
       t.speed = U.clamp(d * 1.4, 40, 340); t.x += t.speed * dt;
       if (here) { t.rumble -= dt; if (t.rumble <= 0) { Sfx.chuff(0.6); t.rumble = t.speed > 200 ? 0.14 : 0.24; } }
-      if (d <= 2) { t.x = S.stopX; t.state = 'stopped'; t.dwell = K.DWELL; t.doors = 0; this.chime(g); this.spawnRiders(g); }
+      if (d <= 2) { t.x = L.stopX; t.state = 'stopped'; t.dwell = K.DWELL; t.doors = 0; if (here) this.chime(g); this.spawnRiders(g, L); }
     } else if (t.state === 'stopped') {
       if (t.doors < 1 && !(t.dwell <= 0)) t.doors = Math.min(1, t.doors + dt / K.DOOR_T);
-      if (!st.boarding && !st.alight) t.dwell -= dt;
-      if (t.dwell <= 0) { t.doors = Math.max(0, t.doors - dt / K.DOOR_T); if (t.doors <= 0 && !st.boarding) { t.state = 'leaving'; t.speed = 0; if (here) this.chime(g); } }
+      const mine = (st.boarding && (st.boarding.line || 1) === L.n) || (st.alight && (st.alight.line || 1) === L.n);
+      if (!mine) t.dwell -= dt;
+      if (t.dwell <= 0) { t.doors = Math.max(0, t.doors - dt / K.DOOR_T); if (t.doors <= 0 && !mine) { t.state = 'leaving'; t.speed = 0; if (here) this.chime(g); } }
     } else if (t.state === 'leaving') {
       t.speed = Math.min(380, t.speed + 170 * dt); t.x += t.speed * dt;
       if (here) { t.rumble -= dt; if (t.rumble <= 0) { Sfx.chuff(0.6); t.rumble = t.speed > 200 ? 0.14 : 0.24; } }
-      if (t.x > S.WORLD.x1 + 400) { t.state = 'away'; t.timer = K.EVERY; }
+      if (t.x > L.to) { t.state = 'away'; t.timer = K.EVERY; }
     }
   },
-  // a couple of riders step off every train and head for the stairs; the waiting commuters climb on
-  spawnRiders(g) {
-    const st = this.st, S = CFG.SUBWAY.STATION, doors = this.doorSpots(S.stopX);
+  // a couple of riders step off every train and head for the stairs (Line 2's through the arch); the waiting commuters climb on
+  spawnRiders(g, L) {
+    const st = this.st, S = CFG.SUBWAY.STATION, doors = this.doorSpots(L.stopX, L.n), A = this.archSpots();
     const look = () => ({ shirt: U.pick(COLORS.shirts), skin: U.pick(COLORS.skins), hair: U.pick(['#2b1d14', '#5a3a1a', '#d9a066', '#1a1a1a']), hairStyle: U.randInt(0, 3), carry: 0, pack: Math.random() < 0.5 ? U.pick(['#e4572e', '#3b7dd8', '#2f9e44']) : null });
-    for (let i = 0; i < 2; i++) { const d = U.pick(doors); st.riders.push(Object.assign({ x: d.x + U.rand(-4, 4), y: S.edge + 18, phase: 0, wait: 0.6 + i * 0.5, moving: false, facing: -1, bob: 0 }, look())); }
-    for (const c of st.commuters) if (c.state === 'wait') { let best = doors[0]; for (const d of doors) if (Math.abs(d.x - c.x) < Math.abs(best.x - c.x)) best = d; c.state = 'board'; c.tx = best.x; c.ty = best.y; c.t = U.rand(0.8, 2.5); }
+    for (let i = 0; i < 2; i++) { const d = U.pick(doors); st.riders.push(Object.assign({ x: d.x + U.rand(-4, 4), y: S.edge + 18, phase: 0, wait: 0.6 + i * 0.5, moving: false, facing: -1, bob: 0, path: L.n === 2 ? [A.e, A.w] : null }, look(), L.n === 2 && i === 0 ? { hat: 'cap', capColor: CFG.SUBWAY.COLOR2 } : {})); }
+    for (const c of st.commuters) if (c.state === 'wait' && (c.line || 1) === L.n && !(c.path && c.path.length)) { let best = doors[0]; for (const d of doors) if (Math.abs(d.x - c.x) < Math.abs(best.x - c.x)) best = d; c.state = 'board'; c.tx = best.x; c.ty = best.y; c.t = U.rand(0.8, 2.5); }
+  },
+  // walk along a list of waypoints first (through the arch between the halls); true while still on the way
+  walkPath(q, speed, dt) {
+    if (!q.path || !q.path.length) return false;
+    q.moving = true; if (U.moveToward(q, q.path[0].x, q.path[0].y, speed, dt)) q.path.shift();
+    return true;
   },
   updateStation(g, dt) {
-    const st = this.st, S = CFG.SUBWAY.STATION, t = st.train;
+    const st = this.st, S = CFG.SUBWAY.STATION, open2 = this.line2Open();
     this.rescue(g);
-    // commuters: pace about, board when the doors open, come back down the stairs later
+    // off a Line 1 train and through the arch to Line 2: no more "up the stairs", the purple train is the plan now
+    if (st.justArrived && st.arrivedLine !== 2 && this.hallOf(g.player.x) === 2) st.justArrived = false;
+    // commuters: pace about, board when the doors open, come back down the stairs later (Line 2's family walks through the arch)
     for (const c of st.commuters) {
+      const two = c.line === 2, t = two ? st.train2 : st.train;
+      if (two && !open2) continue;
       c.bob += dt * 10;
       if (c.state === 'wait') {
-        c.t -= dt; if (c.t <= 0) { c.tx = U.rand(6580, 7230); c.ty = U.rand(2376, 2394); c.t = U.rand(2, 6); }
+        if (this.walkPath(c, 60, dt)) continue;
+        c.t -= dt; if (c.t <= 0) { c.tx = two ? U.rand(7420, 8100) : U.rand(6580, 7230); c.ty = U.rand(2376, 2394); c.t = U.rand(2, 6); }
         if (U.moveToward(c, c.tx, c.ty, 40, dt)) c.moving = false;
       } else if (c.state === 'board') {
         c.t -= dt; if (c.t > 0) { c.moving = false; continue; }
@@ -489,7 +554,10 @@ const SubwayExt = {
         c.y += 60 * dt; c.moving = true;
         if (c.y >= S.edge + 18) { c.hidden = true; c.state = 'gone'; c.t = U.rand(6, 14); }
       } else if (c.state === 'gone') {
-        c.t -= dt; if (c.t <= 0) { c.hidden = false; c.x = S.stairs.foot.x; c.y = S.stairs.foot.y; c.state = 'wait'; c.tx = U.rand(6600, 7200); c.ty = U.rand(2378, 2392); c.t = 0.1; }
+        c.t -= dt; if (c.t <= 0) {
+          c.hidden = false; c.x = S.stairs.foot.x; c.y = S.stairs.foot.y; c.state = 'wait'; c.tx = U.rand(6600, 7200); c.ty = U.rand(2378, 2392); c.t = 0.1;
+          if (two) { const A = this.archSpots(); c.path = [A.w, A.e]; c.tx = U.rand(7440, 8080); c.t = 3; }
+        }
       }
     }
     for (const r of st.riders) {
@@ -497,16 +565,16 @@ const SubwayExt = {
       if (r.wait > 0) { r.wait -= dt; r.moving = false; continue; }
       if (r.phase === 0) { r.y -= 60 * dt; r.moving = true; if (r.y <= S.edge - 16) r.phase = 1; }
       else if (r.phase === 1) { if (U.moveToward(r, r.x, 2300, 75, dt)) r.phase = 2; }
-      else if (r.phase === 2) { if (U.moveToward(r, S.stairs.foot.x, S.stairs.foot.y, 75, dt)) r.phase = 3; }
+      else if (r.phase === 2) { if (this.walkPath(r, 75, dt)) continue; if (U.moveToward(r, S.stairs.foot.x, S.stairs.foot.y, 75, dt)) r.phase = 3; }
     }
     st.riders = st.riders.filter((r) => r.phase < 3);
-    // the rat with its slice scurries along the track now and then
-    const rat = st.rat;
-    if (!rat.on) { rat.t -= dt; if (rat.t <= 0 && t.state === 'away') { rat.on = true; rat.dir = Math.random() < 0.5 ? 1 : -1; rat.x = rat.dir > 0 ? S.WORLD.x0 + 40 : S.WORLD.x1 - 40; rat.pause = 0; } }
+    // the rat with its slice scurries along Line 1's track now and then
+    const rat = st.rat, t = st.train, x0 = S.WORLD.x0 + 40, x1 = S.divider.x0 - 30;
+    if (!rat.on) { rat.t -= dt; if (rat.t <= 0 && t.state === 'away') { rat.on = true; rat.dir = Math.random() < 0.5 ? 1 : -1; rat.x = rat.dir > 0 ? x0 : x1; rat.pause = 0; } }
     else {
       if (rat.pause > 0) rat.pause -= dt;
       else { rat.x += rat.dir * 170 * dt; if (Math.random() < dt * 0.5) rat.pause = U.rand(0.3, 0.8); }
-      if (t.state !== 'away' || rat.x < S.WORLD.x0 + 30 || rat.x > S.WORLD.x1 - 30) { rat.on = false; rat.t = U.rand(12, 26); }
+      if (t.state !== 'away' || rat.x < x0 - 10 || rat.x > x1 + 10) { rat.on = false; rat.t = U.rand(12, 26); }
     }
   },
   updateCampus(g, dt) {
@@ -550,33 +618,44 @@ const SubwayExt = {
     if (U.dist(p.x, p.y, BC.bear.x, BC.bear.y) < 80 && !st.goals.bear) { st.goals.bear = true; g.floats.push({ x: BC.bear.x, y: BC.bear.y - 50, text: 'Hello, bear! 🐻', color: '#ffe08a', t: 0, dur: 1.4, big: true }); }
   },
 
+  // the end of a ride into the station: Line 1 from the other end, or Line 2 home from Pizza Pier (always the City end).
+  // The ride out to the pier lands on the pier's own map, which places the chef itself.
   arrive(g, tr) {
-    if (tr.via !== 'subway') return;
-    const st = this.st, S = CFG.SUBWAY.STATION, t = st.train, p = g.player;
-    st.end = tr.to === 'campus' ? 'campus' : 'city'; g.s.subway.end = st.end;
+    const two = tr.via === 'pierline';
+    if (!(tr.via === 'subway' || (two && tr.to === 'subway'))) return;
+    const st = this.st, S = CFG.SUBWAY.STATION, L = this.line(two ? 2 : 1), p = g.player;
+    st.end = two || tr.to !== 'campus' ? 'city' : 'campus'; g.s.subway.end = st.end;
+    const t = this.line(L.n).train;
     g.area = 'subway'; g.cameraSnap = true;
-    t.state = 'stopped'; t.x = S.stopX; t.dwell = CFG.SUBWAY.DWELL; t.doors = 1; t.speed = 0;
-    const doors = this.doorSpots(S.stopX), d = doors[3];
-    st.alight = { t: 0, x: d.x }; p.x = d.x; p.y = S.edge + 18; p.moving = false; p.facing = 1; p.hasMoved = true;
-    st.justArrived = true; st.boarding = null; st.fade = 0.45;
-    for (const c of st.commuters) if (c.state === 'wait') { c.state = 'board'; c.tx = d.x; c.ty = d.y; c.t = U.rand(1.5, 3); }
+    t.state = 'stopped'; t.x = L.stopX; t.dwell = CFG.SUBWAY.DWELL; t.doors = 1; t.speed = 0;
+    const doors = this.doorSpots(L.stopX, L.n), d = doors[3];
+    st.alight = { t: 0, x: d.x, line: L.n }; p.x = d.x; p.y = S.edge + 18; p.moving = false; p.facing = 1; p.hasMoved = true;
+    st.justArrived = true; st.arrivedLine = L.n; st.boarding = null; st.fade = 0.45;
+    for (const c of st.commuters) if (c.state === 'wait' && (c.line || 1) === L.n && !(c.path && c.path.length)) { c.state = 'board'; c.tx = d.x; c.ty = d.y; c.t = U.rand(1.5, 3); }
     g.toast(st.end === 'campus' ? '🎓 Welcome to Columbia!' : '🏙️ Back in the City!', true);
     this.chime(g); Haptics.success();
   },
 
   hint(g) {
     const st = this.st, p = g.player; if (!st) return undefined;
-    if (st.boarding) return { text: '🚇 All aboard!', target: null };
+    if (st.boarding) return { text: st.boarding.line === 2 ? '🎡 All aboard!' : '🚇 All aboard!', target: null };
     if (g.area === 'city') {
       if (this.cityBusy()) return undefined;
       const e = this.cityEntrance(); if (!this.onFoot(g) || U.dist(p.x, p.y, e.x, e.y) > 150) return undefined;
       return { text: 'Go down to the subway! 🚇', target: U.dist(p.x, p.y, e.x, e.y) < 40 ? null : e };
     }
     if (g.area === 'subway') {
-      const t = st.train, S = CFG.SUBWAY.STATION;
-      if (st.justArrived) return { text: st.end === 'campus' ? 'Up the stairs to the campus 🎓' : 'Up the stairs to the City 🏙️', target: this.nearStairs(g) ? null : S.stairs.foot };
-      if (t.state === 'stopped' && t.doors > 0 && t.dwell > 0) { const nd = this.nearestDoor(g); return { text: `🚇 Subway leaves in ${Math.ceil(t.dwell)}s!`, target: nd.d < 60 ? null : nd.door }; }
-      return { text: 'Wait on the platform for the subway', target: p.y > 2340 ? null : S.stand };
+      const S = CFG.SUBWAY.STATION, hall = this.hallOf(p.x), n = this.hallLine(g), t = this.line(n).train, city = st.end === 'city';
+      if (st.justArrived) return { text: city ? 'Up the stairs to the City 🏙️' : 'Up the stairs to the campus 🎓', target: this.nearStairs(g) ? null : hall === 2 ? this.archSpots().w : S.stairs.foot };
+      if (t.state === 'stopped' && t.doors > 0 && t.dwell > 0) { const nd = this.nearestDoor(g, n); return { text: n === 2 ? `🎡 Purple train leaves in ${Math.ceil(t.dwell)}s!` : `🚇 Subway leaves in ${Math.ceil(t.dwell)}s!`, target: nd.d < 60 ? null : nd.door }; }
+      if (!city) {
+        const D = S.divider; if (U.dist(p.x, p.y, D.x0, (D.arch.y0 + D.arch.y1) / 2) < 70) return { text: '🎡 Line 2 goes from the City 🏙️', target: null };
+        return { text: 'Wait on the platform for the subway', target: p.y > 2340 ? null : S.stand };
+      }
+      // the City end: two lines, told apart by colour and picture
+      if (hall === 2) return { text: 'Purple train 🎡 to Pizza Pier comes here!', target: p.y > 2300 ? null : S.L2.stand };
+      if (p.y > 2300) return { text: 'Red train 🎓 to Columbia comes here!', target: null };
+      return { text: 'Red train 🎓 to Columbia, purple train 🎡 to Pizza Pier!', target: null };
     }
     if (g.area === 'campus') {
       const C = CFG.SUBWAY.CAMPUS, e = this.campusEntrance(), LD = CFG.SUBWAY.LOW.DOOR, BD = CFG.SUBWAY.BARNARD.DOOR;
@@ -746,30 +825,41 @@ const SubwayExt = {
   },
 
   // ---------- the station ----------
+  // two halls side by side: Line 1's (red, 🎓) with the stairs, the booth and the snack stand, and through the arch in the
+  // dividing wall Line 2's (purple, 🎡) with its own turnstiles, platform and track. At the Columbia end Line 2's hall is dark
+  // and a friendly gate with a 🏙️ sign closes the arch.
   paintStation(r, g) {
     const E = this, ctx = r.ctx, S = CFG.SUBWAY.STATION, W = S.WORLD, F = S.floor, K = CFG.SUBWAY, toCampus = this.st && this.st.end === 'city';
-    // white tiled walls all round, a coloured tile band and the station name in mosaic
+    const D = S.divider, L2 = S.L2, F2 = L2.floor, open2 = !this.st || this.st.end === 'city';
+    // white tiled walls all round, a coloured tile band (each hall in its line's colour) and the station name in mosaic
     ctx.fillStyle = '#f3efe4'; ctx.fillRect(W.x0, W.y0, W.x1 - W.x0, W.y1 - W.y0);
     ctx.strokeStyle = 'rgba(0,0,0,0.09)'; ctx.lineWidth = 1;
     for (let yy = W.y0; yy <= W.y1; yy += 10) { ctx.beginPath(); ctx.moveTo(W.x0, yy + 0.5); ctx.lineTo(W.x1, yy + 0.5); ctx.stroke(); }
     for (let xx = W.x0; xx <= W.x1; xx += 20) { ctx.beginPath(); ctx.moveTo(xx + 0.5, W.y0); ctx.lineTo(xx + 0.5, W.y1); ctx.stroke(); }
-    ctx.fillStyle = K.COLOR; ctx.fillRect(W.x0, 2110, W.x1 - W.x0, 12); ctx.fillStyle = 'rgba(255,255,255,0.18)'; for (let xx = W.x0; xx < W.x1; xx += 12) ctx.fillRect(xx + 1, 2111, 5, 5);
-    ctx.fillStyle = K.COLOR; ctx.fillRect(W.x0, 2110, 10, W.y1 - W.y0 - 10); ctx.fillRect(W.x1 - 22, 2110, 12, W.y1 - W.y0 - 10);
-    // the floor: two-tone tiles, light pools from the ceiling lamps
-    ctx.fillStyle = '#d8d2c4'; ctx.fillRect(F.x0, F.y0, F.x1 - F.x0, F.y1 - F.y0);
-    for (let yy = F.y0; yy < F.y1; yy += 32) for (let xx = F.x0; xx < F.x1; xx += 32) { if (((xx - F.x0) / 32 + (yy - F.y0) / 32) % 2 === 0) { ctx.fillStyle = '#cfc8b8'; ctx.fillRect(xx, yy, Math.min(32, F.x1 - xx), Math.min(32, F.y1 - yy)); } }
-    ctx.strokeStyle = 'rgba(0,0,0,0.07)';
-    for (let xx = F.x0; xx <= F.x1; xx += 32) { ctx.beginPath(); ctx.moveTo(xx + 0.5, F.y0); ctx.lineTo(xx + 0.5, F.y1); ctx.stroke(); }
-    for (let yy = F.y0; yy <= F.y1; yy += 32) { ctx.beginPath(); ctx.moveTo(F.x0, yy + 0.5); ctx.lineTo(F.x1, yy + 0.5); ctx.stroke(); }
-    for (const yy of [2210, 2330]) for (let xx = F.x0 + 90; xx < F.x1; xx += 180) { const gr = ctx.createRadialGradient(xx, yy, 4, xx, yy, 90); gr.addColorStop(0, 'rgba(255,240,190,0.35)'); gr.addColorStop(1, 'rgba(255,240,190,0)'); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(xx, yy, 90, 0, Math.PI * 2); ctx.fill(); }
+    for (const [x0, x1, col] of [[W.x0, D.x0, K.COLOR], [D.x1, W.x1, K.COLOR2]]) { ctx.fillStyle = col; ctx.fillRect(x0, 2110, x1 - x0, 12); ctx.fillStyle = 'rgba(255,255,255,0.18)'; for (let xx = x0; xx < x1; xx += 12) ctx.fillRect(xx + 1, 2111, 5, 5); }
+    ctx.fillStyle = K.COLOR; ctx.fillRect(W.x0, 2110, 10, W.y1 - W.y0 - 10); ctx.fillStyle = K.COLOR2; ctx.fillRect(W.x1 - 22, 2110, 12, W.y1 - W.y0 - 10);
+    // the floors: two-tone tiles, light pools from the ceiling lamps
+    for (const FL of [F, F2]) {
+      ctx.fillStyle = '#d8d2c4'; ctx.fillRect(FL.x0, FL.y0, FL.x1 - FL.x0, FL.y1 - FL.y0);
+      for (let yy = FL.y0; yy < FL.y1; yy += 32) for (let xx = FL.x0; xx < FL.x1; xx += 32) { if (((xx - FL.x0) / 32 + (yy - FL.y0) / 32) % 2 === 0) { ctx.fillStyle = '#cfc8b8'; ctx.fillRect(xx, yy, Math.min(32, FL.x1 - xx), Math.min(32, FL.y1 - yy)); } }
+      ctx.strokeStyle = 'rgba(0,0,0,0.07)';
+      for (let xx = FL.x0; xx <= FL.x1; xx += 32) { ctx.beginPath(); ctx.moveTo(xx + 0.5, FL.y0); ctx.lineTo(xx + 0.5, FL.y1); ctx.stroke(); }
+      for (let yy = FL.y0; yy <= FL.y1; yy += 32) { ctx.beginPath(); ctx.moveTo(FL.x0, yy + 0.5); ctx.lineTo(FL.x1, yy + 0.5); ctx.stroke(); }
+      for (const yy of [2210, 2330]) for (let xx = FL.x0 + 90; xx < FL.x1; xx += 180) { const gr = ctx.createRadialGradient(xx, yy, 4, xx, yy, 90); gr.addColorStop(0, 'rgba(255,240,190,0.35)'); gr.addColorStop(1, 'rgba(255,240,190,0)'); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(xx, yy, 90, 0, Math.PI * 2); ctx.fill(); }
+    }
     // a coloured tile stripe across the floor marks the fare line; arrows show the way to the platform
     ctx.fillStyle = 'rgba(228,87,46,0.35)'; ctx.fillRect(F.x0, S.turnstiles.y + 18, F.x1 - F.x0, 6);
+    ctx.fillStyle = 'rgba(142,68,173,0.35)'; ctx.fillRect(F2.x0, L2.turnstiles.y + 18, F2.x1 - F2.x0, 6);
     ctx.fillStyle = 'rgba(43,29,20,0.35)'; ctx.font = r.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     for (const xx of [6640, 6840, 7040]) ctx.fillText('▼ TRAINS ▼', xx, S.turnstiles.y + 36);
+    for (const xx of [7560, 7960]) ctx.fillText('▼ 🎡 ▼', xx, L2.turnstiles.y + 36);
     // the station name (twice, so the hint bubble never hides it), posters and a clock on the top wall
     E.mosaic(r, 6700, 2124, this.stationName(), 12); E.mosaic(r, 7010, 2124, this.stationName(), 12);
     const poster = (x, y, w, h, col, a, b) => { ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(x + 2, y + 2, w, h); ctx.fillStyle = '#fff8ee'; ctx.fillRect(x, y, w, h); ctx.fillStyle = col; ctx.fillRect(x, y, w, 9); ctx.fillStyle = '#2b1d14'; ctx.font = r.font(7); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(a, x + w / 2, y + 4.5); ctx.fillStyle = col; ctx.font = r.font(9); ctx.fillText(b, x + w / 2, y + h - 11); };
     poster(6826, 2104, 60, 34, '#e4572e', 'PIZZA TOWN', '🍕 YUM!'); poster(7130, 2104, 50, 34, '#1f4e9a', 'COLUMBIA', '🎓 LEARN');
+    // Line 2's hall: its own mosaic and posters of the seaside
+    E.mosaic(r, 7580, 2124, '🎡 PIZZA PIER', 12, K.COLOR2); E.mosaic(r, 7905, 2124, '🎡 LINE 2', 12, K.COLOR2);
+    poster(7386, 2104, 62, 34, K.COLOR2, 'FERRIS WHEEL', '🎡 WHEE!'); poster(7700, 2104, 62, 34, '#e4572e', 'COASTER', '🎢 ZOOM!');
     const CK = S.clock; ctx.fillStyle = '#2d3a4a'; ctx.beginPath(); ctx.arc(CK.x, CK.y, 14, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(CK.x, CK.y, 11, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(CK.x, CK.y); ctx.lineTo(CK.x, CK.y - 7); ctx.moveTo(CK.x, CK.y); ctx.lineTo(CK.x + 5, CK.y + 2); ctx.stroke();
     // the stairs up to the street: the chef stands at the foot (the bottom of the picture) and the flight climbs away from
@@ -798,14 +888,24 @@ const SubwayExt = {
     ctx.fillStyle = '#bfe3ff'; ctx.fillRect(B.x0 + 8, B.y0 + 8, B.x1 - B.x0 - 16, 30); ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillRect(B.x0 + 8, B.y0 + 8, B.x1 - B.x0 - 16, 4);
     ctx.fillStyle = '#8d5a2b'; ctx.fillRect(B.x0 - 4, B.y1 - 14, B.x1 - B.x0 + 8, 14); ctx.fillStyle = '#2b1d14'; ctx.fillRect(B.x0 + 40, B.y1 - 10, 30, 3);
     E.sign(r, (B.x0 + B.x1) / 2, B.y0 + 2, '🎫 TICKETS', 8, 12);
-    // route map board on the wall side of the concourse
-    const M = S.board;
-    ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(M.x0 + 3, M.y0 + 3, M.x1 - M.x0, M.y1 - M.y0);
-    ctx.fillStyle = '#2d3a4a'; ctx.fillRect(M.x0, M.y0, M.x1 - M.x0, M.y1 - M.y0); ctx.fillStyle = '#fff8ee'; ctx.fillRect(M.x0 + 4, M.y0 + 4, M.x1 - M.x0 - 8, M.y1 - M.y0 - 8);
-    ctx.fillStyle = '#2b1d14'; ctx.font = r.font(7); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🗺️ LINE 1', (M.x0 + M.x1) / 2, M.y0 + 11);
-    ctx.strokeStyle = K.COLOR; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(M.x0 + 16, M.y0 + 28); ctx.lineTo(M.x1 - 16, M.y0 + 28); ctx.stroke();
-    K.STOPS.forEach((nm, i) => { const x = M.x0 + 16 + i * (M.x1 - M.x0 - 32) / 4; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, M.y0 + 28, 4, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = K.COLOR; ctx.lineWidth = 2; ctx.stroke(); if (i === 0 || i === 4) { ctx.fillStyle = '#2b1d14'; ctx.font = r.font(6); ctx.fillText(nm, x + (i === 0 ? 12 : -14), M.y0 + 39); } });
-    const hereX = M.x0 + 16 + (toCampus ? 0 : 4) * (M.x1 - M.x0 - 32) / 4; ctx.fillStyle = '#2f9e44'; ctx.beginPath(); ctx.moveTo(hereX, M.y0 + 22); ctx.lineTo(hereX - 5, M.y0 + 15); ctx.lineTo(hereX + 5, M.y0 + 15); ctx.closePath(); ctx.fill();
+    // the route board: one row per line, each in its colour with its bullet, its stops and its picture at the far end
+    // (🎓 Columbia, 🎡 Pizza Pier), so a kid can pick "the train with the Ferris wheel" without reading
+    const M = S.board, mw = M.x1 - M.x0;
+    ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(M.x0 + 3, M.y0 + 3, mw, M.y1 - M.y0);
+    ctx.fillStyle = '#2d3a4a'; ctx.fillRect(M.x0, M.y0, mw, M.y1 - M.y0); ctx.fillStyle = '#fff8ee'; ctx.fillRect(M.x0 + 4, M.y0 + 4, mw - 8, M.y1 - M.y0 - 8);
+    const row = (y, col, bullet, stops, pic, hereAt, faded) => {
+      ctx.globalAlpha = faded ? 0.35 : 1;
+      const lx0 = M.x0 + 30, lx1 = M.x1 - 30;
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(M.x0 + 15, y, 8, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = r.font(10); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(bullet, M.x0 + 15, y + 1);
+      ctx.strokeStyle = col; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(lx0, y); ctx.lineTo(lx1, y); ctx.stroke();
+      for (let i = 0; i < stops; i++) { const x = lx0 + i * (lx1 - lx0) / (stops - 1); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.stroke(); }
+      ctx.font = r.font(15); ctx.fillStyle = '#2b1d14'; ctx.fillText(pic, M.x1 - 16, y + 1);
+      if (hereAt !== null) { const hx = lx0 + hereAt * (lx1 - lx0); ctx.fillStyle = '#2f9e44'; ctx.beginPath(); ctx.moveTo(hx, y - 5); ctx.lineTo(hx - 5, y - 12); ctx.lineTo(hx + 5, y - 12); ctx.closePath(); ctx.fill(); }
+      ctx.globalAlpha = 1;
+    };
+    row(M.y0 + 18, K.COLOR, K.LINE, K.STOPS.length, toCampus ? '🎓' : '🏙️', toCampus ? 0 : 1, false);
+    row(M.y0 + 39, K.COLOR2, K.LINE2, K.PIER_STOPS.length, '🎡', open2 ? 0 : null, !open2);
     // snack stand: red counter, striped awning, bottles on a shelf and a slice sign
     const N = S.snack;
     ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(N.x0 + 4, N.y0 + 4, N.x1 - N.x0, N.y1 - N.y0);
@@ -816,38 +916,113 @@ const SubwayExt = {
     for (let i = 0; i < 8; i++) { ctx.fillStyle = i % 2 ? '#fff8ee' : '#e4572e'; ctx.fillRect(N.x0 - 4 + i * 16, N.y0 - 4, 16, 10); ctx.beginPath(); ctx.arc(N.x0 + 4 + i * 16, N.y0 + 6, 8, 0, Math.PI); ctx.fill(); }
     r.drawPizza(N.x1 - 14, N.y1 - 6, 10);
     E.sign(r, (N.x0 + N.x1) / 2 - 8, N.y0 - 12, '🍕 SLICE & SODA', 8, 12);
-    // turnstiles: steel posts with chrome tripod arms, a railing at each end of the row
-    const T = S.turnstiles;
-    for (const x of T.xs) {
-      ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(x - 22, T.y + 8, 52, 5);
-      ctx.fillStyle = '#9aa0a8'; U.roundRect(ctx, x - 22, T.y - 14, 10, 26, 3); ctx.fill(); U.roundRect(ctx, x + 12, T.y - 14, 10, 26, 3); ctx.fill();
-      ctx.fillStyle = '#5c6670'; ctx.fillRect(x - 20, T.y - 12, 6, 6); ctx.fillStyle = '#44d36a'; ctx.fillRect(x - 19, T.y - 11, 4, 4);
-      ctx.strokeStyle = '#d7dbe0'; ctx.lineWidth = 3; ctx.lineCap = 'round';
-      for (const a of [-0.6, 0.6, 1.9]) { ctx.beginPath(); ctx.moveTo(x, T.y); ctx.lineTo(x + Math.cos(a) * 11, T.y + Math.sin(a) * 11); ctx.stroke(); }
-      ctx.lineCap = 'butt'; ctx.fillStyle = '#e6e8eb'; ctx.beginPath(); ctx.arc(x, T.y, 3.5, 0, Math.PI * 2); ctx.fill();
+    // the cotton-candy stand in Line 2's hall: a pink counter, a striped awning and fluffy clouds of candy on sticks
+    const N2 = L2.candy;
+    ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(N2.x0 + 4, N2.y0 + 4, N2.x1 - N2.x0, N2.y1 - N2.y0);
+    ctx.fillStyle = '#ff8fc7'; ctx.fillRect(N2.x0, N2.y0, N2.x1 - N2.x0, N2.y1 - N2.y0);
+    ctx.fillStyle = '#8d5a2b'; ctx.fillRect(N2.x0 - 4, N2.y1 - 14, N2.x1 - N2.x0 + 8, 14);
+    ctx.fillStyle = '#fff8ee'; ctx.fillRect(N2.x0 + 8, N2.y0 + 12, N2.x1 - N2.x0 - 16, 24);
+    for (let i = 0; i < 5; i++) { const cx = N2.x0 + 22 + i * 19, cy = N2.y0 + 22; ctx.fillStyle = '#c9975f'; ctx.fillRect(cx - 1, cy, 2, 12); ctx.fillStyle = ['#ff8fc7', '#9fd8ff', '#ffd6ec', '#c79bff', '#ff8fc7'][i]; ctx.beginPath(); ctx.arc(cx - 3, cy, 6, 0, Math.PI * 2); ctx.arc(cx + 3, cy - 2, 6, 0, Math.PI * 2); ctx.arc(cx, cy - 6, 5, 0, Math.PI * 2); ctx.fill(); }
+    for (let i = 0; i < 8; i++) { ctx.fillStyle = i % 2 ? '#fff8ee' : K.COLOR2; ctx.fillRect(N2.x0 - 4 + i * 16, N2.y0 - 4, 16, 10); ctx.beginPath(); ctx.arc(N2.x0 + 4 + i * 16, N2.y0 + 6, 8, 0, Math.PI); ctx.fill(); }
+    E.sign(r, (N2.x0 + N2.x1) / 2, N2.y0 - 12, '🍭 COTTON CANDY', 8, 12);
+    // turnstiles: steel posts with chrome tripod arms, a railing at each end of the row (one row in each hall)
+    for (const [T, FL] of [[S.turnstiles, F], [L2.turnstiles, F2]]) {
+      for (const x of T.xs) {
+        ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(x - 22, T.y + 8, 52, 5);
+        ctx.fillStyle = '#9aa0a8'; U.roundRect(ctx, x - 22, T.y - 14, 10, 26, 3); ctx.fill(); U.roundRect(ctx, x + 12, T.y - 14, 10, 26, 3); ctx.fill();
+        ctx.fillStyle = '#5c6670'; ctx.fillRect(x - 20, T.y - 12, 6, 6); ctx.fillStyle = '#44d36a'; ctx.fillRect(x - 19, T.y - 11, 4, 4);
+        ctx.strokeStyle = '#d7dbe0'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+        for (const a of [-0.6, 0.6, 1.9]) { ctx.beginPath(); ctx.moveTo(x, T.y); ctx.lineTo(x + Math.cos(a) * 11, T.y + Math.sin(a) * 11); ctx.stroke(); }
+        ctx.lineCap = 'butt'; ctx.fillStyle = '#e6e8eb'; ctx.beginPath(); ctx.arc(x, T.y, 3.5, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.fillStyle = '#9aa0a8'; ctx.fillRect(FL.x0, T.y - 3, T.xs[0] - 30 - FL.x0, 5); ctx.fillRect(T.xs[T.xs.length - 1] + 30, T.y - 3, FL.x1 - T.xs[T.xs.length - 1] - 30, 5);
     }
-    ctx.fillStyle = '#9aa0a8'; ctx.fillRect(F.x0, T.y - 3, T.xs[0] - 30 - F.x0, 5); ctx.fillRect(T.xs[T.xs.length - 1] + 30, T.y - 3, F.x1 - T.xs[T.xs.length - 1] - 30, 5);
-    // pillars holding up the street, benches, a bin
-    for (const [x, y] of S.pillars) {
+    // pillars holding up the street (banded in their line's colour), benches, a bin
+    for (const [pl, col] of [[S.pillars, K.COLOR], [L2.pillars, K.COLOR2]]) for (const [x, y] of pl) {
       ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(x - 11, y - 9, 28, 28);
-      ctx.fillStyle = '#e8e3d8'; ctx.fillRect(x - 13, y - 13, 26, 26); ctx.fillStyle = K.COLOR; ctx.fillRect(x - 13, y - 3, 26, 6);
+      ctx.fillStyle = '#e8e3d8'; ctx.fillRect(x - 13, y - 13, 26, 26); ctx.fillStyle = col; ctx.fillRect(x - 13, y - 3, 26, 6);
       ctx.strokeStyle = 'rgba(0,0,0,0.18)'; ctx.lineWidth = 1.5; ctx.strokeRect(x - 13, y - 13, 26, 26);
     }
-    for (const [x, y] of S.benches) E.bench(r, x, y);
+    for (const [x, y] of S.benches.concat(L2.benches)) E.bench(r, x, y);
     const BN = S.bin; ctx.fillStyle = '#2f9e44'; U.roundRect(ctx, BN.x - 9, BN.y - 12, 18, 22, 4); ctx.fill(); ctx.fillStyle = '#1f6e3e'; ctx.fillRect(BN.x - 10, BN.y - 14, 20, 5); ctx.fillStyle = '#2b1d14'; ctx.fillRect(BN.x - 4, BN.y - 10, 8, 3);
-    // the platform edge: yellow safety line with bumps, then the drop into the track pit
-    ctx.fillStyle = '#f2c94c'; ctx.fillRect(F.x0, S.edge, F.x1 - F.x0, 8); ctx.fillStyle = 'rgba(0,0,0,0.25)'; for (let xx = F.x0 + 4; xx < F.x1; xx += 8) ctx.fillRect(xx, S.edge + 3, 2, 2);
-    ctx.fillStyle = 'rgba(43,29,20,0.45)'; ctx.font = r.font(7); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; for (const xx of [6560, 6850, 7140]) ctx.fillText('STAND BEHIND THE YELLOW LINE', xx, S.edge - 7);
-    ctx.fillStyle = '#8a8378'; ctx.fillRect(W.x0 + 10, S.edge + 8, W.x1 - W.x0 - 32, S.track.y0 - S.edge - 8);
+    // each line's waiting spot on its platform: a big roundel in its colour with its picture
+    const spot = (x, y, col, pic) => {
+      ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.beginPath(); ctx.ellipse(x, y + 2, 17, 9, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(x, y, 17, 9, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff8ee'; ctx.beginPath(); ctx.ellipse(x, y, 12, 6, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.font = r.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText(pic, x, y);
+    };
+    spot(S.stand.x, S.stand.y - 14, K.COLOR, toCampus ? '🎓' : '🏙️');
+    spot(L2.stand.x, L2.stand.y - 14, K.COLOR2, '🎡');
+    // the platform edges: yellow safety line with bumps, then the drop into the track pits; each track runs between its own
+    // tunnel mouths and the dividing wall stands between them
     const TR = S.track;
-    ctx.fillStyle = '#3a3d42'; ctx.fillRect(W.x0 + 10, TR.y0, W.x1 - W.x0 - 32, TR.y1 - TR.y0);
-    ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(W.x0 + 10, TR.y0, W.x1 - W.x0 - 32, 10);
-    ctx.fillStyle = 'rgba(255,255,255,0.06)'; for (let i = 0; i < 400; i++) ctx.fillRect(W.x0 + 10 + ((i * 97) % (W.x1 - W.x0 - 32)), TR.y0 + 10 + ((i * 53) % (TR.y1 - TR.y0 - 10)), 2, 2);
-    ctx.fillStyle = '#5b4a3a'; for (let xx = W.x0 + 16; xx < W.x1 - 22; xx += 24) ctx.fillRect(xx, S.trackY - 24, 12, 48);
-    ctx.fillStyle = '#9aa0a8'; ctx.fillRect(W.x0 + 10, S.trackY - 19, W.x1 - W.x0 - 32, 4); ctx.fillRect(W.x0 + 10, S.trackY + 15, W.x1 - W.x0 - 32, 4);
-    ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(W.x0 + 10, S.trackY - 19, W.x1 - W.x0 - 32, 1); ctx.fillRect(W.x0 + 10, S.trackY + 15, W.x1 - W.x0 - 32, 1);
-    // tunnel mouths at both ends of the track
-    for (const [x, dir] of [[W.x0 + 10, 1], [W.x1 - 22, -1]]) { const gr = ctx.createLinearGradient(x, 0, x + dir * 90, 0); gr.addColorStop(0, 'rgba(0,0,0,0.7)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = gr; ctx.fillRect(Math.min(x, x + dir * 90), TR.y0, 90, TR.y1 - TR.y0); }
+    for (const [FL, xs, x0, x1] of [[F, [6560, 6850, 7140], W.x0 + 10, D.x0], [F2, [7470, 7755, 8040], D.x1, W.x1 - 22]]) {
+      ctx.fillStyle = '#f2c94c'; ctx.fillRect(FL.x0, S.edge, FL.x1 - FL.x0, 8); ctx.fillStyle = 'rgba(0,0,0,0.25)'; for (let xx = FL.x0 + 4; xx < FL.x1; xx += 8) ctx.fillRect(xx, S.edge + 3, 2, 2);
+      ctx.fillStyle = 'rgba(43,29,20,0.45)'; ctx.font = r.font(7); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; for (const xx of xs) ctx.fillText('STAND BEHIND THE YELLOW LINE', xx, S.edge - 7);
+      ctx.fillStyle = '#8a8378'; ctx.fillRect(x0, S.edge + 8, x1 - x0, TR.y0 - S.edge - 8);
+      ctx.fillStyle = '#3a3d42'; ctx.fillRect(x0, TR.y0, x1 - x0, TR.y1 - TR.y0);
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(x0, TR.y0, x1 - x0, 10);
+      ctx.fillStyle = 'rgba(255,255,255,0.06)'; for (let i = 0; i < 400; i++) ctx.fillRect(x0 + ((i * 97) % (x1 - x0)), TR.y0 + 10 + ((i * 53) % (TR.y1 - TR.y0 - 10)), 2, 2);
+      ctx.fillStyle = '#5b4a3a'; for (let xx = x0 + 6; xx < x1 - 12; xx += 24) ctx.fillRect(xx, S.trackY - 24, 12, 48);
+      ctx.fillStyle = '#9aa0a8'; ctx.fillRect(x0, S.trackY - 19, x1 - x0, 4); ctx.fillRect(x0, S.trackY + 15, x1 - x0, 4);
+      ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(x0, S.trackY - 19, x1 - x0, 1); ctx.fillRect(x0, S.trackY + 15, x1 - x0, 1);
+      for (const [x, dir] of [[x0, 1], [x1, -1]]) { const gr = ctx.createLinearGradient(x, 0, x + dir * 90, 0); gr.addColorStop(0, 'rgba(0,0,0,0.7)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = gr; ctx.fillRect(Math.min(x, x + dir * 90), TR.y0, 90, TR.y1 - TR.y0); }
+    }
+    this.paintDivider(r, open2);
+  },
+  // the wall between the two halls: tiled, a red edge on Line 1's side and a purple one on Line 2's, an archway through it
+  // in the concourse under a big arched sign "🎡 LINE 2 →". At the Columbia end Line 2's hall is dark and a folding gate
+  // with a 🏙️ sign closes the arch: Line 2 only goes from the City.
+  paintDivider(r, open2) {
+    const ctx = r.ctx, S = CFG.SUBWAY.STATION, W = S.WORLD, D = S.divider, A = D.arch, K = CFG.SUBWAY, cx = (D.x0 + D.x1) / 2, dw = D.x1 - D.x0;
+    if (!open2) {
+      ctx.fillStyle = 'rgba(18,12,30,0.62)'; ctx.fillRect(D.x1, W.y0, W.x1 - D.x1, W.y1 - W.y0);
+      ctx.font = r.font(40); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.globalAlpha = 0.5; ctx.fillText('🌙', (D.x1 + W.x1) / 2, 2250); ctx.globalAlpha = 1;
+    }
+    // the floor through the arch: Line 2's purple tiles with arrows pointing the way
+    ctx.fillStyle = '#d8d2c4'; ctx.fillRect(D.x0, A.y0, dw, A.y1 - A.y0);
+    ctx.fillStyle = 'rgba(142,68,173,0.28)'; for (let yy = A.y0; yy < A.y1; yy += 16) for (let xx = D.x0; xx < D.x1; xx += 16) if (((xx - D.x0) / 16 + (yy - A.y0) / 16) % 2 === 0) ctx.fillRect(xx, yy, 16, Math.min(16, A.y1 - yy));
+    if (open2) { ctx.fillStyle = 'rgba(142,68,173,0.75)'; ctx.font = r.font(16); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; for (const yy of [A.y0 + 30, A.y1 - 26]) ctx.fillText('➜', cx, yy); }
+    // the wall above and below the arch: tiles, the coloured edges, a dark cap line
+    for (const [y0, y1] of [[S.wallTop, A.y0], [A.y1, W.y1]]) {
+      ctx.fillStyle = '#ece6d8'; ctx.fillRect(D.x0, y0, dw, y1 - y0);
+      ctx.strokeStyle = 'rgba(0,0,0,0.1)'; ctx.lineWidth = 1;
+      for (let yy = y0; yy < y1; yy += 10) { ctx.beginPath(); ctx.moveTo(D.x0, yy + 0.5); ctx.lineTo(D.x1, yy + 0.5); ctx.stroke(); }
+      for (let xx = D.x0; xx < D.x1; xx += 20) { ctx.beginPath(); ctx.moveTo(xx + 0.5, y0); ctx.lineTo(xx + 0.5, y1); ctx.stroke(); }
+      ctx.fillStyle = K.COLOR; ctx.fillRect(D.x0, y0, 8, y1 - y0); ctx.fillStyle = K.COLOR2; ctx.fillRect(D.x1 - 8, y0, 8, y1 - y0);
+      ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(D.x0, y0, dw, 3); ctx.fillRect(D.x0, y1 - 3, dw, 3);
+    }
+    // a "1 🎓" plaque on the wall's Line 1 side and a "2 🎡" one on Line 2's, down by the platforms
+    const bullet = (x, y, col, txt, pic) => {
+      ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, x - 22, y - 13, 44, 26, 8); ctx.fill();
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x - 9, y, 9, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = r.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(txt, x - 9, y + 1);
+      ctx.font = r.font(13); ctx.fillText(pic, x + 10, y + 1);
+    };
+    bullet(cx, 2340, K.COLOR, K.LINE, this.st && this.st.end === 'campus' ? '🏙️' : '🎓');
+    bullet(cx, 2378, K.COLOR2, K.LINE2, '🎡');
+    // the big arched sign over the archway
+    const ax0 = cx - 66, ax1 = cx + 66, ay1 = A.y0 + 4, ay0 = W.y0 + 40, rad = 20;
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.moveTo(ax0 + 3, ay1 + 3); ctx.lineTo(ax0 + 3, ay0 + rad + 3); ctx.quadraticCurveTo(cx + 3, ay0 - rad + 3, ax1 + 3, ay0 + rad + 3); ctx.lineTo(ax1 + 3, ay1 + 3); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = K.COLOR2; ctx.beginPath(); ctx.moveTo(ax0, ay1); ctx.lineTo(ax0, ay0 + rad); ctx.quadraticCurveTo(cx, ay0 - rad, ax1, ay0 + rad); ctx.lineTo(ax1, ay1); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#fff8ee'; ctx.beginPath(); ctx.moveTo(ax0 + 6, ay1 - 5); ctx.lineTo(ax0 + 6, ay0 + rad + 3); ctx.quadraticCurveTo(cx, ay0 - rad + 8, ax1 - 6, ay0 + rad + 3); ctx.lineTo(ax1 - 6, ay1 - 5); ctx.closePath(); ctx.fill();
+    for (let i = 0; i < 9; i++) { const k = (i + 0.5) / 9, x = U.lerp(ax0 + 4, ax1 - 4, k), y = ay0 + rad - Math.sin(k * Math.PI) * rad * 0.98; ctx.fillStyle = ['#ffd166', '#ff8fab', '#9fd8ff'][i % 3]; ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill(); }
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14';
+    ctx.font = r.font(24); ctx.fillText('🎡', cx, ay0 + 22);
+    ctx.fillStyle = K.COLOR2; ctx.font = r.font(11); ctx.fillText(open2 ? 'LINE 2 →' : 'LINE 2', cx, ay1 - 14);
+    if (open2) return;
+    // the closed gate: folding steel bars across the arch, and a round sign with the City on it
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(cx - 6, A.y0, 16, A.y1 - A.y0);
+    ctx.strokeStyle = '#7f8791'; ctx.lineWidth = 2;
+    for (let yy = A.y0; yy < A.y1; yy += 12) { ctx.beginPath(); ctx.moveTo(cx - 8, yy); ctx.lineTo(cx + 8, yy + 12); ctx.moveTo(cx + 8, yy); ctx.lineTo(cx - 8, yy + 12); ctx.stroke(); }
+    ctx.fillStyle = '#9aa0a8'; ctx.fillRect(cx - 10, A.y0, 4, A.y1 - A.y0); ctx.fillRect(cx + 6, A.y0, 4, A.y1 - A.y0);
+    const sy = (A.y0 + A.y1) / 2;
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.arc(cx + 2, sy + 2, 22, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = K.COLOR2; ctx.beginPath(); ctx.arc(cx, sy, 22, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff8ee'; ctx.beginPath(); ctx.arc(cx, sy, 17, 0, Math.PI * 2); ctx.fill();
+    ctx.font = r.font(18); ctx.fillStyle = '#2b1d14'; ctx.fillText('🏙️', cx, sy + 1);
+    this.sign(r, cx - 2, A.y1 - 12, 'FROM THE CITY', 6, 8);
   },
 
   // ---------- the campus ----------
@@ -1262,6 +1437,7 @@ const SubwayExt = {
       // the arrow signs blink green while a train is in; the clock ticks
       const T = CFG.SUBWAY.STATION.turnstiles, on = st.train.state === 'stopped' && Math.floor(t * 2) % 2 === 0;
       for (const x of T.xs) { ctx.fillStyle = on ? '#44d36a' : '#1f6e3e'; ctx.fillRect(x - 19, T.y - 11, 4, 4); }
+      if (this.line2Open()) { const T2 = CFG.SUBWAY.STATION.L2.turnstiles, on2 = st.train2.state === 'stopped' && Math.floor(t * 2) % 2 === 0; for (const x of T2.xs) { ctx.fillStyle = on2 ? '#44d36a' : '#1f6e3e'; ctx.fillRect(x - 19, T2.y - 11, 4, 4); } }
       const CK = CFG.SUBWAY.STATION.clock, a = (t % 60) / 60 * Math.PI * 2 - Math.PI / 2; ctx.strokeStyle = '#e4572e'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(CK.x, CK.y); ctx.lineTo(CK.x + Math.cos(a) * 9, CK.y + Math.sin(a) * 9); ctx.stroke();
       return;
     }
@@ -1383,11 +1559,24 @@ const SubwayExt = {
     // the clerk waving from the booth (a 👋, no arm), the vendor at the snack stand
     items.push({ y: S.booth.clerk.y, draw: () => { const c = S.booth.clerk; r.drawPerson(c.x, c.y, { shirt: '#1f4e9a', skin: '#c68642', hat: 'cap', capColor: '#1f4e9a', facing: 1, moving: false, bob: 0, carry: 0, pants: '#2d3a4a' }); ctx.save(); ctx.translate(c.x + 22, c.y - 46); ctx.rotate(Math.sin(t * 6) * 0.3); ctx.font = r.font(14); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('👋', 0, 0); ctx.restore(); ctx.fillStyle = '#8d5a2b'; ctx.fillRect(S.booth.x0 - 4, S.booth.y1 - 14, S.booth.x1 - S.booth.x0 + 8, 14); } });
     items.push({ y: S.snack.vendor.y, draw: () => { const v = S.snack.vendor; r.drawPerson(v.x, v.y, { shirt: '#e4572e', apron: '#fff', skin: '#f1c27d', hat: 'cap', capColor: '#e4572e', facing: -1, moving: false, bob: 0, carry: 0, pants: '#2d3a4a' }); ctx.fillStyle = '#8d5a2b'; ctx.fillRect(S.snack.x0 - 4, S.snack.y1 - 14, S.snack.x1 - S.snack.x0 + 8, 14); r.drawPizza(S.snack.x1 - 14, S.snack.y1 - 6, 10); } });
-    for (const c of st.commuters) if (!c.hidden) items.push({ y: c.y, draw: () => { this.drawStudent(r, c); if (c.paper && !c.moving) { ctx.fillStyle = '#fff'; ctx.fillRect(c.x - 12, c.y - 26, 24, 14); ctx.fillStyle = 'rgba(0,0,0,0.5)'; for (let k = 0; k < 3; k++) ctx.fillRect(c.x - 9, c.y - 23 + k * 4, 18, 1.5); } } });
+    const open2 = this.line2Open();
+    for (const c of st.commuters) if (!c.hidden && (c.line !== 2 || open2)) items.push({ y: c.y, draw: () => { this.drawStudent(r, c); if (c.balloon) this.drawBalloon(r, c, t); if (c.paper && !c.moving) { ctx.fillStyle = '#fff'; ctx.fillRect(c.x - 12, c.y - 26, 24, 14); ctx.fillStyle = 'rgba(0,0,0,0.5)'; for (let k = 0; k < 3; k++) ctx.fillRect(c.x - 9, c.y - 23 + k * 4, 18, 1.5); } } });
     for (const q of st.riders) items.push({ y: q.y, draw: () => this.drawStudent(r, q) });
+    // the cotton-candy seller (the counter front painted back over her legs); the stand is shut at the Columbia end
+    const CC = S.L2.candy;
+    if (open2) items.push({ y: CC.vendor.y, draw: () => { const v = CC.vendor; r.drawPerson(v.x, v.y, { shirt: '#ff8fc7', apron: '#fff', skin: '#e0ac69', hair: '#8c3b2f', hairStyle: 1, facing: -1, moving: false, bob: 0, carry: 0, pants: '#2d3a4a' }); ctx.fillStyle = '#8d5a2b'; ctx.fillRect(CC.x0 - 4, CC.y1 - 14, CC.x1 - CC.x0 + 8, 14); ctx.font = r.font(14); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🍭', v.x + 18, v.y - 30 + Math.sin(t * 3) * 2); } });
     // the rat with its slice
     if (st.rat.on) items.push({ y: S.trackY + 30, draw: () => this.drawRat(r, g, st.rat) });
-    if (st.train.state !== 'away') items.push({ y: S.trackY + 26, draw: () => this.drawSubwayTrain(r, g, st.train) });
+    if (st.train.state !== 'away') items.push({ y: S.trackY + 26, draw: () => this.drawSubwayTrain(r, g, st.train, this.line(1)) });
+    if (open2 && st.train2.state !== 'away') items.push({ y: S.trackY + 26, draw: () => this.drawSubwayTrain(r, g, st.train2, this.line(2)) });
+  },
+  // a balloon on a string, bobbing over a commuter's head
+  drawBalloon(r, q, t) {
+    const ctx = r.ctx, f = q.facing || 1, bx = q.x + f * 12 + Math.sin(t * 1.7 + q.x) * 3, by = q.y - 92 + Math.sin(t * 2.2 + q.x) * 3;
+    ctx.strokeStyle = 'rgba(43,29,20,0.55)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(q.x + f * 10, q.y - 26); ctx.quadraticCurveTo(bx - f * 4, by + 30, bx, by + 13); ctx.stroke();
+    ctx.fillStyle = q.balloon; ctx.beginPath(); ctx.ellipse(bx, by, 11, 13, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(bx - 3, by + 15); ctx.lineTo(bx + 3, by + 15); ctx.lineTo(bx, by + 11); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.beginPath(); ctx.ellipse(bx - 4, by - 5, 3, 4, 0, 0, Math.PI * 2); ctx.fill();
   },
   drawRat(r, g, rat) {
     const ctx = r.ctx, x = rat.x, y = CFG.SUBWAY.STATION.trackY + 6, f = rat.dir, t = g.time, wig = Math.sin(t * 18) * 3;
@@ -1400,9 +1589,11 @@ const SubwayExt = {
     ctx.fillStyle = '#d98a3c'; ctx.beginPath(); ctx.moveTo(-6, -5); ctx.lineTo(6, -5); ctx.lineTo(0, 9); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#f6c453'; ctx.beginPath(); ctx.moveTo(-4, -2); ctx.lineTo(4, -2); ctx.lineTo(0, 7); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#c0392b'; ctx.beginPath(); ctx.arc(0, 1, 1.3, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   },
-  // the subway train seen from above: silver cars with a red stripe, windows along both sides, doors lit when open, a route bullet
-  drawSubwayTrain(r, g, tr) {
-    const ctx = r.ctx, S = CFG.SUBWAY.STATION, K = CFG.SUBWAY, y = S.trackY, open = tr.doors, stopped = tr.state === 'stopped';
+  // the subway train seen from above: silver cars with a stripe in its line's colour, windows along both sides, doors lit
+  // when open, the route bullet and the line's picture on the roof; it only shows on its own track (L = this.line(n))
+  drawSubwayTrain(r, g, tr, L = this.line(1)) {
+    const ctx = r.ctx, S = CFG.SUBWAY.STATION, y = S.trackY, open = tr.doors, stopped = tr.state === 'stopped', K = { COLOR: L.color, LINE: L.bullet };
+    ctx.save(); ctx.beginPath(); ctx.rect(L.clip0, S.WORLD.y0, L.clip1 - L.clip0, S.WORLD.y1 - S.WORLD.y0 + 60); ctx.clip();
     const car = (x, len, front, back) => {
       ctx.fillStyle = 'rgba(0,0,0,0.3)'; U.roundRect(ctx, x + 4, y - 20, len, 48, 8); ctx.fill();
       ctx.fillStyle = '#1e1e1e'; for (const bx of [x + 16, x + len - 32]) { U.roundRect(ctx, bx, y - 27, 16, 6, 2); ctx.fill(); U.roundRect(ctx, bx, y + 21, 16, 6, 2); ctx.fill(); }
@@ -1434,6 +1625,13 @@ const SubwayExt = {
     // the route bullet on the front car's roof
     const fx = this.carX(S.cars - 1, tr.x) + S.carLen / 2;
     ctx.fillStyle = K.COLOR; ctx.beginPath(); ctx.arc(fx, y, 9, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = r.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(K.LINE, fx, y + 1);
+    // the line's picture on the roof of every car (🎓 or 🏙️ on Line 1, 🎡 on Line 2), so the trains tell apart at a glance
+    for (let i = 0; i < S.cars; i++) {
+      const px = this.carX(i, tr.x) + (i === S.cars - 1 ? 40 : S.carLen / 2);
+      ctx.fillStyle = '#fff8ee'; ctx.beginPath(); ctx.arc(px, y, 11, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = K.COLOR; ctx.lineWidth = 3; ctx.stroke();
+      ctx.font = r.font(13); ctx.fillStyle = '#2b1d14'; ctx.fillText(L.pic, px, y + 1);
+    }
+    ctx.restore();
     // countdown while it waits
     if (stopped && !this.st.boarding && !g.travel) {
       const n = Math.max(0, Math.ceil(tr.dwell)), urgent = n <= 4;
@@ -1513,91 +1711,276 @@ const SubwayExt = {
     ctx.fillStyle = `rgba(20,12,6,${(st.fade / 0.45).toFixed(3)})`; ctx.fillRect(0, 0, W, H);
   },
 
-  // ======================= the ride: inside the car, looking out of the windows =======================
-  travel: {
-    subway(r, g, W, H) {
-      const E = SubwayExt, ctx = r.ctx, tr = g.travel, t = g.time, toCampus = tr.to === 'campus', K = CFG.SUBWAY;
-      const k = tr.t / tr.dur, ease = k < 0.12 ? k / 0.12 : k > 0.88 ? (1 - k) / 0.12 : 1;
-      // speed ramps up over the first second and down over the last
-      const SPEED = 900, dur = tr.dur, tt = tr.t, ramp = Math.min(1, dur / 2);
-      const d = (x) => x < ramp ? x * x / (2 * ramp) : x < dur - ramp ? x - ramp / 2 : (dur - ramp) - ramp / 2 + ((x - (dur - ramp)) - (x - (dur - ramp)) * (x - (dur - ramp)) / (2 * ramp));
-      const dist = d(tt) * SPEED, total = d(dur) * SPEED, speed = (tt < ramp ? tt / ramp : tt > dur - ramp ? (dur - tt) / ramp : 1);
-      const sway = (Math.sin(t * 2.1) * 3 + Math.sin(t * 5.3) * 1.2) * speed, shake = Math.sin(t * 41) * 1.2 * speed;
-      const narrow = W < 560, sc = Math.min(2.4, Math.max(1.3, W / 460));
-      const winTop = Math.max(H * 0.22, 160), winBot = H * 0.6, seatY = winBot + 24, floorY = winBot + 70;
-      ctx.save(); ctx.translate(0, shake);
-      // ---- out of the windows: the tunnel streaming past, lights whooshing by, now and then a lit station
-      ctx.fillStyle = '#16161e'; ctx.fillRect(0, winTop, W, winBot - winTop);
-      ctx.fillStyle = '#23232e'; ctx.fillRect(0, winTop, W, (winBot - winTop) * 0.22);
-      ctx.fillStyle = '#2d2d3a'; for (let i = 0; i < 3; i++) ctx.fillRect(0, winTop + 6 + i * 7, W, 3);   // pipes and cables
-      const layer = (s, step, draw) => { const off = dist * s; const i0 = Math.floor((off - 400) / step), i1 = Math.ceil((off + W + 400) / step); for (let i = Math.max(0, i0); i <= i1; i++) draw(W - (i * step - off), i); };
-      layer(1, 260, (x, i) => { const glow = 40 + 80 * speed; const gr = ctx.createLinearGradient(x - glow, 0, x + 10, 0); gr.addColorStop(0, 'rgba(255,230,160,0)'); gr.addColorStop(1, 'rgba(255,230,160,0.45)'); ctx.fillStyle = gr; ctx.fillRect(x - glow, winTop + 20, glow + 10, 12); ctx.fillStyle = '#fff3b0'; ctx.fillRect(x, winTop + 22, 8, 8); ctx.fillStyle = '#3a3a48'; ctx.fillRect(x - 3, winTop + 12, 14, 10); if (i % 3 === 0) { ctx.fillStyle = '#2d2d3a'; ctx.fillRect(x + 40, winTop + 30, 60, winBot - winTop - 30); ctx.fillStyle = '#44445a'; ctx.fillRect(x + 48, winTop + 50, 44, 60); } });
-      ctx.fillStyle = '#3a3a48'; ctx.fillRect(0, winBot - 18, W, 18); ctx.fillStyle = '#5c5c70'; layer(1, 36, (x) => ctx.fillRect(x, winBot - 14, 16, 4));
-      // the stations we rush through, lit and tiled, with a mosaic name and people waiting
-      const names = toCampus ? K.STOPS.slice(1, 4) : K.STOPS.slice(1, 4).reverse();
-      names.forEach((nm, i) => {
-        const cx = W / 2 + (total * (i + 1) / 4 - dist), sw = 760; if (cx < -sw || cx > W + sw) return;
-        const x0 = cx - sw / 2;
-        ctx.fillStyle = '#f3efe4'; ctx.fillRect(x0, winTop, sw, winBot - winTop);
-        ctx.strokeStyle = 'rgba(0,0,0,0.08)'; ctx.lineWidth = 1; for (let yy = winTop; yy < winBot; yy += 10) { ctx.beginPath(); ctx.moveTo(x0, yy + 0.5); ctx.lineTo(x0 + sw, yy + 0.5); ctx.stroke(); }
-        ctx.fillStyle = K.COLOR; ctx.fillRect(x0, winTop + 10, sw, 10);
-        ctx.fillStyle = '#b9b2a4'; ctx.fillRect(x0, winBot - 40, sw, 22); ctx.fillStyle = '#f2c94c'; ctx.fillRect(x0, winBot - 24, sw, 6);
-        for (let p = 0; p < 4; p++) { const px = x0 + 90 + p * 180, col = ['#4e79a7', '#f28e2b', '#59a14f', '#e15759'][p]; ctx.fillStyle = col; U.roundRect(ctx, px - 9, winBot - 72, 18, 32, 7); ctx.fill(); ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(px, winBot - 80, 8, 0, Math.PI * 2); ctx.fill(); }
-        for (let p = 0; p < 4; p++) { const px = x0 + 100 + p * 200; ctx.fillStyle = '#e8e3d8'; ctx.fillRect(px - 10, winTop + 20, 20, winBot - winTop - 60); ctx.fillStyle = K.COLOR; ctx.fillRect(px - 10, winTop + 60, 20, 5); }
-        E.mosaic(r, cx, winTop + 46, nm, 14);
-        const gr = ctx.createLinearGradient(0, winTop, 0, winBot); gr.addColorStop(0, 'rgba(255,255,230,0.15)'); gr.addColorStop(1, 'rgba(255,255,230,0)'); ctx.fillStyle = gr; ctx.fillRect(x0, winTop, sw, winBot - winTop);
-      });
-      // a touch of reflection on the glass
-      const refl = ctx.createLinearGradient(0, winTop, 0, winBot); refl.addColorStop(0, 'rgba(180,220,255,0.18)'); refl.addColorStop(0.5, 'rgba(180,220,255,0.02)'); refl.addColorStop(1, 'rgba(180,220,255,0.1)'); ctx.fillStyle = refl; ctx.fillRect(0, winTop, W, winBot - winTop);
-      // ---- the car: ceiling with lights, window frames, the wall and the long bench
-      const steel = (y0, y1, a, b) => { const gr = ctx.createLinearGradient(0, y0, 0, y1); gr.addColorStop(0, a); gr.addColorStop(1, b); return gr; };
-      ctx.fillStyle = steel(0, winTop, '#b8bec6', '#dfe3e8'); ctx.fillRect(0, 0, W, winTop);
-      ctx.fillStyle = '#fff8e6'; U.roundRect(ctx, W * 0.1, 10, W * 0.8, 8, 4); ctx.fill(); ctx.fillStyle = 'rgba(255,248,230,0.35)'; U.roundRect(ctx, W * 0.08, 6, W * 0.84, 16, 8); ctx.fill();
-      const nWin = narrow ? 2 : 4, fw = W / nWin;
-      ctx.fillStyle = '#9aa0a8'; for (let i = 0; i <= nWin; i++) ctx.fillRect(i * fw - 6, winTop - 4, 12, winBot - winTop + 8);
-      ctx.fillStyle = '#9aa0a8'; ctx.fillRect(0, winTop - 6, W, 6); ctx.fillRect(0, winBot, W, 6);
-      ctx.fillStyle = steel(winBot, floorY, '#dfe3e8', '#b8bec6'); ctx.fillRect(0, winBot + 6, W, floorY - winBot - 6);
-      ctx.fillStyle = '#f28e2b'; U.roundRect(ctx, 0, seatY, W, 22, 6); ctx.fill(); ctx.fillStyle = '#ffb347'; ctx.fillRect(0, seatY + 22, W, 18); ctx.fillStyle = 'rgba(0,0,0,0.12)'; for (let x = 0; x < W; x += 60 * sc / 1.5) ctx.fillRect(x, seatY + 22, 2, 18);
-      ctx.fillStyle = '#6b7480'; ctx.fillRect(0, floorY, W, H - floorY); ctx.fillStyle = 'rgba(255,255,255,0.07)'; for (let i = 0; i < 160; i++) ctx.fillRect((i * 97) % W, floorY + ((i * 53) % (H - floorY)), 3, 3);
-      ctx.fillStyle = '#5c6670'; ctx.fillRect(0, floorY + 24, W, 6); ctx.fillStyle = '#f2c94c'; for (let x = 0; x < W; x += 40) ctx.fillRect(x, H - 26, 20, 5);   // a metal strip and the yellow stripe by the far doors
-      // ---- the route map above the windows: the stops light up as we go
-      const stops = toCampus ? K.STOPS : K.STOPS.slice().reverse(), mw = Math.min(W - 40, 620), mx = W / 2 - mw / 2, my = winTop - 24;
-      ctx.fillStyle = '#fff8ee'; U.roundRect(ctx, mx, my - 14, mw, 28, 8); ctx.fill(); ctx.strokeStyle = '#9aa0a8'; ctx.lineWidth = 2; U.roundRect(ctx, mx, my - 14, mw, 28, 8); ctx.stroke();
-      ctx.strokeStyle = K.COLOR; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(mx + 30, my); ctx.lineTo(mx + mw - 30, my); ctx.stroke();
-      stops.forEach((nm, i) => {
-        const sx = mx + 30 + i * (mw - 60) / 4, next = Math.min(4, Math.floor(k * 4) + 1), lit = i === next && Math.floor(t * 3) % 2 === 0, passed = i * 0.25 <= k;
-        ctx.fillStyle = lit ? '#ffd166' : passed ? K.COLOR : '#fff'; ctx.beginPath(); ctx.arc(sx, my, lit ? 7 : 5, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = K.COLOR; ctx.lineWidth = 2; ctx.stroke();
-        if (!narrow || i === 0 || i === 4) { ctx.fillStyle = '#2b1d14'; ctx.font = r.font(narrow ? 7 : 8); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(nm, sx, my + (i % 2 ? -9 : 9) * (narrow ? 0 : 1) + (narrow ? 9 : 0)); }
-      });
-      const trainX = mx + 30 + U.clamp(k, 0, 1) * (mw - 60); ctx.fillStyle = '#2b1d14'; ctx.font = r.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🚇', trainX, my - 1);
-      // ---- poles, and hand straps hanging from the window rail, swinging with the car
-      ctx.fillStyle = '#e6e8eb'; for (const px of [W * 0.3, W * 0.7]) ctx.fillRect(px - 3, 0, 6, floorY);
-      for (let x = W * 0.08; x < W; x += W * 0.14) { const a = sway * 0.04 + Math.sin(t * 2.3 + x) * 0.04 * speed; ctx.save(); ctx.translate(x, winTop - 2); ctx.rotate(a); ctx.fillStyle = '#2b1d14'; ctx.fillRect(-1.5, 0, 3, 22); ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(0, 28, 7, 6, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); }
-      // ---- the passengers on the bench, swaying with the ride: a student, the chef, a grandma, a kid with a balloon
-      const py = floorY + 10, people = [
-        { x: W * 0.17, s: sc, look: { shirt: '#4e79a7', skin: '#8d5524', hair: '#1a1a1a', hairStyle: 2, facing: 1, moving: false, bob: 0, carry: 0, pants: '#2d3a4a', pack: '#2f9e44' }, extra: 'student' },
-        { x: W * 0.4, s: sc, look: { shirt: '#fff', apron: '#e4572e', skin: '#f1c27d', hat: 'chef', facing: 1, moving: false, bob: 0, carry: g.player.carry, pants: '#2d3a4a' }, extra: 'chef' },
-        { x: W * 0.63, s: sc, look: { shirt: '#b07aa1', skin: '#ffdbac', hair: '#e6e6e6', hairStyle: 2, facing: -1, moving: false, bob: 0, carry: 0, pants: '#9c755f' }, extra: 'grandma' },
-        { x: W * 0.84, s: sc * 0.75, look: { shirt: '#edc948', skin: '#e0ac69', hair: '#8c3b2f', hairStyle: 1, facing: -1, moving: false, bob: 0, carry: 0, pants: '#3b7dd8', hat: 'cap', capColor: '#3b7dd8' }, extra: 'kid' },
-      ];
-      for (const P of people) {
-        const dx = sway * (0.6 + P.s * 0.2);
-        ctx.save(); ctx.translate(P.x + dx, py); ctx.scale(P.s, P.s);
-        if (P.extra === 'student') { ctx.fillStyle = P.look.pack; U.roundRect(ctx, -26, -36, 14, 22, 4); ctx.fill(); }
-        r.drawPerson(0, 0, P.look);
-        if (P.extra === 'student') { ctx.fillStyle = '#2f9e44'; ctx.fillRect(-7, -22, 16, 10); ctx.fillStyle = '#fff8ee'; ctx.fillRect(-5, -20, 5, 6); ctx.fillRect(2, -20, 5, 6); }
-        if (P.extra === 'grandma') { ctx.fillStyle = '#c9975f'; ctx.fillRect(16, -20, 18, 22); ctx.fillStyle = '#8d5a2b'; ctx.fillRect(18, -24, 14, 4); ctx.fillStyle = '#f2b134'; ctx.fillRect(22, -34, 5, 14); ctx.fillStyle = '#56b862'; ctx.beginPath(); ctx.arc(28, -30, 5, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#2b1d14'; ctx.fillRect(-6, -44, 12, 2); ctx.beginPath(); ctx.arc(-4, -41, 3, 0, Math.PI * 2); ctx.arc(4, -41, 3, 0, Math.PI * 2); ctx.stroke(); }
-        if (P.extra === 'kid') { const bx = 18 + Math.sin(t * 1.7) * 4 - dx * 0.3, by = -80 + Math.sin(t * 2.2) * 3; ctx.strokeStyle = 'rgba(43,29,20,0.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(14, -16); ctx.quadraticCurveTo(bx, by + 30, bx, by + 12); ctx.stroke(); ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.ellipse(bx, by, 10, 12, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.beginPath(); ctx.ellipse(bx - 3, by - 4, 3, 4, 0, 0, Math.PI * 2); ctx.fill(); }
-        if (P.extra === 'chef') { ctx.save(); ctx.translate(22, -46); ctx.rotate(Math.sin(t * 7) * 0.3); ctx.font = r.font(15); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('👋', 0, 0); ctx.restore(); }
-        ctx.restore();
-      }
+  // ======================= the rides: inside the car, looking out of the windows =======================
+  // the speed profile shared by the rides: ramps up over the first second and down over the last; dist(x) is the distance
+  // covered after x seconds (px), speed(x) 0..1
+  rideMotion(dur, SPEED = 900) {
+    const ramp = Math.min(1, dur / 2);
+    const d = (x) => x < ramp ? x * x / (2 * ramp) : x < dur - ramp ? x - ramp / 2 : (dur - ramp) - ramp / 2 + ((x - (dur - ramp)) - (x - (dur - ramp)) * (x - (dur - ramp)) / (2 * ramp));
+    return { dist: (x) => d(U.clamp(x, 0, dur)) * SPEED, total: d(dur) * SPEED, speed: (x) => (x < ramp ? x / ramp : x > dur - ramp ? (dur - x) / ramp : 1) };
+  },
+  // the dark tunnel streaming past the windows: pipes, lights whooshing by, alcoves. dir -1: the scenery slides right (the
+  // train heads left), +1: it slides left
+  tunnelView(r, W, winTop, winBot, dist, speed, dir = -1) {
+    const ctx = r.ctx;
+    ctx.fillStyle = '#16161e'; ctx.fillRect(0, winTop, W, winBot - winTop);
+    ctx.fillStyle = '#23232e'; ctx.fillRect(0, winTop, W, (winBot - winTop) * 0.22);
+    ctx.fillStyle = '#2d2d3a'; for (let i = 0; i < 3; i++) ctx.fillRect(0, winTop + 6 + i * 7, W, 3);   // pipes and cables
+    const X = (x, w) => dir < 0 ? x : W - x - w;
+    const layer = (s, step, draw) => { const off = dist * s; const i0 = Math.floor((off - 400) / step), i1 = Math.ceil((off + W + 400) / step); for (let i = Math.max(0, i0); i <= i1; i++) draw(W - (i * step - off), i); };
+    layer(1, 260, (x, i) => { const glow = 40 + 80 * speed; const gr = ctx.createLinearGradient(X(x - glow, 0), 0, X(x + 10, 0), 0); gr.addColorStop(0, 'rgba(255,230,160,0)'); gr.addColorStop(1, 'rgba(255,230,160,0.45)'); ctx.fillStyle = gr; ctx.fillRect(X(x - glow, glow + 10), winTop + 20, glow + 10, 12); ctx.fillStyle = '#fff3b0'; ctx.fillRect(X(x, 8), winTop + 22, 8, 8); ctx.fillStyle = '#3a3a48'; ctx.fillRect(X(x - 3, 14), winTop + 12, 14, 10); if (i % 3 === 0) { ctx.fillStyle = '#2d2d3a'; ctx.fillRect(X(x + 40, 60), winTop + 30, 60, winBot - winTop - 30); ctx.fillStyle = '#44445a'; ctx.fillRect(X(x + 48, 44), winTop + 50, 44, 60); } });
+    ctx.fillStyle = '#3a3a48'; ctx.fillRect(0, winBot - 18, W, 18); ctx.fillStyle = '#5c5c70'; layer(1, 36, (x) => ctx.fillRect(X(x, 16), winBot - 14, 16, 4));
+  },
+  // inside a car on the move. o: { k (0..1 along the route map), speed (0..1), color, stops (in travel order), balloon,
+  // outside(ctx, winTop, winBot) draws what streams past the windows }
+  carScene(r, g, W, H, o) {
+    const ctx = r.ctx, t = g.time, k = o.k, speed = o.speed, col = o.color, n = o.stops.length;
+    const sway = (Math.sin(t * 2.1) * 3 + Math.sin(t * 5.3) * 1.2) * speed, shake = Math.sin(t * 41) * 1.2 * speed;
+    const narrow = W < 560, sc = Math.min(2.4, Math.max(1.3, W / 460));
+    const winTop = Math.max(H * 0.22, 160), winBot = H * 0.6, seatY = winBot + 24, floorY = winBot + 70;
+    ctx.save(); ctx.translate(0, shake);
+    // ---- out of the windows
+    o.outside(ctx, winTop, winBot);
+    // a touch of reflection on the glass
+    const refl = ctx.createLinearGradient(0, winTop, 0, winBot); refl.addColorStop(0, 'rgba(180,220,255,0.18)'); refl.addColorStop(0.5, 'rgba(180,220,255,0.02)'); refl.addColorStop(1, 'rgba(180,220,255,0.1)'); ctx.fillStyle = refl; ctx.fillRect(0, winTop, W, winBot - winTop);
+    // ---- the car: ceiling with lights, window frames, the wall and the long bench
+    const steel = (y0, y1, a, b) => { const gr = ctx.createLinearGradient(0, y0, 0, y1); gr.addColorStop(0, a); gr.addColorStop(1, b); return gr; };
+    ctx.fillStyle = steel(0, winTop, '#b8bec6', '#dfe3e8'); ctx.fillRect(0, 0, W, winTop);
+    ctx.fillStyle = '#fff8e6'; U.roundRect(ctx, W * 0.1, 10, W * 0.8, 8, 4); ctx.fill(); ctx.fillStyle = 'rgba(255,248,230,0.35)'; U.roundRect(ctx, W * 0.08, 6, W * 0.84, 16, 8); ctx.fill();
+    const nWin = narrow ? 2 : 4, fw = W / nWin;
+    ctx.fillStyle = '#9aa0a8'; for (let i = 0; i <= nWin; i++) ctx.fillRect(i * fw - 6, winTop - 4, 12, winBot - winTop + 8);
+    ctx.fillStyle = '#9aa0a8'; ctx.fillRect(0, winTop - 6, W, 6); ctx.fillRect(0, winBot, W, 6);
+    ctx.fillStyle = steel(winBot, floorY, '#dfe3e8', '#b8bec6'); ctx.fillRect(0, winBot + 6, W, floorY - winBot - 6);
+    ctx.fillStyle = '#f28e2b'; U.roundRect(ctx, 0, seatY, W, 22, 6); ctx.fill(); ctx.fillStyle = '#ffb347'; ctx.fillRect(0, seatY + 22, W, 18); ctx.fillStyle = 'rgba(0,0,0,0.12)'; for (let x = 0; x < W; x += 60 * sc / 1.5) ctx.fillRect(x, seatY + 22, 2, 18);
+    ctx.fillStyle = '#6b7480'; ctx.fillRect(0, floorY, W, H - floorY); ctx.fillStyle = 'rgba(255,255,255,0.07)'; for (let i = 0; i < 160; i++) ctx.fillRect((i * 97) % W, floorY + ((i * 53) % (H - floorY)), 3, 3);
+    ctx.fillStyle = '#5c6670'; ctx.fillRect(0, floorY + 24, W, 6); ctx.fillStyle = '#f2c94c'; for (let x = 0; x < W; x += 40) ctx.fillRect(x, H - 26, 20, 5);   // a metal strip and the yellow stripe by the far doors
+    // ---- the route map above the windows: the stops light up as we go
+    const mw = Math.min(W - 40, 620), mx = W / 2 - mw / 2, my = winTop - 24;
+    ctx.fillStyle = '#fff8ee'; U.roundRect(ctx, mx, my - 14, mw, 28, 8); ctx.fill(); ctx.strokeStyle = '#9aa0a8'; ctx.lineWidth = 2; U.roundRect(ctx, mx, my - 14, mw, 28, 8); ctx.stroke();
+    ctx.strokeStyle = col; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(mx + 30, my); ctx.lineTo(mx + mw - 30, my); ctx.stroke();
+    o.stops.forEach((nm, i) => {
+      const sx = mx + 30 + i * (mw - 60) / (n - 1), next = Math.min(n - 1, Math.floor(k * (n - 1)) + 1), lit = i === next && Math.floor(t * 3) % 2 === 0, passed = i / (n - 1) <= k;
+      ctx.fillStyle = lit ? '#ffd166' : passed ? col : '#fff'; ctx.beginPath(); ctx.arc(sx, my, lit ? 7 : 5, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.stroke();
+      if (!narrow || i === 0 || i === n - 1) { ctx.fillStyle = '#2b1d14'; ctx.font = r.font(narrow ? 7 : 8); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(nm, sx, my + (i % 2 ? -9 : 9) * (narrow ? 0 : 1) + (narrow ? 9 : 0)); }
+    });
+    const trainX = mx + 30 + U.clamp(k, 0, 1) * (mw - 60); ctx.fillStyle = '#2b1d14'; ctx.font = r.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🚇', trainX, my - 1);
+    // ---- poles, and hand straps hanging from the window rail, swinging with the car
+    ctx.fillStyle = '#e6e8eb'; for (const px of [W * 0.3, W * 0.7]) ctx.fillRect(px - 3, 0, 6, floorY);
+    for (let x = W * 0.08; x < W; x += W * 0.14) { const a = sway * 0.04 + Math.sin(t * 2.3 + x) * 0.04 * speed; ctx.save(); ctx.translate(x, winTop - 2); ctx.rotate(a); ctx.fillStyle = '#2b1d14'; ctx.fillRect(-1.5, 0, 3, 22); ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(0, 28, 7, 6, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore(); }
+    // ---- the passengers on the bench, swaying with the ride: a student, the chef, a grandma, a kid with a balloon
+    const py = floorY + 10, people = [
+      { x: W * 0.17, s: sc, look: { shirt: '#4e79a7', skin: '#8d5524', hair: '#1a1a1a', hairStyle: 2, facing: 1, moving: false, bob: 0, carry: 0, pants: '#2d3a4a', pack: '#2f9e44' }, extra: 'student' },
+      { x: W * 0.4, s: sc, look: { shirt: '#fff', apron: '#e4572e', skin: '#f1c27d', hat: 'chef', facing: 1, moving: false, bob: 0, carry: g.player.carry, pants: '#2d3a4a' }, extra: 'chef' },
+      { x: W * 0.63, s: sc, look: { shirt: '#b07aa1', skin: '#ffdbac', hair: '#e6e6e6', hairStyle: 2, facing: -1, moving: false, bob: 0, carry: 0, pants: '#9c755f' }, extra: 'grandma' },
+      { x: W * 0.84, s: sc * 0.75, look: { shirt: '#edc948', skin: '#e0ac69', hair: '#8c3b2f', hairStyle: 1, facing: -1, moving: false, bob: 0, carry: 0, pants: '#3b7dd8', hat: 'cap', capColor: '#3b7dd8' }, extra: 'kid' },
+    ];
+    for (const P of people) {
+      const dx = sway * (0.6 + P.s * 0.2);
+      ctx.save(); ctx.translate(P.x + dx, py); ctx.scale(P.s, P.s);
+      if (P.extra === 'student') { ctx.fillStyle = P.look.pack; U.roundRect(ctx, -26, -36, 14, 22, 4); ctx.fill(); }
+      r.drawPerson(0, 0, P.look);
+      if (P.extra === 'student') { ctx.fillStyle = '#2f9e44'; ctx.fillRect(-7, -22, 16, 10); ctx.fillStyle = '#fff8ee'; ctx.fillRect(-5, -20, 5, 6); ctx.fillRect(2, -20, 5, 6); }
+      if (P.extra === 'grandma') { ctx.fillStyle = '#c9975f'; ctx.fillRect(16, -20, 18, 22); ctx.fillStyle = '#8d5a2b'; ctx.fillRect(18, -24, 14, 4); ctx.fillStyle = '#f2b134'; ctx.fillRect(22, -34, 5, 14); ctx.fillStyle = '#56b862'; ctx.beginPath(); ctx.arc(28, -30, 5, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#2b1d14'; ctx.fillRect(-6, -44, 12, 2); ctx.beginPath(); ctx.arc(-4, -41, 3, 0, Math.PI * 2); ctx.arc(4, -41, 3, 0, Math.PI * 2); ctx.stroke(); }
+      if (P.extra === 'kid') { const bx = 18 + Math.sin(t * 1.7) * 4 - dx * 0.3, by = -80 + Math.sin(t * 2.2) * 3; ctx.strokeStyle = 'rgba(43,29,20,0.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(14, -16); ctx.quadraticCurveTo(bx, by + 30, bx, by + 12); ctx.stroke(); ctx.fillStyle = o.balloon || '#e4572e'; ctx.beginPath(); ctx.ellipse(bx, by, 10, 12, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.beginPath(); ctx.ellipse(bx - 3, by - 4, 3, 4, 0, 0, Math.PI * 2); ctx.fill(); }
+      if (P.extra === 'chef') { ctx.save(); ctx.translate(22, -46); ctx.rotate(Math.sin(t * 7) * 0.3); ctx.font = r.font(15); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('👋', 0, 0); ctx.restore(); }
       ctx.restore();
-      // ---- destination banner and progress bar, like the other rides
-      const msg = toCampus ? '🚇 Next stop: Columbia campus! 🎓' : '🚇 Next stop: the City! 🏙️';
-      ctx.fillStyle = 'rgba(43,29,20,0.85)'; const bw = Math.min(W - 24, 380); U.roundRect(ctx, W / 2 - bw / 2, 60, bw, 44, 12); ctx.fill();
-      ctx.fillStyle = '#ffe08a'; ctx.font = r.font(bw < 300 ? 13 : 17); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(msg, W / 2, 82);
-      ctx.fillStyle = 'rgba(255,255,255,0.5)'; U.roundRect(ctx, W / 2 - bw / 2 + 16, 110, bw - 32, 6, 3); ctx.fill();
-      ctx.fillStyle = '#ffe08a'; U.roundRect(ctx, W / 2 - bw / 2 + 16, 110, (bw - 32) * U.clamp(k, 0, 1), 6, 3); ctx.fill();
+    }
+    ctx.restore();
+  },
+  // the destination banner and the progress bar, like the other rides
+  rideBanner(r, W, msg, k) {
+    const ctx = r.ctx;
+    ctx.fillStyle = 'rgba(43,29,20,0.85)'; const bw = Math.min(W - 24, 380); U.roundRect(ctx, W / 2 - bw / 2, 60, bw, 44, 12); ctx.fill();
+    ctx.fillStyle = '#ffe08a'; ctx.font = r.font(bw < 300 ? 13 : 17); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(msg, W / 2, 82);
+    ctx.fillStyle = 'rgba(255,255,255,0.5)'; U.roundRect(ctx, W / 2 - bw / 2 + 16, 110, bw - 32, 6, 3); ctx.fill();
+    ctx.fillStyle = '#ffe08a'; U.roundRect(ctx, W / 2 - bw / 2 + 16, 110, (bw - 32) * U.clamp(k, 0, 1), 6, 3); ctx.fill();
+  },
+
+  // ---- Pizza Pier from the outside: the sea, the beach, the pier with its Ferris wheel and roller coaster on the horizon
+  // (on the LEFT, the way the pier lies from the City on the world map), the elevated track along the shore and the tunnel
+  // portal in the hill on the right where the line comes up from under the City. The purple train rides the track:
+  // `front` is the x of its leading end, `dir` -1 heading left (to the pier) or +1 heading right (home, into the tunnel).
+  seaView(r, g, W, H, front, dir, speed) {
+    const ctx = r.ctx, t = g.time, K = CFG.SUBWAY, dusk = typeof AtmosphereExt !== 'undefined' ? (AtmosphereExt.dusk || 0) : 0;
+    const hy = H * 0.5, sandY = H * 0.76, deckY = H * 0.665, portalX = W - Math.max(46, W * 0.13), u = Math.min(W, H);
+    // sky, the sun (the moon at dusk), slow clouds
+    const sky = ctx.createLinearGradient(0, 0, 0, hy); sky.addColorStop(0, '#74c2f2'); sky.addColorStop(1, '#d6f0fd'); ctx.fillStyle = sky; ctx.fillRect(0, 0, W, hy);
+    r.skySun(ctx, W * 0.82, H * 0.2, u * 0.055);
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    for (let i = 0; i < 4; i++) { const cx = ((i * 0.31 + t * 0.012) % 1.2) * (W + 160) - 80, cy = H * (0.22 + (i % 2) * 0.07); ctx.beginPath(); ctx.arc(cx, cy, 16, 0, Math.PI * 2); ctx.arc(cx + 18, cy - 9, 21, 0, Math.PI * 2); ctx.arc(cx + 40, cy, 15, 0, Math.PI * 2); ctx.fill(); }
+    // the City's towers far away behind the hill on the right
+    ctx.fillStyle = '#a9c4dc';
+    for (let i = 0; i < 9; i++) { const bw = u * 0.05, bx = W - (i + 0.3) * bw * 1.15, bh = u * (0.08 + 0.13 * Math.abs(Math.sin(i * 2.7))); ctx.fillRect(bx, hy - bh, bw, bh); }
+    ctx.fillStyle = 'rgba(255,246,190,0.7)'; for (let i = 0; i < 9; i++) { const bw = u * 0.05, bx = W - (i + 0.3) * bw * 1.15, bh = u * (0.08 + 0.13 * Math.abs(Math.sin(i * 2.7))); for (let yy = hy - bh + 6; yy < hy - 6; yy += 9) ctx.fillRect(bx + bw * 0.3, yy, bw * 0.4, 3); }
+    // the sea, its waves and a little sailboat
+    const sea = ctx.createLinearGradient(0, hy, 0, sandY); sea.addColorStop(0, '#5bbbe9'); sea.addColorStop(1, '#2a86cc'); ctx.fillStyle = sea; ctx.fillRect(0, hy, W, sandY - hy);
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 2;
+    for (let i = 0; i < 18; i++) { const yy = hy + 10 + (i * 37) % (sandY - hy - 20), xx = ((i * 113 + t * (8 + (i % 3) * 4)) % (W + 60)) - 30, w = 8 + (yy - hy) * 0.08; ctx.beginPath(); ctx.arc(xx, yy, w, Math.PI * 1.15, Math.PI * 1.85); ctx.stroke(); }
+    { const bx = ((t * 14) % (W + 120)) - 60, by = hy + (sandY - hy) * 0.3, s = u / 500; ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.moveTo(bx - 16 * s, by); ctx.lineTo(bx + 16 * s, by); ctx.lineTo(bx + 11 * s, by + 7 * s); ctx.lineTo(bx - 11 * s, by + 7 * s); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#fff8ee'; ctx.beginPath(); ctx.moveTo(bx, by - 2); ctx.lineTo(bx, by - 26 * s); ctx.lineTo(bx + 13 * s, by - 2); ctx.closePath(); ctx.fill(); }
+    // the pier on the horizon, on the left: its deck on stilts, the roller coaster and the big wheel, lights at dusk
+    const px0 = 0, px1 = W * 0.6, pdy = hy - 2;
+    ctx.fillStyle = '#8d5a2b'; ctx.fillRect(px0, pdy - 4, px1 - px0, 6); ctx.fillStyle = '#6b4a2b'; for (let x = px0 + 6; x < px1; x += 14) ctx.fillRect(x, pdy + 2, 3, 8);
+    const R = u * 0.17, wx = W * 0.2, wy = pdy - R - u * 0.03;
+    // the roller coaster: a red track over a white lattice with a little train looping along it
+    const cx0 = W * 0.33, cx1 = W * 0.57, ch = (x) => pdy - 4 - R * (0.18 + 0.6 * Math.pow(Math.abs(Math.sin((x - cx0) / (cx1 - cx0) * Math.PI * 1.5 + 0.3)), 1.4) * (1 - 0.35 * (x - cx0) / (cx1 - cx0)));
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1.5; for (let x = cx0; x <= cx1; x += 7) { ctx.beginPath(); ctx.moveTo(x, pdy - 4); ctx.lineTo(x, ch(x)); ctx.stroke(); }
+    ctx.strokeStyle = '#e4572e'; ctx.lineWidth = 3; ctx.beginPath(); for (let x = cx0; x <= cx1; x += 3) { if (x === cx0) ctx.moveTo(x, ch(x)); else ctx.lineTo(x, ch(x)); } ctx.stroke();
+    { const q = (t * 0.22) % 1, xc = cx0 + q * (cx1 - cx0); for (let j = 0; j < 3; j++) { const x = xc - j * 7; if (x < cx0) continue; ctx.fillStyle = ['#ffd166', '#3b7dd8', '#2f9e44'][j]; ctx.fillRect(x - 3, ch(x) - 6, 6, 5); } }
+    // the Ferris wheel: legs, the rim and spokes turning, gondolas hanging level
+    ctx.strokeStyle = '#fff8ee'; ctx.lineWidth = Math.max(2, R * 0.05);
+    ctx.beginPath(); ctx.moveTo(wx - R * 0.55, pdy - 4); ctx.lineTo(wx, wy); ctx.lineTo(wx + R * 0.55, pdy - 4); ctx.stroke();
+    const ang = t * 0.35;
+    ctx.strokeStyle = '#ff8fc7'; ctx.lineWidth = Math.max(2, R * 0.04); ctx.beginPath(); ctx.arc(wx, wy, R, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,248,238,0.9)'; ctx.lineWidth = 1.2; ctx.beginPath(); for (let i = 0; i < 12; i++) { const a = ang + i * Math.PI / 6; ctx.moveTo(wx, wy); ctx.lineTo(wx + Math.cos(a) * R, wy + Math.sin(a) * R); } ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,143,199,0.7)'; ctx.beginPath(); ctx.arc(wx, wy, R * 0.55, 0, Math.PI * 2); ctx.stroke();
+    const gcols = ['#e4572e', '#ffd166', '#3b7dd8', '#2f9e44', '#8e44ad', '#ff8fc7'];
+    for (let i = 0; i < 12; i++) { const a = ang + i * Math.PI / 6, gx = wx + Math.cos(a) * R, gy = wy + Math.sin(a) * R, gs = Math.max(4, R * 0.1); ctx.fillStyle = gcols[i % 6]; U.roundRect(ctx, gx - gs, gy, gs * 2, gs * 1.4, gs * 0.4); ctx.fill(); if (dusk > 0.2 && Math.floor(t * 3 + i) % 2 === 0) { ctx.fillStyle = `rgba(255,240,170,${(0.9 * dusk).toFixed(3)})`; ctx.beginPath(); ctx.arc(gx, gy, 2.2, 0, Math.PI * 2); ctx.fill(); } }
+    ctx.fillStyle = '#fff8ee'; ctx.beginPath(); ctx.arc(wx, wy, Math.max(3, R * 0.07), 0, Math.PI * 2); ctx.fill();
+    if (dusk > 0.2) for (let x = px0 + 8, i = 0; x < px1; x += 16, i++) { ctx.fillStyle = ['#ffd166', '#ff8fab', '#9fd8ff', '#8ef0a0'][i % 4]; ctx.globalAlpha = dusk * (Math.floor(t * 2 + i) % 3 ? 1 : 0.4); ctx.beginPath(); ctx.arc(x, pdy - 6, 2, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1; }
+    // gulls
+    ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1.6;
+    for (let i = 0; i < 3; i++) { const gx = ((i * 0.37 + t * 0.05) % 1.2) * (W + 80) - 40, gy = H * (0.3 + i * 0.05) + Math.sin(t * 2 + i) * 6, f = Math.sin(t * 8 + i * 2) * 3; ctx.beginPath(); ctx.moveTo(gx - 7, gy - f); ctx.quadraticCurveTo(gx - 3, gy - 4, gx, gy); ctx.quadraticCurveTo(gx + 3, gy - 4, gx + 7, gy - f); ctx.stroke(); }
+    // the beach: foam, sand, umbrellas and a sandcastle
+    ctx.fillStyle = '#f3d99b'; ctx.fillRect(0, sandY, W, H - sandY);
+    ctx.fillStyle = 'rgba(255,255,255,0.85)'; for (let x = -20; x < W + 20; x += 26) { ctx.beginPath(); ctx.arc(x + Math.sin(t * 1.5 + x) * 4, sandY, 9, Math.PI, 0); ctx.fill(); }
+    ctx.fillStyle = 'rgba(201,151,95,0.35)'; for (let i = 0; i < 70; i++) ctx.fillRect((i * 97) % W, sandY + 14 + ((i * 53) % Math.max(1, H - sandY - 20)), 3, 2);
+    for (const [ux, col] of [[0.12, '#e4572e'], [0.4, '#8e44ad'], [0.7, '#2f9e44']]) { const x = W * ux, y = H * 0.93, s = u / 420; ctx.fillStyle = '#8d5a2b'; ctx.fillRect(x - 1.5, y - 34 * s, 3, 34 * s); ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x - 24 * s, y - 30 * s); ctx.quadraticCurveTo(x, y - 52 * s, x + 24 * s, y - 30 * s); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#fff8ee'; ctx.beginPath(); ctx.moveTo(x - 8 * s, y - 33 * s); ctx.quadraticCurveTo(x, y - 47 * s, x + 8 * s, y - 33 * s); ctx.closePath(); ctx.fill(); }
+    { const x = W * 0.55, y = H * 0.95, s = u / 420; ctx.fillStyle = '#d9b26a'; ctx.fillRect(x - 16 * s, y - 14 * s, 32 * s, 14 * s); ctx.fillRect(x - 8 * s, y - 26 * s, 16 * s, 12 * s); for (const dx of [-16, -4, 8]) ctx.fillRect(x + dx * s, y - 18 * s, 8 * s, 4 * s); ctx.fillStyle = '#e4572e'; ctx.fillRect(x - 1, y - 38 * s, 2, 12 * s); ctx.beginPath(); ctx.moveTo(x + 1, y - 38 * s); ctx.lineTo(x + 10 * s, y - 34 * s); ctx.lineTo(x + 1, y - 30 * s); ctx.fill(); }
+    // the elevated track along the shore: piers down into the sand, arches between them, the deck with a purple stripe
+    const span = Math.max(70, W * 0.11);
+    ctx.fillStyle = '#b9b2a4';
+    for (let x = portalX - span; x > -span; x -= span) { ctx.fillRect(x - 7, deckY + 10, 14, sandY + 10 - deckY); }
+    const arc = span * 0.32;
+    ctx.fillStyle = '#b9b2a4'; for (let x = portalX; x > -span; x -= span) { ctx.beginPath(); ctx.moveTo(x, deckY + 10); ctx.lineTo(x, deckY + 10 + arc); ctx.quadraticCurveTo(x - span / 2, deckY + 10 - arc * 0.7, x - span, deckY + 10 + arc); ctx.lineTo(x - span, deckY + 10); ctx.closePath(); ctx.fill(); }
+    ctx.fillStyle = 'rgba(0,0,0,0.12)'; for (let x = portalX - span; x > -span; x -= span) ctx.fillRect(x + 3, deckY + 10, 4, sandY + 10 - deckY);
+    ctx.fillStyle = '#d8d2c4'; ctx.fillRect(0, deckY, portalX, 12); ctx.fillStyle = K.COLOR2; ctx.fillRect(0, deckY + 5, portalX, 3);
+    ctx.fillStyle = '#5c6670'; ctx.fillRect(0, deckY - 3, portalX, 3);
+    // the purple train, side on (it slides out of / into the portal: the hill is drawn over it)
+    this.sideTrain(r, g, front, deckY - 3, dir, Math.max(84, Math.min(190, W * 0.2)), speed);
+    // the hill on the right with the tunnel portal: grass, a stone arch round the dark mouth
+    const tunH = Math.max(52, Math.min(110, W * 0.2 * 0.5)) + 12;
+    ctx.fillStyle = '#4d8a56'; ctx.beginPath(); ctx.moveTo(portalX - 24, sandY + 6); ctx.quadraticCurveTo(portalX - 30, deckY - tunH - 30, portalX + 20, deckY - tunH - 34); ctx.quadraticCurveTo(W * 0.98, deckY - tunH - 70, W + 10, deckY - tunH - 60); ctx.lineTo(W + 10, sandY + 6); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#6cb35a'; ctx.beginPath(); ctx.moveTo(portalX - 26, deckY - tunH - 12); ctx.quadraticCurveTo(portalX - 28, deckY - tunH - 30, portalX + 20, deckY - tunH - 34); ctx.quadraticCurveTo(W * 0.98, deckY - tunH - 70, W + 10, deckY - tunH - 60); ctx.lineTo(W + 10, deckY - tunH - 40); ctx.quadraticCurveTo(W * 0.9, deckY - tunH - 44, portalX, deckY - tunH - 14); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#9a948a'; U.roundRect(ctx, portalX - 12, deckY - tunH - 14, 22, tunH + 28, 6); ctx.fill();
+    ctx.fillStyle = '#7f7a70'; for (let yy = deckY - tunH - 8; yy < deckY + 12; yy += 12) ctx.fillRect(portalX - 12, yy, 22, 2);
+    ctx.fillStyle = '#2b2730'; ctx.fillRect(portalX + 8, deckY - tunH, 6, tunH);   // the dark mouth just behind the arch
+    ctx.fillStyle = K.COLOR2; ctx.beginPath(); ctx.arc(portalX - 1, deckY - tunH - 26, 11, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = r.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(K.LINE2, portalX - 1, deckY - tunH - 25);
+  },
+  // the purple Line 2 train side on, three cars on the deck at `baseY`, the leading end at `front`, heading `dir`
+  sideTrain(r, g, front, baseY, dir, cl, speed) {
+    const ctx = r.ctx, K = CFG.SUBWAY, t = g.time, chH = cl * 0.36, gap = 6, n = 3, bob = Math.sin(t * 20) * 0.6 * speed;
+    for (let i = 0; i < n; i++) {
+      // car 0 leads; x0 is the car's left edge
+      const lead = i === 0, tail = i === n - 1, x0 = dir < 0 ? front + i * (cl + gap) : front - (i + 1) * cl - i * gap, y0 = baseY - chH - 6 + bob;
+      if (x0 > ctx.canvas.width || x0 + cl < -10) continue;
+      if (i > 0) { ctx.fillStyle = '#2b1d14'; ctx.fillRect(dir < 0 ? x0 - gap : x0 + cl, y0 + chH * 0.45, gap, 6); }
+      // wheels
+      ctx.fillStyle = '#2b1d14'; for (const wx of [x0 + cl * 0.16, x0 + cl * 0.3, x0 + cl * 0.7, x0 + cl * 0.84]) { ctx.beginPath(); ctx.arc(wx, baseY - 4, Math.max(3.5, cl * 0.035), 0, Math.PI * 2); ctx.fill(); }
+      // the silver body, rounded at the ends of the train
+      const rl = (dir < 0 ? lead : tail) ? chH * 0.45 : 4, rr = (dir < 0 ? tail : lead) ? chH * 0.45 : 4;
+      const body = ctx.createLinearGradient(0, y0, 0, y0 + chH); body.addColorStop(0, '#e6e9ee'); body.addColorStop(1, '#a9afb8'); ctx.fillStyle = body;
+      ctx.beginPath(); ctx.moveTo(x0 + rl, y0); ctx.lineTo(x0 + cl - rr, y0); ctx.quadraticCurveTo(x0 + cl, y0, x0 + cl, y0 + rr); ctx.lineTo(x0 + cl, y0 + chH); ctx.lineTo(x0, y0 + chH); ctx.lineTo(x0, y0 + rl); ctx.quadraticCurveTo(x0, y0, x0 + rl, y0); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = K.COLOR2; ctx.fillRect(x0 + 2, y0 + chH * 0.66, cl - 4, chH * 0.12); ctx.fillRect(x0 + 6, y0 + 2, cl - 12, 3);
+      // windows with people in them (the chef in the leading car, waving)
+      const nw = 4, ww = cl * 0.13, wy = y0 + chH * 0.18, wh = chH * 0.36;
+      for (let k = 0; k < nw; k++) {
+        const wx = x0 + cl * 0.12 + k * (cl * 0.76 - ww) / (nw - 1);
+        ctx.fillStyle = '#cfeaff'; U.roundRect(ctx, wx, wy, ww, wh, 3); ctx.fill();
+        const who = (i * 4 + k) % 5;
+        if (who === 1 || who === 3 || (lead && k === (dir < 0 ? 0 : nw - 1))) {
+          const hx = wx + ww / 2, hr = Math.min(ww, wh) * 0.3;
+          ctx.save(); ctx.beginPath(); ctx.rect(wx, wy, ww, wh); ctx.clip();
+          if (lead && k === (dir < 0 ? 0 : nw - 1)) {
+            ctx.fillStyle = '#fff'; ctx.fillRect(hx - hr * 1.4, wy + wh - hr * 0.8, hr * 2.8, hr);
+            ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(hx, wy + wh * 0.62, hr, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(hx, wy + wh * 0.62 - hr * 1.3, hr * 0.85, 0, Math.PI * 2); ctx.fill(); ctx.fillRect(hx - hr * 0.7, wy + wh * 0.62 - hr * 1.2, hr * 1.4, hr * 0.5);
+          } else {
+            ctx.fillStyle = ['#8d5524', '#ffdbac', '#e0ac69'][(i + k) % 3]; ctx.beginPath(); ctx.arc(hx, wy + wh * 0.7, hr, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = ['#1a1a1a', '#d9a066', '#5a3a1a'][(i + k) % 3]; ctx.beginPath(); ctx.arc(hx, wy + wh * 0.7 - hr * 0.3, hr, Math.PI, 0); ctx.fill();
+          }
+          ctx.restore();
+        }
+        ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fillRect(wx + 2, wy + 2, ww * 0.3, 2);
+      }
+      // doors
+      ctx.strokeStyle = 'rgba(43,29,20,0.3)'; ctx.lineWidth = 1; for (const dx of [0.43, 0.57]) { ctx.beginPath(); ctx.moveTo(x0 + cl * dx, y0 + 3); ctx.lineTo(x0 + cl * dx, y0 + chH - 2); ctx.stroke(); }
+      if (lead) {
+        // the nose: a headlight, the purple bullet and the Ferris wheel picture
+        const nx = dir < 0 ? x0 + 4 : x0 + cl - 4;
+        ctx.fillStyle = '#fff6b0'; ctx.beginPath(); ctx.arc(nx, y0 + chH * 0.82, Math.max(2.5, chH * 0.08), 0, Math.PI * 2); ctx.fill();
+        const bx = x0 + cl / 2, by = y0 - chH * 0.32, br = Math.max(9, chH * 0.3);
+        ctx.fillStyle = '#fff8ee'; ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = K.COLOR2; ctx.lineWidth = 3; ctx.stroke();
+        ctx.font = r.font(br * 1.2); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('🎡', bx, by + 1);
+        ctx.fillStyle = K.COLOR2; ctx.beginPath(); ctx.arc(bx + (dir < 0 ? -br * 1.7 : br * 1.7), by + br * 0.4, br * 0.6, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.font = r.font(br * 0.8); ctx.fillText(K.LINE2, bx + (dir < 0 ? -br * 1.7 : br * 1.7), by + br * 0.45);
+      }
+    }
+  },
+
+  travel: {
+    // Line 1: inside the car all the way, the tunnel and the stations we rush through streaming past the windows
+    subway(r, g, W, H) {
+      const E = SubwayExt, ctx = r.ctx, tr = g.travel, toCampus = tr.to === 'campus', K = CFG.SUBWAY;
+      const k = tr.t / tr.dur, ease = k < 0.12 ? k / 0.12 : k > 0.88 ? (1 - k) / 0.12 : 1;
+      const M = E.rideMotion(tr.dur), dist = M.dist(tr.t), total = M.total, speed = M.speed(tr.t);
+      E.carScene(r, g, W, H, {
+        k, speed, color: K.COLOR, stops: toCampus ? K.STOPS : K.STOPS.slice().reverse(),
+        outside: (c, winTop, winBot) => {
+          E.tunnelView(r, W, winTop, winBot, dist, speed);
+          // the stations we rush through, lit and tiled, with a mosaic name and people waiting
+          const names = toCampus ? K.STOPS.slice(1, 4) : K.STOPS.slice(1, 4).reverse();
+          names.forEach((nm, i) => {
+            const cx = W / 2 + (total * (i + 1) / 4 - dist), sw = 760; if (cx < -sw || cx > W + sw) return;
+            const x0 = cx - sw / 2;
+            ctx.fillStyle = '#f3efe4'; ctx.fillRect(x0, winTop, sw, winBot - winTop);
+            ctx.strokeStyle = 'rgba(0,0,0,0.08)'; ctx.lineWidth = 1; for (let yy = winTop; yy < winBot; yy += 10) { ctx.beginPath(); ctx.moveTo(x0, yy + 0.5); ctx.lineTo(x0 + sw, yy + 0.5); ctx.stroke(); }
+            ctx.fillStyle = K.COLOR; ctx.fillRect(x0, winTop + 10, sw, 10);
+            ctx.fillStyle = '#b9b2a4'; ctx.fillRect(x0, winBot - 40, sw, 22); ctx.fillStyle = '#f2c94c'; ctx.fillRect(x0, winBot - 24, sw, 6);
+            for (let p = 0; p < 4; p++) { const px = x0 + 90 + p * 180, col = ['#4e79a7', '#f28e2b', '#59a14f', '#e15759'][p]; ctx.fillStyle = col; U.roundRect(ctx, px - 9, winBot - 72, 18, 32, 7); ctx.fill(); ctx.fillStyle = '#f1c27d'; ctx.beginPath(); ctx.arc(px, winBot - 80, 8, 0, Math.PI * 2); ctx.fill(); }
+            for (let p = 0; p < 4; p++) { const px = x0 + 100 + p * 200; ctx.fillStyle = '#e8e3d8'; ctx.fillRect(px - 10, winTop + 20, 20, winBot - winTop - 60); ctx.fillStyle = K.COLOR; ctx.fillRect(px - 10, winTop + 60, 20, 5); }
+            E.mosaic(r, cx, winTop + 46, nm, 14);
+            const gr = ctx.createLinearGradient(0, winTop, 0, winBot); gr.addColorStop(0, 'rgba(255,255,230,0.15)'); gr.addColorStop(1, 'rgba(255,255,230,0)'); ctx.fillStyle = gr; ctx.fillRect(x0, winTop, sw, winBot - winTop);
+          });
+        },
+      });
+      E.rideBanner(r, W, toCampus ? '🚇 Next stop: Columbia campus! 🎓' : '🚇 Next stop: the City! 🏙️', k);
+      if (ease < 1) { ctx.fillStyle = `rgba(43,29,20,${1 - ease})`; ctx.fillRect(0, 0, W, H); }
+    },
+    // Line 2: to the pier it starts inside the car in the tunnel under the City, the windows brighten, and the train comes
+    // up out of the portal onto the elevated track by the sea, rolling in LEFT towards the pier with its Ferris wheel and
+    // roller coaster on the horizon. Home is the mirror: from the pier RIGHT along the shore into the portal, then the
+    // tunnel from inside the car into the City.
+    pierline(r, g, W, H) {
+      const E = SubwayExt, ctx = r.ctx, tr = g.travel, K = CFG.SUBWAY, toPier = tr.to !== 'subway', dur = tr.dur;
+      const k = tr.t / dur, ease = k < 0.1 ? k / 0.1 : k > 0.9 ? (1 - k) / 0.1 : 1, SPLIT = 0.45;
+      const M = E.rideMotion(dur), dist = M.dist(tr.t), speed = M.speed(tr.t), ks = toPier ? SPLIT : 1 - SPLIT, inside = toPier ? k < ks : k >= ks;
+      const stops = toPier ? K.PIER_STOPS : K.PIER_STOPS.slice().reverse();
+      tr.indoors = inside;   // in the tunnel: no night sky (an atmosphere that reads travel.indoors keeps its stars off the car)
+      if (inside) {
+        // otherwise put the night sky up first, off screen, so the tunnel and the car cover its stars
+        if (E._atmoIndoors === undefined) E._atmoIndoors = typeof AtmosphereExt !== 'undefined' && /\.indoors/.test(String(AtmosphereExt.travelScreen));
+        if (!E._atmoIndoors) r.skySun(ctx, -400, -400, 10);
+        const day = U.clamp(toPier ? (k - (ks - 0.1)) / 0.1 : ((ks + 0.1) - k) / 0.1, 0, 1);   // daylight at the tunnel's end
+        E.carScene(r, g, W, H, {
+          k, speed, color: K.COLOR2, stops, balloon: '#8e44ad',
+          outside: (c, winTop, winBot) => {
+            E.tunnelView(r, W, winTop, winBot, dist, speed, toPier ? -1 : 1);
+            if (day > 0) { const gr = c.createLinearGradient(toPier ? 0 : W, 0, toPier ? W : 0, 0); gr.addColorStop(0, `rgba(255,250,225,${(0.95 * day).toFixed(3)})`); gr.addColorStop(1, `rgba(255,250,225,${(0.55 * day * day).toFixed(3)})`); c.fillStyle = gr; c.fillRect(0, winTop, W, winBot - winTop); }
+          },
+        });
+      } else {
+        // outside: the train's leading end moves with the ride's own speed profile, from the portal to the pier end of the
+        // screen (to the pier, heading left) or from there into the portal (home, heading right)
+        const portalX = W - Math.max(46, W * 0.13), cl = Math.max(84, Math.min(190, W * 0.2)), len = 3 * cl + 12, dS = M.dist(ks * dur);
+        let front, dir;
+        if (toPier) { dir = -1; const pierEnd = W * 0.08, f = (dist - dS) / Math.max(1, M.total - dS); front = U.lerp(portalX, pierEnd, f); }
+        else { dir = 1; const start = W * 0.08 + len, f = dist / Math.max(1, dS); front = U.lerp(start, portalX + len + 10, f); }
+        E.seaView(r, g, W, H, front, dir, speed);
+      }
+      // the bright flash of coming up into the daylight (or of diving into the dark)
+      const fl = 1 - Math.abs(k - ks) / 0.05;
+      if (fl > 0) { ctx.fillStyle = `rgba(255,250,230,${(0.85 * fl).toFixed(3)})`; ctx.fillRect(0, 0, W, H); }
+      E.rideBanner(r, W, toPier ? '🎡 Next stop: Pizza Pier!' : '🏙️ Back to the City!', k);
       if (ease < 1) { ctx.fillStyle = `rgba(43,29,20,${1 - ease})`; ctx.fillRect(0, 0, W, H); }
     },
   },

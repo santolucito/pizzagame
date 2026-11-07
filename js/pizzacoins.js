@@ -46,6 +46,7 @@ CFG.PIZZACOINS = {
     { id: 'cinema', area: 'cinema', x: 10055, y: 3185, note: 'at the back of the cinema' },
     { id: 'aquarium', area: 'aquarium', x: 15065, y: 3255, note: 'in the aquarium corner' },
     { id: 'cocoacabin', area: 'cocoacabin', x: 18060, y: 4316, note: 'in the Cocoa Cabin, in the corner by the woodpile' },
+    { id: 'pizzapier', area: 'pizzapier', x: 9240, y: 6168, note: 'on the beach at Pizza Pier, right beside the sandcastle' },
   ],
   // friendly names for the list in the panel, in the order they are listed
   PLACES: {
@@ -55,6 +56,7 @@ CFG.PIZZACOINS = {
     lowlibrary: ['🏛️', 'Low Library'], barnardhall: ['🐻', 'Barnard Hall'], cabin: ['🌲', 'Secret Cabin'],
     upstairs: ['🛏️', 'Bedroom'], pizzarain: ['🌧️', 'Pizza Rain Room'], barn: ['🐐', 'Barn'], firestation: ['🧯', 'Fire Station'],
     cocoacabin: ['🍫', 'Cocoa Cabin'],
+    pizzapier: ['🎡', 'Pizza Pier'],
     hardware: ['🔧', 'Hardware Store'], toyshop: ['🧸', 'Toy Shop'], barber: ['💈', 'Barber'], bakery: ['🥐', 'Bakery'],
     arcade: ['🕹️', 'Arcade'], petshop: ['🐶', 'Pet Shop'], hotel: ['🏨', 'Grand Hotel'], books: ['📚', 'Book Shop'],
     candy: ['🍭', 'Candy Shop'], catcafe: ['🐱', 'Cat Café'], music: ['🎸', 'Music Shop'], gym: ['🏋️', 'Gym'],

@@ -423,7 +423,7 @@ module.exports = async (t) => {
   });
   t.expectEq(sleep.label, '😴 Sleep', 'sleep label beside the bed');
   t.expectEq(sleep.hint, 'Hop into bed for a sleep 😴', 'sleep hint beside the bed');
-  t.expect(sleep.phase === 'sleep' && sleep.during === null && sleep.zzz === 'Zzz… 😴' && sleep.night > 0.9, `asleep: night falls, no button ${JSON.stringify(sleep)}`);
+  t.expect(sleep.phase === 'sleep' && sleep.during === '☀️ Wake up' && sleep.zzz === 'Zzz… 😴 Press ☀️ to wake up' && sleep.night > 0.9, `asleep: night falls, a Wake up button ${JSON.stringify(sleep)}`);
   t.expect(sleep.stayed, 'the chef stays tucked in while asleep');
   await t.shot('beachhut-sleeping');
   // the same moment without the night over the screen: tucked in under the coconut blanket, the net let down
@@ -432,13 +432,15 @@ module.exports = async (t) => {
   const wake = await t.ev(() => {
     IslandsInsideExt.nightAlpha = window.nightA;
     const R = CFG.ISLE_IN.ROOMS.beachhut, floats = [];
+    T.step(60 * 6); const still = IslandsInsideExt.st.nap && IslandsInsideExt.st.nap.phase;   // sleeps on until you wake up
+    T.act();
     const n = T.until(() => { for (const f of Game.floats) if (!floats.includes(f.text)) floats.push(f.text); return !IslandsInsideExt.st.nap; }, 600);
     const atmo = typeof AtmosphereExt !== 'undefined' && AtmosphereExt.st ? AtmosphereExt.st.phase || AtmosphereExt.phase : 'none';
     const back = Math.hypot(Game.player.x - R.SLEEP.x, Game.player.y - R.SLEEP.y) < 1, label = T.label();
     T.tp(R.EXIT.x + 20, R.EXIT.y - 60, 'beachhut');
-    return { n, floats, sleeps: Game.s.isleIn.sleeps, back, label, hint: T.hint(), atmo };
+    return { n, still, floats, sleeps: Game.s.isleIn.sleeps, back, label, hint: T.hint(), atmo };
   });
-  t.expect(wake.n > 100 && wake.n < 400, `the night lasts a few seconds (${wake.n} steps)`);
+  t.expect(wake.still === 'sleep' && wake.n > 10 && wake.n < 200, `asleep until ☀️ Wake up, then up again (${JSON.stringify(wake)})`);
   t.expect(wake.floats.includes('Good morning! 🌅') && wake.sleeps === 1, `good morning: ${JSON.stringify(wake.floats)}`);
   t.expect(wake.back && wake.label === '😴 Sleep', 'out of bed again beside it');
   t.expectEq(wake.hint, 'Swing in the hammock! 🌴', 'next hint: the hammock');

@@ -157,7 +157,8 @@ const UpstairsExt = {
     }
     if (g.area !== 'upstairs') return null;
     const st = this.st;
-    if (st.nap || st.slide || st.draw.on) return null;                   // fast asleep, whooshing, or busy drawing
+    if (st.nap && st.nap.phase === 'sleep' && st.nap.t > 0.4) return { label: '☀️ Wake up', run: (gg) => this.wakeUp(gg) };   // sleeps until you wake up
+    if (st.nap || st.slide || st.draw.on) return null;                   // hopping in or out, whooshing, or busy drawing
     if (st.cat.on) return this.catalogAction(g);
     if (st.sit) return { label: '🚶 Get up', run: (gg) => this.getUp(gg) };
     if (U.dist(p.x, p.y, C.top.x, C.top.y) < C.topReach) return { label: '🪜 Go downstairs', run: (gg) => this.goDown(gg) };
@@ -172,6 +173,7 @@ const UpstairsExt = {
     const p = g.player, C = CFG.UPSTAIRS;
     if (g.area === 'upstairs') {
       const st = this.st;
+      if (st.nap && st.nap.phase === 'sleep') return { text: 'Sweet dreams! 😴 Press ☀️ to wake up', target: null };
       if (st.nap || st.slide || st.draw.on || st.cat.on || st.sit) return null;   // the scenes and overlays explain themselves
       if (U.dist(p.x, p.y, C.catalog.x, C.catalog.y) < C.catalog.reach) return { text: 'Open the catalog to decorate 📖', target: null };
       const nearBag = this.nearBeanbag(g), dChair = U.dist(p.x, p.y, C.chair.x, C.chair.y);
@@ -222,10 +224,23 @@ const UpstairsExt = {
     this.st.nap = { phase: 'hop', t: 0, from: { x: p.x, y: p.y } };
     p.moving = false; p.facing = 1; Sfx.ding(); Haptics.tap();
   },
+  // in bed the chef sleeps (a soft night, moon, stars and z's) for as long as they like, until '☀️ Wake up'
+  wakeUp(g) {
+    const n = this.st.nap, p = g.player;
+    if (!n || n.phase !== 'sleep') return;
+    n.phase = 'wake'; n.t = 0;
+    if (typeof AtmosphereExt !== 'undefined' && AtmosphereExt.force) AtmosphereExt.force({ phase: 'day' });
+    g.s.stats.naps = (g.s.stats.naps || 0) + 1;
+    g.floats.push({ x: p.x + 30, y: p.y - 70, text: '🐓 Good morning!', color: '#ffe08a', t: 0, dur: 1.8, big: true });
+    g.floats.push({ x: p.x + 30, y: p.y - 40, text: '😊 Well rested!', color: '#ffe08a', t: 0.5, dur: 2.2, big: true });
+    Sfx.ding(); Haptics.success();
+  },
   napAlpha() {
     const n = this.st && this.st.nap, N = CFG.UPSTAIRS.nap;
-    if (!n || n.phase !== 'sleep') return 0;
-    return U.clamp(Math.min(n.t / 0.5, (N.sleep - n.t) / 0.6), 0, 1);
+    if (!n) return 0;
+    if (n.phase === 'sleep') return U.clamp(n.t / 0.5, 0, 1);
+    if (n.phase === 'wake') return U.clamp(1 - n.t / N.wake, 0, 1);   // the morning comes back as the chef hops out
+    return 0;
   },
   updateRoom(g, dt) {
     const st = this.st, p = g.player, C = CFG.UPSTAIRS, N = C.nap, n = st.nap;
@@ -266,15 +281,7 @@ const UpstairsExt = {
       const k = Math.min(1, n.t / N.hop); arc(n.from, C.napSpot, k);
       if (k >= 1) { n.phase = 'sleep'; n.t = 0; Sfx.drop(); }
     } else if (n.phase === 'sleep') {
-      p.x = C.napSpot.x; p.y = C.napSpot.y;
-      if (n.t >= N.sleep) {
-        n.phase = 'wake'; n.t = 0;
-        if (typeof AtmosphereExt !== 'undefined' && AtmosphereExt.force) AtmosphereExt.force({ phase: 'day' });
-        g.s.stats.naps = (g.s.stats.naps || 0) + 1;
-        g.floats.push({ x: p.x + 30, y: p.y - 70, text: '🐓 Good morning!', color: '#ffe08a', t: 0, dur: 1.8, big: true });
-        g.floats.push({ x: p.x + 30, y: p.y - 40, text: '😊 Well rested!', color: '#ffe08a', t: 0.5, dur: 2.2, big: true });
-        Sfx.ding(); Haptics.success();
-      }
+      p.x = C.napSpot.x; p.y = C.napSpot.y;   // tucked in: stays asleep until '☀️ Wake up'
     } else {
       const k = Math.min(1, n.t / N.wake); arc(C.napSpot, C.sleepSpot, k);
       if (k >= 1) { st.nap = null; p.x = C.sleepSpot.x; p.y = C.sleepSpot.y; }

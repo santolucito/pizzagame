@@ -203,6 +203,7 @@ const IslandsInsideExt = {
     if (di >= 0) return { label: '🚪 Go inside', run: (gg) => this.enter(gg, di) };
     const k = this.room(g); if (!k || !this.onFoot(g)) return null;
     const R = CFG.ISLE_IN.ROOMS[k];
+    if (st.nap && st.nap.phase === 'sleep' && st.nap.t > 0.4) return { label: '☀️ Wake up', run: (gg) => this.wakeUp(gg) };   // asleep until you wake up
     if (st.climb || st.nap) return null;
     if (st.viewing) return { label: '🚶 Done looking', run: () => { st.viewing = null; Haptics.tap(); } };
     if (st.lie) return { label: '🚶 Get up', run: (gg) => this.getUp(gg) };
@@ -303,7 +304,18 @@ const IslandsInsideExt = {
     p.moving = false; p.facing = -1; Sfx.pickup(); Haptics.tap();
   },
   // how dark the night is over the screen (0..1), and how strong the sunrise glow after it
-  nightAlpha() { const n = this.st && this.st.nap, N = CFG.ISLE_IN.ROOMS.beachhut.NAP_T; if (!n || n.phase !== 'sleep') return 0; return U.clamp(Math.min(n.t / 0.6, (N.sleep - n.t) / 0.5 + 0.35), 0, 1); },
+  nightAlpha() { const n = this.st && this.st.nap; if (!n || n.phase !== 'sleep') return 0; return U.clamp(n.t / 0.6, 0, 1); },
+  // in bed the chef sleeps under the stars for as long as they like, until '☀️ Wake up'
+  wakeUp(g) {
+    const n = this.st.nap, p = g.player;
+    if (!n || n.phase !== 'sleep') return;
+    n.phase = 'wake'; n.t = 0; n.from = { x: p.x, y: p.y };
+    // a fresh new morning (the same as the bedroom nap: the day/night clock jumps to day)
+    if (typeof AtmosphereExt !== 'undefined' && AtmosphereExt.force) AtmosphereExt.force({ phase: 'day' });
+    g.s.isleIn.sleeps++;
+    g.floats.push({ x: p.x + 30, y: p.y - 70, text: 'Good morning! 🌅', color: '#ffe08a', t: 0, dur: 2, big: true });
+    Sfx.ding(); Haptics.success();
+  },
   dawnAlpha() { const n = this.st && this.st.nap, N = CFG.ISLE_IN.ROOMS.beachhut.NAP_T; if (!n || n.phase !== 'wake') return 0; return U.clamp(1 - n.t / N.wake, 0, 1); },
   updateNap(g, dt, R) {
     const st = this.st, n = st.nap, p = g.player, N = R.NAP_T;
@@ -315,14 +327,6 @@ const IslandsInsideExt = {
     } else if (n.phase === 'sleep') {
       p.x = R.NAP.x; p.y = R.NAP.y; p.facing = 1;
       if (Math.floor(n.t / 0.9) !== Math.floor((n.t - dt) / 0.9)) g.floats.push({ x: p.x + 16, y: p.y - 52, text: 'z', color: '#9ad0ff', t: 0, dur: 1.4 });
-      if (n.t >= N.sleep) {
-        n.phase = 'wake'; n.t = 0; n.from = { x: p.x, y: p.y };
-        // a fresh new morning (the same as the bedroom nap: the day/night clock jumps to day)
-        if (typeof AtmosphereExt !== 'undefined' && AtmosphereExt.force) AtmosphereExt.force({ phase: 'day' });
-        g.s.isleIn.sleeps++;
-        g.floats.push({ x: p.x + 30, y: p.y - 70, text: 'Good morning! 🌅', color: '#ffe08a', t: 0, dur: 2, big: true });
-        Sfx.ding(); Haptics.success();
-      }
     } else {
       const k = Math.min(1, n.t / (N.wake * 0.6)); arc(R.NAP, R.SLEEP, k);
       if (n.t >= N.wake) { st.nap = null; p.x = R.SLEEP.x; p.y = R.SLEEP.y; p.facing = -1; }
@@ -469,7 +473,7 @@ const IslandsInsideExt = {
       return { text: 'Aloha! 🌺', target: null };
     }
     if (k === 'beachhut') {
-      if (st.nap) return { text: st.nap.phase === 'wake' ? 'Good morning! 🌅' : 'Zzz… 😴', target: null };
+      if (st.nap) return { text: st.nap.phase === 'wake' ? 'Good morning! 🌅' : 'Zzz… 😴 Press ☀️ to wake up', target: null };
       if (st.lie) return { text: 'Swing, swing… Press the button to get up', target: null };
       if (this.near(g, R.SLEEP, 40)) return { text: 'Hop into bed for a sleep 😴', target: null };
       if (!s.sleeps) return { text: 'Have a sleep in the cosy bed! 😴', target: R.SLEEP };

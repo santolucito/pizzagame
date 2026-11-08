@@ -177,4 +177,16 @@ module.exports = async (t) => {
   t.expect(await t.page.isVisible('#modal-draw'), 'pad reopens after reload');
   await t.page.click('#draw-done');
   t.expect(!(await t.page.isVisible('#modal-draw')), 'Done closes the pad');
+  // in bed: asleep (night over the screen) until ☀️ Wake up, then a fresh morning and out of bed
+  const bed = await t.ev(() => {
+    const C = CFG.UPSTAIRS; T.tp(C.sleepSpot.x, C.sleepSpot.y, 'upstairs'); T.step(2);
+    const label = T.label(); T.act(); T.step(60 * 8);
+    const n = UpstairsExt.st.nap, out = { label, phase: n && n.phase, night: UpstairsExt.napAlpha(), wakeLabel: T.label(), hint: T.hint(), inBed: Math.hypot(Game.player.x - C.napSpot.x, Game.player.y - C.napSpot.y) < 1 };
+    T.act(); const k = T.until(() => !UpstairsExt.st.nap, 300);
+    out.woke = k >= 0; out.morning = Game.floats.some((f) => f.text === '🐓 Good morning!'); out.out = Math.hypot(Game.player.x - C.sleepSpot.x, Game.player.y - C.sleepSpot.y) < 1;
+    return out;
+  });
+  t.expect(bed.label === '😴 Sleep' && bed.phase === 'sleep' && bed.inBed && bed.night > 0.9, `still asleep in bed after 8 s ${JSON.stringify(bed)}`);
+  t.expect(bed.wakeLabel === '☀️ Wake up' && /wake up/i.test(bed.hint || ''), `a Wake up button while asleep ${JSON.stringify(bed)}`);
+  t.expect(bed.woke && bed.morning && bed.out, `Wake up: good morning and out of bed ${JSON.stringify(bed)}`);
 };

@@ -43,8 +43,10 @@ CFG.MTRUCKS = {
   TUNNEL_DOOR: { x: 36300, y: 5292 },                   // on foot: '🏁 Back to the dirt track'
   ARENA_PARK: { x: 36560, y: 5384 },                    // the chef's truck waits here when he walks in
   RAMPS: [
-    { x: 36720, y: 5640, rx: 100, ry: 64, h: 36, vz: 560 },
-    { x: 37780, y: 5640, rx: 100, ry: 64, h: 36, vz: 560 },
+    // each big hill has its own jump: the BACKFLIP hill flips you backwards, the FRONT FLIP hill forwards (both by
+    // themselves), and the plain JUMP hill just flies you (onto the cars), where the 🔄 button can still do a backflip
+    { x: 36720, y: 5640, rx: 100, ry: 64, h: 36, vz: 560, trick: 'back' },
+    { x: 37780, y: 5640, rx: 100, ry: 64, h: 36, vz: 560, trick: 'front' },
     { x: 36700, y: 6090, rx: 92, ry: 58, h: 32, vz: 520 },   // this one flies you onto the cars
   ],
   CARS: { y: 6090, xs: [37000, 37150, 37300, 37450, 37600], colors: ['#c0504d', '#4f81bd', '#8fbf4f', '#e8b84a', '#9a6bc0'], HX: 62, HY: 34 },
@@ -254,7 +256,10 @@ const MonsterTrucksExt = {
     this.st.cheer = Math.max(this.st.cheer, 0.6);
     for (let i = 0; i < 6; i++) this.st.dust.push({ x: v.x + U.rand(-40, 40), y: v.y + U.rand(-4, 6), vx: -v.vx * 0.2 + U.rand(-30, 30), vy: U.rand(-20, 10), t: 0, dur: U.rand(0.4, 0.7), r: U.rand(7, 12), area: g.area });
     if (driven) g.s.mtrucks.jumps++;
-    if (v.ai && g.area === 'arena' && Math.random() < 0.55) this.startFlip(g, v, false);
+    if (ramp.trick) {
+      this.startFlip(g, v, driven, ramp.trick === 'front' ? -1 : 1);
+      this.pop(v.x, v.y - 200, ramp.trick === 'front' ? 'FRONT FLIP! 🔃' : 'BACKFLIP! 🔄', '#ffe08a', 1.1);
+    } else if (v.ai && g.area === 'arena' && Math.random() < 0.55) this.startFlip(g, v, false);
   },
   // seconds until a flying truck is down again (from its height and climb)
   airLeft(v) { const G = CFG.MTRUCKS.G; return (v.vz + Math.sqrt(Math.max(0, v.vz * v.vz + 2 * G * v.z))) / G; },
@@ -304,13 +309,14 @@ const MonsterTrucksExt = {
     if (driven) { this.st.next = 'wheelie'; g.s.mtrucks.donuts++; Sfx.pickup(); Haptics.tap(); g.floats.push({ x: v.x, y: v.y - 160, text: 'Donut! 🍩', color: '#ffe08a', t: 0, dur: 1.2, big: true }); }
     this.st.cheer = Math.max(this.st.cheer, 0.6);
   },
-  startFlip(g, v, driven) {
+  // dir 1: a backflip (the nose goes up and over), -1: a front flip (the nose goes down and over)
+  startFlip(g, v, driven, dir = 1) {
     if (!v.air || v.flip) return;
     const M = CFG.MTRUCKS, G = M.G;
     // always enough air for a whole flip: a short hop gets a little extra lift
     let left = this.airLeft(v);
     if (left < M.FLIP + 0.08) { const T = M.FLIP + 0.1; v.vz = (G * T * T / 2 - v.z) / T; left = T; }
-    v.flip = { t: 0, dur: Math.min(left - 0.04, M.FLIP + 0.15) };
+    v.flip = { t: 0, dur: Math.min(left - 0.04, M.FLIP + 0.15), dir };
     if (driven) { Sfx.pickup(); Haptics.tap(); }
   },
   wheelieAngle(v) {
@@ -318,7 +324,7 @@ const MonsterTrucksExt = {
     const up = U.clamp(w.t / 0.3, 0, 1), down = U.clamp((w.dur - w.t) / 0.35, 0, 1), k = Math.min(up, down);
     return (0.42 * (1 - Math.pow(1 - k, 3))) + Math.sin(w.t * 9) * 0.025 * k;
   },
-  flipAngle(v) { const f = v.flip; if (!f) return 0; const k = U.clamp(f.t / f.dur, 0, 1); return (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2) * Math.PI * 2; },
+  flipAngle(v) { const f = v.flip; if (!f) return 0; const k = U.clamp(f.t / f.dur, 0, 1); return (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2) * Math.PI * 2 * (f.dir || 1); },
 
   // ---------------- the junk cars and the forklift ----------------
   // a truck rolling over a car (or landing on one) crushes it; one just parked on the row does not
@@ -438,7 +444,7 @@ const MonsterTrucksExt = {
     const M = CFG.MTRUCKS, p = g.player, d = this.driven(g);
     if (g.area === 'arena') {
       if (d) {
-        if (d.air) return { text: d.flip ? 'Wheee! 🔄' : 'Up in the air! Press 🔄 Backflip!', target: null };
+        if (d.air) return { text: d.flip ? (d.flip.dir < 0 ? 'Front flip! 🔃' : 'Backflip! 🔄') : 'Up in the air! Press 🔄 Backflip!', target: null };
         if (Math.abs(d.x - M.TUNNEL.x) < 200 && d.y < M.TUNNEL_TRIG + 160 && d.vy < -30) return { text: 'Drive up into the tunnel to go back 🏁', target: null };
         return { text: this.st.cars.some((c) => !c.flat) ? 'Jump the hills! Crush the cars! 💥' : 'Jump the dirt hills! 🏁', target: null };
       }
@@ -490,7 +496,7 @@ const MonsterTrucksExt = {
     ctx.fillStyle = '#2b2b2b'; for (let x = z0 - 100; x < z1 + 100; x += 28) { ctx.beginPath(); ctx.moveTo(x, zy1); ctx.lineTo(x + 14, zy1); ctx.lineTo(x + 14 + (zy1 - zy0), zy0); ctx.lineTo(x + (zy1 - zy0), zy0); ctx.closePath(); ctx.fill(); }
     ctx.restore();
     // the dirt hills
-    for (const rp of M.RAMPS) this.paintRamp(ctx, rp);
+    for (const rp of M.RAMPS) { this.paintRamp(ctx, rp); this.paintRampSign(r, rp); }
     // ---- the north stand: rows of seats (the crowd is drawn live), a concrete front wall, the tunnel, the big screen
     const sy0 = W.y0, sy1 = F.y0;
     ctx.fillStyle = '#26324a'; ctx.fillRect(W.x0, sy0, W.x1 - W.x0, sy1 - sy0);
@@ -544,6 +550,20 @@ const MonsterTrucksExt = {
     ctx.fillStyle = '#e9e4da'; ctx.fillRect(W.x0, F.y1, W.x1 - W.x0, 30);
     for (let x = W.x0 + 20, k = 0; x < W.x1 - 40; x += 120, k++) { ctx.fillStyle = k % 2 ? '#e4572e' : '#3b7dd8'; ctx.fillRect(x, F.y1 + 6, 80, 18); }
     ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(W.x0, F.y1 + 28, W.x1 - W.x0, 4);
+  },
+  // a big sign beside each arena hill: a curly arrow showing which way the truck will flip (or a straight one: just a jump)
+  paintRampSign(r, rp) {
+    const ctx = r.ctx, x = rp.x + rp.rx + 46, y = rp.y - 10, trick = rp.trick;
+    const col = trick === 'back' ? '#3b7dd8' : trick === 'front' ? '#e4572e' : '#41b883';
+    const ico = trick === 'back' ? '🔄' : trick === 'front' ? '🔃' : '⬆️';
+    const word = trick === 'back' ? 'BACKFLIP' : trick === 'front' ? 'FRONT FLIP' : 'JUMP';
+    ctx.fillStyle = 'rgba(60,35,15,0.3)'; ctx.beginPath(); ctx.ellipse(x + 6, y + 4, 26, 7, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#6b4a2b'; ctx.fillRect(x - 4, y - 70, 8, 72);
+    ctx.fillStyle = col; U.roundRect(ctx, x - 52, y - 128, 104, 64, 12); ctx.fill();
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 4; U.roundRect(ctx, x - 52, y - 128, 104, 64, 12); ctx.stroke();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = r.font(30); ctx.fillText(ico, x, y - 104);
+    ctx.fillStyle = '#ffffff'; ctx.font = r.font(12, 900); ctx.fillText(word, x, y - 76);
   },
   paintRamp(ctx, rp) {
     // a round dirt hill seen from above and a little in front: its shadow, then layers getting smaller, higher and

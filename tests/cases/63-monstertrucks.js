@@ -15,6 +15,8 @@ module.exports = async (t) => {
   });
   await t.page.addInitScript(() => { try { navigator.serviceWorker.register = () => Promise.resolve(); } catch (e) { /* none */ } });
   await t.boot();
+  // the hills' own tricks (backflip / front flip) are switched off for the older plain-jump checks and checked at the end
+  await t.ev(() => CFG.MTRUCKS.RAMPS.forEach((r) => { r._trick = r.trick; r.trick = null; }));
   if (await t.ev(() => typeof AtmosphereExt !== 'undefined' && !!AtmosphereExt.force)) await t.ev(() => { AtmosphereExt.force({ phase: 'day', weather: 'none' }); T.step(1); });
 
   // ---- registered: the arena in a free rectangle, part of Construction Town, ahead of the outer maps; the two vehicles
@@ -104,7 +106,7 @@ module.exports = async (t) => {
 
   // ---- a jump: real air time, a shadow on the ground, a bouncy landing with dust and WHOA
   const jump = await t.ev(() => {
-    const M = CFG.MTRUCKS, v = Game.vehicle, R = M.RAMPS[0];
+    const M = CFG.MTRUCKS, v = Game.vehicle, R = M.RAMPS[0], trick = R.trick; R.trick = null;   // as a plain jump here (its own trick is checked at the end)
     MonsterTrucksExt.still(v); v.x = R.x - 260; v.y = R.y; Game.player.x = v.x; Game.player.y = v.y; Game.cameraSnap = true;
     MonsterTrucksExt.st.pops.length = 0; const jumps0 = Game.s.mtrucks.jumps;
     T.steer(1, 0); const n = T.until(() => !!v.air, 200);
@@ -112,6 +114,7 @@ module.exports = async (t) => {
     T.until(() => { air++; top = Math.max(top, v.z); if (air === 20) { label = T.label(); hint = T.hint(); } return !v.air; }, 400);
     const sq = v.sqv, pops = MonsterTrucksExt.st.pops.map((p) => p.text), dust = MonsterTrucksExt.st.dust.length;
     T.unsteer(); T.step(30);
+    R.trick = trick;
     return { n, air, top: Math.round(top), label, hint, sq, pops, dust, jumps: Game.s.mtrucks.jumps - jumps0, z: v.z, flew: Math.round(v.x - R.x) };
   });
   t.expect(jump.n >= 0, 'took off from the dirt hill');
@@ -286,4 +289,26 @@ module.exports = async (t) => {
     v.vx = 0; v.vy = 0; c.t = 9; Game.floats.length = 0; Game.cameraSnap = true; T.step(1); MonsterTrucksExt.st.pops.length = 0; MonsterTrucksExt.pop(c.x, c.y - 170, 'CRUNCH! 🚗💥', '#ffd166', 9); MonsterTrucksExt.st.pops[0].t = 2.7;
   });
   await t.shot('phone-crush');
+
+  // ---- each big arena hill does its own trick: backflip, front flip, a plain jump
+  await t.ev(() => CFG.MTRUCKS.RAMPS.forEach((r) => { if ('_trick' in r) r.trick = r._trick; }));
+  await t.page.setViewportSize({ width: 1100, height: 720 });
+  await t.ev(() => { Render.resize(); Render.setZoom(1); });
+  const flips = await t.ev(() => {
+    const E = MonsterTrucksExt, M = CFG.MTRUCKS, out = [];
+    M.RAMPS.forEach((rp, i) => {
+      const v = E.trucks[0]; if (Game.driving) Game.exitCar(); T.step(2);
+      E.still(v); v.area = 'arena'; v.x = rp.x - rp.rx - 120; v.y = rp.y; v.angle = 0; v.face = 1;
+      T.tp(v.x, v.y + 50, 'arena'); Game.enterCar(); v.vx = 320; v.vy = 0;
+      let dir = null, flipped = false, maxA = 0;
+      for (let n = 0; n < 240; n++) { T.steer(1, 0); T.step(1); if (v.flip) { flipped = true; dir = v.flip.dir; maxA = Math.max(maxA, Math.abs(E.flipAngle(v))); } if (flipped && !v.air) break; }
+      T.unsteer(); T.step(10);
+      out.push({ trick: rp.trick || 'jump', flipped, dir, turned: +(maxA / Math.PI).toFixed(2) });
+    });
+    if (Game.driving) Game.exitCar(); T.step(2);
+    return out;
+  });
+  t.expect(flips[0].flipped && flips[0].dir === 1 && flips[0].turned > 1.9, `the BACKFLIP hill flips the truck backwards ${JSON.stringify(flips)}`);
+  t.expect(flips[1].flipped && flips[1].dir === -1 && flips[1].turned > 1.9, `the FRONT FLIP hill flips it forwards ${JSON.stringify(flips)}`);
+  t.expect(!flips[2].flipped, `the plain JUMP hill just flies ${JSON.stringify(flips)}`);
 };

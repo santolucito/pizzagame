@@ -15,6 +15,8 @@
 // out of the fridge onto the table (or the delivered one is used), he sips it through a striped straw (the level drops
 // sip by sip, bubbles rise, "sip" floats), "Ahh! Fizzy! 🥤", a little "burp! 😅" every other bottle, and the empty
 // bottle flies into the crate. A meal at the table ends with "And a soda? 🥤" and the next press drinks one.
+// A cake baked and sent home from the City bakery (js/city-bakery.js, g.s.bakery.homeCake) waits on a cake stand on the
+// table with a "From the bakery 🧁" card; '🎂 Eat the cake' at the table eats it slice by slice ("Yum!") and it is gone.
 // Extension module: registered with Game.ext (first, so its door beats the bedroom's buttons) and Render.ext.
 // See the hook list in js/EXTENSIONS.md. This file never touches js/upstairs.js: it only reads UpstairsExt.st.
 CFG.PIZZARAIN = {
@@ -37,6 +39,9 @@ CFG.PIZZARAIN = {
   // the delivery: the doorway, the mat, across the room, the server spot at the table (all free floor after the doorway)
   DELIVERY: { path: [[5036, 4224], [5084, 4224], [5300, 4238], [5492, 4256]], speed: 120, call: 2, arrive: 4, door: 3, place: 0.9, serve: 2, wave: 1.1 },
   meal: { dur: 3, bites: [0.45, 1.1, 1.75, 2.4] },
+  // ---- bakery cake: a cake sent home from the City bakery (g.s.bakery.homeCake, drawn by BakeryExt) waits on a cake
+  // stand at the back of the table, with a little "From the bakery" card
+  CAKE: { x: 5500, y: 4281, stand: 0.5, s: 0.58, note: { x: 5467, y: 4278 } },
   LAMP: { x: 5512, y: 4132, block: [5498, 4118, 28, 24] },
   PLANT: { x: 5090, y: 4132, block: [5076, 4118, 28, 24] },
   EXIT: { x: 5080, y: 4222 }, reach: 26,                  // the mat inside the door back to the bedroom (west wall)
@@ -111,6 +116,9 @@ const PizzaRainExt = {
   near(g, pt, d) { return U.dist(g.player.x, g.player.y, pt.x, pt.y) < d; },
   atTable(g) { const T = CFG.PIZZARAIN.TABLE; return this.near(g, T, T.reach); },
   pizzaWaiting() { const st = this.st; return !!(st && st.plate && st.plate.kind === 'pizza' && !st.meal); },
+  // ---- bakery cake: the cake from the bakery, if one was sent home (and not being eaten right now)
+  homeCake(g) { return typeof BakeryExt !== 'undefined' && g.s.bakery && g.s.bakery.homeCake && g.s.bakery.homeCake.flavour ? g.s.bakery.homeCake : null; },
+  cakeWaiting(g) { return !!this.homeCake(g) && !(this.st && this.st.meal); },
   // where the chef is pinned while sitting
   seatSpot(seat) { const C = CFG.PIZZARAIN; return seat === 'chair' ? C.CHAIR.sit : C.TABLE.seat; },
   // the chef left the room (or went home) with something going on: the meal stops, the seat is let go, and a pizza on
@@ -166,6 +174,7 @@ const PizzaRainExt = {
       // one button: the pizza on the plate first, then the soda a meal just offered (or the delivered bottle), then a
       // slice off the carried stack, and otherwise a soda pop (free, as often as you like)
       if (this.pizzaWaiting()) return { label: '🍽️ Eat the pizza', run: (gg) => this.eatAtTable(gg) };
+      if (this.cakeWaiting(g) && !st.sodaNext) return { label: '🎂 Eat the cake', run: (gg) => this.eatCake(gg) };   // ---- bakery cake
       const soda = { label: '🥤 Drink a soda pop', run: (gg) => this.drinkSoda(gg) };
       if (st.sodaNext || st.gift !== null) return soda;
       if (g.player.carry > 0 && !st.plate && !(st.del && st.del.phase === 'serve')) return { label: '🍽️ Eat a slice at the table', run: (gg) => this.eatAtTable(gg) };
@@ -184,6 +193,7 @@ const PizzaRainExt = {
         if (st.soda) return { text: 'Sip sip! 🥤', target: null };
         if (this.pizzaWaiting()) return { text: 'Your pizza is here! 🍽️', target: this.atTable(g) ? null : T.seat };   // (also from the armchair: the arrow shows the way)
         if (st.seat === 'chair') return { text: 'Ahh, so comfy 😌', target: null };
+        if (this.cakeWaiting(g) && !st.sodaNext && !st.soda) return { text: 'A cake from the bakery! 🎂', target: this.atTable(g) ? null : T.seat };   // ---- bakery cake
         if (st.sodaNext && this.atTable(g)) return { text: 'And a soda? 🥤', target: null };
         if (g.player.carry > 0 && !st.plate) return { text: 'Eat a slice at the table 🍽️', target: this.atTable(g) ? null : T.seat };
         if (st.del) return { text: 'Your pizza is on its way! 🍕', target: null };
@@ -292,19 +302,30 @@ const PizzaRainExt = {
     st.seat = 'table'; p.x = T.seat.x; p.y = T.seat.y; p.moving = false; p.facing = 1;
     Sfx.pickup(); Haptics.tap();
   },
+  // ---- bakery cake: sit on the stool and eat the cake from the bakery, slice by slice (it is gone when it is eaten)
+  eatCake(g) {
+    const st = this.st, p = g.player, T = CFG.PIZZARAIN.TABLE;
+    if (st.meal || !this.homeCake(g)) return;
+    st.meal = { kind: 'cake', t: 0, bites: 0, chomp: 0 };
+    st.seat = 'table'; p.x = T.seat.x; p.y = T.seat.y; p.moving = false; p.facing = 1;
+    Sfx.pickup(); Haptics.tap();
+  },
   updateMeal(g, dt) {
     const st = this.st, m = st.meal; if (!m) return;
     const M = CFG.PIZZARAIN.meal, P = CFG.PIZZARAIN.TABLE.plate, p = g.player;
     m.t += dt; m.chomp = Math.max(0, m.chomp - dt);
     while (m.bites < M.bites.length && m.t >= M.bites[m.bites]) {
       m.bites++; m.chomp = 0.3;
-      g.floats.push({ x: p.x + U.rand(-6, 6), y: p.y - 66, text: 'nom', color: '#fff', t: 0, dur: 0.9, big: false });
-      for (let i = 0; i < 5; i++) st.crumbs.push({ x: P.x + U.rand(-6, 6), y: P.y - 4, vx: U.rand(-50, 50), vy: U.rand(-90, -30), t: 0, dur: U.rand(0.4, 0.7), col: i % 3 ? '#d98a3c' : '#c0392b' });
+      const cake = m.kind === 'cake', CK = CFG.PIZZARAIN.CAKE;   // ---- bakery cake: "Yum!" and cake crumbs
+      g.floats.push({ x: p.x + U.rand(-6, 6), y: p.y - 66, text: cake ? 'Yum!' : 'nom', color: '#fff', t: 0, dur: 0.9, big: false });
+      for (let i = 0; i < 5; i++) st.crumbs.push({ x: (cake ? CK.x : P.x) + U.rand(-6, 6), y: (cake ? CK.y - 10 : P.y - 4), vx: U.rand(-50, 50), vy: U.rand(-90, -30), t: 0, dur: U.rand(0.4, 0.7), col: cake ? (i % 2 ? '#fff8ee' : '#ff8fab') : (i % 3 ? '#d98a3c' : '#c0392b') });
     }
     if (m.t >= M.dur) {
-      st.meal = null; st.plate = null; st.seat = null;   // the plate is empty again; the chef stays on the stool spot (free floor)
+      if (m.kind === 'cake') { if (g.s.bakery) g.s.bakery.homeCake = null; }   // ---- bakery cake: all gone
+      else st.plate = null;
+      st.meal = null; st.seat = null;   // the plate is empty again; the chef stays on the stool spot (free floor)
       const sv = this.state(g); sv.meals = (sv.meals || 0) + 1;
-      g.floats.push({ x: p.x, y: p.y - 80, text: 'Delicious! 😋', color: '#ffe08a', t: 0, dur: 1.8, big: true });
+      g.floats.push({ x: p.x, y: p.y - 80, text: m.kind === 'cake' ? 'Yum! What a cake! 🎂' : 'Delicious! 😋', color: '#ffe08a', t: 0, dur: 1.8, big: true });
       g.floats.push({ x: p.x, y: p.y - 104, text: 'And a soda? 🥤', color: '#bdf3ff', t: 0, dur: 2.2, big: true });
       st.sodaNext = true;   // the next press at the table drinks a soda pop
       g.fx.push({ kind: 'sparkle', x0: p.x, y0: p.y - 36, x1: p.x, y1: p.y - 36, t: 0, dur: 0.6 });
@@ -707,6 +728,16 @@ const PizzaRainExt = {
     // the telephone on its wall shelf, the food on the plate, the delivery person
     items.push({ y: C.PHONE.y + 8, draw: () => this.drawPhone(ctx, g) });
     if (st.plate) items.push({ y: C.TABLE.y + 1, draw: () => this.drawPlateFood(r, ctx) });
+    // ---- bakery cake: on its stand at the back of the table, with the little card; smaller with every bite
+    const hc = this.homeCake(g);
+    if (hc) items.push({ y: C.CAKE.y, draw: () => {
+      const K = C.CAKE, N = K.note, m = st.meal && st.meal.kind === 'cake' ? st.meal : null, left = m ? 1 - m.bites / C.meal.bites.length : 1;
+      BakeryExt.drawStand(ctx, K.x, K.y, K.stand);
+      if (left > 0) BakeryExt.drawMadeCake(ctx, K.x, K.y + 1, K.s, hc, left, g.time, true);
+      ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(N.x - 6, N.y + 1, 13, 2);
+      ctx.fillStyle = '#fff8ee'; ctx.beginPath(); ctx.moveTo(N.x - 7, N.y + 1); ctx.lineTo(N.x - 5, N.y - 9); ctx.lineTo(N.x + 5, N.y - 9); ctx.lineTo(N.x + 7, N.y + 1); ctx.closePath(); ctx.fill();
+      ctx.font = r.font(7); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🧁', N.x, N.y - 4);
+    } });
     items.push({ y: C.CRATE.y, draw: () => this.drawCrate(ctx, g) });
     // the soda bottle: hopping out of the fridge, then on the table with its straw to the chef's mouth (drawn before the
     // chef, so the far end of the straw tucks under the face and the hand sits on the bottle); or the delivered one waiting
@@ -746,7 +777,8 @@ const PizzaRainExt = {
     if (st.meal) items.push({ y: p.y + 0.6, draw: () => {
       const m = st.meal, bob = m.chomp > 0 ? Math.sin(g.time * 30) * 1.2 : 0;
       ctx.fillStyle = 'rgba(255,143,171,0.6)'; ctx.beginPath(); ctx.arc(p.x - 4, p.y - 34 + bob, 2.8, 0, Math.PI * 2); ctx.arc(p.x + 10, p.y - 34 + bob, 2.8, 0, Math.PI * 2); ctx.fill();   // rosy cheeks
-      if (m.chomp > 0) this.drawSlice(ctx, p.x + 13, p.y - 30 + bob, -Math.PI / 2 - 0.3, 0.55, 1);   // the bite on its way in
+      if (m.chomp > 0 && m.kind === 'cake') { ctx.fillStyle = '#ff8fab'; ctx.beginPath(); ctx.arc(p.x + 13, p.y - 31 + bob, 3.2, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff8ee'; ctx.fillRect(p.x + 10, p.y - 31 + bob, 6, 1.5); }   // ---- bakery cake: a forkful
+      else if (m.chomp > 0) this.drawSlice(ctx, p.x + 13, p.y - 30 + bob, -Math.PI / 2 - 0.3, 0.55, 1);   // the bite on its way in
     } });
   },
   // the old corded telephone: a red body with a cream dial and the receiver on its cradle (it shakes when it rings)
@@ -860,6 +892,8 @@ const PizzaRainExt = {
     }
     if (d && d.phase === 'serve' && (d.placed || d.t > 0.3)) say(d.x, d.y - 76, 'Here you go! 🍕');
     if (d && d.phase === 'wave') say(d.x, d.y - 76, 'Bye-bye! 👋');
+    // ---- bakery cake: the little card says where it came from when you come close
+    if (this.cakeWaiting(g) && !st.seat && !d && this.near(g, C.TABLE, 110)) say(C.CAKE.x - 8, C.CAKE.y - 40, 'From the bakery 🧁');
   },
   // screen space: the three-slice counter at the top of the room and the fade through the door
   screen(r, g) {

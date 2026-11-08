@@ -41,7 +41,7 @@ CFG.PIZZACOINS = {
     { id: 'pizzarain', area: 'pizzarain', x: 5525, y: 4335, note: 'in the corner of the pizza rain room' },
     { id: 'hayloft', area: 'barn', x: 500, y: 4075, loft: true, note: 'up in the hayloft' },
     // ---- inside the City's shops
-    { id: 'bakery', area: 'bakery', x: 785, y: 3115, note: 'behind the bakery counter' },
+    { id: 'bakery', area: 'bakery', x: 29480, y: 5480, note: 'in the bakery kitchen, behind the counter' },
     { id: 'arcade', area: 'arcade', x: 1945, y: 3125, note: 'behind the claw machine' },
     { id: 'cinema', area: 'cinema', x: 10055, y: 3185, note: 'at the back of the cinema' },
     { id: 'aquarium', area: 'aquarium', x: 20920, y: 5620, note: 'in the glass fish tunnel at the aquarium' },

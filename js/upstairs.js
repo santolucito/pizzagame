@@ -34,7 +34,7 @@ CFG.UPSTAIRS = {
   sleepSpot: { x: 6626, y: 1664 }, sleepReach: 40,       // stand here, beside the bed, to nap
   napSpot: { x: 6538, y: 1640 },                          // where the chef lies (feet); the head lands on the pillow
   table: { x0: 6604, y0: 1574, x1: 6640, y1: 1608 },      // bedside table: lamp and alarm clock
-  photo: { x: 6668, y: 1546 },                            // framed photo on the wall: the chef and the dog
+  photo: { x: 6530, y: 1546 },                            // framed photo on the wall over the bed: the chef and the dog (the playroom door, js/playroom.js, is by the wardrobe)
   wardrobe: { x0: 6688, y0: 1562, x1: 6768, y1: 1612 },
   hook: { x: 6796, y: 1548 },                             // the chef hat's hook on the wall
   window: { x0: 6822, y0: 1504, x1: 6922, y1: 1558 },     // looks out over Main Street

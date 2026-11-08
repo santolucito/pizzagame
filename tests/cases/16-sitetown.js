@@ -45,10 +45,14 @@ module.exports = async (t) => {
   t.expectEq(sitePos, '🚂 Ride the train', 'the train still stops at the site platform');
   await t.ev(() => { Game.siteTrain.state = 'away'; Game.siteTrain.x = CFG.SITE.WORLD.x0 - 500; });
   // the hint stays quiet out on the new streets, away from the things
-  t.expectEq(await t.ev(() => { T.tp(4056, 600, 'site'); return SiteTownExt.hint(Game); }), undefined, 'no hint out on Site Road');
+  t.expectEq(await t.ev(() => { T.tp(4056, 600, 'site'); const far = SiteTownExt.mixers.every((m) => Math.hypot(m.x - 4056, m.y - 600) > 160); return far ? SiteTownExt.hint(Game) : undefined; }), undefined, 'no hint out on Site Road');
 
   // ---- the concrete mixers: hop in, drive, pour, hop out
   const mix = await t.ev(() => {
+    // daylight, and the mixers parked at home (a long test can reach the machines' bedtime, when they drive to the garage)
+    AtmosphereExt.force({ phase: 'day' }); T.step(2);
+    if (typeof SiteGarageExt !== 'undefined' && SiteGarageExt.st) for (const k in SiteGarageExt.st.m) { const q = SiteGarageExt.st.m[k]; if (q.kind === 'mixer') { q.state = 'out'; q.trip = null; q.bay = null; } }
+    SiteTownExt.mixers.forEach((mm, i) => { const H = CFG.SITETOWN.MIXERS[i]; mm.x = H.x; mm.y = H.y; mm.angle = H.angle; mm.vx = 0; mm.vy = 0; });
     const m = SiteTownExt.mixers[0]; T.tp(m.x, m.y + 50, 'site'); T.step(2);
     const hint = SiteTownExt.hint(Game);
     Game.enterCar(); T.step(1);

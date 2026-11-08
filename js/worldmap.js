@@ -75,6 +75,7 @@ CFG.WORLDMAP = {
   },
   // pictures, names and words for interiors whose own config has none, and how notable each is (3 = shown first)
   INSIDE: {
+    arena: ['🏟️', 'Monster Trucks', 'The Monster Truck Arena', 3],
     barn: ['🐄', 'Farm', 'The farm and the barn', 3], firestation: ['🚒', 'Fire Station', 'The fire station', 3],
     cabin: ['🌲', 'Woods', 'The secret woods and the cabin', 3], upstairs: ['🛏️', 'Upstairs', 'Your room upstairs', 1],
     pizzarain: ['🌧️', 'Pizza Rain', 'The room where it rains pizza', 1], jetcabin: ['✈️', 'Jet', 'Inside the big jet', 2],

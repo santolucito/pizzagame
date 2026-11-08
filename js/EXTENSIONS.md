@@ -99,7 +99,8 @@ Reserved interior rectangles (all 600 × 400, y 3000..3400, 900 apart): City bui
 `CFG.CITY.BUILDINGS`) owns `x0 = -1300 + i * 900`. Other interiors: the barn `0..600 × 4000..4400`, Columbia
 `1000..1600 × 4000..4400`, Barnard `2000..2600 × 4000..4400`, more at `x0 = 3000 + k * 1000, y 4000..4400`.
 Bigger maps taken since: Snowy Peak `5000..7400 × 5000..6800`, Coney Island (map 'pizzapier') `8000..10400 ×
-5000..6400`, the aquarium `20200..22100 × 5100..6360`, the airfield terminal `27000..28040 × 4000..4740`; the slots at
+5000..6400`, the aquarium `20200..22100 × 5100..6360`, the airfield terminal `27000..28040 × 4000..4740`; the bakery `29000..30720 × 5000..6220`, the playroom `31500..32700 × 4000..4900`,
+the Monster Truck Arena `36000..38400 × 5000..6400`; the slots at
 `x0 = 17000, 18000, 19000, 23000, 24000` (y 4000..4400) are taken too. Grep every `WORLD:` in js/ before picking a rectangle.
 
 ## Render hooks (`Render.ext`)

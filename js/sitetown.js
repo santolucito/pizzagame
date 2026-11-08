@@ -30,8 +30,8 @@ CFG.SITETOWN = {
   SLIDE: { top: { x: 4420, y: 700 }, bottom: { x: 4420, y: 790 }, dur: 0.8 },   // walk onto the ladder (top) and slide south
   BUS: { x: 4136, y: 905 },                                   // bus shelter (just art) on the grass by the street
   TOWER: { x: 4440, y: 950 },                                 // the water tower's legs stand here
-  LAMPS: [[4106, 200], [4106, 440], [4106, 680], [4106, 920], [4106, 1160], [3200, 1006], [3700, 1006], [2700, 1006]],
-  TREES: [[4470, 170], [4350, 690], [4480, 662], [4300, 980], [3720, 1060], [3960, 1060], [3720, 1260], [3300, 1060], [2660, 1040]],
+  LAMPS: [[4106, 200], [4106, 440], [4106, 680], [4106, 920], [4106, 1160], [3200, 1006], [3700, 1006]],   // (the lamp at 2700,1006 made way for the arena gate)
+  TREES: [[4470, 170], [4350, 690], [4480, 662], [4300, 980], [3720, 1060], [3960, 1060], [3720, 1260], [3300, 1060]],   // (the tree at 2660,1040 made way for the monster truck arena's gate)
   BEDS: [[4230, 180], [4370, 180], [4470, 420], [3440, 1260]],   // flower beds (art)
   CROSSINGS: [{ x0: 4016, y0: 160, x1: 4096, y1: 186 }, { x0: 4016, y0: 860, x1: 4096, y1: 886 }, { x0: 3650, y0: 916, x1: 3676, y1: 996 }, { x0: 2990, y0: 916, x1: 3016, y1: 996 }],
   // the concrete factory (south-east corner)
@@ -53,7 +53,8 @@ CFG.SITETOWN = {
   LOOSE_BEAMS: [[3535, 600, 1.3], [2650, 470, 1.45]],          // a couple of beams lying around (x, y, angle)
   BEAM_LEN: 70, LIFT_REACH: 95, TRUCK_REACH: 125, FRAME_PAD: 44, LIFT_T: 1.4, DROP_T: 1.4,
   // the south strip: the dirt track, the diner and a park
-  TRACK: { x: 2950, y: 1160, rx: 310, ry: 118, rxi: 200, ryi: 54 },
+  // the dirt track: moved east (a little taller) so the monster truck arena's stadium gate fits at its west end (js/monstertrucks.js)
+  TRACK: { x: 3080, y: 1160, rx: 290, ry: 122, rxi: 182, ryi: 50 },
   DINER: { x0: 3400, y0: 1040, x1: 3660, y1: 1170, door: { x: 3530 } },
   TABLE: { x: 3530, y: 1232 }, SEAT: { x: 3530, y: 1258 },   // picnic table and the bench spot you sit on
   POND2: { x: 3810, y: 1180, rx: 62, ry: 38 },
@@ -659,7 +660,7 @@ const SiteTownExt = {
     ctx.strokeStyle = 'rgba(0,0,0,0.1)'; ctx.lineWidth = 5; ctx.beginPath(); ctx.ellipse(T.x, T.y, (T.rx + T.rxi) / 2, (T.ry + T.ryi) / 2, 0, 0, Math.PI * 2); ctx.stroke();
     ctx.fillStyle = 'rgba(0,0,0,0.07)'; for (let i = 0; i < 60; i++) { const a = i * 0.21, rr = T.rxi + 12 + (i % 5) * 18; ctx.beginPath(); ctx.ellipse(T.x + Math.cos(a) * rr, T.y + Math.sin(a) * rr * T.ry / T.rx, 5, 2.5, 0, 0, Math.PI * 2); ctx.fill(); }
     // tyre stacks and hay bales round the outside (art), a chequered start line and a flag in the infield
-    for (let i = 0; i < 14; i++) { const a = i * (Math.PI * 2 / 14) + 0.2, x = T.x + Math.cos(a) * (T.rx + 14), y = T.y + Math.sin(a) * (T.ry + 12); if (i % 2) { ctx.fillStyle = '#2b2b2b'; ctx.beginPath(); ctx.ellipse(x, y, 9, 5, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(x, y, 4, 2, 0, 0, Math.PI * 2); ctx.fill(); } else { ctx.fillStyle = '#e8c56a'; U.roundRect(ctx, x - 10, y - 6, 20, 12, 3); ctx.fill(); ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(x - 10, y - 1, 20, 2); } }
+    for (let i = 0; i < 14; i++) { const a = i * (Math.PI * 2 / 14) + 0.2, x = T.x + Math.cos(a) * (T.rx + 14), y = T.y + Math.sin(a) * (T.ry + 12); if (x > 3372 || x < 2782) continue; if (i % 2) { ctx.fillStyle = '#2b2b2b'; ctx.beginPath(); ctx.ellipse(x, y, 9, 5, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(x, y, 4, 2, 0, 0, Math.PI * 2); ctx.fill(); } else { ctx.fillStyle = '#e8c56a'; U.roundRect(ctx, x - 10, y - 6, 20, 12, 3); ctx.fill(); ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(x - 10, y - 1, 20, 2); } }
     for (let k = 0; k < 2; k++) for (let i = 0; i < 8; i++) { ctx.fillStyle = (i + k) % 2 ? '#fff' : '#2b1d14'; ctx.fillRect(T.x + T.rxi + 2 + i * 14, T.y - 8 + k * 8, 14, 8); }
     ctx.fillStyle = '#5b3a1a'; ctx.fillRect(T.x - 2, T.y - 56, 4, 60); ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.moveTo(T.x + 2, T.y - 56); ctx.lineTo(T.x + 30, T.y - 48); ctx.lineTo(T.x + 2, T.y - 40); ctx.closePath(); ctx.fill();
     ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, T.x - 60, T.y - 28, 120, 22, 5); ctx.fill(); ctx.fillStyle = '#ffe08a'; ctx.font = r.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🏁 DIRT TRACK', T.x, T.y - 17);

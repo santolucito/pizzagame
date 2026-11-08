@@ -46,6 +46,7 @@ CFG.PIZZACOINS = {
     { id: 'cinema', area: 'cinema', x: 10055, y: 3185, note: 'at the back of the cinema' },
     { id: 'aquarium', area: 'aquarium', x: 20920, y: 5620, note: 'in the glass fish tunnel at the aquarium' },
     { id: 'cocoacabin', area: 'cocoacabin', x: 18060, y: 4316, note: 'in the Cocoa Cabin, in the corner by the woodpile' },
+    { id: 'arena', area: 'arena', x: 38150, y: 5500, note: 'in the far corner of the Monster Truck Arena' },
     { id: 'pizzapier', area: 'pizzapier', x: 9240, y: 6168, note: 'on the beach at Coney Island, right beside the sandcastle' },
   ],
   // friendly names for the list in the panel, in the order they are listed
@@ -55,7 +56,7 @@ CFG.PIZZACOINS = {
     cloud: ['☁️', 'Cloud Harbor'], skycafe: ['🌤️', 'Sky Café'], subway: ['🚇', 'Subway'], campus: ['🎓', 'Columbia Campus'],
     lowlibrary: ['🏛️', 'Low Library'], barnardhall: ['🐻', 'Barnard Hall'], cabin: ['🌲', 'Secret Cabin'],
     upstairs: ['🛏️', 'Bedroom'], pizzarain: ['🌧️', 'Pizza Rain Room'], barn: ['🐐', 'Barn'], firestation: ['🧯', 'Fire Station'],
-    cocoacabin: ['🍫', 'Cocoa Cabin'],
+    cocoacabin: ['🍫', 'Cocoa Cabin'], arena: ['🏟️', 'Monster Trucks'],
     pizzapier: ['🎡', 'Coney Island'],
     hardware: ['🔧', 'Hardware Store'], toyshop: ['🧸', 'Toy Shop'], barber: ['💈', 'Barber'], bakery: ['🥐', 'Bakery'],
     arcade: ['🕹️', 'Arcade'], petshop: ['🐶', 'Pet Shop'], hotel: ['🏨', 'Grand Hotel'], books: ['📚', 'Book Shop'],

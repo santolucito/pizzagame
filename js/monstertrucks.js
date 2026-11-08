@@ -601,7 +601,7 @@ const MonsterTrucksExt = {
     for (const v of this.trucks) {
       if (v.area !== g.area || !this.vis(r, v.x - 120, v.y - 30, v.x + 120, v.y + 30)) continue;
       const gz = v.air ? this.groundZ(g, v.x, v.y) : Math.min(v.z, this.groundZ(g, v.x, v.y)), up = Math.max(0, v.z - gz), k = 1 / (1 + up / 320);
-      const len = v.donut ? 96 : 96 * (0.74 + 0.26 * Math.abs(Math.cos(v.angle)));
+      const len = 96;
       ctx.fillStyle = `rgba(30,15,5,${0.42 * k})`; ctx.beginPath(); ctx.ellipse(v.x, v.y - gz + 2, len * k, 18 * k, 0, 0, Math.PI * 2); ctx.fill();
     }
   },
@@ -685,7 +685,7 @@ const MonsterTrucksExt = {
   },
   drawTruckEntity(r, g, v) {
     const ctx = r.ctx, M = CFG.MTRUCKS, driven = g.driving && g.vehicle === v;
-    let sx = v.face * (0.74 + 0.26 * Math.abs(Math.cos(v.angle)));
+    let sx = v.face;   // always full width: no squish when driving up or down the screen
     if (v.donut) { sx = Math.cos(v.donut.a) * v.face; if (Math.abs(sx) < 0.06) sx = sx < 0 ? -0.06 : 0.06; }
     const wa = this.wheelieAngle(v), fa = this.flipAngle(v), bump = v.bump > 0 ? Math.sin((1 - v.bump) * Math.PI) * 14 : 0;
     const idle = !driven && !v.donut && !v.air && !wa && !fa && !bump && !(v.z > 0.5) && Math.hypot(v.vx || 0, v.vy || 0) < 4;

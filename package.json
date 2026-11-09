@@ -4,9 +4,17 @@
   "version": "1.0.0",
   "description": "A kid-friendly pizzeria game for the browser. No build step; the tests drive the real game in headless Chromium.",
   "scripts": {
-    "test": "node tests/run.js"
+    "test": "node tests/run.js",
+    "build:www": "node scripts/build-www.js",
+    "android:sync": "node scripts/build-www.js && npx cap sync android"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/assets": "^4.0.0",
+    "@capacitor/cli": "^8.6.0",
     "playwright": "^1.56.1"
+  },
+  "dependencies": {
+    "@capacitor/core": "^8.6.0"
   }
 }

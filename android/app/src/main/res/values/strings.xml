@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Pizza Rush</string>
+    <string name="title_activity_main">Pizza Rush</string>
+    <string name="package_name">io.github.santolucito.pizzarush</string>
+    <string name="custom_url_scheme">io.github.santolucito.pizzarush</string>
+</resources>

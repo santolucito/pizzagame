@@ -32,8 +32,8 @@
   }
   requestAnimationFrame(frame);
 
-  // Installable / offline: register the service worker when served over http(s).
-  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+  // Installable / offline: register the service worker when served over http(s). The Android app has every file on the device already.
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !window.Capacitor) {
     window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => { /* offline support is optional */ }); });
   }
 

@@ -1,0 +1,11 @@
+{
+  "appId": "io.github.santolucito.pizzarush",
+  "appName": "Pizza Rush",
+  "webDir": "www",
+  "backgroundColor": "#2b1d14",
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  }
+}

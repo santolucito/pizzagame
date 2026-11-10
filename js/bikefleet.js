@@ -1,7 +1,9 @@
 'use strict';
 // A fleet of delivery bikes. They live in a little bike rack on the grass south of the pizzeria, between the
-// conveyor's dock and South Road. When pizzas are waiting on the dock (js/conveyor.js), an idle bike rides over,
-// loads up to three boxes, rides along South Road to a house door, drops them off ("Thank you!") and comes back.
+// conveyor's dock and South Road. When a house orders pizza (the core's h.order) and pizzas wait on the dock
+// (js/conveyor.js), one idle bike rides over, loads what the order still needs (up to three), rides along South Road
+// to that house's door, fills the order ("Thank you!") and comes back. If the order goes away first, the bike rides
+// home and keeps its boxes for the next order (saved, so no pizza is ever lost). No orders: the bikes stay put.
 // The money lands in a cash pile at the rack that the chef collects by walking over it. Bikes are bought on a
 // walk-on pad beside the rack (once the conveyor is built) and any bike resting in the rack can be ridden.
 // Extension module: registered with Game.ext and Render.ext. See the hook list in js/EXTENSIONS.md.
@@ -27,7 +29,7 @@ CFG.VEHICLES.fleetbike = { speed: 420, radius: 13, label: 'ðŸ›µ Ride', exit: 'ðŸ
 
 const BikeFleetExt = {
   name: 'bikefleet',
-  defaults: { bikefleet: { bikes: 0, cash: 0, trips: 0 } },
+  defaults: { bikefleet: { bikes: 0, cash: 0, trips: 0, held: [] } },
   bikes: [],
   queue: [],
 
@@ -39,14 +41,14 @@ const BikeFleetExt = {
   visible(g) { return g.s.bikefleet.bikes > 0 || this.convOwned(g); },
   queueSpot(k) { const D = this.dock(), Q = CFG.BIKEFLEET.QUEUE; return k === 0 ? { x: D.x, y: D.y } : { x: D.x + Q.dx * k, y: D.y + Q.dy }; },
 
-  makeBike(i) {
+  makeBike(i, load) {
     const S = CFG.BIKEFLEET.SLOTS[i];
-    return { kind: 'fleetbike', id: i, x: S.x, y: S.y, angle: -Math.PI / 2, vx: 0, vy: 0, state: 'parked', path: [], load: 0, t: 0, dest: null, earned: 0 };
+    return { kind: 'fleetbike', id: i, x: S.x, y: S.y, angle: -Math.PI / 2, vx: 0, vy: 0, state: 'parked', path: [], load: load || 0, t: 0, dest: null, earned: 0 };
   },
   build(g) {
     this.bikes = []; this.queue = [];
-    const n = Math.min(CFG.BIKEFLEET.SLOTS.length, g.s.bikefleet.bikes | 0);
-    for (let i = 0; i < n; i++) this.bikes.push(this.makeBike(i));
+    const n = Math.min(CFG.BIKEFLEET.SLOTS.length, g.s.bikefleet.bikes | 0), held = g.s.bikefleet.held || [];
+    for (let i = 0; i < n; i++) this.bikes.push(this.makeBike(i, held[i] | 0));
   },
   home(g) {},
 
@@ -55,19 +57,25 @@ const BikeFleetExt = {
   },
   ridden(g, b) { return g.driving && g.vehicle === b; },
 
-  // ---- where to deliver: a house with an open order nobody is bringing yet, otherwise any front door
-  doors(g) {
-    const out = (g.houses || CFG.HOUSES).map((h) => ({ x: h.door.x, y: h.door.y, house: h }));
-    const GA = CFG.GARAGE; out.push({ x: GA.door.x, y: GA.y0, house: null });
+  // ---- orders: bikes only ride for a house that asked for pizza (the core's h.order)
+  busy(b) { return b.state === 'toDock' || b.state === 'loading' || b.state === 'out' || b.state === 'drop'; },
+  need(h) { return h && h.order ? Math.max(0, h.order.want - h.order.have) : 0; },
+  openOrders(g) { return (g.houses || []).filter((h) => this.need(h) > 0 && !this.bikes.some((b) => this.busy(b) && b.dest && b.dest.house === h)); },
+  // the order this bike rides for is gone (the chef filled it, or it timed out)
+  orderGone(b) { return !b.dest || this.need(b.dest.house) <= 0; },
+  homePath(b, slot) {
+    // from the road / a door: along a lane and up into the slot; from the grass by the dock: past the waiting spot
+    const F = CFG.BIKEFLEET;
+    if (b.y > F.RACK.y1) { const lane = slot.x > b.x ? F.LANE_E : F.LANE_W; return [{ x: b.x, y: lane }, { x: slot.x, y: lane }, { x: slot.x, y: slot.y }]; }
+    const q1 = this.queueSpot(1), out = [];
+    if (b.x < q1.x - 2) out.push(q1);
+    out.push({ x: slot.x, y: F.EXIT_Y }, { x: slot.x, y: slot.y });
     return out;
   },
-  pickDest(g, b) {
-    const taken = this.bikes.filter((o) => o !== b && o.dest).map((o) => o.dest.x);
-    const all = this.doors(g);
-    const ordered = all.filter((d) => d.house && d.house.order && !taken.includes(d.x));
-    if (ordered.length) return ordered[0];
-    const free = all.filter((d) => !taken.includes(d.x));
-    return U.pick(free.length ? free : all);
+  goHome(g, b) {
+    const slot = CFG.BIKEFLEET.SLOTS[b.id];
+    b.state = 'back'; b.dest = null; b.goal = null; b.thanks = false; b.path = this.homePath(b, slot);
+    this.queue = this.queue.filter((o) => o !== b);
   },
 
   // ---- simulation
@@ -75,13 +83,21 @@ const BikeFleetExt = {
     const F = CFG.BIKEFLEET, s = g.s.bikefleet;
     while (this.bikes.length < Math.min(F.SLOTS.length, s.bikes)) this.bikes.push(this.makeBike(this.bikes.length));
     this.queue = this.queue.filter((b) => b.state === 'toDock' || b.state === 'loading');
-    // send a bike when pizzas wait on the dock and the bikes already coming cannot carry them all
-    const n = this.dockCount(g);
-    if (n > 0 && this.queue.length < 2 && this.queue.reduce((a, b) => a + (F.CAP - b.load), 0) < n) {
-      const b = this.bikes.find((o) => o.state === 'parked' && !this.ridden(g, o));
-      if (b) { b.state = 'toDock'; b.goal = null; b.path = []; b.load = 0; b.t = 0; this.queue.push(b); }
+    // one bike per open order: a bike already holding boxes (from an order that went away) goes first; otherwise
+    // an empty one goes when pizzas wait on the dock (two bikes at the dock at most)
+    for (const h of this.openOrders(g)) {
+      const free = this.bikes.filter((o) => o.state === 'parked' && !this.ridden(g, o));
+      if (!free.length) break;
+      const need = this.need(h), dest = { x: h.door.x, y: h.door.y, house: h };
+      const loaded = free.filter((o) => o.load > 0).sort((a, b) => b.load - a.load)[0];
+      const n = this.dockCount(g);
+      if (loaded && (loaded.load >= need || n === 0)) { loaded.dest = dest; this.depart(g, loaded); continue; }
+      if (n <= 0 || this.queue.length >= 2) continue;
+      const b = loaded || free.find((o) => o.load === 0) || free[0];
+      b.dest = dest; b.state = 'toDock'; b.goal = null; b.path = []; b.t = 0; this.queue.push(b);
     }
     for (const b of this.bikes) this.updateBike(g, b, dt);
+    s.held = this.bikes.map((b) => b.load);   // boxes on the bikes are saved too: pizzas never vanish
     // the cash pile: walk over it to pick it up
     if (s.cash > 0 && g.area === 'town' && !g.driving && U.dist(g.player.x, g.player.y, F.CASH.x, F.CASH.y) < 46) {
       const amt = s.cash; s.cash = 0; g.s.cash += amt; g.s.stats.earned += amt;
@@ -109,7 +125,9 @@ const BikeFleetExt = {
   turnTo(b, a, dt) { let d = a - b.angle; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; b.angle += d * Math.min(1, dt * 8); },
   updateBike(g, b, dt) {
     const F = CFG.BIKEFLEET, slot = F.SLOTS[b.id];
-    if (this.ridden(g, b)) { b.state = 'ridden'; b.path = []; b.load = 0; b.dest = null; return; }
+    if (this.ridden(g, b)) { if (b.state !== 'ridden') { this.queue = this.queue.filter((o) => o !== b); b.state = 'ridden'; b.path = []; b.dest = null; } return; }
+    // the order went away (the chef brought it, or it timed out): ride home, boxes and all
+    if (this.busy(b) && this.orderGone(b) && !(b.state === 'drop' && b.thanks)) { this.goHome(g, b); return; }
     switch (b.state) {
       case 'parked': b.moving = false; this.turnTo(b, -Math.PI / 2, dt); return;
       case 'ridden': b.state = 'leftout'; b.t = 0; return;                 // the chef hopped off somewhere
@@ -142,8 +160,8 @@ const BikeFleetExt = {
       case 'loading': {
         this.turnTo(b, Math.PI / 2, dt);   // nose toward the road, ready to go
         b.t += dt;
-        const c = this.conv(), D = this.dock();
-        if (b.t >= F.LOAD_EVERY && b.load < F.CAP) {
+        const c = this.conv(), D = this.dock(), want = Math.min(F.CAP, this.need(b.dest.house));
+        if (b.t >= F.LOAD_EVERY && b.load < want) {
           b.t = 0;
           const got = c && c.owned(g) ? c.takeFromDock(g, 1) || 0 : 0;
           if (got > 0) {
@@ -153,28 +171,30 @@ const BikeFleetExt = {
             if (g.area === 'town' && U.dist(g.player.x, g.player.y, b.x, b.y) < 500) Sfx.pickup();
           } else b.wait += F.LOAD_EVERY;
         }
-        // full, or the dock ran dry: off we go (an empty bike waits a little, then goes home)
-        if (b.load >= F.CAP || (b.load > 0 && b.wait >= 0.8)) { this.depart(g, b); this.queue = this.queue.filter((o) => o !== b); }
-        else if (b.load === 0 && b.wait >= 3) { b.state = 'back'; b.path = [this.queueSpot(1), { x: slot.x, y: F.EXIT_Y }, { x: slot.x, y: slot.y }]; this.queue = this.queue.filter((o) => o !== b); }
+        // enough for the order, or the dock ran dry: off we go (an empty bike waits a little, then goes home)
+        if (b.load >= want || (b.load > 0 && b.wait >= 0.8)) { this.depart(g, b); this.queue = this.queue.filter((o) => o !== b); }
+        else if (b.load === 0 && b.wait >= 3) this.goHome(g, b);
         return;
       }
       case 'out':
-        if (this.follow(b, dt)) { b.state = 'drop'; b.t = 0; }
+        if (this.follow(b, dt)) { b.state = 'drop'; b.t = 0; b.thanks = false; }
         return;
       case 'drop': {
         this.turnTo(b, Math.PI / 2, dt);
         b.t += dt;
-        if (b.t >= F.DROP_EVERY && b.load > 0) { b.t = 0; this.dropOne(g, b); }
-        if (b.load <= 0 && b.t >= 0.5) {
-          const d = b.dest; b.dest = null;
-          g.floats.push({ x: d.x, y: d.y - 56, text: 'Thank you!', color: '#ff6b8a', t: 0, dur: 1.5, big: true });
-          if (d.house && d.house.order && d.house.order.have >= d.house.order.want) { d.house.order = null; d.house.happy = 3; }
-          if (d.house) d.house.happy = Math.max(d.house.happy || 0, 3);
-          g.s.stats.delivered = (g.s.stats.delivered || 0) + 1; g.s.bikefleet.trips++;
-          b.state = 'back';
-          const lane = slot.x > b.x ? F.LANE_E : F.LANE_W;
-          b.path = [{ x: b.x, y: lane }, { x: slot.x, y: lane }, { x: slot.x, y: slot.y }];
+        const h = b.dest.house;
+        if (!b.thanks && b.t >= F.DROP_EVERY && b.load > 0 && this.need(h) > 0) { b.t = 0; this.dropOne(g, b); }
+        if (!b.thanks && (this.need(h) <= 0 || b.load <= 0)) {
+          // filled, like the core does it (or as much as this bike had: the order stays open for the next bike)
+          if (this.need(h) <= 0) {
+            h.order = null; h.happy = 3; g.s.stats.delivered = (g.s.stats.delivered || 0) + 1;
+            g.floats.push({ x: h.door.x, y: h.door.y - 56, text: 'Thank you!', color: '#ff6b8a', t: 0, dur: 1.5, big: true });
+            Haptics.success();
+          }
+          g.s.bikefleet.trips++;
+          b.thanks = true; b.t = 0;
         }
+        if (b.thanks && b.t >= 0.4) this.goHome(g, b);
         return;
       }
       case 'back':
@@ -182,12 +202,12 @@ const BikeFleetExt = {
         return;
     }
   },
+  // from the dock, or straight from the rack (a bike already holding boxes), to the house's door
   depart(g, b) {
-    const F = CFG.BIKEFLEET, D = this.dock();
-    b.dest = this.pickDest(g, b);
-    const lane = b.dest.x > D.x ? F.LANE_E : F.LANE_W;
+    const F = CFG.BIKEFLEET, d = b.dest;
+    const lane = d.x > b.x ? F.LANE_E : F.LANE_W;
     b.state = 'out';
-    b.path = [{ x: D.x, y: lane }, { x: b.dest.x, y: lane }, { x: b.dest.x, y: F.CURB }];
+    b.path = [{ x: b.x, y: lane }, { x: d.x, y: lane }, { x: d.x, y: F.CURB }];
   },
   dropOne(g, b) {
     const F = CFG.BIKEFLEET, d = b.dest;
@@ -195,7 +215,7 @@ const BikeFleetExt = {
     const amt = Math.round(g.price() * CFG.DELIVERY_TIP);
     g.s.bikefleet.cash += amt; b.earned += amt;
     g.secEarned += amt;
-    if (d.house && d.house.order) d.house.order.have++;
+    d.house.order.have++;
     g.fx.push({ kind: 'pizza', x0: b.x, y0: b.y - 24, x1: d.x, y1: d.y - 10, t: 0, dur: 0.25 });
     g.fx.push({ kind: 'cash', x0: d.x, y0: d.y - 10, x1: F.CASH.x, y1: F.CASH.y, t: 0.1, dur: 0.8 });
     g.floats.push({ x: d.x, y: d.y - 30, text: '+' + U.money(amt), color: '#ffe08a', t: 0, dur: 1, big: true });

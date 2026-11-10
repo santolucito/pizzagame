@@ -39,6 +39,9 @@ CFG.CONVEYOR = {
   GAP: 34,                                // the closest two pizzas ride on the belt
   TURBO: { mult: 3, time: 6 },
   FLASH: 0.9,                             // seconds an arch glows after a scan
+  // the propeller hat: walk into the belt and fly over it. dur: seconds; lift: px up at the top; push: seconds of
+  // pushing before take-off; touch: how close (px) counts as pushing; search: how far past the belt to look for a clear landing spot
+  FLY: { dur: 0.8, lift: 36, push: 0.1, touch: 3, search: 48 },
 };
 
 const ConveyorExt = {
@@ -76,7 +79,7 @@ const ConveyorExt = {
     }
     this.segs = segs; this.len = d;
     this.st = {
-      feedT: 1, turbo: 0, phase: 0, panel: 0,
+      feedT: 1, turbo: 0, phase: 0, panel: 0, fly: null, push: 0, land: 0, wheee: false,
       arches: C.ARCHES.map((A) => ({ x: A.x, y: A.y, dir: A.dir, d: this.distAt(A.x, A.y), flash: 0, scans: 0, k: 0 })),
     };
   },
@@ -106,7 +109,8 @@ const ConveyorExt = {
     const st = this.ready(g), s = this.save(g), C = CFG.CONVEYOR;
     for (const a of st.arches) a.flash = Math.max(0, a.flash - dt);
     st.panel = Math.max(0, st.panel - dt);
-    if (!s.owned) return;
+    if (!s.owned) { st.fly = null; st.push = 0; return; }
+    this.updateFlight(g, dt);
     st.turbo = Math.max(0, st.turbo - dt);
     const v = this.speed();
     st.phase = (st.phase + v * dt) % 1000;
@@ -213,7 +217,114 @@ const ConveyorExt = {
     if (da < 54) return { text: 'X-ray scanner! Every pizza gets checked ✓', target: null };
     return undefined;
   },
-  home(g) { if (this.st) this.st.turbo = 0; },
+  home(g) { if (this.st) { this.st.turbo = 0; this.st.fly = null; this.st.push = 0; } },
+
+  // ======================= the propeller hat =======================
+  // Walk into a belt piece (straight across it) and a propeller beanie pops out of the chef's hat: up, over the belt,
+  // down on the far side. Only belt pieces, never the X-ray arches, the panel, the dock table or a wall; if the far
+  // side has no clear spot the chef just stays blocked. Staff, customers and the dog still see the belt as solid.
+  beltRects() {
+    const C = CFG.CONVEYOR, H = C.HALF, P = C.PATH, o = [];
+    for (let i = 0; i + 1 < P.length; i++) {
+      const a = P[i], b = P[i + 1];
+      const x0 = Math.min(a.x, b.x) - H, x1 = Math.max(a.x, b.x) + H, y0 = Math.min(a.y, b.y) - H, y1 = Math.max(a.y, b.y) + H;
+      o.push({ x: x0, y: y0, w: x1 - x0, h: y1 - y0, horiz: a.y === b.y });
+    }
+    return o;
+  },
+  flying() { return !!(this.st && this.st.fly); },
+  // where the chef would land walking into the belt from (x, y) along (dx, dy) (one of the four directions), or null
+  flightTarget(g, x, y, dx, dy) {
+    const C = CFG.CONVEYOR, F = C.FLY, r = 12, belts = this.beltRects();
+    const obs = g.obstacles(), W = g.bounds();
+    const isBelt = (o) => belts.some((b) => b.x === o.x && b.y === o.y && b.w === o.w && b.h === o.h);
+    const others = obs.filter((o) => !isBelt(o));
+    const clear = (px, py) => !obs.some((o) => g.hitRect(px, py, r, o));
+    // the belt piece being pushed: touching it (within a few px), crossing it the short way
+    let seg = null;
+    for (const b of belts) {
+      if (b.horiz !== (dy !== 0)) continue;   // a horizontal piece is crossed going up/down, a vertical one going left/right
+      if (dy) { if (x < b.x + 4 || x > b.x + b.w - 4) continue; const gap = dy > 0 ? b.y - (y + r) : (y - r) - (b.y + b.h); if (gap >= -1 && gap <= F.touch) seg = b; }
+      else { if (y < b.y + 4 || y > b.y + b.h - 4) continue; const gap = dx > 0 ? b.x - (x + r) : (x - r) - (b.x + b.w); if (gap >= -1 && gap <= F.touch) seg = b; }
+    }
+    if (!seg) return null;
+    const far = dy > 0 ? seg.y + seg.h + r + 1 : dy < 0 ? seg.y - r - 1 : dx > 0 ? seg.x + seg.w + r + 1 : seg.x - r - 1;
+    for (let k = 0; k <= F.search; k += 3) {
+      const tx = dx ? far + dx * k : x, ty = dy ? far + dy * k : y;
+      if (tx < W.x0 + 16 || tx > W.x1 - 16 || ty > W.y1 - 16 || ty < g.walkTop()) return null;
+      // nothing but belt between here and there (no arch, wall, panel or table to fly through)
+      const n = Math.ceil(Math.hypot(tx - x, ty - y) / 4);
+      let blocked = false;
+      for (let i = 1; i <= n && !blocked; i++) { const px = x + (tx - x) * i / n, py = y + (ty - y) * i / n; if (others.some((o) => g.hitRect(px, py, r, o))) blocked = true; }
+      if (blocked) return null;
+      if (clear(tx, ty)) return { x: tx, y: ty };
+    }
+    return null;
+  },
+  updateFlight(g, dt) {
+    const st = this.st, C = CFG.CONVEYOR, F = C.FLY, p = g.player;
+    if (st.fly) {
+      const f = st.fly;
+      // something else moved the chef (a teleport, Take me home, a ride): forget the flight
+      if (g.area !== 'town' || g.driving || g.onTrain || g.ride || g.travel || U.dist(p.x, p.y, f.px, f.py) > 30) { st.fly = null; return; }
+      f.t += dt;
+      const u = Math.min(1, f.t / F.dur), e = u < 0.5 ? 2 * u * u : 1 - 2 * (1 - u) * (1 - u);
+      p.x = U.lerp(f.x0, f.x1, e); p.y = U.lerp(f.y0, f.y1, e); p.moving = false;
+      f.px = p.x; f.py = p.y;
+      if (u >= 1) {
+        st.fly = null; st.push = 0; st.land = 0.3;
+        for (let i = 0; i < 5; i++) g.fx.push({ kind: 'sparkle', x0: p.x + U.rand(-16, 16), y0: p.y - U.rand(0, 20), x1: 0, y1: 0, t: -i * 0.04, dur: 0.45 });
+        Sfx.tone(520, 0.1, 'sine', 0.04, -220); Haptics.tap();
+      }
+      return;
+    }
+    st.land = Math.max(0, (st.land || 0) - dt);
+    if (g.area !== 'town' || !this.onFoot(g) || g.dead) { st.push = 0; return; }
+    if (U.dist(p.x, p.y, C.CONTROL.x, C.CONTROL.y) < C.REACH + 6) { st.push = 0; return; }
+    const a = Input.axis(), ax = Math.abs(a.x || 0), ay = Math.abs(a.y || 0);
+    let dx = 0, dy = 0;
+    if (ay > 0.6 && ay >= ax) dy = Math.sign(a.y); else if (ax > 0.6 && ax > ay) dx = Math.sign(a.x);
+    const tgt = dx || dy ? this.flightTarget(g, p.x, p.y, dx, dy) : null;
+    if (!tgt) { st.push = 0; return; }
+    st.push += dt;
+    if (st.push < F.push) return;
+    st.push = 0;
+    st.fly = { t: 0, x0: p.x, y0: p.y, x1: tgt.x, y1: tgt.y, px: p.x, py: p.y, dx, dy };
+    const s = this.save(g); s.flights = (s.flights || 0) + 1;
+    if (!st.wheee) { st.wheee = true; g.floats.push({ x: p.x, y: p.y - 90, text: s.flights <= 1 ? 'Propeller hat! Wheee! 🚁' : 'Wheee! 🚁', color: '#ffe08a', t: 0, dur: 1.4, big: true }); }
+    Sfx.tone(240, 0.45, 'triangle', 0.035, 520); Haptics.tap();
+  },
+  // height above the ground and the beanie's size (0..1) right now
+  flightPose(g) {
+    const st = this.st;
+    if (!st) return null;
+    const F = CFG.CONVEYOR.FLY;
+    if (st.fly) {
+      const u = Math.min(1, st.fly.t / F.dur);
+      return { z: F.lift * Math.sin(Math.PI * Math.min(1, u * 1.1)), hat: Math.min(1, st.fly.t / 0.12), spin: g.time * 40 };
+    }
+    if (st.land > 0) { const v = st.land / 0.3; return { z: Math.abs(Math.sin(v * Math.PI)) * 5, hat: v, spin: g.time * 40 * v }; }   // a soft bounce while the hat folds away
+    return null;
+  },
+  drawBeanie(r, x, y, hat, spin) {
+    const ctx = r.ctx;
+    if (hat <= 0.02) return;
+    ctx.save(); ctx.translate(x, y); ctx.scale(hat, hat);
+    // the cap: a striped dome with a little brim
+    const cols = ['#e4572e', '#f2b134', '#41b883', '#3b7dd8'];
+    for (let k = 0; k < 4; k++) { ctx.fillStyle = cols[k]; ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 9, Math.PI + k * Math.PI / 4, Math.PI + (k + 1) * Math.PI / 4); ctx.closePath(); ctx.fill(); }
+    ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(0, 0, 9, Math.PI, 0); ctx.closePath(); ctx.stroke();
+    // the stem and the spinning propeller (seen a little from the side: the blades swing wide and narrow)
+    ctx.fillStyle = '#2b1d14'; ctx.fillRect(-1, -14, 2, 6);
+    const L = 15;
+    for (let k = 0; k < 2; k++) {
+      const c = Math.cos(spin + k * Math.PI);
+      ctx.fillStyle = k ? '#7fd1ff' : '#ff6b8a';
+      ctx.beginPath(); ctx.ellipse(c * L / 2, -14 + Math.sin(spin + k * Math.PI) * 1.5, Math.max(1.5, Math.abs(c) * L / 2), 2.4, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.fillStyle = '#f2b134'; ctx.beginPath(); ctx.arc(0, -14, 2.4, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  },
 
   // ======================= drawing =======================
   dynamic(r, g) {
@@ -224,6 +335,12 @@ const ConveyorExt = {
     this.drawDock(r, g);
     const s = this.save(g);
     for (const it of s.belt) { const q = this.posAt(it.d); this.drawItem(r, g, q.x, q.y, it); }
+    // the flying chef's shadow stays on the ground and shrinks as they rise
+    const pose = this.flightPose(g);
+    if (pose && pose.z > 1) {
+      const p = g.player, k = 1 - Math.min(0.6, pose.z / 60);
+      r.ctx.fillStyle = 'rgba(0,0,0,0.25)'; r.ctx.beginPath(); r.ctx.ellipse(p.x, p.y + 2, 14 * k, 6 * k, 0, 0, Math.PI * 2); r.ctx.fill();
+    }
   },
   entities(r, g, items) {
     if (g.area !== 'town' || !this.owned(g)) return;
@@ -434,6 +551,20 @@ const ConveyorExt = {
     if (f > 0) { ctx.fillStyle = `rgba(126,224,129,${0.4 * f})`; ctx.beginPath(); ctx.arc(a.x, back - A.h + A.d / 2 - 5, 12, 0, Math.PI * 2); ctx.fill(); }
   },
 };
+
+// While the chef flies over the belt (or bounces down after) they are drawn lifted, a propeller beanie on the chef's hat.
+(() => {
+  const draw = Render.drawPlayer;
+  Render.drawPlayer = function (g) {
+    const pose = g.area === 'town' && !g.driving ? ConveyorExt.flightPose(g) : null;
+    if (!pose) return draw.call(this, g);
+    const ctx = this.ctx, p = g.player;
+    ctx.save(); ctx.translate(0, -pose.z);
+    draw.call(this, g);
+    ConveyorExt.drawBeanie(this, p.x, p.y - 61, pose.hat, pose.spin);
+    ctx.restore();
+  };
+})();
 
 Game.ext.push(ConveyorExt);
 Render.ext.push(ConveyorExt);

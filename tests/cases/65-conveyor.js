@@ -151,6 +151,70 @@ module.exports = async (t) => {
   }, K.CONTROL);
   t.expect(walk.x > 400, `walked from the panel around the belt into the shop (${JSON.stringify(walk)})`);
 
+  // ---- the propeller hat: walking into a belt piece flies the chef over it
+  await t.ev(() => {
+    window.flyTry = (x, y, dx, dy) => {
+      Game.s.cash = 0; T.tp(x, y, 'town'); T.steer(dx, dy);
+      const n = T.until(() => ConveyorExt.flying(), 60);
+      let peak = 0, land = null, fly = ConveyorExt.st.fly && Object.assign({}, ConveyorExt.st.fly);
+      const floats = Game.floats.map((f) => f.text);
+      if (n >= 0) T.until(() => { const q = ConveyorExt.flightPose(Game); if (q) peak = Math.max(peak, q.z); if (!ConveyorExt.flying()) { land = { x: Game.player.x, y: Game.player.y }; return true; } return false; }, 120);
+      T.unsteer(); T.step(1);
+      const p = land || { x: Game.player.x, y: Game.player.y };
+      return { n, peak, land, x: p.x, y: p.y, target: fly && { x: fly.x1, y: fly.y1 }, clear: !Game.obstacles().some((o) => Game.hitRect(p.x, p.y, 12, o)), floats };
+    };
+  });
+  const cases = [
+    { name: 'kitchen run, from above', at: [300, 425], dir: [0, 1], ok: (r) => r.y > 464 + 12 },
+    { name: 'kitchen run, from below', at: [300, 490], dir: [0, -1], ok: (r) => r.y < 440 - 12 },
+    { name: 'south run indoors, from the west', at: [350, 560], dir: [1, 0], ok: (r) => r.x > 402 + 12 },
+    { name: 'south run indoors, from the east', at: [430, 560], dir: [-1, 0], ok: (r) => r.x < 378 - 12 },
+    { name: 'south run outdoors, from the west', at: [360, 675], dir: [1, 0], ok: (r) => r.x > 402 + 12 },
+    { name: 'outside run, from the south', at: [280, 750], dir: [0, -1], ok: (r) => r.y < 696 - 12 },
+    { name: 'outside run, from the north', at: [280, 672], dir: [0, 1], ok: (r) => r.y > 720 + 12 },
+  ];
+  let first = true;
+  for (const c of cases) {
+    const r = await t.ev(([x, y, dx, dy]) => flyTry(x, y, dx, dy), [...c.at, ...c.dir]);
+    t.expect(r.n >= 0 && r.land, `${c.name}: walking into the belt starts a flight (${JSON.stringify(r)})`);
+    t.expect(c.ok(r) && r.clear, `${c.name}: lands clear on the far side (${JSON.stringify(r)})`);
+    t.expect(r.peak > 25 && r.peak < 45, `${c.name}: lifts off about 30-40 px (${r.peak})`);
+    if (first) { t.expect(r.floats.some((f) => /Propeller hat/.test(f)), 'the first flight says Propeller hat!'); first = false; }
+  }
+  // no flight where an arch is in the way, or where the far side is blocked (the control panel), or by walking along the belt
+  const blocked = await t.ev(() => ({
+    arch: flyTry(CFG.CONVEYOR.ARCHES[1].x, 750, 0, -1),
+    panel: flyTry(CFG.CONVEYOR.PANEL.x, 490, 0, -1),
+    along: flyTry(300, 425, 1, 0),
+  }));
+  t.expect(blocked.arch.n < 0 && blocked.arch.y > 720, `no flying over an X-ray arch (${JSON.stringify(blocked.arch)})`);
+  t.expect(blocked.panel.n < 0 && blocked.panel.y > 464, `no flight when the far side is blocked (${JSON.stringify(blocked.panel)})`);
+  t.expect(blocked.along.n < 0, 'walking along the belt never flies');
+  // no flight while driving: drive the delivery car into the outside run
+  const drive = await t.ev(() => {
+    Game.s.vehicles.car = true; Game.s.cash = 0;
+    T.tp(Game.car.x - 30, Game.car.y, 'town'); T.step(2);
+    const label = Game.car.kind; Game.enterCar();
+    if (!Game.driving) return { label, driving: false };
+    Game.vehicle.x = 280; Game.vehicle.y = 790; Game.vehicle.angle = -Math.PI / 2; Game.vehicle.vx = 0; Game.vehicle.vy = 0;
+    T.steer(0, -1); let flew = false; for (let i = 0; i < 120; i++) { T.step(1); if (ConveyorExt.flying()) flew = true; } T.unsteer();
+    const out = { label, driving: true, flew, y: Game.vehicle.y };
+    Game.exitCar(); T.step(2);
+    return out;
+  });
+  t.expect(drive.driving, `got into the car (${drive.label})`);
+  t.expect(!drive.flew && drive.y > 720, `no flight while driving (${JSON.stringify(drive)})`);
+  // mid-flight screenshot (slow the flight right down so the picture holds still)
+  await t.ev(() => {
+    document.getElementById('toasts').style.display = 'none';
+    Game.s.conveyor.belt = [{ d: 160, k: 0 }, { d: 220, k: 1 }];
+    Game.s.cash = 0; T.tp(300, 425, 'town'); Game.player.carry = 0; T.steer(0, 1); T.until(() => ConveyorExt.flying(), 60); T.unsteer();
+    const f = ConveyorExt.st.fly; CFG.CONVEYOR.FLY.dur = 1000; f.t = 480;
+    Render.setZoom(2.6); Game.cameraSnap = true; T.step(1);
+  });
+  await t.shot('flying');
+  await t.ev(() => { CFG.CONVEYOR.FLY.dur = 0.8; ConveyorExt.st.fly = null; ConveyorExt.st.land = 0; T.tp(700, 400, 'town'); });
+
   // ---- stuck check around the belt (like 03-stuck, but with the conveyor owned)
   const stuck = await t.ev(() => {
     const out = [], hit = (x, y) => Game.obstacles().some((o) => Game.hitRect(x, y, 12, o));

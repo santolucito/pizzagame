@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "io.github.santolucito.pizzarush"
+    namespace = "io.github.santolucito.yeonhaepizzeria"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "io.github.santolucito.pizzarush"
+        applicationId "io.github.santolucito.yeonhaepizzeria"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // Every Play upload needs a higher versionCode. CI passes the workflow run number.

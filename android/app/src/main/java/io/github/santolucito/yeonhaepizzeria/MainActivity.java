@@ -1,4 +1,4 @@
-package io.github.santolucito.pizzarush;
+package io.github.santolucito.yeonhaepizzeria;
 
 import android.os.Bundle;
 import android.view.WindowManager;

@@ -1,7 +1,7 @@
 # Pizza Rush on Google Play
 
 The Android app is the same game wrapped with [Capacitor](https://capacitorjs.com). Every game file ships
-inside the app, so it works offline and needs no server. App ID: `io.github.santolucito.pizzarush`
+inside the app, so it works offline and needs no server. App ID: `io.github.santolucito.yeonhaepizzeria`
 (permanent once uploaded to Play).
 
 | Piece | Where |

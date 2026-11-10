@@ -10,8 +10,8 @@ module.exports = async (t) => {
       if (!pads.length) break;
       const pad = pads[0];
       Game.player.x = pad.pos.x; Game.player.y = pad.pos.y; Game.player.hasMoved = true; Game.player.moving = false;
-      const before = JSON.stringify([Game.s.unlocked, Game.s.upg, Game.s.staff, Game.s.decor, Game.s.iceCream.owned, Game.s.iceCream.flavors, Game.s.vehicles, Game.s.islands.standOwned, Game.s.icDrive.owned, Game.s.sports.owned]);
-      const n = T.until(() => JSON.stringify([Game.s.unlocked, Game.s.upg, Game.s.staff, Game.s.decor, Game.s.iceCream.owned, Game.s.iceCream.flavors, Game.s.vehicles, Game.s.islands.standOwned, Game.s.icDrive.owned, Game.s.sports.owned]) !== before, 900);
+      const before = JSON.stringify([Game.s.unlocked, Game.s.upg, Game.s.staff, Game.s.decor, Game.s.iceCream.owned, Game.s.iceCream.flavors, Game.s.vehicles, Game.s.islands.standOwned, Game.s.icDrive.owned, Game.s.sports.owned, Game.s.conveyor && Game.s.conveyor.owned, Game.s.bikefleet && Game.s.bikefleet.bikes]);
+      const n = T.until(() => JSON.stringify([Game.s.unlocked, Game.s.upg, Game.s.staff, Game.s.decor, Game.s.iceCream.owned, Game.s.iceCream.flavors, Game.s.vehicles, Game.s.islands.standOwned, Game.s.icDrive.owned, Game.s.sports.owned, Game.s.conveyor && Game.s.conveyor.owned, Game.s.bikefleet && Game.s.bikefleet.bikes]) !== before, 900);
       if (n < 0) return { failed: pad.key, bought };
       bought.push(pad.key);
       Game.player.x = at.x; Game.player.y = at.y; T.step(70);   // step off so the same circle's breather passes

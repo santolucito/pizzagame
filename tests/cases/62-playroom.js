@@ -247,7 +247,7 @@ module.exports = async (t) => {
     let off = 0;
     T.until(() => { const r = PlayroomExt.st.ride; if (!r) return true; o.path.push([p.x, p.y]); let best = 1e9; for (let i = 1; i < path.vis.length; i++) { const a = path.vis[i - 1], b = path.vis[i], dx = b[0] - a[0], dy = b[1] - a[1], k = Math.max(0, Math.min(1, ((p.x - a[0]) * dx + (p.y - a[1]) * dy) / (dx * dx + dy * dy || 1))); best = Math.min(best, Math.hypot(a[0] + dx * k - p.x, a[1] + dy * k - p.y)); } off = Math.max(off, best); return false; }, 300);
     o.off = off; o.n = o.path.length; o.path = null;
-    const L = CFG.PLAYROOM.TOWN.land, obs = Game.obstacles();
+    const L = PlayroomExt.townLand(), obs = Game.obstacles();
     o.land = { d: Math.hypot(p.x - L.x, p.y - L.y), free: !obs.some((q) => Game.hitRect(L.x, L.y, 12, q)), outside: !Game.insideBuilding(L.x, L.y), area: Game.area };
     o.hooray = Game.floats.some((f) => /Hooray/.test(f.text)); o.count = Game.s.playroom.town;
     // and the chef can walk off the mat in every direction
@@ -262,7 +262,7 @@ module.exports = async (t) => {
   t.expect(town.land.d < 1 && town.land.area === 'town' && town.land.free && town.land.outside, 'lands on the mat on free ground outside the pizzeria');
   t.expect(town.hooray && town.count === 1, 'hooray, and counted');
   t.expect(town.moves.every(Boolean), 'and can walk off in every direction');
-  await t.ev(() => { const L = CFG.PLAYROOM.TOWN.land; T.tp(L.x + 40, L.y - 60, 'town'); Render.setZoom && Render.setZoom(1.2); Game.cameraSnap = true; T.step(30); });
+  await t.ev(() => { const L = PlayroomExt.townLand(); T.tp(L.x + 40, L.y - 60, 'town'); Render.setZoom && Render.setZoom(1.2); Game.cameraSnap = true; T.step(30); });
   await t.shot('town-chute');
   await t.ev(() => { const W = CFG.PLAYROOM.WINDOW; T.tp(W.spot.x, W.spot.y, 'playroom'); T.act(); T.until(() => Game.area === 'town', 120); T.step(6); });
   await t.shot('town-sliding');

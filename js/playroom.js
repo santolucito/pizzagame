@@ -44,7 +44,18 @@ CFG.PLAYROOM = {
   // the chute down the outside of the pizzeria's west wall in the town map: [x, y, height] from the wall to the mat
   // (towerPath: from the turret's window instead, with a loop-de-loop near the bottom; built just below)
   TOWN: { path: [[-12, 524, 86], [-34, 540, 70], [-56, 562, 48], [-74, 588, 26], [-84, 608, 8], [-86, 620, 0]],
-    LOOP: { x: -92, y: 562, r: 32, ground: 604, dx: 2, dy: 6, n: 48 }, towerPosts: [1, 2], towerDur: 2.4,
+    CURVE_N: 24, towerDur: 2.6,
+    // [p0, c1, c2, p1] each; the loop is four quarter circles (handles 0.55 r) round x -100, height 40, radius 32
+    CURVES: [
+      [[-35, 524, 82], [-36, 562, 46], [-42, 600, 8], [-70, 600, 8]],          // the drop, ending low and heading west
+      [[-70, 600, 8], [-80, 600, 8], [-90, 600, 8], [-100, 600, 8]],           // a short run in under the loop
+      [[-100, 600, 8], [-118, 600, 8], [-132, 601, 22], [-132, 602, 40]],      // up the west side
+      [[-132, 602, 40], [-132, 603, 58], [-118, 604, 72], [-100, 604, 72]],    // over the top
+      [[-100, 604, 72], [-82, 604, 72], [-68, 605, 58], [-68, 606, 40]],       // down the east side
+      [[-68, 606, 40], [-68, 607, 22], [-86, 608, 8], [-104, 608, 8]],         // round the bottom, in front of the way in
+      [[-104, 608, 8], [-122, 608, 8], [-140, 613, 3], [-140, 620, 0]],        // and out onto the mat
+    ],
+    towerLand: { x: -140, y: 622 },
     land: { x: -86, y: 622 }, dur: 1.6 },
   // how the top of the town chute looks: 'fade' = a little window box on the roof's edge, the chute fading out with the
   // roof while the chef is inside the pizzeria; 'tower' = a little 2nd-floor turret on legs against the west wall
@@ -52,17 +63,19 @@ CFG.PLAYROOM = {
   // the turret: its ground footprint (x0..x1, y0..y1, against the west wall), its floor and wall-top heights
   TURRET: { x0: -56, x1: -14, y0: 492, y1: 522, floor: 74, top: 112 },
 };
-// the turret's chute: a steep drop from the window, a run west into the bottom of the loop, once round (the loop's
-// screen circle drifts a little west and down so the way out passes in front of the way in), then onto the mat.
-// Points are [x, ground y, height]; the screen point is (x, y - height).
+// the turret's chute, a chain of smooth cubic Bezier curves in [x, ground y, height] (the screen point is
+// (x, y - height)): a steep drop out of the window, a swoop west into a teardrop loop-de-loop (up the west side, over
+// the top heading east, down the east side), and a glide on west onto the mat. The way out runs a little nearer the
+// viewer than the way in, so it passes in front of it.
 CFG.PLAYROOM.TOWN.towerPath = (() => {
-  const L = CFG.PLAYROOM.TOWN.LOOP, pts = [[-35, 524, 82], [-38, 560, 40], [-46, 590, 15], [-58, 603, 10], [-76, 604, 10]];
-  for (let i = 0; i <= L.n; i++) {
-    const a = (i / L.n) * Math.PI * 2, k = i / L.n;
-    const vx = L.x - k * L.dx - L.r * Math.sin(a), vy = L.y + k * L.dy + L.r * Math.cos(a), gy = L.ground + k * L.dy;
-    pts.push([Math.round(vx * 10) / 10, gy, Math.round((gy - vy) * 10) / 10]);
-  }
-  pts.push([-90, 613, 6], [-86, 620, 0]);
+  const T = CFG.PLAYROOM.TOWN, n = T.CURVE_N, pts = [];
+  T.CURVES.forEach(([p0, c1, c2, p1], si) => {
+    for (let i = si ? 1 : 0; i <= n; i++) {
+      const t = i / n, u = 1 - t, w = [u * u * u, 3 * u * u * t, 3 * u * t * t, t * t * t];
+      pts.push([0, 1, 2].map((k) => Math.round((w[0] * p0[k] + w[1] * c1[k] + w[2] * c2[k] + w[3] * p1[k]) * 10) / 10));
+    }
+  });
+  T.towerPosts = [Math.round(n * 0.35), Math.round(n * 0.7)];   // two wooden posts under the drop
   return pts;
 })();
 CFG.AREAS.playroom = { WORLD: CFG.PLAYROOM.WORLD, place: 'town', noSky: true };
@@ -140,6 +153,7 @@ const PlayroomExt = {
     return this._path;
   },
   chuteStyle() { return CFG.PLAYROOM.CHUTE_STYLE === 'fade' ? 'fade' : 'tower'; },
+  townLand() { const T = CFG.PLAYROOM.TOWN; return this.chuteStyle() === 'tower' ? T.towerLand : T.land; },   // where the town slide's mat is
   townPath() {
     const k = this.chuteStyle() === 'tower' ? 'towerPath' : 'path';
     if (!this._town || this._townK !== k) { this._town = this.measure(CFG.PLAYROOM.TOWN[k]); this._townK = k; }
@@ -401,7 +415,7 @@ const PlayroomExt = {
       const k = Math.min(1, r.t / (this.chuteStyle() === 'tower' ? C.TOWN.towerDur : C.TOWN.dur)), q = this.along(path, path.total * Math.pow(k, 1.3));
       p.x = q.x; p.y = q.y; p.facing = -1;
       if (k >= 1) {
-        const L = C.TOWN.land; st.ride = null; p.x = L.x; p.y = L.y; p.moving = false; p.hasMoved = true;
+        const L = this.townLand(); st.ride = null; p.x = L.x; p.y = L.y; p.moving = false; p.hasMoved = true;
         const s = this.state(g); s.town = (s.town || 0) + 1;
         Sfx.drop(); Haptics.success();
         g.floats.push({ x: L.x, y: L.y - 70, text: 'Hooray! 🎉', color: '#ffe08a', t: 0, dur: 1.6, big: true });
@@ -448,12 +462,20 @@ const PlayroomExt = {
     // in runs of `chunk` segments (rim, then trough), so a later run passes over an earlier one where they cross
     for (let i = 1; i < vis.length; i += chunk) {
       const run = vis.slice(i - 1, Math.min(vis.length, i + chunk));
-      for (const [w, c] of [[wOuter, '#e8402a'], [wOuter - 8, '#ffb81c']]) { seg(w, c); ctx.beginPath(); run.forEach(([x, y], j) => (j ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke(); }
+      // the rim's ends are flat where one run meets the next (a round end would show as a red notch in the trough)
+      // (and the trough starts a step back, over the hairline the next rim leaves at the joint)
+      const line = (pts) => { ctx.beginPath(); pts.forEach(([x, y], j) => (j ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke(); };
+      if (chunk > 1) {
+        seg(wOuter, '#e8402a'); ctx.lineCap = 'butt'; line(run); ctx.lineCap = 'round';
+        ctx.fillStyle = '#e8402a';
+        for (const q of [i === 1 && vis[0], i + chunk >= vis.length && vis[vis.length - 1]]) if (q) { ctx.beginPath(); ctx.arc(q[0], q[1], wOuter / 2, 0, Math.PI * 2); ctx.fill(); }
+        seg(wOuter - 8, '#ffb81c'); line(vis.slice(Math.max(0, i - 2), Math.min(vis.length, i + chunk)));
+      } else for (const [w, c] of [[wOuter, '#e8402a'], [wOuter - 8, '#ffb81c']]) { seg(w, c); line(run); }
     }
     seg(3, 'rgba(255,240,180,0.9)'); ctx.beginPath(); vis.forEach(([x, y], i) => (i ? ctx.lineTo(x, y - wOuter * 0.18) : ctx.moveTo(x, y - wOuter * 0.18))); ctx.stroke();
   },
   paintTownChute(r) {
-    const ctx = r.ctx, C = CFG.PLAYROOM, path = this.townPath(), L = C.TOWN.land;
+    const ctx = r.ctx, C = CFG.PLAYROOM, path = this.townPath(), L = this.townLand();
     // the soft landing mat on the grass
     ctx.fillStyle = 'rgba(0,0,0,0.15)'; U.roundRect(ctx, L.x - 30, L.y - 12, 64, 30, 10); ctx.fill();
     ctx.fillStyle = '#4aa3ff'; U.roundRect(ctx, L.x - 32, L.y - 15, 64, 30, 10); ctx.fill();
@@ -648,7 +670,7 @@ const PlayroomExt = {
     if (!this.st) return;
     const ctx = r.ctx, st = this.st, C = CFG.PLAYROOM, p = g.player, rd = st.ride;
     if (g.area === 'town') {
-      if (this.chuteStyle() === 'tower') { const T = C.TURRET; if (r.camX < T.x1 + 120 && r.camX + r.viewW > T.x0 - 120 && r.camY < C.TOWN.land.y + 40 && r.camY + r.viewH > T.y0 - 200) items.push({ y: T.y1, draw: () => this.drawTower(r, g) }); }
+      if (this.chuteStyle() === 'tower') { const T = C.TURRET; if (r.camX < T.x1 + 120 && r.camX + r.viewW > T.x0 - 120 && r.camY < this.townLand().y + 40 && r.camY + r.viewH > T.y0 - 200) items.push({ y: T.y1, draw: () => this.drawTower(r, g) }); }
       if (rd && rd.kind === 'town' && rd.phase === 'slide') items.push({ y: p.y + 0.5, draw: () => this.drawTrough(ctx, p.x, p.y, 22) });
       return;
     }
@@ -803,7 +825,6 @@ const PlayroomExt = {
     // the chute: posts and trough, in front of the turret's legs
     // wooden posts under the chute (like the turret's legs), then the trough
     for (const i of C.TOWN.towerPosts) { const [x, y, h] = path.g3[i]; if (h < 6) continue; leg(x, y, y - h + 4); }
-    { const Lp = C.TOWN.LOOP; leg(Lp.x - Lp.dx / 2, Lp.ground + Lp.dy / 2, Lp.y + Lp.r + Lp.dy / 2 + 4); }   // a post holding up the loop
     this.paintChute(ctx, path, [], 22, 'body', 14);
     // the chef riding it sits on top (high up the chute their sort point is above the turret's)
     const rd = this.st && this.st.ride, p = g.player;

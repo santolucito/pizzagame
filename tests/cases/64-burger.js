@@ -19,7 +19,7 @@ module.exports = async (t) => {
     for (const tr of CFG.TREES) if (inS(tr.x, tr.y, 30) || inS(tr.x, tr.y - 44 * tr.s, 0)) out.push('tree ' + tr.x + ',' + tr.y);
     const P = CFG.POND; if (inS(P.x, P.y, P.rx)) out.push('pond');
     if (inS(CFG.DOG_HOME.x, CFG.DOG_HOME.y, 20)) out.push('dog home');
-    const L = CFG.PLAYROOM.TOWN.land; if (inS(L.x, L.y, 40)) out.push('slide mat');
+    const L = PlayroomExt.townLand(); if (inS(L.x, L.y, 40)) out.push('slide mat');
     const B = CFG.BUILDING; if (S.x1 > B.x0 - 20 && S.y0 < B.y1) out.push('pizzeria');
     if (S.x0 < -400 + 20) out.push('West Road');
     if (S.y1 > 920 - 60) out.push('South Road');
@@ -40,7 +40,7 @@ module.exports = async (t) => {
 
   // ---- walk from the slide's landing mat to the door
   const walk = await t.ev((K) => {
-    const L = CFG.PLAYROOM.TOWN.land; T.tp(L.x, L.y, 'town');
+    const L = PlayroomExt.townLand(); T.tp(L.x, L.y, 'town');
     T.steer(0, 1); const a = T.until(() => Game.player.y >= K.DOOR_OUT.y, 600); T.unsteer();
     T.steer(-1, 0); const b = T.until(() => Game.player.x <= K.DOOR_OUT.x, 600); T.unsteer(); T.step(1);
     return { a, b, label: T.label() };

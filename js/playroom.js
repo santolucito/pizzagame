@@ -13,7 +13,7 @@
 //  * THE TOWN SLIDE: a window in the west wall: '🛝 Slide down to town!' The chef climbs out and slides down a long
 //    chute on the pizzeria's west wall (drawn in the town map), landing on a soft mat on the grass by the park.
 // Extension module: registered with Game.ext (first, so its door beats the bedroom's buttons) and Render.ext.
-// See the hook list in js/EXTENSIONS.md. Only reads UpstairsExt.st (to keep out of the way of a nap, the catalog...).
+// See the hook list in js/EXTENSIONS.md. Only reads UpstairsExt.st (to keep out of the way of a nap, the drawing pad...).
 CFG.PLAYROOM = {
   name: 'Playroom', ico: '🛝',
   WORLD: { x0: 31500, y0: 4000, x1: 32700, y1: 4900 },
@@ -42,8 +42,29 @@ CFG.PLAYROOM = {
   // the window in the west wall with the slide down to town, and the spot in front of it
   WINDOW: { y0: 4430, y1: 4510, spot: { x: 31594, y: 4470 }, out: 0.5 },
   // the chute down the outside of the pizzeria's west wall in the town map: [x, y, height] from the wall to the mat
-  TOWN: { path: [[-12, 524, 86], [-34, 540, 70], [-56, 562, 48], [-74, 588, 26], [-84, 608, 8], [-86, 620, 0]], land: { x: -86, y: 622 }, dur: 1.6 },
+  // (towerPath: from the turret's window instead, with a loop-de-loop near the bottom; built just below)
+  TOWN: { path: [[-12, 524, 86], [-34, 540, 70], [-56, 562, 48], [-74, 588, 26], [-84, 608, 8], [-86, 620, 0]],
+    LOOP: { x: -92, y: 562, r: 32, ground: 604, dx: 2, dy: 6, n: 48 }, towerPosts: [1, 2], towerDur: 2.4,
+    land: { x: -86, y: 622 }, dur: 1.6 },
+  // how the top of the town chute looks: 'fade' = a little window box on the roof's edge, the chute fading out with the
+  // roof while the chef is inside the pizzeria; 'tower' = a little 2nd-floor turret on legs against the west wall
+  CHUTE_STYLE: 'tower',
+  // the turret: its ground footprint (x0..x1, y0..y1, against the west wall), its floor and wall-top heights
+  TURRET: { x0: -56, x1: -14, y0: 492, y1: 522, floor: 74, top: 112 },
 };
+// the turret's chute: a steep drop from the window, a run west into the bottom of the loop, once round (the loop's
+// screen circle drifts a little west and down so the way out passes in front of the way in), then onto the mat.
+// Points are [x, ground y, height]; the screen point is (x, y - height).
+CFG.PLAYROOM.TOWN.towerPath = (() => {
+  const L = CFG.PLAYROOM.TOWN.LOOP, pts = [[-35, 524, 82], [-38, 560, 40], [-46, 590, 15], [-58, 603, 10], [-76, 604, 10]];
+  for (let i = 0; i <= L.n; i++) {
+    const a = (i / L.n) * Math.PI * 2, k = i / L.n;
+    const vx = L.x - k * L.dx - L.r * Math.sin(a), vy = L.y + k * L.dy + L.r * Math.cos(a), gy = L.ground + k * L.dy;
+    pts.push([Math.round(vx * 10) / 10, gy, Math.round((gy - vy) * 10) / 10]);
+  }
+  pts.push([-90, 613, 6], [-86, 620, 0]);
+  return pts;
+})();
 CFG.AREAS.playroom = { WORLD: CFG.PLAYROOM.WORLD, place: 'town', noSky: true };
 
 const PLAYROOM_BALLS = ['#ff5c5c', '#ffd166', '#5ad26f', '#4aa3ff', '#ff8fab', '#b07cff', '#ffa94d'];
@@ -63,17 +84,17 @@ const PlayroomExt = {
     if (typeof CityExt !== 'undefined' && (CityExt.floor || (CityExt.st && (CityExt.st.cab || CityExt.st.boarding)))) return false;
     return true;
   },
-  // in the bedroom with nothing going on there (no nap, no slide, no catalog, no drawing pad, not on the bean bag)
+  // in the bedroom with nothing going on there (no nap, no slide, no drawing pad, not on the bean bag)
   bedroomOk(g) {
     if (g.area !== 'upstairs' || typeof UpstairsExt === 'undefined' || !UpstairsExt.st) return false;
     const st = UpstairsExt.st;
-    return !(st.nap || st.slide || st.cat.on || st.draw.on || st.sit);
+    return !(st.nap || st.slide || st.draw.on || st.sit);
   },
   near(g, pt, d) { return U.dist(g.player.x, g.player.y, pt.x, pt.y) < d; },
-  // on the bedroom mat (and nearer to it than to the catalog on the bedside table just south-west of it)
+  // on the bedroom mat
   atMat(g) {
-    const p = g.player, M = CFG.PLAYROOM.MAT_OUT, d = U.dist(p.x, p.y, M.x, M.y), K = CFG.UPSTAIRS.catalog;
-    return d < CFG.PLAYROOM.reach && d <= U.dist(p.x, p.y, K.x, K.y);
+    const p = g.player, M = CFG.PLAYROOM.MAT_OUT;
+    return U.dist(p.x, p.y, M.x, M.y) < CFG.PLAYROOM.reach;
   },
   rect(a) { return { x: a[0], y: a[1], w: a[2], h: a[3] }; },
   roomBlocks() {
@@ -118,7 +139,12 @@ const PlayroomExt = {
     this._path = this.measure(g3);
     return this._path;
   },
-  townPath() { if (!this._town) this._town = this.measure(CFG.PLAYROOM.TOWN.path); return this._town; },
+  chuteStyle() { return CFG.PLAYROOM.CHUTE_STYLE === 'fade' ? 'fade' : 'tower'; },
+  townPath() {
+    const k = this.chuteStyle() === 'tower' ? 'towerPath' : 'path';
+    if (!this._town || this._townK !== k) { this._town = this.measure(CFG.PLAYROOM.TOWN[k]); this._townK = k; }
+    return this._town;
+  },
   measure(g3) {
     const vis = g3.map(([x, y, h]) => [x, y - h]), len = [0];
     for (let i = 1; i < vis.length; i++) len.push(len[i - 1] + Math.hypot(vis[i][0] - vis[i - 1][0], vis[i][1] - vis[i - 1][1]));
@@ -149,8 +175,11 @@ const PlayroomExt = {
     if (!this.st) return;
     this.st.ride = null; this.st.fade = 0; this.st.balls.length = 0; this.st.slid = false; this.st.trainA = CFG.PLAYROOM.TRAIN.a0;
   },
-  bgKey() { return 'pl'; },   // constant: the door and the town chute never change, they only have to be painted once
-  obstacles(g) { return g.area === 'playroom' ? this.roomBlocks() : []; },
+  bgKey() { return 'pl-' + this.chuteStyle(); },   // the door and the town chute never change, they only have to be painted once
+  obstacles(g) {
+    if (g.area === 'town' && this.chuteStyle() === 'tower') { const T = CFG.PLAYROOM.TURRET; return [{ x: T.x0, y: T.y0 - 3, w: 8, h: T.y1 - T.y0 + 6 }]; }   // the turret's west legs
+    return g.area === 'playroom' ? this.roomBlocks() : [];
+  },
   enter(g) {
     const C = CFG.PLAYROOM, p = g.player, s = this.state(g);
     if (!this.st) this.build(g);
@@ -210,9 +239,6 @@ const PlayroomExt = {
     if (!this.bedroomOk(g)) return undefined;
     const p = g.player, M = C.MAT_OUT, d = U.dist(p.x, p.y, M.x, M.y);
     if (d >= C.hintReach) return undefined;
-    // standing at the catalog (just south-west of the mat): the bedroom's own hint and button win
-    const K = CFG.UPSTAIRS.catalog, dk = U.dist(p.x, p.y, K.x, K.y);
-    if (dk < K.reach && dk < d) return undefined;
     return { text: 'A playroom! 🛝', target: this.atMat(g) ? null : M };
   },
   // start a ride / a toy (kind: slide | pit | tramp | castle | train | town)
@@ -372,7 +398,7 @@ const PlayroomExt = {
     }
     if (g.area !== 'town') { st.ride = null; return; }
     if (r.phase === 'slide') {
-      const k = Math.min(1, r.t / C.TOWN.dur), q = this.along(path, path.total * Math.pow(k, 1.3));
+      const k = Math.min(1, r.t / (this.chuteStyle() === 'tower' ? C.TOWN.towerDur : C.TOWN.dur)), q = this.along(path, path.total * Math.pow(k, 1.3));
       p.x = q.x; p.y = q.y; p.facing = -1;
       if (k >= 1) {
         const L = C.TOWN.land; st.ride = null; p.x = L.x; p.y = L.y; p.moving = false; p.hasMoved = true;
@@ -408,16 +434,21 @@ const PlayroomExt = {
     [['#4aa3ff', 1], ['#5ad26f', 0.76], ['#ffd166', 0.52], ['#ff5c5c', 0.28]].forEach(([c, k]) => { ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(M.x, M.y, 22 * k, 11 * k, 0, 0, Math.PI * 2); ctx.fill(); });
   },
   // a chute: a soft shadow on the ground, posts down to it, then the red-edged yellow trough along the visual path
-  paintChute(ctx, path, posts, wOuter) {
+  // (parts: 'all', or 'shadow' = only the shadow on the ground, or 'body' = the posts and the trough)
+  paintChute(ctx, path, posts, wOuter, parts = 'all', chunk = 1) {
     const { g3, vis } = path;
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    ctx.strokeStyle = 'rgba(0,0,0,0.13)'; ctx.lineWidth = wOuter - 4;
-    ctx.beginPath(); g3.forEach(([x, y], i) => (i ? ctx.lineTo(x + 4, y + 6) : ctx.moveTo(x + 4, y + 6))); ctx.stroke();
-    for (const i of posts) { const [x, y, h] = g3[i]; if (h < 6) continue; ctx.fillStyle = '#3b7dd8'; ctx.fillRect(x - 3, y - h, 6, h); ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(x, y, 7, 3, 0, 0, Math.PI * 2); ctx.fill(); }
+    if (parts !== 'body') {
+      ctx.strokeStyle = 'rgba(0,0,0,0.13)'; ctx.lineWidth = wOuter - 4;
+      ctx.beginPath(); g3.forEach(([x, y], i) => (i ? ctx.lineTo(x + 4, y + 6) : ctx.moveTo(x + 4, y + 6))); ctx.stroke();
+      if (parts === 'shadow') { for (const i of posts) { const [x, y, h] = g3[i]; if (h < 6) continue; ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(x, y, 7, 3, 0, 0, Math.PI * 2); ctx.fill(); } return; }
+    }
+    for (const i of posts) { const [x, y, h] = g3[i]; if (h < 6) continue; ctx.fillStyle = '#3b7dd8'; ctx.fillRect(x - 3, y - h, 6, h); if (parts === 'all') { ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(x, y, 7, 3, 0, 0, Math.PI * 2); ctx.fill(); } }
     const seg = (w, c) => { ctx.strokeStyle = c; ctx.lineWidth = w; };
-    for (let i = 1; i < vis.length; i++) {
-      const a = vis[i - 1], b = vis[i];
-      for (const [w, c] of [[wOuter, '#e8402a'], [wOuter - 8, '#ffb81c']]) { seg(w, c); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
+    // in runs of `chunk` segments (rim, then trough), so a later run passes over an earlier one where they cross
+    for (let i = 1; i < vis.length; i += chunk) {
+      const run = vis.slice(i - 1, Math.min(vis.length, i + chunk));
+      for (const [w, c] of [[wOuter, '#e8402a'], [wOuter - 8, '#ffb81c']]) { seg(w, c); ctx.beginPath(); run.forEach(([x, y], j) => (j ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke(); }
     }
     seg(3, 'rgba(255,240,180,0.9)'); ctx.beginPath(); vis.forEach(([x, y], i) => (i ? ctx.lineTo(x, y - wOuter * 0.18) : ctx.moveTo(x, y - wOuter * 0.18))); ctx.stroke();
   },
@@ -427,7 +458,13 @@ const PlayroomExt = {
     ctx.fillStyle = 'rgba(0,0,0,0.15)'; U.roundRect(ctx, L.x - 30, L.y - 12, 64, 30, 10); ctx.fill();
     ctx.fillStyle = '#4aa3ff'; U.roundRect(ctx, L.x - 32, L.y - 15, 64, 30, 10); ctx.fill();
     ctx.fillStyle = '#7cc0ff'; U.roundRect(ctx, L.x - 26, L.y - 11, 52, 9, 5); ctx.fill();
-    this.paintChute(ctx, path, [1, 2, 3], 22);
+    // the chute itself is drawn every frame (it fades with the roof, or stands in front of the turret); only its
+    // shadow (and the turret's) lies on the ground here
+    if (this.chuteStyle() === 'tower') {
+      const T = C.TURRET;
+      ctx.fillStyle = 'rgba(0,0,0,0.14)'; U.roundRect(ctx, T.x0 - 2, T.y0 + 2, T.x1 - T.x0 + 10, T.y1 - T.y0 + 6, 6); ctx.fill();
+      this.paintChute(ctx, path, C.TOWN.towerPosts, 22, 'shadow');
+    }
     // a little slide sign by the mat
     ctx.fillStyle = '#5b3a1a'; ctx.fillRect(L.x + 38, L.y - 22, 3, 24);
     ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, L.x + 27, L.y - 38, 26, 18, 4); ctx.fill();
@@ -588,6 +625,11 @@ const PlayroomExt = {
   // ---------- moving things ----------
   // under people: the trampoline (its mat dips under a landing) and the tumbling blocks' shadows
   dynamic(r, g) {
+    if (g.area === 'town' && this.chuteStyle() === 'fade') {   // the town chute, fading out with the roof
+      const a = this.chuteAlpha(g); if (a <= 0) return;
+      const ctx = r.ctx; ctx.save(); ctx.globalAlpha = a; this.paintChute(ctx, this.townPath(), [1, 2, 3], 22); ctx.restore();
+      return;
+    }
     if (g.area !== 'playroom' || !this.st) return;
     const ctx = r.ctx, M = CFG.PLAYROOM.TRAMP, rd = this.st.ride;
     const h = rd && rd.kind === 'tramp' && rd.phase === 'bounce' ? rd.h || 0 : 0, dip = rd && rd.kind === 'tramp' ? Math.max(0, 1 - h / 14) * 5 : 0;
@@ -606,6 +648,7 @@ const PlayroomExt = {
     if (!this.st) return;
     const ctx = r.ctx, st = this.st, C = CFG.PLAYROOM, p = g.player, rd = st.ride;
     if (g.area === 'town') {
+      if (this.chuteStyle() === 'tower') { const T = C.TURRET; if (r.camX < T.x1 + 120 && r.camX + r.viewW > T.x0 - 120 && r.camY < C.TOWN.land.y + 40 && r.camY + r.viewH > T.y0 - 200) items.push({ y: T.y1, draw: () => this.drawTower(r, g) }); }
       if (rd && rd.kind === 'town' && rd.phase === 'slide') items.push({ y: p.y + 0.5, draw: () => this.drawTrough(ctx, p.x, p.y, 22) });
       return;
     }
@@ -712,16 +755,75 @@ const PlayroomExt = {
       ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.beginPath(); ctx.arc(b.x - 2.2, b.y - b.h - 2.2, 2, 0, Math.PI * 2); ctx.fill();
     }
   },
+  // 'fade': how much of the chute shows: with the roof, but always while the chef is riding it
+  chuteAlpha(g) {
+    const rd = this.st && this.st.ride;
+    if (rd && rd.kind === 'town') return 1;
+    return typeof UpstairsExt !== 'undefined' && UpstairsExt.st ? UpstairsExt.st.roofA : 1;
+  },
+  // 'tower': the little turret on legs against the pizzeria's west wall, the playroom window in its front, and the
+  // chute coming out of that window (one picture, sorted at the turret's front legs)
+  drawTower(r, g) {
+    const ctx = r.ctx, C = CFG.PLAYROOM, T = C.TURRET, path = this.townPath(), t = g.time;
+    const x0 = T.x0, x1 = T.x1, cx = (x0 + x1) / 2, fy = T.y1 - T.floor, ty = T.y1 - T.top, by = T.y0 - T.floor;
+    // the legs: two at the back (mostly behind the cabin), two at the front, sturdy wooden posts with knee braces
+    const leg = (x, gy, top) => { ctx.fillStyle = '#7a4a22'; ctx.fillRect(x - 3, top, 6, gy - top); ctx.fillStyle = '#9a6634'; ctx.fillRect(x - 3, top, 2, gy - top); ctx.fillStyle = '#5b3a1a'; ctx.fillRect(x - 4, gy - 3, 8, 4); };
+    leg(x0 + 4, T.y0, by); leg(x1 - 4, T.y0, by);
+    ctx.strokeStyle = '#7a4a22'; ctx.lineWidth = 3; ctx.lineCap = 'butt';
+    ctx.beginPath(); ctx.moveTo(x0 + 4, T.y0 - 30); ctx.lineTo(x1 - 4, T.y0 - 52); ctx.stroke();   // a cross bar at the back
+    leg(x0 + 4, T.y1, fy); leg(x1 - 4, T.y1, fy);
+    ctx.beginPath(); ctx.moveTo(x0 + 4, fy + 18); ctx.lineTo(x0 + 16, fy + 2); ctx.moveTo(x1 - 4, fy + 18); ctx.lineTo(x1 - 16, fy + 2); ctx.stroke();   // knee braces
+    // a little covered walkway joining the cabin to the pizzeria's wall (the playroom is just behind it)
+    ctx.fillStyle = '#e0a93a'; ctx.fillRect(x1 - 2, ty + 10, -x1 + 2, fy - ty - 10);
+    ctx.fillStyle = 'rgba(160,100,20,0.3)'; for (let y = ty + 16; y < fy; y += 7) ctx.fillRect(x1 - 2, y, -x1 + 2, 1.2);
+    ctx.fillStyle = '#b8321f'; ctx.fillRect(x1 - 2, ty + 6, -x1 + 2, 5);
+    ctx.fillStyle = '#5b3a1a'; ctx.fillRect(x1 - 2, fy - 2, -x1 + 2, 5);
+    // the cabin's floor: a thick plank edge
+    ctx.fillStyle = '#5b3a1a'; ctx.fillRect(x0 - 3, fy - 2, x1 - x0 + 6, 6);
+    // the front wall: sunny planks with white trim
+    ctx.fillStyle = '#ffd166'; ctx.fillRect(x0, ty, x1 - x0, fy - ty - 2);
+    ctx.fillStyle = 'rgba(160,100,20,0.22)'; for (let y = ty + 7; y < fy - 2; y += 7) ctx.fillRect(x0, y, x1 - x0, 1.2);
+    ctx.fillStyle = '#fff8ee'; ctx.fillRect(x0, ty, 3, fy - ty - 2); ctx.fillRect(x1 - 3, ty, 3, fy - ty - 2);
+    // the window (the playroom's warm light), the chute comes out of its sill
+    const s = path.vis[0], wx = s[0], wy = s[1];
+    ctx.fillStyle = '#4aa3ff'; ctx.beginPath(); ctx.moveTo(wx - 12, wy + 2); ctx.lineTo(wx - 12, wy - 20); ctx.arc(wx, wy - 20, 12, Math.PI, 0); ctx.lineTo(wx + 12, wy + 2); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#ffe9b0'; ctx.beginPath(); ctx.moveTo(wx - 8, wy + 2); ctx.lineTo(wx - 8, wy - 20); ctx.arc(wx, wy - 20, 8, Math.PI, 0); ctx.lineTo(wx + 8, wy + 2); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#ff8fab'; ctx.beginPath(); ctx.arc(wx, wy - 20, 8, Math.PI, 0); ctx.fill();   // a pink curtain at the top
+    // the pointy roof: a red pyramid with shingle rows, a little pizza flag on top
+    const ey = ty + 3, pk = { x: cx, y: ty - 40 };
+    ctx.fillStyle = '#b8321f'; ctx.beginPath(); ctx.moveTo(x0 - 6, ey); ctx.lineTo(x0 - 4, ey - (T.y1 - T.y0) * 0.5); ctx.lineTo(pk.x, pk.y); ctx.lineTo(x1 + 4, ey - (T.y1 - T.y0) * 0.5); ctx.lineTo(x1 + 6, ey); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#e8402a'; ctx.beginPath(); ctx.moveTo(x0 - 6, ey); ctx.lineTo(pk.x, pk.y); ctx.lineTo(x1 + 6, ey); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = 'rgba(120,20,10,0.35)'; ctx.lineWidth = 1.2;
+    for (let k = 0.25; k < 1; k += 0.25) { const y = ey + (pk.y - ey) * k, hw = (x1 - x0 + 12) / 2 * (1 - k); ctx.beginPath(); ctx.moveTo(cx - hw, y); ctx.lineTo(cx + hw, y); ctx.stroke(); }
+    ctx.fillStyle = '#fff8ee'; ctx.fillRect(x0 - 6, ey - 1, x1 - x0 + 12, 3);   // the eave trim
+    ctx.fillStyle = '#5b3a1a'; ctx.fillRect(pk.x - 1, pk.y - 20, 2, 22);
+    const wv = Math.sin(t * 4) * 2.5;
+    ctx.fillStyle = '#5ad26f'; ctx.beginPath(); ctx.moveTo(pk.x + 1, pk.y - 20); ctx.quadraticCurveTo(pk.x + 10, pk.y - 19 + wv, pk.x + 19, pk.y - 16 + wv); ctx.lineTo(pk.x + 1, pk.y - 11); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(pk.x + 1, pk.y - 21, 2.2, 0, Math.PI * 2); ctx.fill();
+    // the chute: posts and trough, in front of the turret's legs
+    // wooden posts under the chute (like the turret's legs), then the trough
+    for (const i of C.TOWN.towerPosts) { const [x, y, h] = path.g3[i]; if (h < 6) continue; leg(x, y, y - h + 4); }
+    { const Lp = C.TOWN.LOOP; leg(Lp.x - Lp.dx / 2, Lp.ground + Lp.dy / 2, Lp.y + Lp.r + Lp.dy / 2 + 4); }   // a post holding up the loop
+    this.paintChute(ctx, path, [], 22, 'body', 14);
+    // the chef riding it sits on top (high up the chute their sort point is above the turret's)
+    const rd = this.st && this.st.ride, p = g.player;
+    if (rd && rd.kind === 'town' && rd.phase === 'slide' && p.y < T.y1) { r.drawPlayer(g); this.drawTrough(ctx, p.x, p.y, 22); }
+  },
   overlayTown(r, g) {
+    if (this.chuteStyle() === 'tower') return;   // the turret is out past the roof's edge, nothing to draw over it
     const ctx = r.ctx, s = this.townPath().vis[0], x = s[0], y = s[1];
     if (r.camX > x + 60 || r.camX + r.viewW < x - 60 || r.camY > y + 60 || r.camY + r.viewH < y - 60) return;
+    const a = this.chuteAlpha(g); if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha = a; this.drawWindowBox(ctx, x, y); ctx.restore();
+    const rd = this.st && this.st.ride, p = g.player;
+    if (rd && rd.kind === 'town' && rd.phase === 'slide' && p.x > x - 34) { r.drawPlayer(g); this.drawTrough(ctx, p.x, p.y, 22); }
+  },
+  drawWindowBox(ctx, x, y) {
     ctx.fillStyle = '#4aa3ff'; U.roundRect(ctx, x - 8, y - 22, 26, 34, 6); ctx.fill();                   // the window's frame
     ctx.fillStyle = '#ffe9b0'; U.roundRect(ctx, x - 4, y - 18, 18, 26, 4); ctx.fill();                   // warm playroom light
     ctx.fillStyle = '#ff8fab'; ctx.fillRect(x - 4, y - 18, 18, 5);
     ctx.lineCap = 'round';
     for (const [w, c] of [[22, '#e8402a'], [14, '#ffb81c']]) { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(x + 4, y - 2); ctx.lineTo(x, y); ctx.stroke(); }
-    const rd = this.st && this.st.ride, p = g.player;
-    if (rd && rd.kind === 'town' && rd.phase === 'slide' && p.x > x - 34) { r.drawPlayer(g); this.drawTrough(ctx, p.x, p.y, 22); }
   },
   // screen space: the fade through a door (or out of the window)
   screen(r, g) {

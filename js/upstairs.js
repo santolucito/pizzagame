@@ -27,7 +27,7 @@ CFG.UPSTAIRS = {
     pigeons: [{ x: 380, y: 300 }, { x: 760, y: 420 }],
   },
   // The office stairs: a flight along the bottom wall climbing east into the corner; stand at its foot to go up.
-  STAIRS: { block: { x: 296, y: 596, w: 76, h: 44 }, landing: { x: 266, y: 620 }, reach: 36, sign: { x: 334, y: 578 } },
+  STAIRS: { block: { x: 296, y: 596, w: 76, h: 44 }, landing: { x: 266, y: 620 }, reach: 36, sign: { x: 318, y: 538 } },
   WORLD: { x0: 6400, y0: 1500, x1: 7000, y1: 1900 },      // free space east of the cabin's map
   room: { x0: 6460, y0: 1560, x1: 6940, y1: 1840 }, wall: 26,
   bed: { x0: 6484, y0: 1572, x1: 6592, y1: 1710 },
@@ -45,20 +45,18 @@ CFG.UPSTAIRS = {
   opening: { x0: 6866, y0: 1766, x1: 6936, y1: 1838 },    // the stair hole in the floor, railed on two sides
   top: { x: 6836, y: 1806 }, topReach: 34,                // the top of the stairs: arrive here, go down from here
   nap: { hop: 0.45, sleep: 3.0, wake: 0.5 },              // seconds
-  catalog: { x: 6622, y: 1602, reach: 36 },               // the catalog lies on the bedside table; stand just below it
   chairReach: 36,                                         // stand by the desk chair to draw
   beanbag: { reach: 46, seat: { dx: 0, dy: 10 }, hop: 0.35 }, // stand beside the (owned) bean bag to flop into it; the chef's feet land on the seat
   art: { room: { x: 6600, y: 1546, w: 44, h: 33 }, shop: { x: 922, y: 132, w: 48, h: 36 }, size: [160, 120] },   // where the drawing hangs
   slide: { entry: { x: 6600, y: 1712 }, top: { x: 6566, y: 1702 }, bottom: { x: 6566, y: 1804 }, reach: 14, dur: 1.1 },
-  // bedroom upgrades, bought from the catalog: `spot` is where the item goes, `block` an obstacle rect once owned,
-  // `view` how the catalog page shows it (scale, and the item's visual centre relative to its spot)
+  // bedroom upgrades, bought at display stands in the City shops (js/homeshop.js): `spot` is where the item goes,
+  // `block` an obstacle rect once owned, `view` how a stand shows it (scale, and the item's visual centre relative to its spot)
   items: [
     { key: 'poster', label: 'Pizza Chef Poster', ico: '🖼️', price: 50, spot: { x: 6728, y: 1547 }, view: { s: 3.4, dy: 0 } },
     { key: 'lava', label: 'Lava Lamp', ico: '🔮', price: 60, spot: { x: 6752, y: 1590 }, view: { s: 3.6, dy: -10 } },
     { key: 'beanbag', label: 'Bean Bag', ico: '🛋️', price: 70, spot: { x: 6790, y: 1680 }, view: { s: 3.2, dy: 0 }, block: [6766, 1664, 48, 32] },
     { key: 'stars', label: 'Star Projector', ico: '🌟', price: 80, spot: { x: 6706, y: 1590 }, view: { s: 3.4, dy: -6 } },
     { key: 'chest', label: 'Toy Chest', ico: '🧸', price: 90, spot: { x: 6630, y: 1820 }, view: { s: 2.8, dy: -4 }, block: [6600, 1804, 60, 34] },
-    { key: 'hamster', label: 'Hamster Wheel', ico: '🐹', price: 100, spot: { x: 6806, y: 1802 }, view: { s: 3.4, dy: -4 }, block: [6786, 1784, 40, 34] },
     { key: 'horse', label: 'Rocking Horse', ico: '🐴', price: 110, spot: { x: 6690, y: 1806 }, view: { s: 3.4, dy: -8 }, block: [6672, 1790, 36, 30] },
     { key: 'fish', label: 'Fish Tank', ico: '🐟', price: 120, spot: { x: 6916, y: 1592 }, view: { s: 3.4, dy: 0 }, block: [6896, 1574, 40, 36] },
     { key: 'drums', label: 'Drum Kit', ico: '🥁', price: 150, spot: { x: 6745, y: 1802 }, view: { s: 2.8, dy: -6 }, block: [6716, 1782, 58, 40] },
@@ -75,7 +73,7 @@ const UpstairsExt = {
 
   // ---------- game hooks ----------
   defaults: { upstairs: { seen: false, owned: {}, drawing: null } },
-  home(g) { if (this.st) { this.st.nap = null; this.st.slide = null; this.st.sit = null; this.st.fade = 0; this.st.roofA = 1; this.closeCatalog(g); } if (this.st && this.st.draw.on) this.closePad(g); },
+  home(g) { if (this.st) { this.st.nap = null; this.st.slide = null; this.st.sit = null; this.st.fade = 0; this.st.roofA = 1; } if (this.st && this.st.draw.on) this.closePad(g); },
   build(g) {
     if (!g.s.upstairs) g.s.upstairs = { seen: false, owned: {}, drawing: null };
     if (!g.s.upstairs.owned) g.s.upstairs.owned = {};
@@ -85,10 +83,9 @@ const UpstairsExt = {
       roofA: this.insideShop(g) ? 0 : 1, fade: 0, nap: null, slide: null, slideArmed: true,
       smoke: [], smokeT: 1, puffing: 0, rest: 3,
       pigeons: R.pigeons.map((p, i) => ({ x: p.x, y: p.y, tx: p.x, ty: p.y, wait: 1 + i, facing: 1, step: 0 })),
-      cat: { on: false, page: 0, flip: null, ready: true, hold: null, bought: 0, nope: 0 },   // the decoration catalog
       draw: { on: false, hold: null, slot: null },                                           // the drawing pad (and which picture it paints)
       sit: null,                                                                             // flopped on the bean bag: { t, from, landed }
-      notes: [], noteT: 0, wheel: 0, wheelV: 0, rock: 0,
+      notes: [], noteT: 0, rock: 0,
     };
   },
   owned(g, key) { return !!(g.s.upstairs && g.s.upstairs.owned && g.s.upstairs.owned[key]); },
@@ -159,10 +156,8 @@ const UpstairsExt = {
     const st = this.st;
     if (st.nap && st.nap.phase === 'sleep' && st.nap.t > 0.4) return { label: '☀️ Wake up', run: (gg) => this.wakeUp(gg) };   // sleeps until you wake up
     if (st.nap || st.slide || st.draw.on) return null;                   // hopping in or out, whooshing, or busy drawing
-    if (st.cat.on) return this.catalogAction(g);
     if (st.sit) return { label: '🚶 Get up', run: (gg) => this.getUp(gg) };
     if (U.dist(p.x, p.y, C.top.x, C.top.y) < C.topReach) return { label: '🪜 Go downstairs', run: (gg) => this.goDown(gg) };
-    if (U.dist(p.x, p.y, C.catalog.x, C.catalog.y) < C.catalog.reach) return { label: '📖 Open the catalog', run: (gg) => this.openCatalog(gg) };
     const nearBag = this.nearBeanbag(g), dChair = U.dist(p.x, p.y, C.chair.x, C.chair.y);
     if (nearBag && !(dChair < C.chairReach && dChair < nearBag)) return { label: '🛋️ Flop on the bean bag', run: (gg) => this.flop(gg) };
     if (dChair < C.chairReach) return { label: '✏️ Sit and draw', run: (gg) => this.openPad(gg, 'bedroom') };
@@ -174,8 +169,7 @@ const UpstairsExt = {
     if (g.area === 'upstairs') {
       const st = this.st;
       if (st.nap && st.nap.phase === 'sleep') return { text: 'Sweet dreams! 😴 Press ☀️ to wake up', target: null };
-      if (st.nap || st.slide || st.draw.on || st.cat.on || st.sit) return null;   // the scenes and overlays explain themselves
-      if (U.dist(p.x, p.y, C.catalog.x, C.catalog.y) < C.catalog.reach) return { text: 'Open the catalog to decorate 📖', target: null };
+      if (st.nap || st.slide || st.draw.on || st.sit) return null;   // the scenes and overlays explain themselves
       const nearBag = this.nearBeanbag(g), dChair = U.dist(p.x, p.y, C.chair.x, C.chair.y);
       if (nearBag && !(dChair < C.chairReach && dChair < nearBag)) return { text: 'Flop on the bean bag! 🛋️', target: null };
       if (U.dist(p.x, p.y, C.chair.x, C.chair.y) < C.chairReach) return { text: 'Sit at the desk and draw ✏️', target: null };
@@ -214,7 +208,6 @@ const UpstairsExt = {
     const bb = this.beanbagBlock(g);
     if (bb && p.x > bb.x && p.x < bb.x + bb.w && p.y > bb.y && p.y < bb.y + bb.h) { const q = this.standSpot(g, null); if (q) { p.x = q.x; p.y = q.y; p.moving = false; return true; } }   // a save made on the bean bag: just get up
     p.x = C.top.x; p.y = C.top.y; p.moving = false;
-    if (this.st.cat.hold) this.st.cat.hold = { x: p.x, y: p.y };
     g.floats.push({ x: p.x, y: p.y - 50, text: 'Oops! Back inside', color: '#ffe08a', t: 0, dur: 1.4, big: true });
     return true;
   },
@@ -245,13 +238,6 @@ const UpstairsExt = {
   updateRoom(g, dt) {
     const st = this.st, p = g.player, C = CFG.UPSTAIRS, N = C.nap, n = st.nap;
     this.updateToys(g, dt);
-    // reading the catalog: stay put (the ◀ ▶ buttons turn the pages and the ✕ closes it)
-    if (st.cat.on) {
-      const c = st.cat; p.x = c.hold.x; p.y = c.hold.y; p.moving = false;
-      c.bought = Math.max(0, c.bought - dt); c.nope = Math.max(0, c.nope - dt);
-      if (c.flip) { c.flip.t += dt; if (c.flip.t >= c.flip.dur) c.flip = null; }
-      return;
-    }
     // drawing at the desk: the chef stays on the chair's side while the pad is open
     if (st.draw.on) { p.x = st.draw.hold.x; p.y = st.draw.hold.y; p.moving = false; return; }
     // flopped on the bean bag: a little hop in, a squashy landing, then comfy until "Get up"
@@ -539,27 +525,50 @@ const UpstairsExt = {
     ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.beginPath(); ctx.ellipse(L.x + 2, L.y + 4, 24, 13, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#b23a48'; ctx.beginPath(); ctx.ellipse(L.x, L.y, 24, 13, 0, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(L.x, L.y, 18, 8, 0, 0, Math.PI * 2); ctx.stroke();
-    // the flight: treads climbing east, each a little darker and narrower, into a dark opening at the top
-    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(b.x + 3, b.y + 3, b.w, b.h);
-    ctx.fillStyle = '#5b3a1a'; ctx.fillRect(b.x, b.y, b.w, b.h);
-    const n = 7, tw = (b.w - 14) / n;
+    // the flight climbs EAST: each step stands taller than the last (3/4 view, so height lifts it up the screen),
+    // with a sawtooth stringer facing the room's front, lit treads, a rising handrail and, at the top, the stairwell
+    // opening into the floor above.
+    const n = 5, top = 14, run = (b.w - top) / n, rise = 7, y0 = b.y, y1 = b.y + b.h, ex = b.x + b.w - top, hTop = (n + 1) * rise;
+    // floor shadow cast to the south-east of the flight
+    ctx.fillStyle = 'rgba(0,0,0,0.16)'; ctx.beginPath();
+    ctx.moveTo(b.x + 4, y1); ctx.lineTo(b.x + b.w + 3, y1); ctx.lineTo(b.x + b.w + 3, y1 + 4); ctx.lineTo(b.x + 6, y1 + 4); ctx.fill();
+    // the stairwell: a dark opening in the corner that the top step leads into (the floor above is up there)
+    ctx.fillStyle = '#3a2516'; ctx.fillRect(ex, y0 - hTop - 10, top, b.h + hTop + 10);          // wall block in the corner
+    ctx.fillStyle = '#1b120b'; ctx.fillRect(ex + 2, y0 - hTop - 8, top - 3, b.h - 2);           // the hole up
+    const glow = ctx.createLinearGradient(0, y0 - hTop - 8, 0, y0 - hTop + b.h - 10);
+    glow.addColorStop(0, 'rgba(255,214,140,0.55)'); glow.addColorStop(1, 'rgba(255,214,140,0)');
+    ctx.fillStyle = glow; ctx.fillRect(ex + 2, y0 - hTop - 8, top - 3, b.h - 2);              // light from the bedroom
+    ctx.fillStyle = '#8d5a2b'; ctx.fillRect(ex, y0 - hTop - 10, top, 3);                        // the upstairs floor's edge
     for (let i = 0; i < n; i++) {
-      const x = b.x + 2 + i * tw, k = i / (n - 1), inset = k * 5;
-      ctx.fillStyle = `rgb(${Math.round(201 - 60 * k)},${Math.round(154 - 50 * k)},${Math.round(95 - 35 * k)})`;
-      ctx.fillRect(x, b.y + 4 + inset, tw - 1.5, b.h - 8 - inset * 2);
-      ctx.fillStyle = 'rgba(255,230,180,0.25)'; ctx.fillRect(x, b.y + 4 + inset, 1.5, b.h - 8 - inset * 2);
-      ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(x + tw - 4.5, b.y + 4 + inset, 3, b.h - 8 - inset * 2);   // riser shadow
+      const x = b.x + i * run, h = (i + 1) * rise, k = i / (n - 1);
+      // stringer (the flight's side, facing the viewer): a column as tall as this step
+      ctx.fillStyle = `rgb(${Math.round(120 + 14 * k)},${Math.round(76 + 10 * k)},${Math.round(38 + 6 * k)})`;
+      ctx.fillRect(x, y1 - h, run + 0.5, h);
+      ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(x, y1 - 3, run + 0.5, 3);
+      // the tread on top, lifted by its height, a touch lighter the higher it is
+      ctx.fillStyle = `rgb(${Math.round(196 + 40 * k)},${Math.round(146 + 40 * k)},${Math.round(88 + 34 * k)})`;
+      ctx.fillRect(x, y0 - h, run + 0.5, b.h);
+      // the riser: the step's face toward the landing, a dark band rising from the step below
+      ctx.fillStyle = 'rgba(70,40,18,0.55)'; ctx.fillRect(x, y0 - h, 3, b.h);
+      // bright nosing along the step's front edge (toward the viewer) and the stringer's top edge
+      ctx.fillStyle = 'rgba(255,240,205,0.7)'; ctx.fillRect(x + 3, y1 - h - 1.5, run - 2.5, 1.5);
+      ctx.fillStyle = '#3a2516'; ctx.fillRect(x, y1 - h, run + 0.5, 1.2); ctx.fillRect(x, y1 - h, 1.2, rise);   // sawtooth outline
     }
-    ctx.fillStyle = '#2b1d14'; ctx.fillRect(b.x + b.w - 12, b.y + 2, 12, b.h - 4);
-    ctx.fillStyle = '#ffe08a'; ctx.font = r.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('▲', b.x + b.w - 6, b.y + b.h / 2);
-    // railing along the room side: posts and a hand rail
-    ctx.fillStyle = '#8d5a2b'; ctx.fillRect(b.x, b.y - 2, b.w - 10, 4);
-    ctx.fillStyle = '#5b3a1a'; for (let x = b.x + 2; x < b.x + b.w - 12; x += 12) ctx.fillRect(x, b.y - 10, 3, 12);
-    ctx.fillStyle = '#d7b98a'; ctx.fillRect(b.x, b.y - 12, b.w - 10, 3);
-    // "UPSTAIRS" sign on the railing
+    // the handrail on the room side: posts on every step, the rail rising with them into the stairwell
+    const railY = (x) => y0 - rise * ((x - b.x) / run + 1) - 15;
+    ctx.fillStyle = '#5b3a1a';
+    for (let i = 0; i < n; i++) { const x = b.x + i * run + run / 2, h = (i + 1) * rise; ctx.fillRect(x - 1.2, railY(x), 2.4, y0 - h - railY(x) + 2); }
+    ctx.fillRect(b.x - 1, railY(b.x) - 3, 4, y0 - rise - railY(b.x) + 5);                       // newel post at the foot
+    ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(b.x + 1, railY(b.x) - 1); ctx.lineTo(ex + 2, railY(ex + 2)); ctx.stroke();
+    ctx.strokeStyle = '#d7b98a'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(b.x + 1, railY(b.x) - 1.5); ctx.lineTo(ex + 2, railY(ex + 2) - 0.5); ctx.stroke();
+    ctx.lineCap = 'butt';
+    ctx.fillStyle = '#d7b98a'; ctx.beginPath(); ctx.arc(b.x + 1, railY(b.x) - 3, 2.6, 0, Math.PI * 2); ctx.fill();
+    // "UPSTAIRS" sign hung on the wall above the flight
     const sg = S.sign;
-    ctx.fillStyle = 'rgba(0,0,0,0.2)'; U.roundRect(ctx, sg.x - 28, sg.y - 7, 60, 16, 4); ctx.fill();
-    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, sg.x - 30, sg.y - 9, 60, 16, 4); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; U.roundRect(ctx, sg.x - 30, sg.y - 7, 64, 16, 4); ctx.fill();
+    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, sg.x - 32, sg.y - 9, 64, 16, 4); ctx.fill();
     ctx.fillStyle = '#ffe08a'; ctx.font = r.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🛏️ UPSTAIRS', sg.x, sg.y - 1);
     // the owner's drawing hangs in the dining room too, on the back wall past the neon sign
     const A = CFG.UPSTAIRS.art.shop;
@@ -662,9 +671,6 @@ const UpstairsExt = {
     ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(tx + 9, T.y0 + 20, 4.5, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(tx + 9, T.y0 + 20); ctx.lineTo(tx + 9, T.y0 + 17); ctx.moveTo(tx + 9, T.y0 + 20); ctx.lineTo(tx + 11.5, T.y0 + 21); ctx.stroke();
     ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.arc(tx + 5, T.y0 + 14.5, 1.8, 0, Math.PI * 2); ctx.arc(tx + 13, T.y0 + 14.5, 1.8, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#b23a48'; U.roundRect(ctx, tx - 16, T.y0 + 22, 20, 10, 2); ctx.fill();                  // the catalog, lying on the table
-    ctx.fillStyle = '#fff8ee'; ctx.fillRect(tx - 14, T.y0 + 24, 16, 1.5); ctx.fillRect(tx - 14, T.y0 + 27, 12, 1.5);
-    ctx.fillStyle = '#ffe08a'; ctx.font = r.font(6); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('📖', tx - 6, T.y0 + 27);
     // wardrobe with two doors
     const Wd = C.wardrobe;
     ctx.fillStyle = 'rgba(0,0,0,0.18)'; U.roundRect(ctx, Wd.x0 + 4, Wd.y0 + 5, Wd.x1 - Wd.x0, Wd.y1 - Wd.y0, 4); ctx.fill();
@@ -757,7 +763,6 @@ const UpstairsExt = {
     const ctx = r.ctx, W = r.canvas.width / r.dpr, H = r.canvas.height / r.dpr;
     const a = this.napAlpha();
     if (a > 0 && g.area === 'upstairs') this.drawNight(r, g, W, H, a);
-    if (g.area === 'upstairs' && this.st.cat.on) this.drawCatalog(r, g, W, H);
     if (this.st.fade > 0) { ctx.fillStyle = `rgba(20,12,6,${(this.st.fade / CFG.UPSTAIRS.ROOF.fade).toFixed(3)})`; ctx.fillRect(0, 0, W, H); }
   },
   drawNight(r, g, W, H, a) {
@@ -824,7 +829,7 @@ const UpstairsExt = {
   },
 
   // ======================= the decorations =======================
-  // `mode`: 'static' paints the still parts (cached background), 'dynamic' the moving parts (each frame), 'all' both (the catalog page).
+  // `mode`: 'static' paints the still parts (cached background), 'dynamic' the moving parts (each frame), 'all' both (a shop's display stand).
   drawItem(r, g, it, mode) {
     const ctx = r.ctx, x = it.spot.x, y = it.spot.y, t = g.time, st = this.st || {}, p = g.player;
     const S = mode !== 'dynamic', D = mode !== 'static';
@@ -862,8 +867,8 @@ const UpstairsExt = {
           const R = CFG.UPSTAIRS.room, cx = (R.x0 + R.x1) / 2, cy = (R.y0 + R.y1) / 2;
           ctx.fillStyle = `rgba(90,111,176,${mode === 'all' ? 0 : 0.08})`; ctx.fillRect(R.x0, R.y0, R.x1 - R.x0, R.y1 - R.y0);
           for (let k = 0; k < 16; k++) {
-            const a = t * 0.12 + k * 0.39, rad = (mode === 'all' ? 30 : 120) + (k % 4) * (mode === 'all' ? 8 : 34), sx = (mode === 'all' ? x : cx) + Math.cos(a) * rad * 1.6, sy = (mode === 'all' ? y - 26 : cy) + Math.sin(a) * rad * 0.9;
-            const tw = 0.6 + 0.4 * Math.sin(t * 3 + k), s = (mode === 'all' ? 2.5 : 4) * tw;
+            const a = t * 0.12 + k * 0.39, rad = (mode === 'all' ? 9 : 120) + (k % 4) * (mode === 'all' ? 3 : 34), sx = (mode === 'all' ? x : cx) + Math.cos(a) * rad * 1.6, sy = (mode === 'all' ? y - 18 : cy) + Math.sin(a) * rad * 0.9;
+            const tw = 0.6 + 0.4 * Math.sin(t * 3 + k), s = (mode === 'all' ? 1.6 : 4) * tw;
             ctx.fillStyle = `rgba(255,224,138,${(0.55 * tw).toFixed(2)})`;
             ctx.beginPath(); for (let i = 0; i < 8; i++) { const rr = i % 2 ? s * 0.4 : s, aa = i * Math.PI / 4; ctx.lineTo(sx + Math.cos(aa) * rr, sy + Math.sin(aa) * rr); } ctx.closePath(); ctx.fill();
           }
@@ -871,20 +876,6 @@ const UpstairsExt = {
         break;
       case 'chest':
         if (S) { ctx.fillStyle = 'rgba(0,0,0,0.18)'; U.roundRect(ctx, x - 27, y - 12, 60, 34, 4); ctx.fill(); ctx.fillStyle = '#5b3a1a'; U.roundRect(ctx, x - 30, y - 16, 60, 34, 4); ctx.fill(); ctx.fillStyle = '#e4572e'; U.roundRect(ctx, x - 27, y - 13, 54, 28, 3); ctx.fill(); ctx.fillStyle = '#ffe08a'; ctx.fillRect(x - 27, y - 2, 54, 3); ctx.fillStyle = '#f2b134'; ctx.beginPath(); ctx.arc(x, y - 1, 4, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.font = r.font(10); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🧸', x - 14, y - 7); ctx.fillText('🚂', x + 14, y - 7); }
-        break;
-      case 'hamster':
-        if (S) { ctx.fillStyle = 'rgba(0,0,0,0.18)'; U.roundRect(ctx, x - 17, y - 12, 40, 32, 5); ctx.fill(); ctx.fillStyle = '#d7b98a'; U.roundRect(ctx, x - 20, y - 16, 40, 32, 5); ctx.fill(); ctx.strokeStyle = '#8d9299'; ctx.lineWidth = 1; for (let k = -16; k <= 16; k += 5) { ctx.beginPath(); ctx.moveTo(x + k, y - 14); ctx.lineTo(x + k, y + 14); ctx.stroke(); } ctx.fillStyle = '#e8d2b4'; ctx.fillRect(x - 18, y + 8, 36, 6); }
-        if (D) {
-          const ang = mode === 'all' ? t * 6 : st.wheel || 0;
-          ctx.strokeStyle = '#e4572e'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x + 6, y - 1, 11, 0, Math.PI * 2); ctx.stroke();
-          ctx.strokeStyle = '#ff8a65'; ctx.lineWidth = 1.5; for (let k = 0; k < 4; k++) { const a = ang + k * Math.PI / 2; ctx.beginPath(); ctx.moveTo(x + 6 - Math.cos(a) * 11, y - 1 - Math.sin(a) * 11); ctx.lineTo(x + 6 + Math.cos(a) * 11, y - 1 + Math.sin(a) * 11); ctx.stroke(); }
-          const run = mode === 'all' || (st.wheelV || 0) > 0.5, bob = run ? Math.sin(t * 20) * 1 : 0;
-          ctx.fillStyle = '#d9a066'; ctx.beginPath(); ctx.ellipse(x + 6, y + 5 + bob, 6, 4, 0, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = '#f3e6cf'; ctx.beginPath(); ctx.ellipse(x + 6, y + 6 + bob, 3.5, 2, 0, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.arc(x + 10, y + 4 + bob, 0.8, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = '#d9a066'; ctx.beginPath(); ctx.arc(x + 3, y + 1 + bob, 1.6, 0, Math.PI * 2); ctx.arc(x + 8, y + 1 + bob, 1.6, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.arc(x - 12, y + 2, 2.5, 0, Math.PI * 2); ctx.fill();   // a seed
-        }
         break;
       case 'horse':
         if (S) { ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(x + 2, y + 10, 20, 6, 0, 0, Math.PI * 2); ctx.fill(); }
@@ -966,104 +957,18 @@ const UpstairsExt = {
       if (U.dist(p.x, p.y, d.x, d.y) < 70) { st.noteT -= dt; if (st.noteT <= 0) { st.noteT = 0.45; st.notes.push({ x: d.x + U.rand(-20, 20), y: d.y - 24, ch: U.pick(['♪', '♫', '♩', '🥁']), col: U.pick(['#e4572e', '#3b7dd8', '#f2b134']), t: 0 }); } }
       else st.noteT = 0;
     }
-    if (this.owned(g, 'hamster')) {
-      const h = byKey('hamster'), want = U.dist(p.x, p.y, h.x, h.y) < 70 ? 7 : 0;
-      st.wheelV = U.lerp(st.wheelV, want, 0.04); st.wheel += st.wheelV * dt;
-    }
     if (this.owned(g, 'horse')) { const h = byKey('horse'), amp = U.dist(p.x, p.y, h.x, h.y) < 70 ? 0.18 : 0.04; st.rock = Math.sin(g.time * 3) * amp; }
   },
 
-  // ======================= the catalog: one item per page, the ◀ ▶ buttons turn pages, the ✕ closes, the big button buys =======================
-  openCatalog(g) { const c = this.st.cat, p = g.player; c.on = true; c.page = 0; c.flip = null; c.bought = 0; c.nope = 0; c.hold = { x: p.x, y: p.y }; p.moving = false; Sfx.pickup(); Haptics.tap(); UI.openCatalog({ prev: () => this.turnPage(g, -1), next: () => this.turnPage(g, 1), close: () => this.closeCatalog(g) }); },
-  closeCatalog(g) { if (!this.st.cat.on) return; this.st.cat.on = false; this.st.cat.hold = null; UI.closeCatalog(); Sfx.drop(); },
-  catalogPages() { return CFG.UPSTAIRS.items.length + 1; },
-  turnPage(g, dir) {
-    const c = this.st.cat, n = this.catalogPages(), to = c.page + dir;
-    if (to < 0 || to >= n || c.flip) return;
-    c.flip = { from: c.page, to, t: 0, dur: 0.32 }; c.page = to; c.bought = 0; c.nope = 0; Sfx.pickup();
-  },
-  catalogAction(g) {
-    const c = this.st.cat, items = CFG.UPSTAIRS.items;
-    if (c.page === 0) return { label: '📖 Open it up!', run: (gg) => this.turnPage(gg, 1) };
-    const it = items[c.page - 1];
-    if (this.owned(g, it.key)) return { label: '✅ You have this one!', run: (gg) => this.turnPage(gg, c.page < this.catalogPages() - 1 ? 1 : -1) };
-    if (g.s.cash >= it.price) return { label: `🛒 Buy for ${U.money(it.price)}`, run: (gg) => this.buyItem(gg, it) };
-    return { label: `💰 Need ${U.money(it.price - g.s.cash)} more`, run: (gg) => { c.nope = 1.4; Sfx.error(); } };
-  },
-  buyItem(g, it) {
-    const c = this.st.cat;
-    if (this.owned(g, it.key) || g.s.cash < it.price) return;
-    g.s.cash -= it.price; g.s.upstairs.owned[it.key] = true;
-    Sfx.buy(); Haptics.success(); c.bought = 1.8; c.nope = 0;
-    this.nudgeOut(g, it);
-    g.fx.push({ kind: 'sparkle', x0: it.spot.x, y0: it.spot.y, x1: it.spot.x, y1: it.spot.y, t: 0, dur: 0.8 });
-    g.floats.push({ x: g.player.x, y: g.player.y - 50, text: `${it.ico} It's in your room!`, color: '#ffe08a', t: 0, dur: 1.6, big: true });
-    g.save();
-  },
-  // A newly solid item must never appear under the chef: step to the nearest free spot beside it.
-  nudgeOut(g, it) {
-    const p = g.player, b = it.block, r = 12;
-    if (!b || !(p.x + r > b[0] && p.x - r < b[0] + b[2] && p.y + r > b[1] && p.y - r < b[1] + b[3])) return;
-    const cands = [[b[0] - r - 2, p.y], [b[0] + b[2] + r + 2, p.y], [p.x, b[1] - r - 2], [p.x, b[1] + b[3] + r + 2]];
-    let best = null, bd = 1e9;
-    for (const [x, y] of cands) { if (!this.roomFree(x, y)) continue; const d = U.dist(p.x, p.y, x, y); if (d < bd) { bd = d; best = [x, y]; } }
-    if (best) { p.x = best[0]; p.y = best[1]; } else this.rescue(g);
-    if (this.st.cat.hold) this.st.cat.hold = { x: p.x, y: p.y };
-  },
-  drawCatalog(r, g, W, H) {
-    const ctx = r.ctx, c = this.st.cat, items = CFG.UPSTAIRS.items, n = this.catalogPages();
-    ctx.fillStyle = 'rgba(10,8,6,0.72)'; ctx.fillRect(0, 0, W, H);
-    const cw = Math.min(360, W - 32), ch = Math.min(440, H - 150), cx = W / 2, cy = 56 + (H - 128) / 2;
-    // page flip: the card squashes to a spine and back, the content switches half way
-    let sq = 1, page = c.page;
-    if (c.flip) { const k = c.flip.t / c.flip.dur; sq = Math.abs(Math.cos(k * Math.PI)); if (k < 0.5) page = c.flip.from; }
-    ctx.save(); ctx.translate(cx, cy); ctx.scale(Math.max(0.04, sq), 1); ctx.translate(-cx, -cy);
-    ctx.fillStyle = 'rgba(0,0,0,0.35)'; U.roundRect(ctx, cx - cw / 2 + 6, cy - ch / 2 + 8, cw, ch, 16); ctx.fill();
-    if (page === 0) {
-      // the cover: a little bed under a night sky
-      ctx.fillStyle = '#3b7dd8'; U.roundRect(ctx, cx - cw / 2, cy - ch / 2, cw, ch, 16); ctx.fill();
-      ctx.fillStyle = '#2f64b0'; U.roundRect(ctx, cx - cw / 2, cy - ch / 2, 22, ch, 16); ctx.fill();
-      ctx.fillStyle = '#fff8ee'; U.roundRect(ctx, cx - cw / 2 + 36, cy - ch / 2 + 22, cw - 56, ch - 44, 10); ctx.fill();
-      ctx.fillStyle = '#2b1d14'; ctx.font = r.font(Math.min(30, cw * 0.08)); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText('🛏️ Room Catalog', cx + 8, cy - ch / 2 + 62);
-      const bx = cx + 8, by = cy + 10, bs = Math.min(1.1, ch / 400);
-      ctx.save(); ctx.translate(bx, by); ctx.scale(bs, bs);
-      ctx.fillStyle = '#182040'; U.roundRect(ctx, -110, -80, 220, 70, 10); ctx.fill();
-      ctx.fillStyle = '#ffe08a'; for (let k = 0; k < 9; k++) { const tw = 0.5 + 0.5 * Math.sin(g.time * 3 + k); ctx.globalAlpha = 0.4 + 0.6 * tw; ctx.beginPath(); ctx.arc(-95 + k * 24, -66 + (k % 3) * 16, 2 + tw, 0, Math.PI * 2); ctx.fill(); }
-      ctx.globalAlpha = 1; ctx.fillStyle = '#fff7c2'; ctx.beginPath(); ctx.arc(80, -50, 14, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#182040'; ctx.beginPath(); ctx.arc(74, -54, 12, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#c99a5f'; ctx.fillRect(-110, -10, 220, 70);
-      ctx.save(); ctx.translate(0, 20); ctx.scale(0.55, 0.55); ctx.translate(-(CFG.UPSTAIRS.bed.x0 + CFG.UPSTAIRS.bed.x1) / 2, -(CFG.UPSTAIRS.bed.y0 + CFG.UPSTAIRS.bed.y1) / 2); this.paintBed(ctx, this.owned(g, 'racecar')); ctx.restore();
-      ctx.restore();
-      ctx.fillStyle = '#2b1d14'; ctx.font = r.font(15); ctx.fillText(`${items.length} fun things for your room`, cx + 8, cy + ch / 2 - 72);
-      ctx.fillStyle = '#8a7a6a'; ctx.font = r.font(14); ctx.fillText('Tap ◀ ▶ to turn the pages', cx + 8, cy + ch / 2 - 46);
-    } else {
-      const it = items[page - 1], own = this.owned(g, it.key), afford = g.s.cash >= it.price;
-      ctx.fillStyle = '#fff8ee'; U.roundRect(ctx, cx - cw / 2, cy - ch / 2, cw, ch, 16); ctx.fill();
-      ctx.fillStyle = '#e8dcc4'; U.roundRect(ctx, cx - cw / 2, cy - ch / 2, 14, ch, 16); ctx.fill();
-      ctx.fillStyle = '#2b1d14'; ctx.font = r.font(Math.min(26, cw * 0.072)); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(`${it.ico} ${it.label}`, cx + 6, cy - ch / 2 + 40);
-      // the picture, on a plain board
-      const bw = cw - 60, bh = ch - 170, bx = cx + 6, by = cy - 12;
-      ctx.fillStyle = '#fdf3dc'; U.roundRect(ctx, bx - bw / 2, by - bh / 2, bw, bh, 12); ctx.fill();
-      ctx.strokeStyle = '#e8dcc4'; ctx.lineWidth = 2; U.roundRect(ctx, bx - bw / 2, by - bh / 2, bw, bh, 12); ctx.stroke();
-      ctx.save(); ctx.beginPath(); U.roundRect(ctx, bx - bw / 2, by - bh / 2, bw, bh, 12); ctx.clip();
-      const k = it.view.s * Math.min(1, bh / 260);
-      ctx.translate(bx, by + Math.sin(g.time * 1.4) * 2); ctx.scale(k, k); ctx.translate(-it.spot.x, -it.spot.y - it.view.dy);
-      this.drawItem(r, g, it, 'all');
-      ctx.restore();
-      // price / status
-      const tag = own ? '✅ In your room' : U.money(it.price);
-      ctx.font = r.font(22); const tw = ctx.measureText(tag).width + 28;
-      ctx.fillStyle = own ? '#2f9e44' : afford ? '#1f6e2e' : '#b8401c'; U.roundRect(ctx, cx + 6 - tw / 2, cy + ch / 2 - 74, tw, 34, 17); ctx.fill();
-      ctx.fillStyle = '#fff'; ctx.fillText(tag, cx + 6, cy + ch / 2 - 57);
-      if (c.bought > 0) { ctx.globalAlpha = Math.min(1, c.bought); ctx.fillStyle = '#ffe08a'; ctx.font = r.font(18); ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(43,29,20,0.85)'; const yy = by - bh / 2 + 22 - (1.8 - c.bought) * 10; ctx.strokeText("✨ It's in your room! ✨", bx, yy); ctx.fillText("✨ It's in your room! ✨", bx, yy); ctx.globalAlpha = 1; }
-      if (c.nope > 0) { ctx.globalAlpha = Math.min(1, c.nope); ctx.fillStyle = '#b8401c'; ctx.font = r.font(13); ctx.fillText('Earn more at the pizzeria 🍕', cx + 6, cy + ch / 2 - 32); ctx.globalAlpha = 1; }
-    }
-    // page counter and the arrows
-    ctx.fillStyle = '#8a7a6a'; ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(`${page + 1} / ${n}`, cx + 6, cy + ch / 2 - 16);
+  // ======================= the shop display: an item drawn small on a City shop's stand (js/homeshop.js) =======================
+  // Draws the item `key` centred on (x, y) at `scale`, moving parts and all.
+  drawShopItem(r, g, key, x, y, scale) {
+    const it = CFG.UPSTAIRS.items.find((i) => i.key === key);
+    if (!it) return;
+    const ctx = r.ctx;
+    ctx.save(); ctx.translate(x, y); ctx.scale(scale, scale); ctx.translate(-it.spot.x, -it.spot.y - it.view.dy);
+    this.drawItem(r, g, it, 'all');
     ctx.restore();
-    UI.placeCatalog({ x: cx - cw / 2, y: cy - ch / 2, w: cw, h: ch }, page > 0, page < n - 1);   // the ✕ and ◀ ▶ buttons sit on the card
   },
 
   // ======================= the owner's drawings: one picture per slot, each hung in its own frame =======================

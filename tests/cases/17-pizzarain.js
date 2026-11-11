@@ -39,12 +39,11 @@ module.exports = async (t) => {
   await t.shot('bedroom-door');
   t.expectEq(await t.ev(() => { const M = CFG.PIZZARAIN.MAT_OUT; T.tp(M.x - 60, M.y, 'upstairs'); T.step(2); return T.hint(); }), 'A pizza room! 🍕', 'door hint 60 px away');
   t.expect(await t.ev(() => { const M = CFG.PIZZARAIN.MAT_OUT; T.tp(M.x - 120, M.y, 'upstairs'); T.step(2); return T.hint() !== 'A pizza room! 🍕' && T.label() !== '🍕 Go into the pizza room'; }), 'no door hint or button 120 px away');
-  // not while napping, drawing or reading the catalog
+  // not while napping or drawing
   const busy = await t.ev(() => {
     const M = CFG.PIZZARAIN.MAT_OUT; T.tp(M.x, M.y, 'upstairs'); const st = UpstairsExt.st, out = [];
     st.nap = { phase: 'sleep', t: 0 }; out.push(T.label(), PizzaRainExt.hint(Game)); st.nap = null;
     st.draw.on = true; out.push(T.label(), PizzaRainExt.hint(Game)); st.draw.on = false;
-    st.cat.on = true; out.push(T.label(), PizzaRainExt.hint(Game)); st.cat.on = false;
     return out;
   });
   t.expect(!busy.some((v) => v === '🍕 Go into the pizza room' || (v && v.text === 'A pizza room! 🍕')), `door button and hint stay away while the bedroom is busy (${JSON.stringify(busy)})`);

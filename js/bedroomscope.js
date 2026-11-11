@@ -1,5 +1,5 @@
 'use strict';
-// The bedroom telescope. Once the Telescope is bought from the catalog upstairs it stands by the window; stand next
+// The bedroom telescope. Once the Telescope is bought (at the City bookshop) it stands by the window; stand next
 // to it and press the button to look out over the town. It reuses the Pizza Tower's telescope mechanism
 // (CityExt.scopeStart / scopeUpdate / scopeBegin / scopeEnd in js/city.js): the chef is held at the eyepiece, the
 // stick pans the view with easing and a soft bump at each end, a label says what is in the middle of the view.
@@ -30,12 +30,12 @@ const BedroomScopeExt = {
 
   // ---------- helpers ----------
   spot() { if (!this._spot) { const it = CFG.UPSTAIRS.items.find((i) => i.key === 'telescope'); this._spot = it ? it.spot : { x: 6872, y: 1594 }; } return this._spot; },
-  // in the bedroom, on foot, the telescope bought, and no nap / slide / catalog / drawing pad going on
+  // in the bedroom, on foot, the telescope bought, and no nap / slide / drawing pad going on
   ready(g) {
     if (g.area !== 'upstairs' || g.driving || g.onTrain || g.ride || g.travel || g.fishing) return false;
     if (typeof UpstairsExt === 'undefined' || typeof CityExt === 'undefined' || !UpstairsExt.st || !UpstairsExt.owned(g, 'telescope')) return false;
     const st = UpstairsExt.st;
-    return !(st.nap || st.slide || st.cat.on || st.draw.on);
+    return !(st.nap || st.slide || st.draw.on);
   },
   near(g) { const p = g.player, s = this.spot(); return U.dist(p.x, p.y, s.x, s.y) < CFG.BEDROOMSCOPE.reach; },
   look(g) {

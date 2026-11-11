@@ -79,7 +79,9 @@ module.exports = async (t) => {
     t.expect(r.moved > 80 && r.face === 1 && r.spun > 2, `${kind}: drove east, facing east, wheels turning ${JSON.stringify(r)}`);
     t.expect(r.out && !r.solid && r.still === 0, `${kind}: hopped out on free ground ${JSON.stringify(r)}`);
   }
-  t.expectEq(await t.ev(() => { T.step(10); return document.getElementById('btn-car') && document.getElementById('btn-car').textContent; }), '👻 Drive Grave Digger', 'the vehicle button names the truck');
+  // the button's text is set by UI.update (in the page's own frame loop, not T.step): update it here so the check does not
+  // depend on whether a frame happened to run between the evals
+  t.expectEq(await t.ev(() => { T.step(10); UI.update(0); return document.getElementById('btn-car') && document.getElementById('btn-car').textContent; }), '👻 Drive Grave Digger', 'the vehicle button names the truck');
 
   // ---- drive El Toro through the gate into the arena
   const into = await t.ev(() => {
@@ -231,6 +233,46 @@ module.exports = async (t) => {
   const baby = await t.ev(() => { const R = CFG.MTRUCKS.SITE_RAMPS[0], v = Game.vehicle; MonsterTrucksExt.still(v); v.x = R.x - 200; v.y = R.y; T.steer(1, 0); const n = T.until(() => !!v.air, 200); let top = 0; T.until(() => { top = Math.max(top, v.z); return !v.air; }, 200); T.unsteer(); T.step(10); return { n, top: Math.round(top) }; });
   t.expect(baby.n >= 0 && baby.top > 30, `a little jump on the dirt track ${JSON.stringify(baby)}`);
 
+  // ---- no bouncing in and out: still holding the stick the way you were going after the tunnel / the gate, the truck
+  // drives on AWAY from it (it came out facing away), and only goes back in when you drive in again on purpose
+  const bounce1 = await t.ev(() => {
+    const M = CFG.MTRUCKS, v = Game.vehicle; T.tp(M.ARRIVE.x, M.ARRIVE.y, 'arena');
+    // back in the arena (on foot, by the button) and into the chef's truck, then up the tunnel, holding up all the way
+    const mine = MonsterTrucksExt.st.mine; Game.player.x = mine.x; Game.player.y = mine.y + 30; T.step(1); Game.enterCar(); T.step(1);
+    const d = Game.vehicle; MonsterTrucksExt.still(d); d.x = M.TUNNEL.x; d.y = M.ARRIVE.y + 80; Game.player.x = d.x; Game.player.y = d.y; T.step(1);
+    T.steer(0, -1); const n = T.until(() => Game.area === 'site', 300);
+    const at = { x: Math.round(d.x), y: Math.round(d.y), angle: +d.angle.toFixed(2), inTrig: d.y < M.TRIG.y1 + 1 };
+    T.step(10);
+    return { kind: d.kind, n, at, area: Game.area, x10: Math.round(d.x), vx: Math.round(d.vx) };
+  });
+  t.expect(bounce1.n >= 0 && bounce1.area === 'site', `out through the tunnel ${JSON.stringify(bounce1)}`);
+  t.expect(!bounce1.at.inTrig && Math.abs(bounce1.at.angle) < 0.05, `came out below the gate, facing away from it, along the dirt track ${JSON.stringify(bounce1)}`);
+  t.expect(bounce1.x10 > bounce1.at.x + 30 && bounce1.vx > 100, `still holding up, the truck drives on along the track, away from the gate ${JSON.stringify(bounce1)}`);
+  await t.ev(() => { Game.floats.length = 0; Game.cameraSnap = true; });
+  await t.shot('left-arena');   // (the stick is still held: the page's own frames keep driving it away)
+  const bounce2 = await t.ev(() => {
+    const M = CFG.MTRUCKS, d = Game.vehicle; let flips = 0, last = Game.area;
+    for (let i = 0; i < 120; i++) { T.step(1); if (Game.area !== last) { flips++; last = Game.area; } }   // 2 s more, still holding up
+    const held = { flips, area: Game.area, x: Math.round(d.x), y: Math.round(d.y) };
+    T.unsteer(); T.step(20);
+    // now back in on purpose: up into the gate
+    MonsterTrucksExt.still(d); d.x = M.OUT.x; d.y = M.OUT.y + 10; Game.player.x = d.x; Game.player.y = d.y; T.step(1);
+    T.steer(0, -1); const n = T.until(() => Game.area === 'arena', 400);
+    // arrival side: keep holding up for 2 s, the truck drives on down into the arena and not back up the tunnel
+    const arr = { x: Math.round(d.x), y: Math.round(d.y) }; let flips2 = 0; last = Game.area;
+    for (let i = 0; i < 120; i++) { T.step(1); if (Game.area !== last) { flips2++; last = Game.area; } }
+    const held2 = { flips: flips2, area: Game.area, y: Math.round(d.y) };
+    T.unsteer(); T.step(20);
+    // and back up the tunnel on purpose
+    MonsterTrucksExt.still(d); d.x = M.TUNNEL.x; Game.player.x = d.x; Game.player.y = d.y; T.step(1);
+    T.steer(0, -1); const n2 = T.until(() => Game.area === 'site', 400); T.unsteer(); T.step(20);
+    return { held, n, arr, held2, n2, area: Game.area, driving: Game.driving };
+  });
+  t.expect(bounce2.held.flips === 0 && bounce2.held.area === 'site' && bounce2.held.x > 2694 + 250, `held up for 2 s after leaving: stayed out, drove away along the track ${JSON.stringify(bounce2)}`);
+  t.expect(bounce2.n >= 0, `let go, then drove back into the gate on purpose ${JSON.stringify(bounce2)}`);
+  t.expect(bounce2.held2.flips === 0 && bounce2.held2.area === 'arena' && bounce2.held2.y > bounce2.arr.y + 250, `held up for 2 s after arriving: stayed in the arena, drove away from the tunnel ${JSON.stringify(bounce2)}`);
+  t.expect(bounce2.n2 >= 0 && bounce2.area === 'site' && bounce2.driving, `let go, then drove back up the tunnel on purpose ${JSON.stringify(bounce2)}`);
+
   // ---- on foot: walk in with the button, and out again with the button
   const walk = await t.ev(() => {
     const M = CFG.MTRUCKS; Game.exitCar(); T.tp(M.DOOR.x, M.DOOR.y + 8, 'site'); T.step(2);
@@ -311,4 +353,35 @@ module.exports = async (t) => {
   t.expect(flips[0].flipped && flips[0].dir === 1 && flips[0].turned > 1.9, `the BACKFLIP hill flips the truck backwards ${JSON.stringify(flips)}`);
   t.expect(flips[1].flipped && flips[1].dir === -1 && flips[1].turned > 1.9, `the FRONT FLIP hill flips it forwards ${JSON.stringify(flips)}`);
   t.expect(!flips[2].flipped, `the plain JUMP hill just flies ${JSON.stringify(flips)}`);
+
+  // ---- the hills are easy to hit: from every side, aiming a bit off (the magnet pulls you on), and driving slowly
+  const easy = await t.ev(() => {
+    const E = MonsterTrucksExt, M = CFG.MTRUCKS, F = M.FLOOR, out = [];
+    const tryIt = (rp, ang, off, mag) => {
+      const v = E.trucks[0]; if (Game.driving) Game.exitCar(); T.step(1);
+      // start ~1.9 hill radii out on the side opposite to where we drive, then hold the stick `off` radians off the top
+      const dx = Math.cos(ang), dy = Math.sin(ang), e = Math.hypot(dx / rp.rx, dy / rp.ry), dist = 1.9 / e;
+      E.still(v); v.area = 'arena'; v.x = U.clamp(rp.x - dx * dist, F.x0 + 60, F.x1 - 60); v.y = U.clamp(rp.y - dy * dist, F.y0 + 60, F.y1 - 60); v.angle = ang;
+      T.tp(v.x, v.y + 50, 'arena'); Game.enterCar(); T.step(1);
+      const a = ang + off; T.steer(Math.cos(a) * mag, Math.sin(a) * mag);
+      const n = T.until(() => !!v.air, mag < 0.1 ? 1500 : 420); T.unsteer();
+      T.until(() => !v.air, 300); T.step(30);
+      const inFloor = v.x > F.x0 && v.x < F.x1 && v.y > F.y0 && v.y < F.y1;
+      return { n, inFloor };
+    };
+    M.RAMPS.forEach((rp, i) => {
+      for (let k = 0; k < 8; k++) {
+        const ang = k * Math.PI / 4;
+        for (const off of [0, 0.35, -0.35]) { const r = tryIt(rp, ang, off, 1); out.push({ i, deg: k * 45, off, slow: false, n: r.n, inFloor: r.inFloor }); }
+      }
+      const r = tryIt(rp, 0, 0, 0.22); out.push({ i, deg: 0, off: 0, slow: true, n: r.n, inFloor: r.inFloor });
+      const r2 = tryIt(rp, Math.PI, 0.3, 0.22); out.push({ i, deg: 180, off: 0.3, slow: true, n: r2.n, inFloor: r2.inFloor });
+      const r3 = tryIt(rp, Math.PI / 2, 0, 0.06); out.push({ i, deg: 90, off: 0, crawl: true, n: r3.n, inFloor: r3.inFloor });   // ~16 px/s: no minimum speed
+    });
+    if (Game.driving) Game.exitCar(); T.step(2);
+    return out;
+  });
+  const missed = easy.filter((r) => r.n < 0), offFloor = easy.filter((r) => !r.inFloor);
+  t.expect(missed.length === 0, `every hill launches from every side, aiming a bit off, slowly and at a crawl: missed ${JSON.stringify(missed)}`);
+  t.expect(offFloor.length === 0, `every landing stays on the dirt ${JSON.stringify(offFloor)}`);
 };

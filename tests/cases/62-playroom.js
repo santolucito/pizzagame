@@ -1,7 +1,7 @@
 'use strict';
 // The playroom (js/playroom.js) behind the bedroom: its map in a free rectangle; the green door on the bedroom's north
-// wall (its mat is free floor, reachable from the top of the stairs with and without every catalog item, clear of the
-// catalog spot; button and hint, not while the bedroom is busy); going in (one toast) and back out to the same mat;
+// wall (its mat is free floor, reachable from the top of the stairs with and without every bedroom item bought, clear
+// of the pizza room's door; button and hint, not while the bedroom is busy); going in (one toast) and back out to the same mat;
 // a grid walk from the door mat reaches every toy; the big slide (climb the ladder, "Wheee!", whoosh down the twisty
 // chute with the camera on the chef, into the ball pit, hop out); the ball pit; the trampoline; the toy train (one lap);
 // the castle (crawl in, peekaboo, crawl out); the soft blocks (knock down, stack again); the slide out of the window to
@@ -34,8 +34,8 @@ module.exports = async (t) => {
   t.expectEq(reg.wm, 'town', 'the world map puts the playroom in the town');
   t.expect(reg.save, 'a fresh save has not seen the playroom yet');
 
-  // ---- the door in the bedroom: free floor, reachable from the stairs (with and without every catalog item), clear of
-  // the catalog spot and the pizza room's door
+  // ---- the door in the bedroom: free floor, reachable from the stairs (with and without every bedroom item), clear of
+  // the pizza room's door
   const mat = await t.ev(() => {
     const M = CFG.PLAYROOM.MAT_OUT, U2 = CFG.UPSTAIRS, out = {};
     const reach = () => {
@@ -52,14 +52,13 @@ module.exports = async (t) => {
     out.bare = reach();
     for (const it of U2.items) Game.s.upstairs.owned[it.key] = true;
     out.full = reach();
-    const K = U2.catalog; out.catalog = Math.hypot(M.x - K.x, M.y - K.y); out.catReach = K.reach;
     out.rain = typeof CFG.PIZZARAIN === 'undefined' ? 999 : Math.hypot(M.x - CFG.PIZZARAIN.MAT_OUT.x, M.y - CFG.PIZZARAIN.MAT_OUT.y);
     const D = CFG.PLAYROOM.DOOR_OUT; out.inWall = D.y1 === U2.room.y0 && D.x0 > U2.table.x1 && D.x1 < U2.wardrobe.x0;
     return out;
   });
   t.expect(mat.bare.free && mat.bare.reached, 'the bedroom mat is free floor, reachable from the top of the stairs');
-  t.expect(mat.full.free && mat.full.reached, 'still reachable with every catalog item bought');
-  t.expect(mat.catalog > mat.catReach && mat.rain > 150, `the mat is clear of the catalog spot (${mat.catalog.toFixed(0)} px) and the pizza room door`);
+  t.expect(mat.full.free && mat.full.reached, 'still reachable with every bedroom item bought');
+  t.expect(mat.rain > 150, 'the mat is clear of the pizza room door');
   t.expect(mat.inWall, 'the door sits in the north wall between the bedside table and the wardrobe');
 
   await t.ev(() => { const M = CFG.PLAYROOM.MAT_OUT; T.tp(M.x, M.y, 'upstairs'); T.step(2); Render.setZoom && Render.setZoom(1.6); Game.cameraSnap = true; T.step(1); });
@@ -70,17 +69,14 @@ module.exports = async (t) => {
     const M = CFG.PLAYROOM.MAT_OUT, out = {};
     T.tp(M.x + 20, M.y + 45, 'upstairs'); out.near = Game.hint && { text: Game.hint.text, target: !!Game.hint.target };
     T.tp(M.x + 40, M.y + 80, 'upstairs'); out.far = T.hint(); out.farLabel = T.label();
-    const K = CFG.UPSTAIRS.catalog; T.tp(K.x, K.y + 20, "upstairs"); out.cat = T.label(); out.catHint = T.hint();
     const st = UpstairsExt.st; T.tp(M.x, M.y, 'upstairs');
     st.nap = { phase: 'sleep', t: 0 }; out.nap = [T.label(), PlayroomExt.hint(Game)]; st.nap = null;
-    st.cat.on = true; out.catOn = [T.label(), PlayroomExt.hint(Game)]; st.cat.on = false;
+    st.draw.on = true; out.drawOn = [T.label(), PlayroomExt.hint(Game)]; st.draw.on = false;
     return out;
   });
   t.expect(far.near && far.near.text === 'A playroom! 🛝' && far.near.target, 'walking up, the hint points at the door');
   t.expect(far.far !== 'A playroom! 🛝' && far.farLabel !== '🚪 Go to the playroom', 'no door hint or button 90 px away');
-  t.expectEq(far.cat, '📖 Open the catalog', 'the catalog still opens from its own spot');
-  t.expect(far.catHint !== 'A playroom! 🛝', 'and the catalog spot keeps its own hint');
-  t.expect(far.nap[0] !== '🚪 Go to the playroom' && !far.nap[1] && far.catOn[0] !== '🚪 Go to the playroom' && !far.catOn[1], 'no door while napping or reading the catalog');
+  t.expect(far.nap[0] !== '🚪 Go to the playroom' && !far.nap[1] && far.drawOn[0] !== '🚪 Go to the playroom' && !far.drawOn[1], 'no door while napping or drawing');
 
   // ---- go in
   const inside = await t.ev(() => { const M = CFG.PLAYROOM.MAT_OUT; T.tp(M.x, M.y, 'upstairs'); T.toasts.length = 0; T.act(); T.step(2); const E = CFG.PLAYROOM.EXIT; return { area: Game.area, d: Math.hypot(Game.player.x - E.x, Game.player.y - E.y), label: T.label(), hint: Game.hint && { text: Game.hint.text, target: Game.hint.target }, toasts: T.toasts.slice(), seen: Game.s.playroom.seen }; });

@@ -33,6 +33,10 @@ CFG.MTRUCKS = {
   DOOR_R: 70,
   TRIG: { x0: 2608, x1: 2780, y0: 1140, y1: 1208 },     // a monster truck driven into this box (up under the arch) goes in
   OUT: { x: 2694, y: 1254 },                            // where a truck comes back out (the chef on foot: just under the arch)
+  // after going through the gate or the tunnel: no going straight back (see gateTurn): the truck rolls out facing away
+  // (OUT_DIR at the dirt track: east along it, the map ends just below the gate; ARRIVE_DIR in the arena: down onto the
+  // dirt), and the way through only works again GATE_CD seconds later, once the truck is GATE_CLEAR px clear of the trigger
+  OUT_DIR: 0, ARRIVE_DIR: Math.PI / 2, GATE_CD: 1, GATE_CLEAR: 30, ROLL_OUT: 150,
   PARK: { eltoro: { x: 2904, y: 1110 }, gravedigger: { x: 2904, y: 1262 } },   // the two bays (both nose to the gate)
   SITE_RAMPS: [{ x: 3080, y: 1074, rx: 46, ry: 24, h: 14, vz: 330 }, { x: 3080, y: 1246, rx: 46, ry: 24, h: 14, vz: 330 }],
   // ---- the arena
@@ -45,16 +49,21 @@ CFG.MTRUCKS = {
   RAMPS: [
     // each big hill has its own jump: the BACKFLIP hill flips you backwards, the FRONT FLIP hill forwards (both by
     // themselves), and the plain JUMP hill just flies you (onto the cars), where the 🔄 button can still do a backflip
-    { x: 36720, y: 5640, rx: 100, ry: 64, h: 36, vz: 560, trick: 'back' },
-    { x: 37780, y: 5640, rx: 100, ry: 64, h: 36, vz: 560, trick: 'front' },
-    { x: 36700, y: 6090, rx: 92, ry: 58, h: 32, vz: 520 },   // this one flies you onto the cars
+    // (big and easy to hit for small hands: launched from anywhere on the inner CREST of the hill, from any side, at any
+    // speed, and a driven truck heading roughly at one is pulled onto it: MAGNET)
+    { x: 36720, y: 5640, rx: 135, ry: 86, h: 38, vz: 560, trick: 'back' },
+    { x: 37780, y: 5640, rx: 135, ry: 86, h: 38, vz: 560, trick: 'front' },
+    { x: 36700, y: 6090, rx: 120, ry: 76, h: 34, vz: 520 },   // this one flies you onto the cars
   ],
   CARS: { y: 6090, xs: [37000, 37150, 37300, 37450, 37600], colors: ['#c0504d', '#4f81bd', '#8fbf4f', '#e8b84a', '#9a6bc0'], HX: 62, HY: 34 },
   REFILL: 6,                                            // seconds a crushed car lies there before the forklift comes
   FORK: { x: 38300, y: 6176, speed: 340, reach: 74, PARK: { x: 38236, y: 6176 } },   // the service door in the east wall (the forklift
                                                         // waits just inside it and drives along the row's front)
   AI: { speed: 230, pause: 150, start: 3, path: [[36230, 5640], [37250, 5640], [38080, 5640], [38080, 6240], [37250, 6240], [36230, 6240]] },
-  G: 1100, LAUNCH_MIN: 280, CREST: 0.35, MIN_SPEED: 110,   // gravity, launch speed, how near the hill's top it launches
+  G: 1100, LAUNCH_MIN: 280, CREST: 0.6,   // gravity, launch speed, how near the hill's top it launches (at any speed)
+  // the arena hills' magnet: within REACH (in hill radii) and heading within COS of the hill's top, a driven truck is
+  // slid sideways onto it at up to PULL px/s
+  MAGNET: { REACH: 2.3, COS: 0.55, PULL: 240 },
   WHEELIE: 2.4, DONUT: 1.8, FLIP: 0.95,                 // seconds
   WR: 38, WB: 56,                                       // tyre radius, half the wheelbase (the chef is ~70 px tall)
   LABELS: { wheelie: '🤸 Wheelie', donut: '🍩 Donut', flip: '🔄 Backflip' },
@@ -77,6 +86,7 @@ const MonsterTrucksExt = {
     this.trucks = this.KINDS.map((k) => this.newTruck(k));
     this.st = {
       lastArea: null, mine: this.trucks[0], next: 'wheelie', fade: 0, cheer: 0, roarCd: 0, rescueT: 0,
+      armed: true, gateCd: 0, turn: null,   // the gate / tunnel trigger (re-armed once clear of it), the turned-around stick
       dust: [], sparks: [], confetti: [], pops: [], marks: [],
       // the forklift: waits by its door; brings a fresh car for each crushed one (fetch → in → swap → out → home); drivable
       fork: { kind: 'forklift', x: M.FORK.PARK.x, y: M.FORK.PARK.y, angle: Math.PI, vx: 0, vy: 0, face: -1, phase: 'parked', car: null, t: 0, load: null, swapped: false, lift: 0, liftTo: 0 },
@@ -118,9 +128,10 @@ const MonsterTrucksExt = {
     }
   },
   enterArena(g, v) {
-    const M = CFG.MTRUCKS, st = this.st;
+    const M = CFG.MTRUCKS, st = this.st, sp0 = v ? Math.hypot(v.vx, v.vy) : 0;
     g.area = 'arena';
-    if (v) { this.still(v); v.area = 'arena'; v.x = M.ARRIVE.x; v.y = M.ARRIVE.y + 12; v.angle = Math.PI / 2; v.face = 1; v.ai = false; st.mine = v; }
+    if (v) { this.still(v); v.area = 'arena'; v.x = M.ARRIVE.x; v.y = M.ARRIVE.y + 12; v.angle = M.ARRIVE_DIR; v.face = 1; v.ai = false; st.mine = v; }
+    this.gateTurn(g, v, sp0, M.ARRIVE_DIR);
     g.player.x = M.ARRIVE.x; g.player.y = M.ARRIVE.y + (v ? 12 : 0); g.player.moving = false; g.player.hasMoved = true;
     this.populateArena(g); st.lastArea = 'arena';
     g.cameraSnap = true; st.fade = 0.6; st.cheer = 1;
@@ -129,14 +140,65 @@ const MonsterTrucksExt = {
     this.roar(true);
   },
   leaveArena(g, v) {
-    const M = CFG.MTRUCKS, st = this.st;
+    const M = CFG.MTRUCKS, st = this.st, sp0 = v ? Math.hypot(v.vx, v.vy) : 0;
     g.area = 'site';
-    if (v) { this.still(v); v.area = 'site'; v.x = M.OUT.x; v.y = M.OUT.y; v.angle = Math.PI / 2; v.face = 1; v.ai = false; }
+    if (v) { this.still(v); v.area = 'site'; v.x = M.OUT.x; v.y = M.OUT.y; v.angle = M.OUT_DIR; v.face = 1; v.ai = false; }
+    this.gateTurn(g, v, sp0, M.OUT_DIR);
     for (const t of this.trucks) if (t !== v) this.park(t);
     g.player.x = M.OUT.x; g.player.y = v ? M.OUT.y : M.DOOR.y + 22; g.player.moving = false; g.player.hasMoved = true;
     st.lastArea = 'site';
     g.cameraSnap = true; st.fade = 0.6;
   },
+  // Just through the gate or the tunnel (both are driven into going UP the screen): no bouncing straight back in. The
+  // truck comes out already rolling away from it (dir: the angle it rolls out at), and if the stick is still held the way
+  // it was going, the stick is TURNED for a while: holding it the same way keeps the truck driving out along `dir`, until
+  // the stick is let go or pushed another way (then it is the normal stick again). The trigger itself is disarmed for
+  // GATE_CD seconds and until the truck is clear of it.
+  gateTurn(g, v, sp0, dir) {
+    const M = CFG.MTRUCKS, st = this.st;
+    st.armed = false; st.gateCd = M.GATE_CD; st.turn = null;
+    if (!v) return;
+    const rs = U.clamp(sp0 * 0.8, M.ROLL_OUT, CFG.VEHICLES[v.kind].speed);
+    v.vx = Math.cos(dir) * rs; v.vy = Math.sin(dir) * rs;
+    const a = Input.axis(), m = Math.hypot(a.x, a.y);
+    if (m > 0.2) st.turn = { v, area: g.area, dx: a.x / m, dy: a.y / m, rot: dir - Math.atan2(a.y, a.x), t: 0, snap: null };
+  },
+  clearOfGate(g, x, y) {
+    const M = CFG.MTRUCKS, C = M.GATE_CLEAR;
+    if (g.area === 'site') { const T = M.TRIG; return x < T.x0 - C || x > T.x1 + C || y < T.y0 - C || y > T.y1 + C; }
+    if (g.area === 'arena') return Math.abs(x - M.TUNNEL.x) > M.TUNNEL.half + 10 + C || y > M.TUNNEL_TRIG + C;
+    return true;
+  },
+  // runs first thing in update, right after Game.updateDriving moved the truck with the plain stick: while the stick is
+  // turned, that move is undone and the truck is driven again with the turned stick (the same physics as updateDriving)
+  stepGate(g, d, dt) {
+    const st = this.st, tn = st.turn;
+    if (tn) {
+      tn.t += dt;
+      const a = Input.axis(), m = Math.hypot(a.x, a.y);
+      if (d !== tn.v || g.area !== tn.area || (tn.snap && U.dist(d.x, d.y, tn.snap.x, tn.snap.y) > 40)) st.turn = null;   // (or put somewhere else)
+      else if (tn.t > 0.3 && (m < 0.2 || (a.x * tn.dx + a.y * tn.dy) / m < 0.5)) st.turn = null;   // let go, or a new way
+      else if (tn.snap) { Object.assign(d, tn.snap); this.turnedDrive(g, d, a, tn.rot, dt); }
+    }
+    st.gateCd = Math.max(0, st.gateCd - dt);
+    const w = d || g.player;
+    if (!st.armed && st.gateCd <= 0 && !st.turn && this.clearOfGate(g, w.x, w.y)) st.armed = true;
+  },
+  turnedDrive(g, c, a, rot, dt) {
+    const spec = CFG.VEHICLES[c.kind], sp = spec.speed, cs = Math.cos(rot), sn = Math.sin(rot);
+    const ax = a.x * cs - a.y * sn, ay = a.x * sn + a.y * cs;
+    const k = (a.x || a.y) ? 1 - Math.pow(0.02, dt) : 1 - Math.pow(0.001, dt);
+    c.vx += (ax * sp - c.vx) * k; c.vy += (ay * sp - c.vy) * k;
+    const speed = Math.hypot(c.vx, c.vy);
+    if (speed > 15) { let dA = Math.atan2(c.vy, c.vx) - c.angle; while (dA > Math.PI) dA -= Math.PI * 2; while (dA < -Math.PI) dA += Math.PI * 2; c.angle += dA * Math.min(1, dt * 10); }
+    const r = spec.radius, w = g.bounds(), obs = g.townObstacles(true);
+    c.x = U.clamp(c.x + c.vx * dt, w.x0 + 30, w.x1 - 30);
+    for (const o of obs) if (o.w && g.hitRect(c.x, c.y, r, o)) { c.x = c.vx > 0 ? o.x - r : o.x + o.w + r; c.vx = 0; }
+    c.y = U.clamp(c.y + c.vy * dt, Math.max(w.y0 + 30, g.walkTop() + r - 12), w.y1 - 30);
+    for (const o of obs) if (o.w && g.hitRect(c.x, c.y, r, o)) { c.y = c.vy > 0 ? o.y - r : o.y + o.h + r; c.vy = 0; }
+    g.player.x = c.x; g.player.y = c.y; g.player.moving = speed > 15;
+  },
+  snapTurn(d) { const tn = this.st.turn; if (tn && d === tn.v) tn.snap = { x: d.x, y: d.y, vx: d.vx, vy: d.vy, angle: d.angle }; },
 
   // ================= update =================
   update(g, dt) {
@@ -147,13 +209,14 @@ const MonsterTrucksExt = {
     if (g.area !== st.lastArea) {
       if (g.area === 'arena') this.populateArena(g);
       else if (st.lastArea === 'arena') for (const v of this.trucks) if (v !== d) this.park(v);
-      st.lastArea = g.area;
+      st.lastArea = g.area; st.armed = false; st.turn = null;
     }
     st.fade = Math.max(0, st.fade - dt); st.cheer = Math.max(0, st.cheer - dt * 0.3); st.roarCd -= dt;
     this.stepBits(dt);
     this.stepCars(g, dt);
-    if (g.area !== 'site' && g.area !== 'arena') return;
+    if (g.area !== 'site' && g.area !== 'arena') { st.turn = null; return; }
     if (g.travel) return;
+    this.stepGate(g, d, dt);
     // in the arena the truck that is not the chef's does the show
     if (g.area === 'arena') for (const v of this.trucks) {
       if (v.area !== 'arena') continue;
@@ -163,8 +226,8 @@ const MonsterTrucksExt = {
     } else for (const v of this.trucks) v.ai = false;
     for (const v of this.trucks) if (v.area === g.area) this.stepTruck(g, v, dt, v === d);
     if (g.area === 'arena') this.crushCheck(g, d);
-    // through the gate / the tunnel with a truck
-    if (d && !d.air && !d.donut) {
+    // through the gate / the tunnel with a truck (not straight back the way it just came: stepGate)
+    if (d && st.armed && !d.air && !d.donut) {
       const T = M.TRIG;
       if (g.area === 'site' && d.x > T.x0 && d.x < T.x1 && d.y > T.y0 && d.y < T.y1) this.enterArena(g, d);
       else if (g.area === 'arena' && Math.abs(d.x - M.TUNNEL.x) < M.TUNNEL.half + 10 && d.y < M.TUNNEL_TRIG) this.leaveArena(g, d);
@@ -172,6 +235,7 @@ const MonsterTrucksExt = {
     // rescues, twice a second: a chef or a truck stuck inside a wall goes somewhere free
     st.rescueT -= dt;
     if (st.rescueT <= 0) { st.rescueT = 0.5; this.rescue(g); }
+    this.snapTurn(this.driven(g));
   },
   nearestWp(v) { const P = CFG.MTRUCKS.AI.path; let bi = 0, bd = Infinity; P.forEach((w, i) => { const dd = U.dist(v.x, v.y, w[0], w[1]); if (dd < bd) { bd = dd; bi = i; } }); return bi; },
 
@@ -210,8 +274,9 @@ const MonsterTrucksExt = {
       const gz = this.groundZ(g, v.x, v.y);
       if (v.z <= gz && v.vz < 0) this.land(g, v, driven, gz);
     } else {
+      if (driven && g.area === 'arena' && !v.donut && v.launchCd <= 0 && sp > 1) this.magnet(g, v, sp, dt);
       const h = this.rampAt(g, v.x, v.y);
-      if (h && h.d < M.CREST && sp > M.MIN_SPEED && !v.donut && v.launchCd <= 0) this.launch(g, v, h.ramp, sp, driven);
+      if (h && h.d < M.CREST && sp > 1 && !v.donut && v.launchCd <= 0) this.launch(g, v, h.ramp, sp, driven);
       else { const gz = h ? h.ramp.h * (1 - h.d * h.d) : 0; v.z += (gz - v.z) * Math.min(1, dt * 18); }
     }
     // which way it faces (a little hysteresis so driving straight up the screen does not flicker)
@@ -260,6 +325,19 @@ const MonsterTrucksExt = {
       this.startFlip(g, v, driven, ramp.trick === 'front' ? -1 : 1);
       this.pop(v.x, v.y - 200, ramp.trick === 'front' ? 'FRONT FLIP! 🔃' : 'BACKFLIP! 🔄', '#ffe08a', 1.1);
     } else if (v.ai && g.area === 'arena' && Math.random() < 0.55) this.startFlip(g, v, false);
+  },
+  // a driven truck heading roughly at an arena hill is slid sideways onto its top (a joystick in small hands wobbles)
+  magnet(g, v, sp, dt) {
+    const A = CFG.MTRUCKS.MAGNET, hx = v.vx / sp, hy = v.vy / sp;
+    let best = null, be = A.REACH;
+    for (const r of CFG.MTRUCKS.RAMPS) { const e = Math.hypot((v.x - r.x) / r.rx, (v.y - r.y) / r.ry); if (e < be) { be = e; best = r; } }
+    if (!best || be < CFG.MTRUCKS.CREST * 0.5) return;
+    const tx = best.x - v.x, ty = best.y - v.y, td = Math.hypot(tx, ty);
+    if (td < 1 || (tx * hx + ty * hy) / td < A.COS) return;
+    const along = tx * hx + ty * hy, px = tx - along * hx, py = ty - along * hy, pd = Math.hypot(px, py);
+    if (pd < 0.5) return;
+    const step = Math.min(pd, A.PULL * dt);
+    v.x += px / pd * step; v.y += py / pd * step;
   },
   // seconds until a flying truck is down again (from its height and climb)
   airLeft(v) { const G = CFG.MTRUCKS.G; return (v.vz + Math.sqrt(Math.max(0, v.vz * v.vz + 2 * G * v.z))) / G; },
@@ -456,6 +534,7 @@ const MonsterTrucksExt = {
       return { text: 'Hop in a monster truck! 🐂👻', target: U.dist(p.x, p.y, v.x, v.y) < 70 ? null : v };
     }
     if (g.area === 'site') {
+      if (d && !this.st.armed) return { text: 'Back at the dirt track! Jump the little hills 🏁', target: null };   // just came out
       if (d) return { text: 'Drive into the big gate to the arena! 🏟️', target: U.dist(p.x, p.y, M.DOOR.x, M.DOOR.y) < 100 ? null : M.DOOR };
       if (g.driving) return undefined;
       if (U.dist(p.x, p.y, M.DOOR.x, M.DOOR.y) < M.DOOR_R) return { text: 'The Monster Truck Arena! 🏟️', target: null };
@@ -466,7 +545,7 @@ const MonsterTrucksExt = {
   home(g) {
     if (!this.trucks) return;
     for (const v of this.trucks) this.park(v);
-    const st = this.st, f = st.fork; Object.assign(f, { x: CFG.MTRUCKS.FORK.PARK.x, y: CFG.MTRUCKS.FORK.PARK.y, angle: Math.PI, vx: 0, vy: 0, face: -1, phase: 'parked', car: null, load: null, lift: 0, liftTo: 0 }); st.fade = 0; st.dust = []; st.sparks = []; st.confetti = []; st.pops = []; st.mine = this.trucks[0]; st.next = 'wheelie';
+    const st = this.st, f = st.fork; st.turn = null; st.armed = true; st.gateCd = 0; Object.assign(f, { x: CFG.MTRUCKS.FORK.PARK.x, y: CFG.MTRUCKS.FORK.PARK.y, angle: Math.PI, vx: 0, vy: 0, face: -1, phase: 'parked', car: null, load: null, lift: 0, liftTo: 0 }); st.fade = 0; st.dust = []; st.sparks = []; st.confetti = []; st.pops = []; st.mine = this.trucks[0]; st.next = 'wheelie';
     for (const c of st.cars) { c.flat = false; c.flatT = 0; }
   },
 

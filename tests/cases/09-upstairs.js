@@ -1,54 +1,32 @@
 'use strict';
-// The bedroom upstairs: the decoration catalog (open, flip, buy), the drawing pad at the desk (draw, hang it on
-// the wall, close) and the drawing surviving a reload.
+// The bedroom upstairs: no catalog any more (things are bought in the City shops, see 67-homeshop; the room still
+// draws and rebuilds what is owned), the bean bag, the drawing pad at the desk (draw, hang it on the wall, close)
+// and the drawing surviving a reload.
 module.exports = async (t) => {
   await t.boot();
   const C = await t.ev(() => CFG.UPSTAIRS);
+
+  // ---- the office stairs, close up (they should read as climbing UP to the east)
+  await t.ev(() => { const L = CFG.UPSTAIRS.STAIRS.landing; Render.setZoom(2.2); T.tp(L.x - 70, L.y + 6, 'town'); Game.cameraSnap = true; T.step(2); });
+  await t.shot('stairs-closeup');
+  await t.ev(() => { Render.setZoom(1); Game.cameraSnap = true; T.step(1); });
 
   // ---- up the office stairs
   await t.ev(() => { const L = CFG.UPSTAIRS.STAIRS.landing; T.tp(L.x, L.y, 'town'); T.act(); T.step(30); });
   t.expectEq(await t.ev(() => Game.area), 'upstairs', 'in the bedroom');
 
-  // ---- the catalog on the bedside table
-  await t.ev(() => { const c = CFG.UPSTAIRS.catalog; T.tp(c.x, c.y + 20); Game.s.cash = 5000; });
-  t.expectEq(await t.ev(() => T.label()), '📖 Open the catalog', 'catalog label by the bedside table');
-  t.expectEq(await t.ev(() => T.hint()), 'Open the catalog to decorate 📖', 'catalog hint');
+  // ---- no catalog on the bedside table any more: the things are sold in the City shops
+  await t.ev(() => { const T2 = CFG.UPSTAIRS.table; T.tp((T2.x0 + T2.x1) / 2, T2.y1 + 16); Game.s.cash = 5000; });
+  t.expect(await t.ev(() => !/catalog/i.test(T.label() || '') && !/catalog/i.test(T.hint() || '')), 'no catalog button or hint by the bedside table');
+  t.expect(await t.ev(() => CFG.UPSTAIRS.catalog === undefined && !CFG.UPSTAIRS.items.some((i) => i.key === 'hamster')), 'no catalog spot, no hamster wheel');
+  // owning something (as a City shop would set it) rebuilds the room with it
   const keyBefore = await t.ev(() => UpstairsExt.bgKey(Game));
-  await t.ev(() => T.act());
-  t.expect(await t.ev(() => UpstairsExt.st.cat.on && UpstairsExt.st.cat.page === 0), 'catalog opens on the cover');
-  t.expectEq(await t.ev(() => T.label()), '📖 Open it up!', 'cover action turns to the first page');
-  // the controls are DOM buttons on the card: the X on its top-right corner, the arrows on its sides, under the HUD
-  await t.wait(150);
-  const ctl = await t.ev(() => { const r = (id) => document.getElementById(id).getBoundingClientRect(); const c = r('cat-close'), p = r('cat-prev'), n = r('cat-next'), W = innerWidth; return { shown: !document.getElementById('catalog-ctl').classList.contains('hidden'), closeRight: c.left > W / 2, closeTop: c.top > 40 && c.top < innerHeight / 2, prevLeft: p.left < W / 2, nextRight: n.left > W / 2, prevOff: document.getElementById('cat-prev').disabled, nextOn: !document.getElementById('cat-next').disabled }; });
-  t.expect(ctl.shown && ctl.closeRight && ctl.closeTop && ctl.prevLeft && ctl.nextRight && ctl.prevOff && ctl.nextOn, `catalog buttons sit on the card (${JSON.stringify(ctl)})`);
-  t.expectEq(await t.ev(() => T.hint()), null, 'no hint while reading');
-  await t.shot('catalog-cover');
-  // frozen while reading
-  const held = await t.ev(() => { const x = Game.player.x; T.steer(0, -1); T.step(40); T.unsteer(); T.step(2); return Math.abs(Game.player.x - x) < 0.01; });
-  t.expect(held, 'the chef stays put while the catalog is open');
-  // walking does not turn pages any more
-  await t.ev(() => { T.steer(1, 0); T.step(10); T.unsteer(); T.step(25); T.steer(0, 1); T.step(10); T.unsteer(); T.step(2); });
-  t.expect(await t.ev(() => UpstairsExt.st.cat.on && UpstairsExt.st.cat.page === 0), 'the joystick neither turns pages nor closes the catalog');
-  // flip to the second item with the ▶ button (two taps), the flip animation finishing between taps
-  await t.ev(() => { document.getElementById('cat-next').click(); T.step(25); document.getElementById('cat-next').click(); T.step(25); });
-  const page = await t.ev(() => UpstairsExt.st.cat.page);
-  t.expectEq(page, 2, 'two pages to the right');
-  const item = C.items[page - 1];
-  t.expectEq(await t.ev(() => T.label()), '🛒 Buy for ' + await t.ev((p) => U.money(p), item.price), 'buy label with enough cash');
-  await t.shot('catalog-item');
-  await t.ev(() => T.act());
-  t.expect(await t.ev((k) => !!Game.s.upstairs.owned[k], item.key), `bought the ${item.label}`);
-  t.expectEq(await t.ev(() => Math.round(Game.s.cash)), 5000 - item.price, 'paid for it');
-  t.expectEq(await t.ev(() => T.label()), '✅ You have this one!', 'owned label after buying');
+  await t.ev(() => { Game.s.upstairs.owned.horse = true; Game.s.upstairs.owned.fish = true; T.step(2); });
   t.expect(await t.ev(() => UpstairsExt.bgKey(Game)) !== keyBefore, 'bgKey changes once something is owned');
-  // too poor on the next page
-  await t.ev(() => { document.getElementById('cat-next').click(); T.step(25); Game.s.cash = 10; });
-  t.expect((await t.ev(() => T.label())).startsWith('💰 Need'), 'need-more label when poor');
-  // ◀ goes back, the X closes
-  await t.ev(() => { document.getElementById('cat-prev').click(); T.step(25); });
-  t.expectEq(await t.ev(() => UpstairsExt.st.cat.page), 2, 'the ◀ button turns back a page');
-  await t.ev(() => { document.getElementById('cat-close').click(); T.step(2); });
-  t.expect(await t.ev(() => !UpstairsExt.st.cat.on && document.getElementById('catalog-ctl').classList.contains('hidden')), 'the X closes the catalog and hides the buttons');
+  // an old save's hamster wheel is ignored: not drawn into the key, not solid
+  const keyHam = await t.ev(() => { const k = UpstairsExt.bgKey(Game); Game.s.upstairs.owned.hamster = true; T.step(1); return k; });
+  t.expectEq(await t.ev(() => UpstairsExt.bgKey(Game)), keyHam, 'an owned hamster wheel changes nothing');
+  t.expect(await t.ev(() => !UpstairsExt.roomBlocks().some((o) => o.x === 6786 && o.y === 1784)), 'and it is not solid');
   await t.ev(() => { Game.s.cash = 5000; T.step(20); });
   await t.shot('room-bought');
 
@@ -170,7 +148,7 @@ module.exports = async (t) => {
   await t.reload();
   const kept = await t.ev(() => ({ url: Game.s.upstairs.drawing, owned: Object.keys(Game.s.upstairs.owned) }));
   t.expect(typeof kept.url === 'string' && kept.url.startsWith('data:image/png'), 'drawing persisted across reload');
-  t.expect(kept.owned.includes(item.key), 'purchase persisted across reload');
+  t.expect(kept.owned.includes('horse') && kept.owned.includes('fish'), 'owned things persisted across reload');
   await t.page.waitForFunction(() => UpstairsExt.img && UpstairsExt.img.ok, null, { timeout: 5000 });
   // reopening the pad shows the saved picture, ready to touch up
   await t.ev(() => { const ch = CFG.UPSTAIRS.chair; T.tp(ch.x - 24, ch.y, 'upstairs'); T.act(); });

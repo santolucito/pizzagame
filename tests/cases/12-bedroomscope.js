@@ -1,5 +1,5 @@
 'use strict';
-// The bedroom telescope: once bought from the catalog it stands by the window upstairs; stand next to it to look
+// The bedroom telescope: once bought (at the City bookshop) it stands by the window upstairs; stand next to it to look
 // out over the town with the same mechanism as the Pizza Tower's rooftop telescope (the chef held at the eyepiece,
 // the stick panning the view). Also checks the City's own telescope still works after the mechanism was shared.
 const path = require('path');
@@ -10,14 +10,14 @@ module.exports = async (t) => {
   await load();
   t.expect(await t.ev(() => Game.ext.indexOf(BedroomScopeExt) < Game.ext.indexOf(CityExt) && Render.ext.includes(BedroomScopeExt)), 'registered first in Game.ext and in Render.ext');
   const spot = await t.ev(() => BedroomScopeExt.spot());
-  t.expectEq([spot.x, spot.y].join(','), '6872,1594', 'the telescope spot is the catalog item by the window');
+  t.expectEq([spot.x, spot.y].join(','), '6872,1594', 'the telescope spot is the bedroom item by the window');
 
   // ---- not bought yet: nothing offered by the window
   await t.ev((s) => { Game.s.cash = 5000; T.tp(s.x, s.y + 28, 'upstairs'); T.step(2); }, spot);
   t.expect(await t.ev(() => T.label() !== '🔭 Look through the telescope'), 'no telescope button before buying it');
   t.expect(await t.ev(() => T.hint() !== 'Look through the telescope! 🔭'), 'no telescope hint before buying it');
 
-  // ---- own it (as the catalog would) and stand by it
+  // ---- own it (as the bookshop's stand would) and stand by it
   const keyBefore = await t.ev(() => UpstairsExt.bgKey(Game));
   await t.ev((s) => { Game.s.upstairs.owned.telescope = true; T.tp(s.x, s.y + 28, 'upstairs'); T.step(2); }, spot);
   t.expect(await t.ev(() => UpstairsExt.bgKey(Game)) !== keyBefore, 'the room rebuilds with the telescope in it');
@@ -71,10 +71,9 @@ module.exports = async (t) => {
   const walk = await t.ev(() => { const x = Game.player.x; T.steer(-1, 0); T.step(20); T.unsteer(); return x - Game.player.x; });
   t.expect(walk > 10, 'the chef can walk away after looking');
 
-  // ---- the room's own scenes win: no telescope button while the catalog is open
-  await t.ev((s) => { T.tp(s.x, s.y + 28, 'upstairs'); T.step(1); UpstairsExt.st.cat.on = true; UpstairsExt.st.cat.hold = { x: Game.player.x, y: Game.player.y }; T.step(1); }, spot);
-  t.expect(await t.ev(() => T.label() !== '🔭 Look through the telescope'), 'no telescope button while the catalog is open');
-  await t.ev(() => { UpstairsExt.st.cat.on = false; UpstairsExt.st.cat.hold = null; T.step(1); });
+  // ---- the room's own scenes win: no telescope button while the drawing pad is open (checked without stepping)
+  await t.ev((s) => { T.tp(s.x, s.y + 28, 'upstairs'); T.step(1); }, spot);
+  t.expect(await t.ev(() => { UpstairsExt.st.draw.on = true; const l = T.label(); UpstairsExt.st.draw.on = false; return l !== '🔭 Look through the telescope'; }), 'no telescope button while the drawing pad is open');
 
   // ---- Take me home while looking clears the view
   await t.ev((s) => { T.tp(s.x, s.y + 28, 'upstairs'); T.step(2); T.act(); T.step(5); }, spot);

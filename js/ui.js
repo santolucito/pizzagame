@@ -89,7 +89,7 @@ const UI = {
     setTimeout(() => el.remove(), 4200);
   },
   toggleCar() { if (Game.driving) Game.exitCar(); else Game.enterCar(); },
-  // ---- catalog controls (used by the cabin and bedroom catalogs): handlers { prev, next, close }, then placeCatalog each frame
+  // ---- catalog controls (used by the bookshop's picture book): handlers { prev, next, close }, then placeCatalog each frame
   catalog: null,
   openCatalog(handlers) { this.catalog = handlers; this.els.catCtl.classList.remove('hidden'); },
   closeCatalog() { this.catalog = null; this.els.catCtl.classList.add('hidden'); },

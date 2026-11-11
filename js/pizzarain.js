@@ -83,11 +83,11 @@ const PizzaRainExt = {
     if (typeof CityExt !== 'undefined' && (CityExt.floor || (CityExt.st && (CityExt.st.cab || CityExt.st.boarding)))) return false;
     return true;
   },
-  // in the bedroom with nothing going on there (no nap, no slide, no catalog, no drawing pad)
+  // in the bedroom with nothing going on there (no nap, no slide, no drawing pad)
   bedroomOk(g) {
     if (g.area !== 'upstairs' || typeof UpstairsExt === 'undefined' || !UpstairsExt.st) return false;
     const st = UpstairsExt.st;
-    return !(st.nap || st.slide || st.cat.on || st.draw.on);
+    return !(st.nap || st.slide || st.draw.on);
   },
   atMat(g) { const p = g.player, M = CFG.PIZZARAIN.MAT_OUT; return U.dist(p.x, p.y, M.x, M.y) < CFG.PIZZARAIN.reach; },
   atExit(g) { const p = g.player, E = CFG.PIZZARAIN.EXIT; return U.dist(p.x, p.y, E.x, E.y) < CFG.PIZZARAIN.reach; },

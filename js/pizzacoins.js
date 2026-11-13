@@ -39,7 +39,7 @@ CFG.PIZZACOINS = {
     // ---- home: the cabin, the bedroom, the pizza rain room, the barn's hayloft, the fire station, the hardware store
     { id: 'cabin', area: 'cabin', x: 4785, y: 1585, note: 'in the corner of the secret cabin' },
     { id: 'pizzarain', area: 'pizzarain', x: 5525, y: 4335, note: 'in the corner of the pizza rain room' },
-    { id: 'hayloft', area: 'barn', x: 500, y: 4075, loft: true, note: 'up in the hayloft' },
+    { id: 'hayloft', area: 'barn', x: 40000, y: 4075, loft: true, note: 'up in the hayloft' },
     // ---- inside the City's shops
     { id: 'bakery', area: 'bakery', x: 29480, y: 5480, note: 'in the bakery kitchen, behind the counter' },
     { id: 'arcade', area: 'arcade', x: 1945, y: 3125, note: 'behind the claw machine' },

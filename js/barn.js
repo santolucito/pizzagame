@@ -2,28 +2,35 @@
 // Inside the barn: its own little map behind the big door on the farm. A cosy barn with a goat and a pig to pat, hens
 // that scatter and lay eggs, hay bales (one to sit on), a ladder up to the hayloft with a window onto the farm, a tractor
 // poster, a sleeping cat, swallows under the roof and dust in the sunbeam. Extension module (see js/EXTENSIONS.md).
-CFG.AREAS.barn = { WORLD: { x0: 0, y0: 4000, x1: 600, y1: 4400 } };
+// The barn's map is a big rectangle of its own (1400 x 940): the cosy old barn sits in its top-left corner (BX..BX+600 x
+// 4000..4400, the room it always had) and a wide archway in its bottom wall leads into the Egg Farm hall below and to
+// the right (js/eggfarm.js). `place: 'town'` puts it on the farm in the world map.
+const BX = 39500;   // the old barn's left edge: every x below is BX + its old x
+CFG.AREAS.barn = { WORLD: { x0: BX, y0: 4000, x1: BX + 1400, y1: 4940 }, place: 'town', noSky: true };
 CFG.BARN = {
   // where you stand on the farm to go in: on the grass right in front of the big door on the barn's right wall
   DOOR_OUT: { x: -774, y: 232 },
-  room: { x0: 48, y0: 4130, x1: 552, y1: 4364 }, wall: 22,     // the floor; the back wall carries the hayloft
-  loft: { x0: 48, y0: 4040, x1: 552, y1: 4108, walk: { x0: 70, y0: 4050, x1: 530, y1: 4100 } },
+  box: { x0: BX, x1: BX + 600 },                                   // the old barn's own strip of the map (rafters, back wall)
+  room: { x0: BX + 48, y0: 4130, x1: BX + 552, y1: 4364 }, wall: 22,     // the floor; the back wall carries the hayloft
+  loft: { x0: BX + 48, y0: 4040, x1: BX + 552, y1: 4108, walk: { x0: BX + 70, y0: 4050, x1: BX + 530, y1: 4100 } },
   roof: { y0: 4000, y1: 4040 },                               // the back wall up under the rafters (window, poster, swallows)
-  ladder: { x: 424, foot: { x: 424, y: 4152 }, top: { x: 424, y: 4086 } },
-  window: { x: 300, y: 4021, r: 15 }, eye: { x: 300, y: 4084 },   // stand at the eye spot in the loft to look out
-  poster: { x: 170, y: 4020 },
-  nest: { x: 548, y: 4014 },
+  ladder: { x: BX + 424, foot: { x: BX + 424, y: 4152 }, top: { x: BX + 424, y: 4086 } },
+  window: { x: BX + 300, y: 4021, r: 15 }, eye: { x: BX + 300, y: 4084 },   // stand at the eye spot in the loft to look out
+  poster: { x: BX + 170, y: 4020 },
+  nest: { x: BX + 548, y: 4014 },
   stalls: {
-    goat: { x0: 64, y0: 4146, x1: 180, y1: 4226, at: { x: 120, y: 4196 } },
-    pig: { x0: 64, y0: 4246, x1: 180, y1: 4326, at: { x: 120, y: 4296 } },
+    goat: { x0: BX + 64, y0: 4146, x1: BX + 180, y1: 4226, at: { x: BX + 120, y: 4196 } },
+    pig: { x0: BX + 64, y0: 4246, x1: BX + 180, y1: 4326, at: { x: BX + 120, y: 4296 } },
   },
-  bales: [{ x: 300, y: 4316 }, { x: 348, y: 4316 }, { x: 236, y: 4316, seat: true }],
+  bales: [{ x: BX + 300, y: 4316 }, { x: BX + 348, y: 4316 }, { x: BX + 236, y: 4316, seat: true }],
   baleW: 48, baleH: 30,
-  sack: { x: 508, y: 4158 }, cat: { x: 508, y: 4150 },
-  barrow: { x: 470, y: 4336 },
-  bucket: { x: 200, y: 4344 },
-  exit: { x: 520, y: 4252 }, door: { y0: 4212, y1: 4292 },    // the big door is in the right wall; the mat is inside it
-  henArea: { x0: 215, y0: 4168, x1: 468, y1: 4280 },
+  sack: { x: BX + 508, y: 4158 }, cat: { x: BX + 508, y: 4150 },
+  barrow: { x: BX + 482, y: 4198 },                           // moved up by the sack: the archway took its old corner
+  bucket: { x: BX + 200, y: 4344 },
+  exit: { x: BX + 520, y: 4252 }, door: { y0: 4212, y1: 4292 },    // the big door is in the right wall; the mat is inside it
+  // the wide archway in the bottom wall, through to the Egg Farm hall (the passage runs down to the hall's floor)
+  arch: { x0: BX + 390, x1: BX + 514, y1: 4410, mat: { x: BX + 452, y: 4340 } },
+  henArea: { x0: BX + 215, y0: 4168, x1: BX + 450, y1: 4280 },
   VIEW: 5, PAT: 1.6, EGG_MAX: 2,
 };
 
@@ -37,7 +44,7 @@ const BarnExt = {
     this.st = {
       fade: 0, loft: false, view: 0, seat: null,
       goat: { happy: 0, t: 0, pats: 0 }, pig: { happy: 0, t: 0, pats: 0 },
-      hens: [{ x: 300, y: 4210, c: '#c97a3a' }, { x: 380, y: 4240, c: '#f5f0dc' }, { x: 420, y: 4200, c: '#8d5a2b' }].map((h, i) => ({ x: h.x, y: h.y, col: h.c, facing: i % 2 ? -1 : 1, target: null, wait: U.rand(0.5, 2), flee: 0, vx: 0, vy: 0, bob: 0, peck: 0, bok: 0 })),
+      hens: [{ x: BX + 300, y: 4210, c: '#c97a3a' }, { x: BX + 380, y: 4240, c: '#f5f0dc' }, { x: BX + 420, y: 4200, c: '#8d5a2b' }].map((h, i) => ({ x: h.x, y: h.y, col: h.c, facing: i % 2 ? -1 : 1, target: null, wait: U.rand(0.5, 2), flee: 0, vx: 0, vy: 0, bob: 0, peck: 0, bok: 0 })),
       eggs: [], eggT: 0, bokT: 0,
       cat: { z: 0 }, obs: null,
     };
@@ -47,7 +54,9 @@ const BarnExt = {
   // ---------- geometry ----------
   floorBlocks() {
     const K = CFG.BARN, R = K.room, w = K.wall, o = [];
-    o.push({ x: R.x0 - w, y: R.y0 - w, w: R.x1 - R.x0 + 2 * w, h: w }, { x: R.x0 - w, y: R.y1, w: R.x1 - R.x0 + 2 * w, h: w });
+    const A = K.arch;   // the bottom wall has the wide archway through to the Egg Farm hall
+    o.push({ x: R.x0 - w, y: R.y0 - w, w: R.x1 - R.x0 + 2 * w, h: w });
+    o.push({ x: R.x0 - w, y: R.y1, w: A.x0 - (R.x0 - w), h: w }, { x: A.x1, y: R.y1, w: R.x1 + w - A.x1, h: w });
     o.push({ x: R.x0 - w, y: R.y0, w, h: R.y1 - R.y0 }, { x: R.x1, y: R.y0, w, h: R.y1 - R.y0 });
     for (const s of [K.stalls.goat, K.stalls.pig]) o.push({ x: s.x0, y: s.y0, w: s.x1 - s.x0, h: s.y1 - s.y0 });
     for (const b of K.bales) o.push({ x: b.x - K.baleW / 2, y: b.y - 18, w: K.baleW, h: 26 });
@@ -63,20 +72,25 @@ const BarnExt = {
       { x: W.x0, y: W.y0, w: L.x0 - W.x0, h: W.y1 - W.y0 }, { x: L.x1, y: W.y0, w: W.x1 - L.x1, h: W.y1 - W.y0 },
     ];
   },
-  // Is this somewhere the chef can stand: on the floor clear of the walls and the furniture, or on the loft planks?
+  // Is this somewhere the chef can stand: on the floor clear of the walls and the furniture (the old barn, the archway
+  // or the Egg Farm hall), or on the loft planks?
   free(x, y) {
     const K = CFG.BARN, r = 12;
     if (this.st.loft) { const L = K.loft.walk; return x >= L.x0 + r && x <= L.x1 - r && y >= L.y0 + r && y <= L.y1 - r; }
-    const R = K.room;
-    if (x < R.x0 + r || x > R.x1 - r || y < R.y0 + r || y > R.y1 - r) return false;
-    for (const o of this.st.obs) if (x > o.x && x < o.x + o.w && y > o.y && y < o.y + o.h) return false;
+    const R = K.room, A = K.arch, in_ = (q) => x >= q.x0 + r && x <= q.x1 - r && y >= q.y0 + r && y <= q.y1 - r;
+    const hall = typeof EggFarmExt !== 'undefined' ? CFG.EGGFARM.HALL : null;
+    if (!in_(R) && !in_({ x0: A.x0, y0: R.y1 - 40, x1: A.x1, y1: A.y1 + 40 }) && !(hall && in_(hall))) return false;
+    const obs = hall ? this.st.obs.concat(EggFarmExt.obstacles(Game, false)) : this.st.obs;
+    for (const o of obs) if (x > o.x && x < o.x + o.w && y > o.y && y < o.y + o.h) return false;
     return true;
   },
+  inHall(g) { return g.area === 'barn' && g.player.y > CFG.BARN.room.y1 + 10; },
   // Rescue: a save (or a push) that left the chef in a wall or inside the furniture goes back onto the door mat.
   rescue(g) {
     const p = g.player, K = CFG.BARN;
     if (this.free(p.x, p.y)) return false;
     if (this.st.loft) { p.x = K.ladder.top.x; p.y = K.ladder.top.y; }
+    else if (p.y > K.room.y1 + 10 && typeof EggFarmExt !== 'undefined') { const M = CFG.EGGFARM.ARCH_MAT; p.x = M.x; p.y = M.y; }   // lost in the Egg Farm hall: back under its archway
     else { p.x = K.exit.x; p.y = K.exit.y - 8; }
     p.moving = false;
     g.floats.push({ x: p.x, y: p.y - 50, text: 'Oops! Back inside', color: '#ffe08a', t: 0, dur: 1.4, big: true });
@@ -152,7 +166,7 @@ const BarnExt = {
     if (g.area !== 'barn') { if (st.loft || st.seat) { st.loft = false; st.seat = null; st.view = 0; } return; }
     const p = g.player, K = CFG.BARN;
     if (st.seat) { p.x = st.seat.x; p.y = st.seat.y; p.moving = false; }
-    else this.rescue(g);
+    else if (!g.driving) this.rescue(g);   // the egg truck in the hall keeps the chef in its cab
     if (st.view > 0) { st.view = Math.max(0, st.view - dt); if (p.moving) st.view = Math.min(st.view, 0.5); }
     for (const who of ['goat', 'pig']) { const a = st[who]; a.happy = Math.max(0, a.happy - dt); a.t += dt; }
     // the hens: wander and peck; when the chef comes close they scatter, and sometimes one leaves an egg behind
@@ -186,6 +200,7 @@ const BarnExt = {
       if (got) {
         st.eggs.splice(st.eggs.indexOf(got), 1); g.s.barn.eggs++;
         g.floats.push({ x: got.x, y: got.y - 34, text: '🥚 +1', color: '#ffe08a', t: 0, dur: 1, big: true });
+        if (typeof EggFarmExt !== 'undefined') EggFarmExt.catchEgg(g, got.x, got.y - 4, 0);   // it hops up onto the chef's egg tower
         g.fx.push({ kind: 'sparkle', x0: got.x, y0: got.y, x1: got.x, y1: got.y, t: 0, dur: 0.5 });
         Sfx.pickup(); Haptics.tap();
       }
@@ -203,6 +218,7 @@ const BarnExt = {
       return undefined;
     }
     if (g.area !== 'barn') return undefined;
+    if (!st.loft && this.inHall(g)) return undefined;   // the Egg Farm hall gives its own hints
     if (st.seat) return { text: 'Comfy on the hay 🌾', target: null };
     if (st.loft) {
       if (st.view > 0) return { text: 'What a view! 🌾', target: null };
@@ -214,6 +230,7 @@ const BarnExt = {
     if (!st.goat.pats) return { text: 'Pat the goat! 🐐', target: { x: K.stalls.goat.x1 + 24, y: K.stalls.goat.at.y } };
     if (!st.pig.pats) return { text: 'Pat the pig! 🐷', target: { x: K.stalls.pig.x1 + 24, y: K.stalls.pig.at.y } };
     if (U.dist(p.x, p.y, K.exit.x, K.exit.y) < 30) return { text: 'Press the button to go outside', target: null };
+    if (typeof EggFarmExt !== 'undefined' && !g.s.eggfarm.seen) return { text: 'Through the big arch to the Egg Farm! 🐣', target: K.arch.mat };
     return { text: 'Climb the ladder to the hayloft 🪜', target: K.ladder.foot };
   },
 
@@ -236,8 +253,8 @@ const BarnExt = {
       }
     };
     // the back wall up under the rafters: red boards, a beam, the round hayloft window, the tractor poster and a nest
-    planks(W.x0, K.roof.y0, W.x1, K.roof.y1, '#8e2a2a', '#9c3232', 20, true);
-    ctx.fillStyle = '#5b3a1a'; ctx.fillRect(W.x0, K.roof.y1 - 6, W.x1 - W.x0, 6);
+    planks(K.box.x0, K.roof.y0, K.box.x1, K.roof.y1, '#8e2a2a', '#9c3232', 20, true);
+    ctx.fillStyle = '#5b3a1a'; ctx.fillRect(K.box.x0, K.roof.y1 - 6, K.box.x1 - K.box.x0, 6);
     const wn = K.window;
     ctx.fillStyle = '#f5f0dc'; ctx.beginPath(); ctx.arc(wn.x, wn.y, wn.r + 4, 0, Math.PI * 2); ctx.fill();
     const sky = ctx.createLinearGradient(0, wn.y - wn.r, 0, wn.y + wn.r); sky.addColorStop(0, '#49a8ea'); sky.addColorStop(0.62, '#bfe6ff'); sky.addColorStop(0.63, '#79b85e'); sky.addColorStop(1, '#5fa04a');
@@ -270,8 +287,8 @@ const BarnExt = {
       ctx.fillStyle = '#f0cf7a'; ctx.beginPath(); ctx.ellipse(x - rx * 0.2, y - ry * 0.25, rx * 0.55, ry * 0.5, 0, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = '#b8862c'; ctx.lineWidth = 1.2; for (let k = 0; k < 9; k++) { const a = k * 0.7, len = 6 + (k % 3) * 3; const sx = x + Math.cos(a) * rx * 0.7, sy = y + Math.sin(a) * ry * 0.7; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + Math.cos(a + 1) * len, sy + Math.sin(a + 1) * len * 0.6); ctx.stroke(); }
     };
-    hay(118, 4068, 56, 22); hay(500, 4066, 40, 20); hay(150, 4082, 30, 12);
-    ctx.fillStyle = '#8d5a2b'; ctx.save(); ctx.translate(72, 4080); ctx.rotate(-0.9); ctx.fillRect(-2, -34, 4, 36); ctx.fillStyle = '#9aa0a8'; for (const dx of [-7, -2.5, 2, 6.5]) ctx.fillRect(dx - 1, -46, 2, 13); ctx.fillRect(-8, -34, 16, 3); ctx.restore();
+    hay(BX + 118, 4068, 56, 22); hay(BX + 500, 4066, 40, 20); hay(BX + 150, 4082, 30, 12);
+    ctx.fillStyle = '#8d5a2b'; ctx.save(); ctx.translate(BX + 72, 4080); ctx.rotate(-0.9); ctx.fillRect(-2, -34, 4, 36); ctx.fillStyle = '#9aa0a8'; for (const dx of [-7, -2.5, 2, 6.5]) ctx.fillRect(dx - 1, -46, 2, 13); ctx.fillRect(-8, -34, 16, 3); ctx.restore();
     ctx.fillStyle = '#8d5a2b'; ctx.fillRect(L.x0, L.y1 - 8, L.x1 - L.x0, 8); ctx.fillStyle = '#6b4a2b'; ctx.fillRect(L.x0, L.y1 - 2, L.x1 - L.x0, 2);
     ctx.fillStyle = '#d7b98a'; for (let x = L.x0 + 10; x < L.x1; x += 56) if (Math.abs(x - K.ladder.x) > 22) ctx.fillRect(x - 2, L.y1 - 18, 4, 12);
     ctx.fillStyle = '#d7b98a'; ctx.fillRect(L.x0, L.y1 - 20, L.x1 - L.x0, 3);
@@ -280,11 +297,12 @@ const BarnExt = {
     planks(R.x0, R.y0, R.x1, R.y1, '#b5773a', '#ad7036', 26, false);
     ctx.fillStyle = 'rgba(0,0,0,0.13)'; for (let i = 0; i < 18; i++) ctx.fillRect(R.x0 + ((i * 131) % 480) + 10, R.y0 + Math.floor(((i * 71) % 230) / 26) * 26, 1.5, 26);
     ctx.strokeStyle = 'rgba(240,207,122,0.8)'; ctx.lineWidth = 1.5;
-    for (let i = 0; i < 70; i++) { const x = R.x0 + 14 + ((i * 173) % 476), y = R.y0 + 10 + ((i * 97) % 214), a = (i * 1.3) % 6.3; if (x < 190 && y < 4330) continue; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * 8, y + Math.sin(a) * 4); ctx.stroke(); }
+    for (let i = 0; i < 70; i++) { const x = R.x0 + 14 + ((i * 173) % 476), y = R.y0 + 10 + ((i * 97) % 214), a = (i * 1.3) % 6.3; if (x < BX + 190 && y < 4330) continue; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * 8, y + Math.sin(a) * 4); ctx.stroke(); }
     ctx.fillStyle = 'rgba(0,0,0,0.08)'; for (let i = 0; i < 20; i++) { ctx.beginPath(); ctx.ellipse(R.x0 + 20 + ((i * 211) % 470), R.y0 + 16 + ((i * 59) % 210), 7, 3, 0, 0, Math.PI * 2); ctx.fill(); }
     // the side and bottom walls: red boards with white trim
     const wallRect = (x, y, ww, hh, vertical) => { planks(x, y, x + ww, y + hh, '#8e2a2a', '#9c3232', 20, !vertical); ctx.fillStyle = '#f5f0dc'; if (vertical) { ctx.fillRect(x, y, 3, hh); ctx.fillRect(x + ww - 3, y, 3, hh); } else { ctx.fillRect(x, y, ww, 3); ctx.fillRect(x, y + hh - 3, ww, 3); } };
-    wallRect(R.x0 - w, R.y0 - w, w, R.y1 - R.y0 + 2 * w, true); wallRect(R.x1, R.y0 - w, w, R.y1 - R.y0 + 2 * w, true); wallRect(R.x0 - w, R.y1, R.x1 - R.x0 + 2 * w, w, false);
+    wallRect(R.x0 - w, R.y0 - w, w, R.y1 - R.y0 + 2 * w, true); wallRect(R.x1, R.y0 - w, w, R.y1 - R.y0 + 2 * w, true);
+    wallRect(R.x0 - w, R.y1, K.arch.x0 - (R.x0 - w), w, false); wallRect(K.arch.x1, R.y1, R.x1 + w - K.arch.x1, w, false);   // the archway gap (js/eggfarm.js paints the arch)
     // the big door in the right wall: the opening shows the farm, the two white-framed leaves stand open against the wall
     const D = K.door;
     const out = ctx.createLinearGradient(0, D.y0, 0, D.y1); out.addColorStop(0, '#bfe6ff'); out.addColorStop(0.3, '#79b85e'); out.addColorStop(1, '#5fa04a');
@@ -355,7 +373,7 @@ const BarnExt = {
     if (vx0 < W.x0) ctx.fillRect(vx0, W.y0, W.x0 - vx0, W.y1 - W.y0);
     if (vx1 > W.x1) ctx.fillRect(W.x1, W.y0, vx1 - W.x1, W.y1 - W.y0);
     // the sunbeam through the big door, with dust drifting in it
-    const D = K.door, bx = 330;
+    const D = K.door, bx = BX + 330;
     const beam = ctx.createLinearGradient(R.x1, 0, bx, 0); beam.addColorStop(0, 'rgba(255,236,160,0.34)'); beam.addColorStop(1, 'rgba(255,236,160,0)');
     ctx.fillStyle = beam; ctx.beginPath(); ctx.moveTo(R.x1, D.y0); ctx.lineTo(bx, D.y0 - 40); ctx.lineTo(bx, D.y1 + 60); ctx.lineTo(R.x1, D.y1); ctx.closePath(); ctx.fill();
     ctx.fillStyle = 'rgba(255,250,220,0.85)';
@@ -368,7 +386,7 @@ const BarnExt = {
     ctx.globalAlpha = 1;
     // swallows under the roof
     for (let i = 0; i < 3; i++) {
-      const ph = t * (0.5 + i * 0.13) + i * 2.1, x = 300 + Math.sin(ph) * (230 - i * 40), y = K.roof.y0 + 16 + Math.sin(ph * 2.3 + i) * 8, dir = Math.cos(ph) < 0 ? -1 : 1, flap = Math.sin(t * 14 + i) * 4;
+      const ph = t * (0.5 + i * 0.13) + i * 2.1, x = BX + 300 + Math.sin(ph) * (230 - i * 40), y = K.roof.y0 + 16 + Math.sin(ph * 2.3 + i) * 8, dir = Math.cos(ph) < 0 ? -1 : 1, flap = Math.sin(t * 14 + i) * 4;
       ctx.strokeStyle = '#2d3a4a'; ctx.lineWidth = 2; ctx.lineCap = 'round';
       ctx.beginPath(); ctx.moveTo(x - 9, y - flap); ctx.quadraticCurveTo(x - 4, y + 2, x, y); ctx.quadraticCurveTo(x + 4, y + 2, x + 9, y - flap); ctx.stroke();
       ctx.fillStyle = '#2d3a4a'; ctx.beginPath(); ctx.ellipse(x, y + 1, 5, 2.6, 0, 0, Math.PI * 2); ctx.fill();

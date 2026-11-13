@@ -38,11 +38,11 @@ module.exports = async (t) => {
   t.expect(await t.ev(() => T.toasts.includes('🐐 Welcome to the barn!')), 'welcome toast the first time');
   t.expect(await t.ev(() => { const E = CFG.BARN.exit; return Math.hypot(Game.player.x - E.x, Game.player.y - (E.y - 8)) < 2; }), 'standing on the exit mat');
   t.expect(await t.ev(() => Game.s.barn.seen), 'the barn is marked seen');
-  const h1 = await t.ev(() => ({ text: T.hint(), target: Game.hint && Game.hint.target }));
+  const h1 = await t.ev(() => ({ text: T.hint(), target: Game.hint && Game.hint.target, box: CFG.BARN.box }));
   t.expect(!!h1.text, 'a hint shows inside');
-  t.expect(!h1.target || (h1.target.x > 0 && h1.target.x < 600 && h1.target.y > 4000 && h1.target.y < 4400), `the hint target is inside the barn (${JSON.stringify(h1.target)})`);
+  t.expect(!h1.target || (h1.target.x > h1.box.x0 && h1.target.x < h1.box.x1 && h1.target.y > 4000 && h1.target.y < 4440), `the hint target is inside the barn (${JSON.stringify(h1.target)})`);
   t.expectEq(await t.ev(() => T.label()), '🚪 Go outside', 'exit label on the mat');
-  await t.ev(() => { Render.setZoom(1); T.tp(300, 4250, 'barn'); T.step(2); });
+  await t.ev(() => { Render.setZoom(1); T.tp(CFG.BARN.box.x0 + 300, 4250, 'barn'); T.step(2); });
   await t.shot('inside');
 
   // ---- pat the goat and the pig: floats, hearts, and the hint moves on (any egg the startled hens left is cleared first)
@@ -57,12 +57,14 @@ module.exports = async (t) => {
   t.expectEq(await t.ev(() => T.label()), '🐷 Pat the pig', 'pat-the-pig label');
   await t.ev(() => T.act());
   t.expect(await t.ev(() => Game.floats.some((f) => f.text.includes('Oink')) && BarnExt.st.pig.happy > 0), 'the pig says Oink');
-  t.expectEq(await t.ev(() => { T.step(1); return T.hint(); }), 'Climb the ladder to the hayloft 🪜', 'hint moves on to the ladder');
+  t.expectEq(await t.ev(() => { T.step(1); return T.hint(); }), 'Through the big arch to the Egg Farm! 🐣', 'hint moves on to the archway into the egg farm');
+  t.expect(await t.ev(() => Game.hint.target === CFG.BARN.arch.mat), 'and points at the archway');
+  t.expectEq(await t.ev(() => { Game.s.eggfarm.seen = true; T.step(1); return T.hint(); }), 'Climb the ladder to the hayloft 🪜', 'once the egg farm is found, the hint moves on to the ladder');
 
   // ---- scatter the hens: the first burst leaves an egg; walk over it to pick it up
   const scatter = await t.ev(() => {
-    const h = BarnExt.st.hens[0]; h.x = 330; h.y = 4220; h.flee = 0; h.target = null; BarnExt.st.eggT = 0; BarnExt.st.bokT = 0;
-    T.tp(362, 4220, 'barn'); T.step(3);
+    const h = BarnExt.st.hens[0], X = CFG.BARN.box.x0; h.x = X + 330; h.y = 4220; h.flee = 0; h.target = null; BarnExt.st.eggT = 0; BarnExt.st.bokT = 0;
+    T.tp(X + 362, 4220, 'barn'); T.step(3);
     return { flee: h.flee, eggs: BarnExt.st.eggs.length, hint: T.hint(), bok: Game.floats.some((f) => f.text.includes('Bok')) };
   });
   t.expect(scatter.flee > 0, 'the hen scatters');
@@ -123,7 +125,7 @@ module.exports = async (t) => {
 
   // ---- phone-size barn
   await t.page.setViewportSize({ width: 390, height: 844 });
-  await t.ev(() => { Render.resize(); T.tp(300, 4250, 'barn'); T.step(2); });
+  await t.ev(() => { Render.resize(); T.tp(CFG.BARN.box.x0 + 300, 4250, 'barn'); T.step(2); });
   await t.shot('phone');
   await t.ev(() => { const L = CFG.BARN.ladder.foot; T.tp(L.x, L.y, 'barn'); T.act(); T.step(2); });
   await t.shot('loft-phone');
@@ -132,7 +134,7 @@ module.exports = async (t) => {
   await t.ev(() => { Render.resize(); T.step(1); });
 
   // ---- rescue: pushed into a wall, back onto the mat
-  await t.ev(() => { Game.player.x = 30; Game.player.y = 4250; T.step(3); });
+  await t.ev(() => { Game.player.x = CFG.BARN.box.x0 + 30; Game.player.y = 4250; T.step(3); });
   t.expect(await t.ev(() => { const E = CFG.BARN.exit; return BarnExt.free(Game.player.x, Game.player.y) && Math.hypot(Game.player.x - E.x, Game.player.y - (E.y - 8)) < 2; }), 'rescued onto the exit mat');
 
   // ---- out through the big door: back at the door spot on the farm

@@ -96,7 +96,7 @@ or a push leaves the chef in a wall, put them back on the exit mat. Vehicles nev
 while you are inside: the core only lists vehicles from `vehicles()` hooks, and all are far away in other maps anyway).
 
 Reserved interior rectangles (all 600 × 400, y 3000..3400, 900 apart): City building `i` (its index in
-`CFG.CITY.BUILDINGS`) owns `x0 = -1300 + i * 900`. Other interiors: the barn `0..600 × 4000..4400`, Columbia
+`CFG.CITY.BUILDINGS`) owns `x0 = -1300 + i * 900`. Other interiors: the barn (now with the Egg Farm hall) `39500..40900 × 4000..4940`, Columbia
 `1000..1600 × 4000..4400`, Barnard `2000..2600 × 4000..4400`, more at `x0 = 3000 + k * 1000, y 4000..4400`.
 Bigger maps taken since: Snowy Peak `5000..7400 × 5000..6800`, Coney Island (map 'pizzapier') `8000..10400 ×
 5000..6400`, the aquarium `20200..22100 × 5100..6360`, the airfield terminal `27000..28040 × 4000..4740`; the bakery `29000..30720 × 5000..6220`, the playroom `31500..32700 × 4000..4900`,

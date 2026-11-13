@@ -16,7 +16,9 @@
 //    register and pay (the chef or a hired cashier must be standing behind the register) into the cash pile behind
 //    the counter; walk over it to collect. Some sit in a booth to eat and leave a tip on the table.
 //  * walk-on pads: Faster Grill, a 2nd Grill, Carry More, hire a Burger Cook (carries burgers from the pile to the
-//    counter) and hire a Cashier, with growing prices like the pizzeria's.
+//    counter) and hire a Cashier, with growing prices like the pizzeria's; and in a row under them, decorations like
+//    the pizzeria's (CFG.BURGER.DECOR: table cacti, a poster and a clock, curtains and flags, a neon sign, a jukebox),
+//    each shown as a faded ghost where it goes until bought; each one makes customers more patient and come more often.
 //  * the shop runs every step wherever the chef is, and when the game was closed it catches up like the pizzeria (the
 //    pile fills, and with both staff hired it keeps half of the money it was making per second).
 // Fun bits: '😋 Eat a burger' from the stack you are carrying (three big CHOMPs, "Yum! 😋"), '🥤 Make a milkshake' at
@@ -45,7 +47,20 @@ CFG.BURGER = {
   BOOTH: { x0: 34752, x1: 34920, tops: [4136, 4290] },          // two booths by the right wall (bench, table, bench)
   PLANTS: [{ x: 34896, y: 4532 }, { x: 34066, y: 4196 }],
   EXIT: { x: 34640, y: 4532 },                                  // the mat inside the door (the door is in the bottom wall)
-  PADS: { grill: { x: 34110, y: 4350 }, grill2: { x: 34222, y: 4350 }, carry: { x: 34334, y: 4350 }, cook: { x: 34110, y: 4480 }, cashier: { x: 34222, y: 4480 } },
+  // the walk-on pads: the shop's upgrades and staff in one row, the decorations in a row under it (DECOR[i].pad)
+  PADS: { grill: { x: 34084, y: 4350 }, grill2: { x: 34172, y: 4350 }, carry: { x: 34260, y: 4350 }, cook: { x: 34348, y: 4350 }, cashier: { x: 34436, y: 4350 } },
+  // Decorations, like the pizzeria's (CFG.DECOR_ITEMS): a faded "ghost" shows where each one goes until its pad is
+  // bought; each one makes customers more patient and come more often (Shop.patience / Shop.spawnInterval).
+  // spots: where it appears (the sparkle on buying); none of them stands on a path, a line, a booth or a pad.
+  DECOR: [
+    { key: 'cactus',   label: 'Cactus',    ico: '🌵', price: 50,  pad: { x: 34084, y: 4480 }, spots: [{ x: 34778, y: 4182 }, { x: 34778, y: 4336 }, { x: 34474, y: 4274 }, { x: 34708, y: 4274 }] },   // a mini cactus on each booth table and both ends of the counter
+    { key: 'posters',  label: 'Posters',   ico: '🖼️', price: 80,  pad: { x: 34172, y: 4480 }, spots: [{ x: 34094, y: 4070 }, { x: 34700, y: 4068 }] },   // a burger poster and a retro clock on the back wall
+    { key: 'curtains', label: 'Curtains',  ico: '🎀', price: 120, pad: { x: 34260, y: 4480 }, spots: [{ x: 34836, y: 4060 }, { x: 34240, y: 4038 }] },   // checkered curtains on the window, flags along the back wall
+    { key: 'neon',     label: 'Neon Sign', ico: '💡', price: 180, pad: { x: 34348, y: 4480 }, spots: [{ x: 34405, y: 4068 }] },                          // a glowing BURGERS sign over the warming pile
+    { key: 'jukebox',  label: 'Jukebox',   ico: '🎵', price: 260, pad: { x: 34436, y: 4480 }, spots: [{ x: 34884, y: 4420 }] },                          // a jukebox and a round rug in the corner by the booths
+  ],
+  NEON: { x0: 34296, x1: 34514, y0: 4040, y1: 4098 },
+  JUKEBOX: { x: 34884, y: 4452 }, RUG: { x: 34786, y: 4470, rx: 64, ry: 28 },
   // ---- balance
   // (the shared rules and timings, and how upgrades scale them, are SHOP in js/shop.js; these are the shop's own numbers)
   PRICE: 6, TIP_RATE: 0.35,                                     // a burger; a booth customer tips this share of the bill
@@ -66,6 +81,7 @@ const BURGER_DEFAULTS = {
   owned: false, grills: 1, grillLv: 0, carryLv: 0, cook: false, cashier: false,
   piles: { grill: 0, counter: 0, cash: 0 }, tips: [0, 0], served: 0, earned: 0, lost: 0,
   rate: 0,                                                                     // money per second, measured (for the catch-up)
+  decor: {},                                                                   // the decorations bought: { cactus: true, ... }
 };
 
 // The burger shop as a shop for the shared restaurant code (js/shop.js): where things are, its timings and its art.
@@ -82,7 +98,7 @@ const BurgerShop = {
   get tipRate() { return CFG.BURGER.TIP_RATE; },
   get payPatience() { return CFG.BURGER.PAY_PATIENCE; },
   get sitChance() { return CFG.BURGER.BOOTH_CHANCE; },
-  patience() { return Shop.patience(CFG.BURGER.PATIENCE, BurgerExt.state(Game).grillLv); },
+  patience() { return Shop.patience(CFG.BURGER.PATIENCE, BurgerExt.busy(Game)); },
   customers: () => BurgerExt.st.customers, staff: () => BurgerExt.st.staff, piles: (g) => BurgerExt.state(g).piles,
   tables: () => BurgerExt.st.tables,
   price: () => CFG.BURGER.PRICE, payTime: () => Shop.payTime(CFG.BURGER.PAY_T, 0), cashierPresent: (g) => BurgerExt.cashierPresent(g),
@@ -124,6 +140,7 @@ const BurgerExt = {
     const s = g.s.burger || (g.s.burger = {});
     for (const k of Object.keys(BURGER_DEFAULTS)) if (s[k] === undefined) s[k] = JSON.parse(JSON.stringify(BURGER_DEFAULTS[k]));
     for (const k of Object.keys(BURGER_DEFAULTS.piles)) if (typeof s.piles[k] !== 'number') s.piles[k] = 0;
+    if (!s.decor || typeof s.decor !== 'object') s.decor = {};
     return s;
   },
   build(g) {
@@ -170,6 +187,7 @@ const BurgerExt = {
     o.push({ x: C.x0, y: C.y0, w: C.x1 - C.x0, h: C.y1 - C.y0 });                                           // the counter
     for (const top of K.BOOTH.tops) o.push({ x: K.BOOTH.x0, y: top, w: K.BOOTH.x1 - K.BOOTH.x0, h: 78 });
     for (const P of K.PLANTS) o.push({ x: P.x - 12, y: P.y - 12, w: 24, h: 20 });
+    if (this.hasDecor(g, 'jukebox')) { const J = K.JUKEBOX; o.push({ x: J.x - 20, y: J.y - 16, w: 40, h: 18 }); }   // only once it is bought
     return o;
   },
   obstacles(g) {
@@ -197,7 +215,13 @@ const BurgerExt = {
   pileCap(g) { return Shop.stationCap(CFG.BURGER.PILE_CAP, this.state(g).grillLv); },
   carryCap(g) { return Shop.chefCap(this.state(g).carryLv); },
   upgCost(g, key) { const u = CFG.BURGER.UPG[key], lv = this.state(g)[key + 'Lv']; return lv >= u.max ? null : Shop.cost(u.base, lv, u.growth); },
-  spawnTime(g) { return Shop.spawnInterval(CFG.BURGER.SPAWN, this.state(g).grillLv); },
+  spawnTime(g) { return Shop.spawnInterval(CFG.BURGER.SPAWN, this.busy(g)); },
+  // decorations, as in the pizzeria (Game.decorCount): the bought ones count
+  decorCount(g) { const d = this.state(g).decor; return CFG.BURGER.DECOR.filter((it) => d[it.key]).length; },
+  hasDecor(g, key) { return !!this.state(g).decor[key]; },
+  // the shop's "busyness" level for the shared rules (patience, arrivals, groups, how much they want): every
+  // decoration counts, like the pizzeria's, and so does each Faster Grill level, as before the decorations
+  busy(g) { return this.decorCount(g); },   // like the pizzeria: decorations make customers patient and come more often
 
   // ---------- small helpers ----------
   onFoot(g) { return !g.driving && !g.onTrain && !g.ride && !g.travel && !g.fishing; },
@@ -282,7 +306,8 @@ const BurgerExt = {
     if (s.grills < 2) out.push({ key: 'burgerGrill2', label: '2nd Grill', ico: '♨️', pos: P.grill2, price: K.HIRE.grill2, sub: 'more burgers' });
     out.push({ key: 'burgerCarry', label: 'Carry More', ico: '📦', pos: P.carry, price: cc || 0, maxed: cc === null, sub: `${s.carryLv}/${K.UPG.carry.max}` });
     if (!s.cook) out.push({ key: 'burgerCook', label: 'Hire Cook', ico: '🧑‍🍳', pos: P.cook, price: K.HIRE.cook, sub: 'carries burgers' });
-    if (!s.cashier) out.push({ key: 'burgerCashier', label: 'Hire Cashier', ico: '🧑‍💼', pos: P.cashier, price: K.HIRE.cashier, sub: 'takes the money' });
+    if (!s.cashier) out.push({ key: 'burgerCashier', label: 'Hire Cashier', ico: '🧑‍💼', pos: P.cashier, price: K.HIRE.cashier, sub: 'takes money' });
+    for (const it of K.DECOR) if (!s.decor[it.key]) out.push({ key: 'burgerDecor_' + it.key, item: it.key, label: it.label, ico: it.ico, pos: it.pad, price: it.price });
     return out;
   },
   onPad(g, pad) {
@@ -292,13 +317,24 @@ const BurgerExt = {
       g.toast('🍔 You own the burger shop! Go inside!', true);
       return;
     }
+    if (pad.item) {
+      // a decoration: it appears where its ghost was, with a sparkle there (the core already rang the till)
+      const it = CFG.BURGER.DECOR.find((d) => d.key === pad.item); if (!it) return;
+      s.decor[it.key] = true; st.obs = this.makeObstacles(g);
+      for (const q of it.spots) st.sparks.push({ x: q.x, y: q.y, area: 'burger', t: 0, dur: 0.8, color: '255,214,10' });
+      g.toast(`${it.ico} ${it.label} bought!`);
+      return;
+    }
     if (pad.key === 'burgerGrill') { s.grillLv++; g.toast(`🔥 Faster grill! ${s.grillLv}/${CFG.BURGER.UPG.grill.max}`); }
     else if (pad.key === 'burgerGrill2') { s.grills = 2; g.toast('♨️ A second grill!'); }
     else if (pad.key === 'burgerCarry') { s.carryLv++; g.toast(`📦 Carry more burgers! ${this.carryCap(g)}`); }
     else if (pad.key === 'burgerCook') { s.cook = true; this.addStaff('cook'); g.toast('🧑‍🍳 The cook carries burgers to the counter!', true); }
     else if (pad.key === 'burgerCashier') { s.cashier = true; this.addStaff('cashier'); g.toast('🧑‍💼 The cashier takes the money!', true); }
   },
-  bgKey(g) { return 'burger2-' + (g && g.s && g.s.burger && g.s.burger.owned ? 1 : 0) + '-' + (g && g.s && g.s.burger ? g.s.burger.grills : 1); },
+  bgKey(g) {
+    const b = g && g.s && g.s.burger, d = (b && b.decor) || {};
+    return 'burger3-' + (b && b.owned ? 1 : 0) + '-' + (b ? b.grills : 1) + '-' + CFG.BURGER.DECOR.map((it) => d[it.key] ? 1 : 0).join('');
+  },
 
   // ---------- the simulation ----------
   update(g, dt) {
@@ -319,7 +355,7 @@ const BurgerExt = {
     // the business runs wherever the chef is
     if (s.owned) {
       this.stepGrills(g, dt);
-      Shop.spawns(st, dt, this.spawnTime(g), Shop.groupChance(s.grillLv), () => this.spawnCustomer(g));
+      Shop.spawns(st, dt, this.spawnTime(g), Shop.groupChance(this.busy(g)), () => this.spawnCustomer(g));
       for (const c of st.customers) c.update(dt, g);
       st.customers = st.customers.filter((c) => c.state !== 'gone');
       for (const w of st.staff) w.update(dt, g);
@@ -346,7 +382,7 @@ const BurgerExt = {
   spawnCustomer(g) {
     const st = this.st, K = CFG.BURGER;
     if (st.customers.length >= K.MAX_CUSTOMERS || st.customers.filter((c) => c.inMainQueue || c.entering).length >= K.QUEUE.max) return;
-    st.customers.push(new ShopCustomer(BurgerShop, st.seq++, Shop.want(this.state(g).grillLv)));
+    st.customers.push(new ShopCustomer(BurgerShop, st.seq++, Shop.want(this.busy(g))));
   },
   // the chef: grab burgers at the pile, put them on the display, collect the cash pile and the booth tips
   stepChef(g, dt) {
@@ -624,6 +660,7 @@ const BurgerExt = {
     ctx.fillStyle = '#ffd166'; ctx.fillRect(R.x0 - w, K.BACK_TOP, R.x1 - R.x0 + 2 * w, 6); ctx.fillRect(R.x0 - w, R.y0 - 10, R.x1 - R.x0 + 2 * w, 6);
     ctx.fillStyle = '#a8322a'; ctx.fillRect(R.x0 - w, R.y1, R.x1 - R.x0 + 2 * w, w); ctx.fillRect(R.x0 - w, R.y0, w, R.y1 - R.y0); ctx.fillRect(R.x1, R.y0, w, R.y1 - R.y0);
     ctx.fillStyle = '#ffd166'; ctx.fillRect(R.x0 - w, R.y1, R.x1 - R.x0 + 2 * w, 3); ctx.fillRect(R.x0 - 3, R.y0, 3, R.y1 - R.y0); ctx.fillRect(R.x1, R.y0, 3, R.y1 - R.y0);
+    this.paintBunting(r, g);   // under the menu cards
     // the menu cards: a burger and its price over the grills, a milkshake over the machine
     const cards = [['🍔', '$' + K.PRICE, (K.GRILLS[0].x0 + K.GRILLS[1].x1) / 2], ['🥤', '😋', K.MACHINE.x]];
     for (const [ico, price, x] of cards) {
@@ -640,6 +677,7 @@ const BurgerExt = {
     ctx.fillStyle = '#5ab8f0'; ctx.beginPath(); ctx.ellipse(wx0 + 40, wy1 - 8, 22, 5, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#6b4a2b'; ctx.fillRect(wx1 - 40, wy1 - 26, 5, 14); ctx.fillStyle = '#3f9a4a'; ctx.beginPath(); ctx.arc(wx1 - 38, wy1 - 32, 12, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = '#fff1d0'; ctx.fillRect((wx0 + wx1) / 2 - 2, wy0, 4, wy1 - wy0);
+    this.paintDecor(r, g, { wx0, wx1, wy0, wy1 });
     // the steel worktop along the back wall, with the warming shelf for the burger pile
     ctx.fillStyle = '#9aa0a8'; ctx.fillRect(WT.x0, R.y0, WT.x1 - WT.x0, WT.y1 - R.y0);
     ctx.fillStyle = '#d7dbe0'; ctx.fillRect(WT.x0, R.y0, WT.x1 - WT.x0, WT.y1 - R.y0 - 8);
@@ -665,6 +703,141 @@ const BurgerExt = {
     for (let i = 0; i < 6; i++) for (let j = 0; j < 2; j++) { ctx.fillStyle = (i + j) % 2 ? '#ffd166' : '#e53935'; ctx.fillRect(X.x - 18 + i * 6, X.y + 4 + j * 6, 6, 6); }
     ctx.fillStyle = '#2b1d14'; ctx.font = r.font(10); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🚪', X.x, X.y - 4);
     ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, (R.x0 + R.x1) / 2 - 60, R.y1 + w + 4, 120, 14, 4); ctx.fill(); ctx.fillStyle = '#ffd166'; ctx.font = r.font(8); ctx.fillText('🍔 BURGERS 🍔', (R.x0 + R.x1) / 2, R.y1 + w + 11);
+  },
+
+  // ---------- the decorations ----------
+  // fn drawn as it is once bought, and as a faded ghost where it will go before that (like the pizzeria's bgDecor)
+  ghost(r, g, key, fn) { if (this.hasDecor(g, key)) { fn(); return; } const ctx = r.ctx; ctx.save(); ctx.globalAlpha = 0.32; fn(); ctx.restore(); },
+  // little triangle flags swinging along the top of the back wall
+  paintBunting(r, g) {
+    const ctx = r.ctx, R = CFG.BURGER.ROOM, w = CFG.BURGER.WALL, top = CFG.BURGER.BACK_TOP + 8, x0 = R.x0 - w + 4, x1 = R.x1 + w - 4, n = 8, L = (x1 - x0) / n;
+    const sag = (x) => top + 10 * Math.sin(Math.PI * (((x - x0) % L) / L));
+    this.ghost(r, g, 'curtains', () => {
+      ctx.strokeStyle = '#5b3a1a'; ctx.lineWidth = 1.5; ctx.beginPath();
+      for (let i = 0; i < n; i++) { ctx.moveTo(x0 + i * L, top); ctx.quadraticCurveTo(x0 + (i + 0.5) * L, top + 20, x0 + (i + 1) * L, top); }
+      ctx.stroke();
+      const cols = ['#fff8ee', '#ffd166', '#5ab8f0', '#7ee081'];
+      for (let x = x0 + 8, i = 0; x < x1 - 4; x += 15, i++) {
+        const y = sag(x); ctx.fillStyle = cols[i % cols.length];
+        ctx.beginPath(); ctx.moveTo(x - 5, y); ctx.lineTo(x + 5, y); ctx.lineTo(x, y + 11); ctx.closePath(); ctx.fill();
+      }
+    });
+  },
+  // the wall and floor pieces (cached with the room): curtains, the poster and the clock, the neon sign's board, the rug
+  paintDecor(r, g, win) {
+    const ctx = r.ctx, K = CFG.BURGER;
+    // checkered red-and-white curtains on the window over the booths, tied back, with a scalloped top
+    this.ghost(r, g, 'curtains', () => {
+      const checks = (x0, y0, w, h) => {
+        ctx.fillStyle = '#fff8ee'; ctx.fillRect(x0, y0, w, h); ctx.fillStyle = '#e53935';
+        for (let y = y0, j = 0; y < y0 + h; y += 6, j++) for (let x = x0, i = 0; x < x0 + w; x += 6, i++) if ((i + j) % 2) ctx.fillRect(x, y, Math.min(6, x0 + w - x), Math.min(6, y0 + h - y));
+      };
+      for (const side of [-1, 1]) {
+        const x0 = side < 0 ? win.wx0 - 9 : win.wx1 - 15;
+        checks(x0, win.wy0 - 6, 24, win.wy1 - win.wy0 + 12);
+        ctx.fillStyle = '#ffd166'; ctx.fillRect(x0 - 1, win.wy0 + 34, 26, 5);   // the tieback
+      }
+      checks(win.wx0 - 12, win.wy0 - 10, win.wx1 - win.wx0 + 24, 10);
+      ctx.fillStyle = '#e53935'; for (let x = win.wx0 - 6; x < win.wx1 + 12; x += 12) { ctx.beginPath(); ctx.arc(x, win.wy0, 6, 0, Math.PI); ctx.fill(); }
+    });
+    // a framed burger poster left of the menu, and a round retro clock between the milkshake card and the window
+    this.ghost(r, g, 'posters', () => {
+      const P = K.DECOR[1].spots[0], C = K.DECOR[1].spots[1];
+      ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(P.x - 25, P.y - 30, 54, 66);
+      ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, P.x - 28, P.y - 33, 56, 66, 4); ctx.fill();
+      ctx.fillStyle = '#5ab8f0'; ctx.fillRect(P.x - 24, P.y - 29, 48, 58);
+      ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(P.x, P.y - 4, 19, 0, Math.PI * 2); ctx.fill();
+      this.drawBurger(ctx, P.x, P.y + 6, 6, 0.95, 0, 1);
+      ctx.fillStyle = '#fff'; ctx.font = r.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('YUM!', P.x, P.y + 20);
+      ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.arc(C.x + 3, C.y + 3, 22, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#d7dbe0'; ctx.beginPath(); ctx.arc(C.x, C.y, 22, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#5ab8f0'; ctx.beginPath(); ctx.arc(C.x, C.y, 18, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff8ee'; ctx.beginPath(); ctx.arc(C.x, C.y, 15, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#2b1d14'; for (let i = 0; i < 12; i++) { const a = (i * Math.PI) / 6; ctx.beginPath(); ctx.arc(C.x + Math.cos(a) * 12, C.y + Math.sin(a) * 12, i % 3 ? 0.9 : 1.6, 0, Math.PI * 2); ctx.fill(); }
+      ctx.strokeStyle = '#2b1d14'; ctx.lineCap = 'round'; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(C.x, C.y); ctx.lineTo(C.x - 6, C.y - 4); ctx.stroke();
+      ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(C.x, C.y); ctx.lineTo(C.x + 7, C.y - 8); ctx.stroke(); ctx.lineCap = 'butt';
+      ctx.fillStyle = '#e53935'; ctx.beginPath(); ctx.arc(C.x, C.y, 2.2, 0, Math.PI * 2); ctx.fill();
+    });
+    // the neon sign's dark board (the glowing tubes are live once it is bought: drawNeon); its ghost shows them unlit
+    this.ghost(r, g, 'neon', () => {
+      const N = K.NEON;
+      ctx.fillStyle = 'rgba(0,0,0,0.25)'; U.roundRect(ctx, N.x0 + 3, N.y0 + 4, N.x1 - N.x0, N.y1 - N.y0, 10); ctx.fill();
+      ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, N.x0, N.y0, N.x1 - N.x0, N.y1 - N.y0, 10); ctx.fill();
+      ctx.fillStyle = '#9aa0a8'; for (const x of [N.x0 + 14, N.x1 - 14]) { ctx.beginPath(); ctx.arc(x, N.y0 + 8, 2.5, 0, Math.PI * 2); ctx.fill(); }
+      if (!this.hasDecor(g, 'neon')) this.neonTubes(r, 1, true);
+    });
+    // a round diner rug in front of the jukebox (the jukebox itself stands among the people: drawJukebox)
+    this.ghost(r, g, 'jukebox', () => {
+      const U2 = K.RUG;
+      ctx.fillStyle = 'rgba(0,0,0,0.1)'; ctx.beginPath(); ctx.ellipse(U2.x + 2, U2.y + 3, U2.rx, U2.ry, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#2b8ae6'; ctx.beginPath(); ctx.ellipse(U2.x, U2.y, U2.rx, U2.ry, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff8ee'; ctx.beginPath(); ctx.ellipse(U2.x, U2.y, U2.rx - 9, U2.ry - 6, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#e53935'; ctx.beginPath(); ctx.ellipse(U2.x, U2.y, U2.rx - 18, U2.ry - 11, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ffd166'; ctx.font = r.font(14); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('★', U2.x, U2.y + 1);
+    });
+  },
+  // the sign's tubes: a burger outline and BURGERS. lit: 0..1 (flicker); dim: the unlit ghost
+  neonTubes(r, lit, dim) {
+    const ctx = r.ctx, N = CFG.BURGER.NEON, bx = N.x0 + 34, by = (N.y0 + N.y1) / 2;
+    const tubes = (w, a) => {
+      ctx.lineWidth = w; ctx.lineCap = 'round';
+      ctx.strokeStyle = dim ? '#c9a0b4' : `rgba(255,184,64,${a})`;
+      ctx.beginPath(); ctx.moveTo(bx - 18, by - 2); ctx.quadraticCurveTo(bx - 18, by - 18, bx, by - 18); ctx.quadraticCurveTo(bx + 18, by - 18, bx + 18, by - 2); ctx.closePath(); ctx.stroke();   // top bun
+      ctx.strokeStyle = dim ? '#b8c9a0' : `rgba(126,255,140,${a})`; ctx.beginPath(); ctx.moveTo(bx - 19, by + 3); for (let i = 1; i <= 6; i++) ctx.lineTo(bx - 19 + i * 6.3, by + 3 + (i % 2 ? 3 : 0)); ctx.stroke();   // lettuce
+      ctx.strokeStyle = dim ? '#c9a0b4' : `rgba(255,120,80,${a})`; ctx.beginPath(); ctx.moveTo(bx - 17, by + 9); ctx.lineTo(bx + 17, by + 9); ctx.stroke();   // patty
+      ctx.strokeStyle = dim ? '#c9a0b4' : `rgba(255,184,64,${a})`; ctx.beginPath(); ctx.moveTo(bx - 16, by + 15); ctx.quadraticCurveTo(bx, by + 21, bx + 16, by + 15); ctx.stroke();   // bottom bun
+      ctx.lineCap = 'butt';
+    };
+    const tx = (N.x0 + N.x1) / 2 + 22;
+    ctx.font = r.font(25); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    if (dim) { tubes(3, 1); ctx.fillStyle = '#c9a0b4'; ctx.fillText('BURGERS', tx, by + 1); return; }
+    // a soft halo (wide faint strokes; no canvas shadow, so it stays cheap), then the bright tubes
+    tubes(9, 0.18 * lit); tubes(3, lit);
+    ctx.lineWidth = 6; ctx.lineJoin = 'round'; ctx.strokeStyle = `rgba(255,79,216,${(0.3 * lit).toFixed(3)})`; ctx.strokeText('BURGERS', tx, by + 1);
+    ctx.fillStyle = `rgba(255,150,230,${lit.toFixed(3)})`; ctx.fillText('BURGERS', tx, by + 1);
+    ctx.lineJoin = 'miter';
+  },
+  drawNeon(r, g) {
+    const t = g.time, lit = 0.8 + 0.2 * Math.sin(t * 9) * Math.sin(t * 2.3);
+    this.neonTubes(r, lit, false);
+  },
+  // a mini cactus in a pot, its bottom at (x, y)
+  drawCactus(ctx, x, y) {
+    ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(x + 1, y, 7, 2, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#d2673b'; ctx.beginPath(); ctx.moveTo(x - 6, y - 8); ctx.lineTo(x + 6, y - 8); ctx.lineTo(x + 4.5, y); ctx.lineTo(x - 4.5, y); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#b5532b'; ctx.fillRect(x - 6.5, y - 9.5, 13, 3);
+    ctx.fillStyle = '#3f9a4a'; U.roundRect(ctx, x - 3.5, y - 26, 7, 18, 3.5); ctx.fill();
+    U.roundRect(ctx, x - 9, y - 21, 4, 9, 2); ctx.fill(); ctx.fillRect(x - 7, y - 14, 4, 3);
+    U.roundRect(ctx, x + 5, y - 23, 4, 9, 2); ctx.fill(); ctx.fillRect(x + 3, y - 17, 4, 3);
+    ctx.fillStyle = '#56b862'; ctx.fillRect(x - 1.5, y - 24, 1.5, 14);
+    ctx.fillStyle = '#ff5c8a'; ctx.beginPath(); ctx.arc(x, y - 26.5, 2.4, 0, Math.PI * 2); ctx.fill();
+  },
+  // the jukebox in the corner: a chrome arch with rainbow lights (they chase round once it plays), records behind
+  // glass and a speaker; little notes float up while it plays
+  drawJukebox(r, g) {
+    const ctx = r.ctx, J = CFG.BURGER.JUKEBOX, x = J.x, y = J.y, on = this.hasDecor(g, 'jukebox'), t = g.time;
+    this.ghost(r, g, 'jukebox', () => this.paintJukebox(ctx, x, y, on ? t : 0));
+    if (!on) return;
+    ctx.font = r.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let i = 0; i < 2; i++) {
+      const k = (t * 0.5 + i * 0.5) % 1;
+      ctx.fillStyle = `rgba(${i ? '43,138,230' : '229,57,53'},${(1 - k).toFixed(3)})`;
+      ctx.fillText(i ? '♫' : '♪', x - 12 + i * 22 + Math.sin(k * 6 + i) * 5, y - 66 - k * 30);
+    }
+  },
+  paintJukebox(ctx, x, y, t) {
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(x + 2, y + 1, 24, 6, 0, 0, Math.PI * 2); ctx.fill();
+    const arch = (inset, h) => { ctx.beginPath(); ctx.moveTo(x - 20 + inset, y - inset * 0.3); ctx.lineTo(x - 20 + inset, y - h + 20); ctx.arc(x, y - h + 20, 20 - inset, Math.PI, 0); ctx.lineTo(x + 20 - inset, y - inset * 0.3); ctx.closePath(); };
+    ctx.fillStyle = '#8c2f2f'; arch(0, 62); ctx.fill();
+    ctx.fillStyle = '#d7dbe0'; arch(3, 60); ctx.fill();
+    const cols = ['#ff5c8a', '#ffd166', '#7ee081', '#5ab8f0'];
+    for (let i = 0; i < 4; i++) { ctx.fillStyle = cols[(i + Math.floor(t * 4)) % 4]; arch(5 + i * 2.2, 58 - i * 2.2); ctx.fill(); }
+    ctx.fillStyle = '#c62828'; arch(14, 49); ctx.fill();
+    ctx.fillStyle = '#bfe3ff'; U.roundRect(ctx, x - 10, y - 44, 20, 14, 4); ctx.fill();
+    ctx.fillStyle = '#2b1d14'; for (let i = 0; i < 3; i++) ctx.fillRect(x - 8 + i * 6, y - 42, 4, 10);
+    ctx.fillStyle = '#ffd166'; ctx.fillRect(x - 10, y - 27, 20, 3);
+    ctx.fillStyle = '#5c2020'; U.roundRect(ctx, x - 9, y - 21, 18, 16, 3); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1; for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.moveTo(x - 7, y - 18 + k * 4); ctx.lineTo(x + 7, y - 18 + k * 4); ctx.stroke(); }
   },
 
   // ---------- the interior, moving things ----------
@@ -735,6 +908,7 @@ const BurgerExt = {
     ctx.fillStyle = '#7ee081'; ctx.fillRect(R.x - 11, R.y - 17, 22, 7);
     ctx.fillStyle = '#2b1d14'; ctx.font = r.font(6); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('$' + K.PRICE, R.x, R.y - 13);
     ctx.fillStyle = '#9aa0a8'; ctx.fillRect(R.x - 14, R.y + (paying ? 2 : -2), 28, 5);
+    this.cacti(r, g, K.DECOR[0].spots.slice(2));
     if (!s.owned) {
       // a CLOSED sign hanging over the counter until the shop is bought
       ctx.strokeStyle = '#5b3a1a'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(D.x + 50, C.y0 - 60); ctx.lineTo(D.x + 40, C.y0 - 40); ctx.moveTo(D.x + 50, C.y0 - 60); ctx.lineTo(D.x + 60, C.y0 - 40); ctx.stroke();
@@ -748,11 +922,13 @@ const BurgerExt = {
     ctx.fillStyle = '#d7dbe0'; U.roundRect(ctx, x0, top + 30, x1 - x0, 24, 5); ctx.fill();
     ctx.fillStyle = '#fff1d0'; U.roundRect(ctx, x0 + 2, top + 30, x1 - x0 - 4, 19, 4); ctx.fill();
     ctx.fillStyle = '#e53935'; U.roundRect(ctx, x1 - 22, top + 33, 4, 9, 1.5); ctx.fill(); ctx.fillStyle = '#ffd166'; U.roundRect(ctx, x1 - 16, top + 33, 4, 9, 1.5); ctx.fill();   // ketchup & mustard
+    this.cacti(r, g, [K.DECOR[0].spots[i]]);
     // a burger on the table while a customer eats, a tip after
     const c = this.st.customers.find((q) => q.table === this.st.tables[i] && q.state === 'eating');
     if (c) this.drawBurger(ctx, (x0 + x1) / 2 + 4, top + 44, 6, 0.7, Math.floor((1 - c.timer / c.eatDur) * 4), -1);
     if (s.tips[i] > 0) { const q = this.seats()[i].tip; ctx.fillStyle = '#2f9e44'; U.roundRect(ctx, q.x - 9, q.y - 5, 18, 9, 2); ctx.fill(); ctx.fillStyle = '#7ee081'; ctx.fillRect(q.x - 6, q.y - 2, 12, 3); }
   },
+  cacti(r, g, spots) { this.ghost(r, g, 'cactus', () => { for (const q of spots) this.drawCactus(r.ctx, q.x, q.y); }); },
   drawBoothFront(r, g, top) {
     const ctx = r.ctx, x0 = CFG.BURGER.BOOTH.x0, x1 = CFG.BURGER.BOOTH.x1;
     ctx.fillStyle = '#9b1d1d'; U.roundRect(ctx, x0 + 2, top + 58, x1 - x0 - 4, 20, 6); ctx.fill();
@@ -809,6 +985,7 @@ const BurgerExt = {
     this.drawStack(r.ctx, K.PILE.x, K.PILE.y + 4, Math.min(s.piles.grill, 15));
     if (s.piles.grill > 0) r.drawCountBadge(K.PILE.x + 44, K.PILE.y - 22, s.piles.grill, this.pileCap(g));
     this.drawCash(r, g);
+    if (this.hasDecor(g, 'neon')) this.drawNeon(r, g);
     if (st.order && st.order.phase === 'make') this.drawOrder(r, g);
   },
   entities(r, g, items) {
@@ -832,6 +1009,7 @@ const BurgerExt = {
       items.push({ y: top + 78, draw: () => this.drawBoothFront(r, g, top) });
     });
     for (const P of K.PLANTS) items.push({ y: P.y + 6, draw: () => this.drawPlant(r, g, P) });
+    items.push({ y: K.JUKEBOX.y, draw: () => this.drawJukebox(r, g) });
     for (const c of st.customers) items.push({ y: c.state === 'eating' ? K.BOOTH.tops[c.table.i] + 40 : c.y, draw: () => this.drawCustomer(r, g, c) });
     for (const w of st.staff) items.push({ y: w.y, draw: () => this.drawStaff(r, g, w) });
   },

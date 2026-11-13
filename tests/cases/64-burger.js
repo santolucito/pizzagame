@@ -218,8 +218,9 @@ module.exports = async (t) => {
     for (let i = 0; i < K.QUEUE.max; i++) { if (!BurgerExt.free(K.QUEUE.x, K.QUEUE.y + i * K.QUEUE.dy)) bad.push('queue' + i); if (!BurgerExt.free(K.PAY.x, K.PAY.y + i * K.PAY.dy)) bad.push('pay' + i); }
     BurgerExt.seats().forEach((q, i) => { if (!BurgerExt.free(q.spot.x, q.spot.y)) bad.push('seat' + i); });
     if (!BurgerExt.free(K.EXIT.x, K.EXIT.y - 8)) bad.push('exit');
-    // pads do not overlap each other or the standing spots
-    const pads = Object.values(K.PADS);
+    // pads (the shop's and the decorations') do not overlap each other or the standing spots
+    const pads = Object.values(K.PADS).concat(K.DECOR.map((it) => it.pad));
+    for (const P of pads) if (!BurgerExt.free(P.x, P.y)) bad.push('pad ' + P.x + ',' + P.y);
     for (let i = 0; i < pads.length; i++) for (let j = i + 1; j < pads.length; j++) if (U.dist(pads[i].x, pads[i].y, pads[j].x, pads[j].y) < 2 * CFG.PAD_RADIUS) bad.push('pads overlap');
     for (const P of pads) for (const pt of [K.PILE_STAND, K.DISPLAY_STAND, K.CASHIER_SPOT, K.SHAKE_SPOT, K.EXIT, { x: K.QUEUE.x, y: K.QUEUE.y }]) if (U.dist(P.x, P.y, pt.x, pt.y) < CFG.PAD_RADIUS + 30) bad.push('pad near a spot');
     return bad;
@@ -244,7 +245,7 @@ module.exports = async (t) => {
     out.carry = buyPad('burgerCarry'); out.bigger = BurgerExt.carryCap(Game) > cap0;
     out.cook = buyPad('burgerCook'); out.cashier = buyPad('burgerCashier');
     out.staff = BurgerExt.st.staff.map((w) => w.role).sort().join(',');
-    out.left = BurgerExt.pads(Game).map((p) => p.key).join(',');
+    out.left = BurgerExt.pads(Game).filter((p) => !p.item).map((p) => p.key).join(',');
     return out;
   }, K);
   t.expect(typeof pads.grill1 === 'number' && typeof pads.grill2 === 'number' && pads.grill2 > pads.grill1, `Faster Grill twice, the second one dearer (${JSON.stringify(pads)})`);
@@ -311,6 +312,166 @@ module.exports = async (t) => {
   t.expect(misc.rescued, 'stuck in the counter: back on the mat');
   t.expect(misc.home.area === 'town' && misc.home.carry === 0, 'Take-me-home drops the burgers');
   t.expect(misc.label !== '🚪 Go inside' && misc.hint === undefined, 'no door button or hint while driving');
+
+  // ---- decorations, like the pizzeria's: a ghost where each goes, a pad to buy it, then it is drawn for real,
+  // customers wait longer and come more often, it is saved, and nothing ends up in anybody's way
+  await t.boot();
+  // every ghost() call records its key and how faded it was drawn
+  const ghostSpy = () => {
+    window.decorLog = {};
+    if (!BurgerExt._ghost0) { BurgerExt._ghost0 = BurgerExt.ghost; BurgerExt.ghost = function (r, g, key, fn) { return BurgerExt._ghost0.call(this, r, g, key, () => { window.decorLog[key] = r.ctx.globalAlpha < 0.5 ? 'ghost' : 'full'; fn(); }); }; }
+    Render.invalidateBackgrounds(); Render.draw(Game);
+    return window.decorLog;
+  };
+  const dec0 = await t.ev((a) => {
+    const K = a.K;
+    Game.s.burger.owned = true; BurgerExt.build(Game);
+    T.tp(K.DOOR_OUT.x, K.DOOR_OUT.y, 'town'); T.act();
+    BurgerExt.st.spawnT = 999; BurgerExt.st.customers = [];
+    T.tp(K.EXIT.x, K.EXIT.y - 8, 'burger'); Render.setZoom(1); Game.cameraSnap = true; T.step(1);
+    const log = (0, eval)('(' + a.spy + ')')();
+    return {
+      area: Game.area, decor: JSON.stringify(Game.s.burger.decor), count: BurgerExt.decorCount(Game), log: JSON.stringify(log),
+      pads: BurgerExt.pads(Game).filter((p) => p.item).map((p) => p.item + ':' + p.price).join(','),
+      patience: BurgerShop.patience(), spawn: BurgerExt.spawnTime(Game), obs: BurgerExt.st.obs.length,
+    };
+  }, { K, spy: ghostSpy.toString() });
+  t.expectEq(dec0.area, 'burger', 'inside the open shop');
+  t.expectEq(dec0.decor, '{}', 'a new game has no decorations');
+  t.expectEq(dec0.count, 0, 'none counted');
+  t.expectEq(dec0.pads, K.DECOR.map((it) => it.key + ':' + it.price).join(','), 'a pad for each decoration, at its price');
+  t.expect(K.DECOR.length >= 4 && K.DECOR.every((it) => it.price >= 50 && it.price <= 260), 'four or five decorations at $50-$260');
+  t.expect(K.DECOR.every((it) => JSON.parse(dec0.log)[it.key] === 'ghost'), `every decoration is drawn as a faded ghost before it is bought (${dec0.log})`);
+  await t.shot('decor-ghosts');
+  await t.ev(() => { Render.MIN_ZOOMED_VIEW = 150; Render.setZoom(1.8); T.tp(34300, 4420, 'burger'); Game.cameraSnap = true; T.step(1); });
+  await t.shot('decor-pads');
+  await t.ev(() => { Render.setZoom(1); Game.cameraSnap = true; T.step(1); });
+
+  // buy each one on its pad: money goes, the toast, a sparkle where it appears, it counts, and it draws for real
+  const bought = await t.ev((a) => {
+    const K = a.K, out = [];
+    let pat = BurgerShop.patience(), sp = BurgerExt.spawnTime(Game);
+    for (const it of K.DECOR) {
+      const pad = BurgerExt.pads(Game).find((p) => p.item === it.key);
+      Game.s.cash = it.price + 7;
+      T.tp(K.EXIT.x, K.EXIT.y - 8, 'burger'); T.tp(pad.pos.x, pad.pos.y, 'burger');
+      const n = T.until(() => Game.s.burger.decor[it.key], 900);
+      const sparks = BurgerExt.st.sparks.filter((q) => it.spots.some((s) => s.x === q.x && s.y === q.y)).length;
+      const p2 = BurgerShop.patience(), s2 = BurgerExt.spawnTime(Game);
+      out.push({ key: it.key, n, cash: Math.round(Game.s.cash), toast: Game.floats.some((f) => String(f.text).includes(it.label)), sparks, padGone: !BurgerExt.pads(Game).some((p) => p.item === it.key),
+        patienceUp: p2 > pat, spawnDown: s2 < sp, count: BurgerExt.decorCount(Game), free: BurgerExt.free(Game.player.x, Game.player.y) });
+      pat = p2; sp = s2;
+      T.step(60);
+    }
+    return out;
+  }, { K });
+  bought.forEach((b, i) => {
+    t.expect(b.n >= 0 && b.cash === 7, `standing on the pad buys ${b.key} for its price (${JSON.stringify(b)})`);
+    t.expect(b.toast && b.sparks > 0 && b.padGone, `${b.key}: a toast, a sparkle where it appears, the pad is gone (${JSON.stringify(b)})`);
+    t.expect(b.patienceUp && b.spawnDown && b.count === i + 1, `${b.key}: customers more patient and coming faster (${JSON.stringify(b)})`);
+    t.expect(b.free, `${b.key}: the chef is not stuck after buying`);
+  });
+  const dec1 = await t.ev((a) => {
+    const K = a.K, s = Game.s.burger;
+    const log = (0, eval)('(' + a.spy + ')')();
+    // the same rule and numbers as the pizzeria: Shop.patience / Shop.spawnInterval with the shop's own count
+    const lv = BurgerExt.busy(Game);
+    return { log: JSON.stringify(log), busy: lv, grillLv: s.grillLv, count: BurgerExt.decorCount(Game),
+      patience: BurgerShop.patience(), patienceWant: Shop.patience(K.PATIENCE, lv), spawn: BurgerExt.spawnTime(Game), spawnWant: Shop.spawnInterval(K.SPAWN, lv),
+      fresh: new ShopCustomer(BurgerShop, 77, 1).patienceMax, pizzeria: Game.decorCount(), bg: Render.bgs.burger.key };
+  }, { K, spy: ghostSpy.toString() });
+  t.expect(K.DECOR.every((it) => JSON.parse(dec1.log)[it.key] === 'full'), `every decoration is drawn for real once bought (${dec1.log})`);
+  t.expectEq(dec1.count, K.DECOR.length, 'all of them counted');
+  t.expectEq(dec1.busy, dec1.count + dec1.grillLv, 'the busyness level counts the decorations');
+  t.expect(Math.abs(dec1.patience - dec1.patienceWant) < 1e-9 && Math.abs(dec1.spawn - dec1.spawnWant) < 1e-9, 'patience and arrivals use the shared Shop helpers');
+  t.expect(dec1.fresh > K.PATIENCE && dec1.spawn < K.SPAWN, `a new customer is more patient, and they come more often (${dec1.fresh}, ${dec1.spawn})`);
+  t.expectEq(dec1.pizzeria, 0, 'the pizzeria has none of them');
+  t.expect(dec1.bg.includes('burger3-1-1-' + '1'.repeat(K.DECOR.length)), `the cached room repaints with them (${dec1.bg})`);
+  await t.ev(() => { T.tp(CFG.BURGER.EXIT.x, CFG.BURGER.EXIT.y - 8, 'burger'); Game.cameraSnap = true; T.step(1); });
+  await t.shot('decor-bought');
+  await t.ev(() => { Render.MIN_ZOOMED_VIEW = 150; Render.setZoom(2.2); T.tp(34800, 4400, 'burger'); Game.cameraSnap = true; T.step(30); });
+  await t.shot('decor-jukebox');
+  await t.ev(() => { Render.setZoom(1.5); T.tp(34420, 4215, 'burger'); Game.cameraSnap = true; T.step(30); });
+  await t.shot('decor-neon');
+  await t.ev(() => { Render.setZoom(1); Game.cameraSnap = true; T.step(1); });
+
+  // nothing in the way: a grid walk (the chef's size) from the door reaches every pad, the counter, the register,
+  // the pile, the milkshake machine, both booths and every place in both lines
+  const reach = await t.ev((a) => {
+    const K = a.K, R = K.ROOM, obs = Game.obstacles(), step = 8, r = 12;
+    const ok = (x, y) => x >= R.x0 + r && x <= R.x1 - r && y >= R.y0 + r && y <= R.y1 - r && !obs.some((o) => Game.hitRect(x, y, r, o));
+    const cols = Math.floor((R.x1 - R.x0) / step), rows = Math.floor((R.y1 - R.y0) / step), seen = new Uint8Array(cols * rows);
+    const cell = (x, y) => [Math.round((x - R.x0) / step), Math.round((y - R.y0) / step)];
+    const [sx, sy] = cell(K.EXIT.x, K.EXIT.y - 8), q = [[sx, sy]]; seen[sy * cols + sx] = 1;
+    while (q.length) {
+      const [cx, cy] = q.shift();
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = cx + dx, ny = cy + dy;
+        if (nx < 0 || ny < 0 || nx >= cols || ny >= rows || seen[ny * cols + nx]) continue;
+        if (!ok(R.x0 + nx * step, R.y0 + ny * step)) continue;
+        seen[ny * cols + nx] = 1; q.push([nx, ny]);
+      }
+    }
+    // a target counts as reached when a walkable cell within a few px of it was reached
+    const reached = (pt) => { const [cx, cy] = cell(pt.x, pt.y); for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const nx = cx + dx, ny = cy + dy; if (nx >= 0 && ny >= 0 && nx < cols && ny < rows && seen[ny * cols + nx]) return true; } return false; };
+    const targets = { exit: { x: K.EXIT.x, y: K.EXIT.y - 8 }, pile: K.PILE_STAND, counter: K.DISPLAY_STAND, register: K.CASHIER_SPOT, cash: K.CASH, shake: K.SHAKE_SPOT };
+    Object.entries(K.PADS).forEach(([k, P]) => { targets['pad ' + k] = P; });
+    K.DECOR.forEach((it) => { targets['decor pad ' + it.key] = it.pad; });
+    BurgerExt.seats().forEach((q2, i) => { targets['booth ' + i] = q2.spot; });
+    for (let i = 0; i < K.QUEUE.max; i++) { targets['queue ' + i] = { x: K.QUEUE.x, y: K.QUEUE.y + i * K.QUEUE.dy }; targets['pay ' + i] = { x: K.PAY.x, y: K.PAY.y + i * K.PAY.dy }; }
+    const miss = Object.keys(targets).filter((k) => !reached(targets[k]));
+    // and no decoration stands on a pad, a line or a booth seat: the jukebox is the only solid one
+    const J = { x: K.JUKEBOX.x - 20, y: K.JUKEBOX.y - 16, w: 40, h: 18 }, near = [];
+    for (const [k, pt] of Object.entries(targets)) if (Game.hitRect(pt.x, pt.y, CFG.PAD_RADIUS, J)) near.push(k);
+    return { miss, near, jukeboxSolid: obs.some((o) => Game.hitRect(K.JUKEBOX.x, K.JUKEBOX.y - 6, 4, o)) };
+  }, { K });
+  t.expectEq(reach.miss.join(','), '', 'a grid walk from the door reaches every pad, the counter, the booths and the lines');
+  t.expect(reach.jukeboxSolid, 'the jukebox is solid');
+  t.expectEq(reach.near.join(','), '', 'the jukebox is well clear of every pad, seat and line spot');
+
+  // a customer comes in, buys and leaves with everything bought (the entry and exit routes are clear)
+  const run = await t.ev((K) => {
+    const s = Game.s.burger, st = BurgerExt.st;
+    s.piles.counter = 8; st.customers = []; st.groupLeft = 0; st.spawnT = 0;
+    T.tp(K.CASHIER_SPOT.x, K.CASHIER_SPOT.y, 'burger');
+    T.step(2); st.spawnT = 999; st.groupLeft = 0;
+    const served0 = s.served;
+    const n = T.until(() => s.served > served0, 60 * 30);
+    for (const c of st.customers) if (c.state === 'eating') c.timer = 0;
+    const m = T.until(() => st.customers.length === 0, 60 * 30);
+    return { n, m };
+  }, K);
+  t.expect(run.n >= 0 && run.m >= 0, `a customer still gets in, pays and out with everything bought (${JSON.stringify(run)})`);
+
+  // saved across a reload, and an old save (no decor) gets an empty set
+  await t.ev(() => Game.save());
+  await t.reload();
+  const decLoad = await t.ev((a) => {
+    const K = a.K;
+    const out = { decor: Object.keys(Game.s.burger.decor).sort().join(','), count: BurgerExt.decorCount(Game) };
+    T.tp(K.EXIT.x, K.EXIT.y - 8, 'burger'); Game.cameraSnap = true; T.step(1);
+    out.log = JSON.stringify((0, eval)('(' + a.spy + ')')());
+    out.solid = BurgerExt.st.obs.some((o) => Game.hitRect(K.JUKEBOX.x, K.JUKEBOX.y - 6, 4, o));
+    Game.s.burger = { seen: true, eaten: 2, owned: true };
+    const s = BurgerExt.state(Game);
+    out.old = JSON.stringify(s.decor); out.oldCount = BurgerExt.decorCount(Game);
+    return out;
+  }, { K, spy: ghostSpy.toString() });
+  t.expectEq(decLoad.decor, K.DECOR.map((it) => it.key).sort().join(','), 'the decorations survive a reload');
+  t.expectEq(decLoad.count, K.DECOR.length, 'still counted after a reload');
+  t.expect(K.DECOR.every((it) => JSON.parse(decLoad.log)[it.key] === 'full'), `still drawn for real after a reload (${decLoad.log})`);
+  t.expect(decLoad.solid, 'the jukebox is still solid after a reload');
+  t.expectEq(decLoad.old, '{}', 'an old save without decorations gets an empty set');
+  t.expectEq(decLoad.oldCount, 0, '...and counts none');
+
+  // phone, before and after
+  await t.boot({ viewport: { width: 390, height: 844 } });
+  await t.ev((K) => { Game.s.burger.owned = true; BurgerExt.build(Game); T.tp(K.DOOR_OUT.x, K.DOOR_OUT.y, 'town'); T.act(); BurgerExt.st.spawnT = 999; T.tp(34300, 4400, 'burger'); Render.setZoom(1); Game.cameraSnap = true; T.step(2); }, K);
+  await t.shot('decor-phone-before');
+  await t.ev((K) => { for (const it of K.DECOR) Game.s.burger.decor[it.key] = true; BurgerExt.st.obs = BurgerExt.makeObstacles(Game); T.tp(34640, 4300, 'burger'); Game.cameraSnap = true; T.step(30); }, K);
+  await t.shot('decor-phone-after');
+  await t.ev(() => { T.tp(34800, 4250, 'burger'); Game.cameraSnap = true; T.step(30); });
+  await t.shot('decor-phone-booths');
 
   // ---- phone screenshot: carrying burgers past the counter with customers waiting
   await t.boot({ viewport: { width: 390, height: 844 } });

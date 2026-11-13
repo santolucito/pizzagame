@@ -1,5 +1,5 @@
 // Every staircase in the game, drawn by the shared js/stairs.js: small, flat, a dark frame of slats, the step to stand on
-// pale with two footprints (no rug, no arrow). For each one: the step is part of the stairs, reachable on foot and free,
+// pale with two footprints (no arrow; the pizzeria's red rug is only decoration). For each one: the step is part of the stairs, reachable on foot and free,
 // the button follows the convention ('⬆️ Go upstairs' / '⬇️ Go downstairs', or 'Up to' / 'Down to' a place) and the
 // stairs work both ways. Screenshots of each at 1100×720, and the pizzeria and the bedroom at 390×844 too.
 module.exports = async (t) => {
@@ -26,7 +26,7 @@ module.exports = async (t) => {
   const api = await t.ev(() => ({ up: Stairs.up(), down: Stairs.down(), place: Stairs.up('the lamp room'), sub: Stairs.down('the subway'), reach: Stairs.REACH }));
   t.expect(api.up === '⬆️ Go upstairs' && api.down === '⬇️ Go downstairs' && api.place === '⬆️ Up to the lamp room' && api.sub === '⬇️ Down to the subway' && api.reach === 40, `the labels and the reach ${JSON.stringify(api)}`);
 
-  // ---- the pizzeria: a small flat flight by the HIRING desk, the bottom step (footprints) to stand on, no rug
+  // ---- the pizzeria: a small flat flight by the HIRING desk, the bottom step (footprints) to stand on, a red rug for looks
   const shop = await t.ev(() => {
     Game.s.unlocked.dining = true;
     const C = CFG.UPSTAIRS.STAIRS, G = UpstairsExt.stairs().G, F = G.foot;
@@ -38,7 +38,7 @@ module.exports = async (t) => {
     // the rest of the flight is solid
     out.solid = !S68.free(G.top.x, G.top.y);
     // no rug: nothing in the town art or the config draws a mat at the foot
-    out.rug = /rug|mat at the foot|#b23a48/.test(String(UpstairsExt.paintTown)) || 'block' in C || 'reach' in C;
+    out.rug = !!C.rug && /#b23a48/.test(String(UpstairsExt.paintTown)) && !('block' in C) && !('reach' in C);   // the red rug is back, just for looks
     T.act(); T.step(2);
     const W = UpstairsExt.well().G;
     out.up = { area: Game.area, d: Math.hypot(Game.player.x - W.foot.x, Game.player.y - W.foot.y), label: T.label(), onStep: S68.inside(W.foot, W.stand), free: S68.free(W.foot.x, W.foot.y) };
@@ -53,7 +53,7 @@ module.exports = async (t) => {
   t.expectEq(shop.hint, 'Go upstairs to your room! 🛏️', 'pizzeria: the hint');
   t.expect(shop.w <= 90 && shop.h <= 60 && shop.inShop, `pizzeria: small and inside the shop ${JSON.stringify(shop)}`);
   t.expect(shop.pads.length === 0, `pizzeria: no buy pad on the stairs ${JSON.stringify(shop.pads)}`);
-  t.expect(shop.solid && !shop.rug, 'pizzeria: the flight is solid and there is no rug');
+  t.expect(shop.solid && shop.rug, 'pizzeria: the flight is solid; the red rug lies at its foot just for looks');
   t.expect(shop.up.area === 'upstairs' && shop.up.d < 1 && shop.up.onStep && shop.up.free && shop.up.label === '⬇️ Go downstairs', `bedroom: up on the top step ${JSON.stringify(shop.up)}`);
   t.expect(shop.up.walk < 5 && shop.up.label2 === '⬇️ Go downstairs', `bedroom: the top step is reachable ${JSON.stringify(shop.up)}`);
   t.expect(shop.down.area === 'town' && shop.down.d < 1 && shop.down.roof === 0, `pizzeria: back down on the bottom step ${JSON.stringify(shop.down)}`);

@@ -29,7 +29,8 @@ CFG.UPSTAIRS = {
   // The office stairs: a small flat flight in the office's south-east corner, climbing east from the step by the HIRING
   // desk (drawn by js/stairs.js). Stand on the bottom step (the pale one with the footprints) to go up;
   // `landing` (where to stand) is read from it. `sign`: the ⬆️🛏️ picture sign.
-  STAIRS: { x0: 288, y0: 596, x1: 372, y1: 640, dir: 'e', n: 6, first: 22, rails: ['n'], sign: { x: 340, y: 580 } },
+  STAIRS: { x0: 288, y0: 596, x1: 372, y1: 640, dir: 'e', n: 6, first: 22, rails: ['n'], sign: { x: 340, y: 580 },
+    rug: { x: 266, y: 620 } },   // a red rug at the foot of the stairs, just for looks (the button is on the footprint step)
   WORLD: { x0: 6400, y0: 1500, x1: 7000, y1: 1900 },      // free space east of the cabin's map
   room: { x0: 6460, y0: 1560, x1: 6940, y1: 1840 }, wall: 26,
   bed: { x0: 6484, y0: 1572, x1: 6592, y1: 1710 },
@@ -529,7 +530,11 @@ const UpstairsExt = {
 
   // ---------- the office stairs (static town art) ----------
   paintTown(r, g) {
-    const ctx = r.ctx, S = CFG.UPSTAIRS.STAIRS;
+    const ctx = r.ctx, S = CFG.UPSTAIRS.STAIRS, M = S.rug;
+    // the red rug at the foot of the stairs (decoration only)
+    ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.beginPath(); ctx.ellipse(M.x + 2, M.y + 4, 24, 13, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#b23a48'; ctx.beginPath(); ctx.ellipse(M.x, M.y, 24, 13, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(M.x, M.y, 18, 8, 0, 0, Math.PI * 2); ctx.stroke();
     Stairs.flat(ctx, Object.assign({ mat: 'wood' }, S));
     Stairs.sign(ctx, r, S.sign.x, S.sign.y, '⬆️🛏️', 9);
     // the owner's drawing hangs in the dining room too, on the back wall past the neon sign

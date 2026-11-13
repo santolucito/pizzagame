@@ -100,10 +100,7 @@ const BikeFleetExt = {
     s.held = this.bikes.map((b) => b.load);   // boxes on the bikes are saved too: pizzas never vanish
     // the cash pile: walk over it to pick it up
     if (s.cash > 0 && g.area === 'town' && !g.driving && U.dist(g.player.x, g.player.y, F.CASH.x, F.CASH.y) < 46) {
-      const amt = s.cash; s.cash = 0; g.s.cash += amt; g.s.stats.earned += amt;
-      for (let i = 0; i < Math.min(8, Math.ceil(amt / 15)); i++) g.fx.push({ kind: 'bill', x0: F.CASH.x + U.rand(-14, 14), y0: F.CASH.y + U.rand(-10, 4), x1: g.player.x, y1: g.player.y - 10, t: -i * 0.04, dur: 0.3, follow: true });
-      g.floats.push({ x: g.player.x, y: g.player.y - 46, text: '+' + U.money(amt), color: '#ffe08a', t: 0, dur: 1, big: true });
-      Sfx.cash(); Haptics.tap();
+      const amt = s.cash; s.cash = 0; Shop.pocket(g, amt, F.CASH);
     }
   },
   // follow the waypoints; true once the last one is reached

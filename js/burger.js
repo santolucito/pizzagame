@@ -5,7 +5,9 @@
 // OUTSIDE. Before it is bought the windows are boarded up, the name board says COMING SOON and a walk-on pad by the
 // door sells it ('🍔 Burger Shop', $600). You can still peek inside (cold grills, a CLOSED sign). Once bought: the
 // boards come off, a GIANT burger bounces on the roof, the door says OPEN, and customers start coming in.
-// INSIDE (its own map, CFG.AREAS.burger, in the free block 34000..34960 × 4000..4620) the loop is the pizzeria's:
+// INSIDE (its own map, CFG.AREAS.burger, in the free block 34000..34960 × 4000..4620) the loop is the pizzeria's, and so
+// is the code: the grills, the customers, the cook and the cashier, the pads' prices and the catch-up all run on the
+// shared restaurant system in js/shop.js (BurgerShop below tells it where things are); only the art is the shop's own:
 //  * the grills on the back worktop build burgers by themselves, layer by layer (bottom bun, patty, cheese, lettuce,
 //    tomato, top bun), and each finished burger hops onto the warming pile beside them (like the oven pile);
 //  * the chef walks past the pile to pick burgers up (a stack in his hands, like the pizzas), and walks behind the
@@ -15,10 +17,11 @@
 //    the counter; walk over it to collect. Some sit in a booth to eat and leave a tip on the table.
 //  * walk-on pads: Faster Grill, a 2nd Grill, Carry More, hire a Burger Cook (carries burgers from the pile to the
 //    counter) and hire a Cashier, with growing prices like the pizzeria's.
-//  * the shop runs every step wherever the chef is, and when the game was closed it catches up a little (the pile
-//    fills, and with both staff hired some burgers get sold).
+//  * the shop runs every step wherever the chef is, and when the game was closed it catches up like the pizzeria (the
+//    pile fills, and with both staff hired it keeps half of the money it was making per second).
 // Fun bits: '😋 Eat a burger' from the stack you are carrying (three big CHOMPs, "Yum! 😋"), '🥤 Make a milkshake' at
-// the pink machine (free), and '🪑 Sit down' in a free booth. No failure states: customers wait as long as it takes.
+// the pink machine (free), and '🪑 Sit down' in a free booth. Customers have the pizzeria's patience: the bar runs
+// down, the face turns grumpy, and somebody who waits too long walks out ("Too slow!").
 // Extension module: registered with Game.ext (unshift, so the door's button and hint beat the town's own) and
 // Render.ext. See js/EXTENSIONS.md ("Interiors").
 CFG.BURGER = {
@@ -44,13 +47,13 @@ CFG.BURGER = {
   EXIT: { x: 34640, y: 4532 },                                  // the mat inside the door (the door is in the bottom wall)
   PADS: { grill: { x: 34110, y: 4350 }, grill2: { x: 34222, y: 4350 }, carry: { x: 34334, y: 4350 }, cook: { x: 34110, y: 4480 }, cashier: { x: 34222, y: 4480 } },
   // ---- balance
-  PRICE: 6, TIP: 2,                                             // a burger, and the tip a booth customer leaves
-  GRILL_T: 4.0, PILE_CAP: 8,                                    // seconds per burger per grill (faster with upgrades), pile size
+  // (the shared rules and timings, and how upgrades scale them, are SHOP in js/shop.js; these are the shop's own numbers)
+  PRICE: 6, TIP_RATE: 0.35,                                     // a burger; a booth customer tips this share of the bill
+  GRILL_T: 4.0, PILE_CAP: 8,                                    // seconds per burger per grill, pile size (before upgrades)
   SPAWN: 7, MAX_CUSTOMERS: 6, PAY_T: 0.8, EAT_T: 6, BOOTH_CHANCE: 0.4,
+  PATIENCE: 60, PAY_PATIENCE: 70,                               // seconds in the display line / the register line
   UPG: { grill: { base: 60, growth: 1.5, max: 6 }, carry: { base: 50, growth: 1.5, max: 5 } },
   HIRE: { grill2: 250, cook: 300, cashier: 250 },
-  STAFF_SPEED: 135, COOK_CAP: 4, XFER: 0.11,
-  AWAY_MAX: 3 * 3600,                                           // offline catch-up, like the pizzeria's
   LAYERS: ['bunB', 'patty', 'cheese', 'lettuce', 'tomato', 'bunT'],
   BITES: { burger: 3, shake: 3 },
   T: { shake: 1.6, give: 0.45, bite: 0.75, yum: 1.1 },          // seconds: the milkshake machine, the hand-over, a bite, the happy munch
@@ -61,7 +64,53 @@ CFG.AREAS.burger = { WORLD: CFG.BURGER.WORLD, place: 'town', noSky: true };
 const BURGER_DEFAULTS = {
   seen: false, eaten: 0, fries: 0, shakes: 0, sits: 0,                        // the fun counts (fries: from the old snack bar)
   owned: false, grills: 1, grillLv: 0, carryLv: 0, cook: false, cashier: false,
-  piles: { grill: 0, counter: 0, cash: 0 }, tips: [0, 0], served: 0, earned: 0,
+  piles: { grill: 0, counter: 0, cash: 0 }, tips: [0, 0], served: 0, earned: 0, lost: 0,
+  rate: 0,                                                                     // money per second, measured (for the catch-up)
+};
+
+// The burger shop as a shop for the shared restaurant code (js/shop.js): where things are, its timings and its art.
+const BurgerShop = {
+  key: 'burger', area: 'burger',
+  keys: { made: 'grill', display: 'counter', cash: 'cash' },
+  get pile() { return CFG.BURGER.PILE; },
+  get display() { return CFG.BURGER.DISPLAY; },
+  get cashPile() { return CFG.BURGER.CASH; },
+  get cashierSpot() { return CFG.BURGER.CASHIER_SPOT; },
+  get cashierStand() { return CFG.BURGER.CASHIER_SPOT; },
+  cashierFacing: 1, handY: 60, tableFacing: -1,
+  get eatTime() { return CFG.BURGER.EAT_T; },
+  get tipRate() { return CFG.BURGER.TIP_RATE; },
+  get payPatience() { return CFG.BURGER.PAY_PATIENCE; },
+  get sitChance() { return CFG.BURGER.BOOTH_CHANCE; },
+  patience() { return Shop.patience(CFG.BURGER.PATIENCE, BurgerExt.state(Game).grillLv); },
+  customers: () => BurgerExt.st.customers, staff: () => BurgerExt.st.staff, piles: (g) => BurgerExt.state(g).piles,
+  tables: () => BurgerExt.st.tables,
+  price: () => CFG.BURGER.PRICE, payTime: () => Shop.payTime(CFG.BURGER.PAY_T, 0), cashierPresent: (g) => BurgerExt.cashierPresent(g),
+  lineIndex: (g, c) => BurgerExt.queueIndex(c), payIndex: (g, c) => BurgerExt.payIndex(c),
+  queueSpot(g, i) { const Q = CFG.BURGER.QUEUE; return { x: Q.x, y: Q.y + Math.min(i, Q.max + 1) * Q.dy }; },
+  paySpot(g, i) { const P = CFG.BURGER.PAY; return { x: P.x, y: P.y + Math.min(i, P.max + 1) * P.dy }; },
+  // in through the door in the bottom wall, and back out of it
+  enter(c) { const K = CFG.BURGER; c.x = K.EXIT.x + U.rand(-8, 8); c.y = K.ROOM.y1 + 14; c.route = [{ x: K.EXIT.x - 40, y: K.EXIT.y - 30 }]; },
+  exitRoute() { const K = CFG.BURGER; return [{ x: K.EXIT.x + 30, y: K.EXIT.y - 30 }, { x: K.EXIT.x + 10, y: K.ROOM.y1 + 16 }]; },
+  paid(g, c, amt) {
+    const K = CFG.BURGER, s = BurgerExt.state(g), st = BurgerExt.st;
+    s.piles.cash += amt; s.served += c.want; s.earned += amt; st.secEarned += amt;
+    if (g.area === 'burger') { g.floats.push({ x: K.REGISTER.x, y: K.REGISTER.y - 30, text: '+' + U.money(amt), color: '#2f9e44', t: 0, dur: 1 }); Sfx.cash(); }
+    BurgerExt.fly(K.REGISTER.x, K.REGISTER.y - 8, K.CASH.x, K.CASH.y - 6, 0.3);
+  },
+  lost(g) { BurgerExt.state(g).lost++; },
+  // a free booth (not the one the chef sits in)
+  freeTable() { const st = BurgerExt.st, free = st.tables.filter((t) => !t.occupied && st.seat !== t.i); return free.length ? U.pick(free) : null; },
+  tableRoute(t) { return [{ x: CFG.BURGER.BOOTH.x0 - 16, y: t.spot.y - 6 }, { x: t.spot.x, y: t.spot.y }, { x: t.x + 26, y: t.y }]; },
+  tableExit(t) { return [{ x: t.spot.x, y: t.spot.y }, { x: CFG.BURGER.BOOTH.x0 - 16, y: t.spot.y - 6 }]; },
+  tipped(g, c, t, tip) { const s = BurgerExt.state(g); s.tips[t.i] = (s.tips[t.i] || 0) + tip; },
+  fly(g, x0, y0, x1, y1, dur) { BurgerExt.fly(x0, y0, x1, y1, dur); },
+  dropTargets() { const K = CFG.BURGER; return [{ key: 'counter', pos: K.DISPLAY, stand: K.DISPLAY_STAND, cap: K.DISPLAY_CAP, main: true }]; },
+  stackNeed: (g, key) => Shop.lineWant(BurgerExt.st.customers) - BurgerExt.state(g).piles[key],
+  staffStart(role) { const K = CFG.BURGER; return role === 'cashier' ? K.CASHIER_SPOT : K.PILE_STAND; },
+  staffSpeed: () => Shop.staffSpeed(0), carrierCap: () => Shop.staffCap(0),
+  pileStand() { const P = CFG.BURGER.PILE_STAND; return { x: P.x + 8, y: P.y }; },
+  dropStand(t) { return t.stand; },
 };
 
 const BurgerExt = {
@@ -83,9 +132,11 @@ const BurgerExt = {
       fade: 0, seat: null,                    // seat: index into seats()
       carry: 0, xferCd: 0,                    // burgers in the chef's hands
       order: null,                            // something the chef is eating: { kind: 'burger' | 'shake', phase: 'make' | 'give' | 'eat' | 'yum', t, bites }
-      grillT: K.GRILLS.map((_, i) => i * 1.3),
-      customers: [], spawnT: 2, seq: 0,
-      staff: [],                              // { role: 'cook' | 'cashier', x, y, carry, facing, moving, bob, cd }
+      grills: K.GRILLS.map((_, i) => ({ t: i * 1.3 })),   // each grill's timer (Shop.produce)
+      customers: [], spawnT: 2, groupLeft: 0, groupT: 0, seq: 0,   // ShopCustomer, and the door (Shop.spawns)
+      staff: [],                              // ShopStaff: role 'cook' (a carrier) or 'cashier'
+      tables: this.seats().map((q) => Object.assign({ occupied: null }, q)),   // the booths, with who eats there
+      secT: 0, secEarned: 0,                  // money per second (Shop.meter)
       flies: [],                              // burgers flying between piles, hands and grills { x0, y0, x1, y1, t, dur }
       say: null, steam: [], sparks: [], drawn: 0, awayMsg: null,
     };
@@ -93,23 +144,19 @@ const BurgerExt = {
     if (s.cook) this.addStaff('cook');
     if (s.cashier) this.addStaff('cashier');
     // catch up on the time the game was closed
-    const away = Math.min(K.AWAY_MAX, (Date.now() - (g.s.savedAt || Date.now())) / 1000);
-    if (away >= 30) this.away(g, away);
+    this.away(g, Shop.awaySeconds(g));
   },
   ready(g) { if (!this.st) this.build(g); this.state(g); return this.st; },
-  addStaff(role) {
-    const K = CFG.BURGER, at = role === 'cook' ? K.PILE_STAND : K.CASHIER_SPOT;
-    this.st.staff.push({ role, x: at.x, y: at.y, carry: 0, facing: 1, moving: false, bob: 0, cd: 0 });
-  },
-  // the time the game was closed: the grills fill the pile; with a cook and a cashier some burgers get sold too
+  addStaff(role) { this.st.staff.push(new ShopStaff(BurgerShop, role, 0)); },
+  // the time the game was closed (the shared rule): the grills fill the pile; with a cook and a cashier the shop keeps
+  // half of the money it was making per second
   away(g, sec) {
     const s = this.state(g), K = CFG.BURGER;
-    if (!s.owned) return 0;
-    s.piles.grill = this.pileCap(g);
-    if (!(s.cook && s.cashier)) return 0;
-    const sold = Math.floor((sec / K.SPAWN) * 2 * 0.5);
+    if (!s.owned || sec < SHOP.AWAY_MIN) return 0;
+    s.piles.grill = Math.max(s.piles.grill, this.pileCap(g));
+    const amt = Math.round(Shop.awayEarnings(sec, s.cook && s.cashier, s.rate));
+    const sold = Math.round(amt / K.PRICE);
     if (sold < 1) return 0;
-    const amt = sold * K.PRICE;
     s.piles.cash += amt; s.served += sold; s.earned += amt;
     this.st.awayMsg = `🍔 Your burger shop sold ${sold} burgers while you were away!`;
     return amt;
@@ -142,14 +189,15 @@ const BurgerExt = {
     this._seats = K.BOOTH.tops.map((top, i) => ({ i, x: bx - 4, y: top + 40, facing: 1, spot: { x: bx - 4, y: top + 98 }, tip: { x: bx + 30, y: top + 40 } }));
     return this._seats;
   },
-  boothTaken(i) { return this.st.customers.some((c) => c.booth === i); },
+  boothTaken(i) { return !!this.st.tables[i].occupied; },
 
   // ---------- derived values ----------
-  grillTime(g) { return CFG.BURGER.GRILL_T / (1 + 0.3 * this.state(g).grillLv); },
-  pileCap(g) { return CFG.BURGER.PILE_CAP + 2 * this.state(g).grillLv; },
-  carryCap(g) { return 3 + 2 * this.state(g).carryLv; },
-  upgCost(g, key) { const u = CFG.BURGER.UPG[key], lv = this.state(g)[key + 'Lv']; return lv >= u.max ? null : Math.round(u.base * Math.pow(u.growth, lv)); },
-  spawnTime(g) { return CFG.BURGER.SPAWN / (1 + 0.12 * this.state(g).grillLv); },
+  // (the same formulas as the pizzeria's: js/shop.js)
+  grillTime(g) { return Shop.stationTime(CFG.BURGER.GRILL_T, this.state(g).grillLv); },
+  pileCap(g) { return Shop.stationCap(CFG.BURGER.PILE_CAP, this.state(g).grillLv); },
+  carryCap(g) { return Shop.chefCap(this.state(g).carryLv); },
+  upgCost(g, key) { const u = CFG.BURGER.UPG[key], lv = this.state(g)[key + 'Lv']; return lv >= u.max ? null : Shop.cost(u.base, lv, u.growth); },
+  spawnTime(g) { return Shop.spawnInterval(CFG.BURGER.SPAWN, this.state(g).grillLv); },
 
   // ---------- small helpers ----------
   onFoot(g) { return !g.driving && !g.onTrain && !g.ride && !g.travel && !g.fishing; },
@@ -161,14 +209,11 @@ const BurgerExt = {
     for (let i = 0; i < s.length; i++) if (!this.boothTaken(i) && this.near(g, s[i].spot, 28)) return i;
     return -1;
   },
-  cashierPresent(g) {
-    if (this.state(g).cashier) return true;
-    return g.area === 'burger' && this.onFoot(g) && this.near(g, CFG.BURGER.CASHIER_SPOT, 46);
-  },
+  cashierPresent(g) { return Shop.cashierPresent(g, BurgerShop); },
   // the chef is drawn on foot right now (not in a vehicle, on the train or on a ride)
   visible(g) { return !g.driving && !g.onTrain && !g.travel; },
-  queueIndex(c) { let i = 0; for (const o of this.st.customers) { if (o === c) return i; if (o.state === 'queue') i++; } return i; },
-  payIndex(c) { let i = 0; for (const o of this.st.customers) { if (o === c) return i; if (o.state === 'pay') i++; } return i; },
+  queueIndex(c) { return Shop.lineIndex(this.st.customers, c, (o) => o.inMainQueue); },
+  payIndex(c) { return Shop.lineIndex(this.st.customers, c, (o) => o.inPayQueue); },
   fly(x0, y0, x1, y1, dur) { this.st.flies.push({ x0, y0, x1, y1, t: 0, dur: dur || 0.2 }); },
 
   // ---------- game hooks ----------
@@ -274,10 +319,11 @@ const BurgerExt = {
     // the business runs wherever the chef is
     if (s.owned) {
       this.stepGrills(g, dt);
-      this.stepSpawns(g, dt);
-      for (const c of st.customers) this.stepCustomer(g, c, dt);
+      Shop.spawns(st, dt, this.spawnTime(g), Shop.groupChance(s.grillLv), () => this.spawnCustomer(g));
+      for (const c of st.customers) c.update(dt, g);
       st.customers = st.customers.filter((c) => c.state !== 'gone');
-      for (const w of st.staff) this.stepStaff(g, w, dt);
+      for (const w of st.staff) w.update(dt, g);
+      s.rate = Shop.meter(st, dt, s.rate);
     }
     if (g.area !== 'burger') { st.seat = null; return; }
     // seated: stay put
@@ -289,133 +335,25 @@ const BurgerExt = {
     st.steam = st.steam.filter((q) => q.t < 1.3);
   },
   stepGrills(g, dt) {
-    const st = this.st, s = this.state(g), K = CFG.BURGER, bt = this.grillTime(g), cap = this.pileCap(g);
-    for (let i = 0; i < s.grills; i++) {
-      if (s.piles.grill >= cap) { st.grillT[i] = Math.min(st.grillT[i], bt * 0.98); continue; }
-      st.grillT[i] += dt;
-      if (st.grillT[i] >= bt) {
-        st.grillT[i] = 0; s.piles.grill++;
-        const G = K.GRILLS[i];
-        this.fly((G.x0 + G.x1) / 2, K.WORKTOP.y1 - 22, K.PILE.x, K.PILE.y - 6, 0.35);
-        if (g.area === 'burger') Sfx.tone(660 + i * 80, 0.06, 'triangle', 0.03);
-      }
-    }
+    const st = this.st, s = this.state(g), K = CFG.BURGER;
+    Shop.produce(st.grills, s.grills, this.grillTime(g), s.piles, 'grill', this.pileCap(g), dt, (i) => {
+      const G = K.GRILLS[i];
+      this.fly((G.x0 + G.x1) / 2, K.WORKTOP.y1 - 22, K.PILE.x, K.PILE.y - 6, 0.35);
+      if (g.area === 'burger') Sfx.tone(660 + i * 80, 0.06, 'triangle', 0.03);
+    });
   },
-  stepSpawns(g, dt) {
+  // one more customer at the door, if there is room (Shop.spawns decides when)
+  spawnCustomer(g) {
     const st = this.st, K = CFG.BURGER;
-    st.spawnT -= dt;
-    if (st.spawnT > 0) return;
-    st.spawnT = this.spawnTime(g) * U.rand(0.7, 1.3);
-    if (st.customers.length >= K.MAX_CUSTOMERS || st.customers.filter((c) => c.state === 'queue' || c.state === 'in').length >= K.QUEUE.max) return;
-    const c = {
-      id: st.seq++, x: K.EXIT.x + U.rand(-8, 8), y: K.ROOM.y1 + 14, state: 'in', route: [{ x: K.EXIT.x - 40, y: K.EXIT.y - 30 }],
-      want: U.randInt(1, 3), have: 0, cd: 0, pay: 0, booth: -1, eat: 0, facing: -1, moving: true, bob: Math.random() * 6,
-      shirt: U.pick(COLORS.shirts), skin: U.pick(COLORS.skins), hair: U.pick(['#2b1d14', '#5a3a1a', '#d9a066', '#1a1a1a', '#8c3b2f', '#c7c7c7']), hairStyle: U.randInt(0, 3), stripes: Math.random() < 0.3,
-    };
-    st.customers.push(c);
+    if (st.customers.length >= K.MAX_CUSTOMERS || st.customers.filter((c) => c.inMainQueue || c.entering).length >= K.QUEUE.max) return;
+    st.customers.push(new ShopCustomer(BurgerShop, st.seq++, Shop.want(this.state(g).grillLv)));
   },
-  // walk a customer along their route; true once it is used up
-  walk(c, dt, speed) {
-    while (c.route.length) {
-      const wp = c.route[0], px = c.x;
-      const done = U.moveToward(c, wp.x, wp.y, speed, dt);
-      if (Math.abs(c.x - px) > 0.01) c.facing = c.x > px ? 1 : -1;
-      if (!done) { c.moving = true; return false; }
-      c.route.shift(); dt = 0;
-    }
-    c.moving = false;
-    return true;
-  },
-  stepCustomer(g, c, dt) {
-    const st = this.st, K = CFG.BURGER, s = this.state(g), sp = 120;
-    c.cd -= dt;
-    if (c.moving) c.bob += dt * 14;
-    if (c.state === 'in') { if (this.walk(c, dt, sp)) c.state = 'queue'; return; }
-    if (c.state === 'queue') {
-      const i = this.queueIndex(c), tx = K.QUEUE.x, ty = K.QUEUE.y + i * K.QUEUE.dy;
-      const arrived = U.moveToward(c, tx, ty, sp, dt); c.moving = !arrived; if (!arrived) c.facing = tx >= c.x ? 1 : -1;
-      if (arrived && i === 0 && c.cd <= 0 && s.piles.counter > 0 && c.have < c.want) {
-        s.piles.counter--; c.have++; c.cd = 0.3;
-        this.fly(K.DISPLAY.x, K.DISPLAY.y - 10, c.x, c.y - 50, 0.25);
-      }
-      if (c.have >= c.want) c.state = 'pay';
-      return;
-    }
-    if (c.state === 'pay') {
-      const i = this.payIndex(c), tx = K.PAY.x, ty = K.PAY.y + i * K.PAY.dy;
-      const arrived = U.moveToward(c, tx, ty, sp, dt); c.moving = !arrived; if (!arrived) c.facing = tx >= c.x ? 1 : -1;
-      if (arrived && i === 0 && this.cashierPresent(g)) {
-        c.pay += dt / K.PAY_T;
-        if (c.pay >= 1) {
-          const amt = c.want * K.PRICE;
-          s.piles.cash += amt; s.served += c.want; s.earned += amt;
-          g.secEarned = (g.secEarned || 0) + amt;
-          if (g.area === 'burger') { g.floats.push({ x: K.REGISTER.x, y: K.REGISTER.y - 30, text: '+' + U.money(amt), color: '#2f9e44', t: 0, dur: 1 }); Sfx.cash(); }
-          this.fly(K.REGISTER.x, K.REGISTER.y - 8, K.CASH.x, K.CASH.y - 6, 0.3);
-          // some sit down in a free booth to eat; the rest take theirs away
-          const free = [0, 1].filter((b) => !this.boothTaken(b) && st.seat !== b);
-          if (free.length && Math.random() < K.BOOTH_CHANCE) {
-            const b = U.pick(free), q = this.seats()[b];
-            c.booth = b; c.state = 'toBooth'; c.route = [{ x: K.BOOTH.x0 - 16, y: q.spot.y - 6 }, { x: q.spot.x, y: q.spot.y }, { x: q.x + 26, y: q.y }];
-          } else this.goOut(c);
-        }
-      }
-      return;
-    }
-    if (c.state === 'toBooth') { if (this.walk(c, dt, sp)) { c.state = 'eating'; c.eat = 0; c.facing = -1; } return; }
-    if (c.state === 'eating') {
-      c.eat += dt;
-      if (c.eat >= K.EAT_T) {
-        s.tips[c.booth] = (s.tips[c.booth] || 0) + K.TIP;
-        const q = this.seats()[c.booth];
-        c.route = [{ x: q.spot.x, y: q.spot.y }, { x: K.BOOTH.x0 - 16, y: q.spot.y - 6 }];
-        c.state = 'leaving'; c.booth = -1;
-      }
-      return;
-    }
-    if (c.state === 'leaving') { if (this.walk(c, dt, sp)) this.goOut(c); return; }
-    if (c.state === 'out') { if (this.walk(c, dt, sp * 1.1)) c.state = 'gone'; }
-  },
-  goOut(c) { const K = CFG.BURGER; c.state = 'out'; c.route = [{ x: K.EXIT.x + 30, y: K.EXIT.y - 30 }, { x: K.EXIT.x + 10, y: K.ROOM.y1 + 16 }]; },
   // the chef: grab burgers at the pile, put them on the display, collect the cash pile and the booth tips
   stepChef(g, dt) {
-    const st = this.st, s = this.state(g), K = CFG.BURGER, p = g.player;
+    const st = this.st, s = this.state(g);
     st.xferCd -= dt;
-    if (st.xferCd <= 0 && s.piles.grill > 0 && st.carry < this.carryCap(g) && this.near(g, K.PILE, 52)) {
-      s.piles.grill--; st.carry++; st.xferCd = K.XFER;
-      this.fly(K.PILE.x, K.PILE.y - 6, p.x, p.y - 60, 0.15); Sfx.pickup();
-    }
-    if (st.xferCd <= 0 && st.carry > 0 && s.piles.counter < K.DISPLAY_CAP && this.near(g, K.DISPLAY, 54)) {
-      st.carry--; s.piles.counter++; st.xferCd = K.XFER;
-      this.fly(p.x, p.y - 60, K.DISPLAY.x, K.DISPLAY.y - 8, 0.15); Sfx.drop();
-    }
-    if (s.piles.cash > 0 && this.near(g, K.CASH, 46)) {
-      const amt = s.piles.cash; s.piles.cash = 0; this.pocket(g, amt, K.CASH, '+');
-    }
-    this.seats().forEach((q, i) => { if (s.tips[i] > 0 && this.near(g, q.spot, 58)) { const amt = s.tips[i]; s.tips[i] = 0; this.pocket(g, amt, q.tip, 'Tip +'); } });
-  },
-  pocket(g, amt, pos, prefix) {
-    const p = g.player;
-    g.s.cash += amt; g.s.stats.earned += amt;
-    for (let i = 0; i < Math.min(8, Math.ceil(amt / 15)); i++) g.fx.push({ kind: 'bill', x0: pos.x + U.rand(-14, 14), y0: pos.y + U.rand(-8, 4), x1: p.x, y1: p.y - 10, t: -i * 0.04, dur: 0.3, follow: true });
-    g.floats.push({ x: p.x, y: p.y - 46, text: prefix + U.money(amt), color: '#ffe08a', t: 0, dur: 1, big: true });
-    Sfx.cash(); Haptics.tap();
-  },
-  stepStaff(g, w, dt) {
-    const s = this.state(g), K = CFG.BURGER;
-    w.cd -= dt;
-    const go = (pt) => { const px = w.x; const done = U.moveToward(w, pt.x, pt.y, K.STAFF_SPEED, dt); if (Math.abs(w.x - px) > 0.01) w.facing = w.x > px ? 1 : -1; w.moving = !done; if (w.moving) w.bob += dt * 14; return done; };
-    if (w.role === 'cashier') { if (go(K.CASHIER_SPOT)) w.facing = 1; return; }
-    // the cook: fill up at the pile, carry it to the display, back again
-    const toDisplay = w.carry > 0 && (w.carry >= K.COOK_CAP || s.piles.grill === 0);
-    if (!toDisplay) {
-      if (go({ x: K.PILE_STAND.x + 8, y: K.PILE_STAND.y }) && s.piles.grill > 0 && w.carry < K.COOK_CAP && w.cd <= 0) {
-        s.piles.grill--; w.carry++; w.cd = 0.15;
-        this.fly(K.PILE.x, K.PILE.y - 6, w.x, w.y - 60, 0.15);
-      }
-    } else if (go(K.DISPLAY_STAND) && w.cd <= 0) {
-      if (s.piles.counter < K.DISPLAY_CAP) { w.carry--; s.piles.counter++; w.cd = 0.15; this.fly(w.x, w.y - 60, K.DISPLAY.x, K.DISPLAY.y - 8, 0.15); }
-    }
+    Shop.chef(g, BurgerShop, st, this.carryCap(g));
+    this.seats().forEach((q, i) => { if (s.tips[i] > 0 && this.near(g, q.spot, 58)) { const amt = s.tips[i]; s.tips[i] = 0; Shop.pocket(g, amt, q.tip, 'Tip +'); } });
   },
   stepOrder(g, dt) {
     const st = this.st, o = st.order, K = CFG.BURGER, T = K.T, p = g.player;
@@ -466,14 +404,14 @@ const BurgerExt = {
     if (o && (o.phase === 'give' || o.phase === 'eat')) return { text: o.kind === 'burger' ? 'CHOMP! CHOMP! 🍔' : 'Slurp! 🥤', target: null };
     if (st.seat !== null) return { text: 'Comfy! Press the button to stand up 🪑', target: null };
     const at = (pt, r) => (this.near(g, pt, r) ? null : pt);
-    const payer = st.customers.find((c) => c.state === 'pay' && this.payIndex(c) === 0 && U.dist(c.x, c.y, K.PAY.x, K.PAY.y) < 4);
+    const payer = st.customers.find((c) => c.state === 'paying');
     if (st.carry > 0 && s.piles.counter < K.DISPLAY_CAP) return { text: 'Put the burgers on the counter! 🍔', target: at(K.DISPLAY_STAND, 30) };
     if (payer && !this.cashierPresent(g)) return { text: 'Stand at the register to take the money! 💵', target: K.CASHIER_SPOT };
     if (payer && !s.cashier) return { text: 'Ka-ching! 💵', target: null };
     if (s.piles.cash > 0) return { text: 'Grab the money! 💵', target: K.CASH };
     const tip = this.seats().findIndex((q, i) => s.tips[i] > 0);
     if (tip >= 0) return { text: 'A tip on the table! 💵', target: this.seats()[tip].spot };
-    const hungry = st.customers.some((c) => c.state === 'queue' || c.state === 'in');
+    const hungry = st.customers.some((c) => c.inMainQueue || c.entering);
     if (s.piles.grill > 0 && st.carry < this.carryCap(g) && (hungry || s.piles.counter < 3) && !s.cook) return { text: 'Grab the burgers! 🍔', target: at(K.PILE_STAND, 30) };
     if (s.piles.grill === 0 && st.carry === 0 && s.piles.counter === 0 && hungry) return { text: 'The grill is cooking… 🔥', target: null };
     if (st.carry > 0) return { text: 'Eat a burger! 😋', target: null };
@@ -753,7 +691,7 @@ const BurgerExt = {
     // a patty sizzling on the left, and the burger being stacked on the right
     const px = G.x0 + 28, py = (y0 + y1) / 2 + 4;
     ctx.save(); ctx.translate(px, py); ctx.scale(0.8, 0.8); this.drawLayer(ctx, 'patty'); ctx.restore();
-    const k = U.clamp(st.grillT[i] / this.grillTime(g), 0, 1), n = Math.min(6, Math.floor(k * 7));
+    const k = U.clamp(st.grills[i].t / this.grillTime(g), 0, 1), n = Math.min(6, Math.floor(k * 7));
     if (n > 0) this.drawBurger(ctx, G.x1 - 32, py + 2, n, 0.8, 0, 1);
     for (const q of st.steam) if (q.x > G.x0 && q.x < G.x1) { const a = q.t / 1.3; ctx.fillStyle = `rgba(255,255,255,${(0.65 * (1 - a)).toFixed(2)})`; ctx.beginPath(); ctx.arc(q.x, q.y, 3 + a * 5, 0, Math.PI * 2); ctx.fill(); }
   },
@@ -792,7 +730,7 @@ const BurgerExt = {
     ctx.fillStyle = '#d7dbe0'; ctx.beginPath(); ctx.ellipse(D.x, D.y + 2, 34, 9, 0, 0, Math.PI * 2); ctx.fill();
     for (let i = 0; i < s.piles.counter; i++) this.drawBurger(ctx, D.x + (i % 2 ? 13 : -13), D.y + 4 - Math.floor(i / 2) * 9, 6, 0.6, 0, 1);
     // the register: a little till with a drawer that pops while someone pays
-    const R = K.REGISTER, paying = this.st.customers.some((c) => c.state === 'pay' && c.pay > 0 && c.pay < 1);
+    const R = K.REGISTER, paying = this.st.customers.some((c) => c.state === 'paying' && c.payProg > 0 && c.payProg < 1);
     ctx.fillStyle = '#5c6670'; U.roundRect(ctx, R.x - 16, R.y - 20, 32, 22, 4); ctx.fill();
     ctx.fillStyle = '#7ee081'; ctx.fillRect(R.x - 11, R.y - 17, 22, 7);
     ctx.fillStyle = '#2b1d14'; ctx.font = r.font(6); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('$' + K.PRICE, R.x, R.y - 13);
@@ -811,8 +749,8 @@ const BurgerExt = {
     ctx.fillStyle = '#fff1d0'; U.roundRect(ctx, x0 + 2, top + 30, x1 - x0 - 4, 19, 4); ctx.fill();
     ctx.fillStyle = '#e53935'; U.roundRect(ctx, x1 - 22, top + 33, 4, 9, 1.5); ctx.fill(); ctx.fillStyle = '#ffd166'; U.roundRect(ctx, x1 - 16, top + 33, 4, 9, 1.5); ctx.fill();   // ketchup & mustard
     // a burger on the table while a customer eats, a tip after
-    const c = this.st.customers.find((q) => q.booth === i && q.state === 'eating');
-    if (c) this.drawBurger(ctx, (x0 + x1) / 2 + 4, top + 44, 6, 0.7, Math.floor((c.eat / CFG.BURGER.EAT_T) * 4), -1);
+    const c = this.st.customers.find((q) => q.table === this.st.tables[i] && q.state === 'eating');
+    if (c) this.drawBurger(ctx, (x0 + x1) / 2 + 4, top + 44, 6, 0.7, Math.floor((1 - c.timer / c.eatDur) * 4), -1);
     if (s.tips[i] > 0) { const q = this.seats()[i].tip; ctx.fillStyle = '#2f9e44'; U.roundRect(ctx, q.x - 9, q.y - 5, 18, 9, 2); ctx.fill(); ctx.fillStyle = '#7ee081'; ctx.fillRect(q.x - 6, q.y - 2, 12, 3); }
   },
   drawBoothFront(r, g, top) {
@@ -831,20 +769,25 @@ const BurgerExt = {
   drawCustomer(r, g, c) {
     const ctx = r.ctx, K = CFG.BURGER;
     const sitting = c.state === 'eating';
-    r.drawPerson(c.x, c.y, { shirt: c.shirt, skin: c.skin, hair: c.hair, hairStyle: c.hairStyle, stripes: c.stripes, facing: c.facing, moving: c.moving, bob: c.bob, carry: 0, pants: '#4a4a4a' });
+    c.bob = (c.bob || 0) + (c.moving ? 0.25 : 0);
+    r.drawPerson(c.x, c.y, { shirt: c.shirt, skin: c.skin, hair: c.hair, hairStyle: c.hairStyle, stripes: c.stripes, facing: c.facing, moving: c.moving, bob: c.bob, carry: 0, angry: c.angry, pants: '#4a4a4a' });
     const bob = c.moving ? Math.sin(c.bob) * 2 : 0;
-    if (!sitting && c.have > 0 && c.state !== 'out' && c.state !== 'leaving') this.drawCarried(r, g, c.x, c.y, c.have, 0, bob, 0);
-    // what the customer at the front wants: burgers, then money
-    if (c.state === 'queue' && this.queueIndex(c) === 0 && U.dist(c.x, c.y, K.QUEUE.x, K.QUEUE.y) < 4) {
+    if (!sitting && c.have > 0) this.drawCarried(r, g, c.x, c.y, c.have, 0, bob, 0);
+    // what the customer at the front wants: burgers, then money; the patience bar like the pizzeria's
+    const by = c.y - 70 - c.have * 9, frac = c.patience / c.patienceMax;
+    if (c.state === 'queue' && this.queueIndex(c) === 0) {
       const left = c.want - c.have;
-      r.drawBubble(c.x, c.y - 70 - c.have * 9, () => { ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('🍔×' + left, 0, 0); }, 52);
-    } else if (c.state === 'pay' && this.payIndex(c) === 0 && U.dist(c.x, c.y, K.PAY.x, K.PAY.y) < 4) {
-      r.drawBubble(c.x, c.y - 70 - c.have * 9, () => { ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('💵', 0, 0); }, 34);
-      if (c.pay > 0) r.drawProgressRing(c.x, c.y - 20, 22, c.pay, '#2f9e44');
-    }
+      r.drawBubble(c.x, by, () => { ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('🍔×' + left, 0, 0); }, 52);
+      r.drawPatience(c.x, by - 18, frac);
+    } else if (c.state === 'paying') {
+      r.drawBubble(c.x, by, () => { ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#2b1d14'; ctx.fillText('💵', 0, 0); }, 34);
+      if (c.payProg > 0) r.drawProgressRing(c.x, c.y - 20, 22, c.payProg, '#2f9e44');
+      else if (frac < 0.5) r.drawPatience(c.x, by - 18, frac);
+    } else if ((c.inMainQueue || c.inPayQueue) && frac < 0.35) r.drawPatience(c.x, c.y - 60 - c.have * 9, frac);
   },
   drawStaff(r, g, w) {
     const ctx = r.ctx, x = w.x, y = w.y;
+    w.bob = (w.bob || 0) + (w.moving ? 0.25 : 0);
     if (w.role === 'cook') {
       r.drawPerson(x, y, { shirt: '#e53935', skin: '#e0ac69', hair: '#6b3e1e', hairStyle: 0, facing: w.facing, moving: w.moving, bob: w.bob, carry: 0, apron: '#fff', pants: '#2d3a4a' });
       ctx.fillStyle = '#fff'; ctx.strokeStyle = 'rgba(43,29,20,0.45)'; ctx.lineWidth = 1.2;
@@ -889,7 +832,7 @@ const BurgerExt = {
       items.push({ y: top + 78, draw: () => this.drawBoothFront(r, g, top) });
     });
     for (const P of K.PLANTS) items.push({ y: P.y + 6, draw: () => this.drawPlant(r, g, P) });
-    for (const c of st.customers) items.push({ y: c.state === 'eating' ? K.BOOTH.tops[c.booth] + 40 : c.y, draw: () => this.drawCustomer(r, g, c) });
+    for (const c of st.customers) items.push({ y: c.state === 'eating' ? K.BOOTH.tops[c.table.i] + 40 : c.y, draw: () => this.drawCustomer(r, g, c) });
     for (const w of st.staff) items.push({ y: w.y, draw: () => this.drawStaff(r, g, w) });
   },
   overlay(r, g) {

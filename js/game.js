@@ -1,5 +1,60 @@
 'use strict';
 // Core simulation: persistent state, economy, player interactions and all systems.
+
+// The pizzeria as a shop for the shared restaurant code (js/shop.js): where things are, its timings and its art.
+const PizzeriaShop = {
+  key: 'pizzeria', area: 'town',
+  keys: { made: 'oven', display: 'display', cash: 'cash' },
+  PILE_CAP: 6,                                   // the oven pile, before Better Oven levels
+  PAY_PATIENCE: 70,                              // seconds a customer waits in the register line
+  SIT_CHANCE: 0.65,                              // how many sit down at a free table after paying
+  get pile() { return CFG.OVEN_PILE; },
+  get display() { return CFG.DISPLAY; },
+  get cashPile() { return CFG.CASH_PILE; },
+  get cashierSpot() { return CFG.CASHIER_SPOT; },
+  get cashierStand() { return { x: CFG.CASHIER_SPOT.x + 24, y: CFG.CASHIER_SPOT.y }; },
+  get cleanerHome() { return CFG.CLEANER_HOME; },
+  cashierFacing: -1, handY: 30, tableFacing: 1,
+  get eatTime() { return CFG.EAT_TIME; },
+  get tipRate() { return CFG.TIP_RATE; },
+  get payPatience() { return this.PAY_PATIENCE; },
+  get sitChance() { return this.SIT_CHANCE; },
+  patience() { return Shop.patience(CFG.PATIENCE, Game.decorCount()); },
+  customers: (g) => g.customers, staff: (g) => g.staff, piles: (g) => g.s.piles, tables: (g) => g.tables,
+  price: (g) => g.price(), payTime: (g) => g.checkoutTime(), cashierPresent: (g) => g.cashierPresent(),
+  lineIndex: (g, c) => g.queueIndex(c), payIndex: (g, c) => g.payIndex(c),
+  // the line: inside along the counter, then out of the door
+  queueSpot(g, i) {
+    const Q = CFG.QUEUE; if (i < Q.max) return { x: Q.x, y: Q.y + i * Q.dy };
+    const o = CFG.STATION.overflow; return { x: o.x, y: o.y + (i - Q.max) * o.dy, outside: true };
+  },
+  paySpot(g, i) { const P = CFG.PAY_QUEUE; return { x: P.x + i * P.dx, y: P.y }; },
+  enter(c) { c.x = CFG.SPAWN_OUT.x; c.y = CFG.SPAWN_OUT.y; c.route = [CFG.DOOR_OUT, CFG.ENTRANCE]; },
+  exitRoute() { return [CFG.ENTRANCE, CFG.DOOR_OUT, { x: CFG.SPAWN_OUT.x + U.rand(0, 10), y: CFG.SPAWN_OUT.y + U.rand(-12, 12) }]; },
+  paid(g, c, amount) {
+    g.earn(amount, CFG.CASH_PILE, 'register');
+    if (c.special) { g.floats.push({ x: c.x, y: c.y - 64, text: SPECIALS[c.special].thanks, color: '#ff6b8a', t: 0, dur: 1.6, big: true }); g.s.stats.specials = (g.s.stats.specials || 0) + 1; }
+    g.fx.push({ kind: 'cash', x0: c.x, y0: c.y - 20, x1: CFG.CASH_PILE.x, y1: CFG.CASH_PILE.y, t: 0, dur: 0.35 });
+  },
+  lost(g) { g.s.stats.lost++; },
+  freeTable: (g) => g.findFreeTable(),
+  tableRoute(t) { return [{ x: t.x, y: t.y - 34 }]; },
+  tableExit() { return []; },
+  // a tip on the table, and the table needs a wipe
+  tipped(g, c, t, tip) {
+    t.tip += tip;
+    g.floats.push({ x: t.x, y: t.y - 30, text: 'Tip ' + U.money(tip), color: '#2f9e44', t: 0, dur: 1.2 });
+    t.dirty = true; t.cleanProg = 0;
+  },
+  fly(g, x0, y0, x1, y1, dur) { g.fx.push({ kind: 'pizza', x0, y0, x1, y1, t: 0, dur }); },
+  dropTargets: (g) => g.dropTargets(), stackNeed: (g, key) => g.stackNeed(key),
+  staffStart() { const d = CFG.OFFICE_DESK; return { x: d.x, y: d.y - 50 }; },
+  staffSpeed: (g, role) => g.staffSpeed(role), carrierCap: (g) => g.helperCap(),
+  pileStand(w) { return { x: CFG.OVEN_PILE_STAND.x + (w.index - 1) * 34, y: CFG.OVEN_PILE_STAND.y + 10 }; },
+  dropStand(t, w) { return { x: t.stand.x + (w.index - 1) * 30, y: t.stand.y }; },
+  cleanTime: (g) => g.cleanTime('cleaner'), cleanTable: (g, t) => g.cleanTable(t),
+};
+
 const Game = {
   s: null,
   player: null,
@@ -155,13 +210,14 @@ const Game = {
     this.buildRuntime();
   },
 
-  // Offline progress: staff keep a fraction of the measured income going while away.
+  // Offline progress (the shared rule, js/shop.js): the ovens fill their pile, and with a cashier and a helper hired
+  // the shop keeps a share of the measured income going while away.
   computeOffline() {
     const s = this.s;
-    const elapsed = Math.min(CFG.OFFLINE_MAX_SEC, (Date.now() - (s.savedAt || Date.now())) / 1000);
-    if (elapsed < 30) return null;
-    if (s.staff.cashier.count < 1 || s.staff.helper.count < 1) return null;
-    const earned = s.incomeRate * elapsed * CFG.OFFLINE_EFFICIENCY;
+    const elapsed = Shop.awaySeconds(this);
+    if (elapsed < SHOP.AWAY_MIN) return null;
+    s.piles.oven = Math.max(s.piles.oven, this.ovenPileCap());
+    const earned = Shop.awayEarnings(elapsed, s.staff.cashier.count > 0 && s.staff.helper.count > 0, s.incomeRate);
     if (earned < 1) return null;
     s.cash += earned; s.stats.earned += earned;
     return { earned, elapsed };
@@ -177,23 +233,23 @@ const Game = {
   hasDecor(key) { return !!this.s.decor[key]; },
   coinValue() { return Math.round(this.price() * 2); },
   playerSpeed() { return 175 + 22 * this.s.upg.speed; },
-  playerCap() { return Math.round(4 * Math.pow(1.5, this.s.upg.capacity)); },
-  bakeTime() { return CFG.BAKE_TIME / (1 + 0.25 * this.s.upg.oven); },
-  ovenPileCap() { return 6 + 2 * this.s.upg.oven; },
+  playerCap() { return Shop.chefCap(this.s.upg.capacity); },
+  bakeTime() { return Shop.stationTime(CFG.BAKE_TIME, this.s.upg.oven); },
+  ovenPileCap() { return Shop.stationCap(PizzeriaShop.PILE_CAP, this.s.upg.oven); },
   ovenCount() { return this.isUnlocked('oven2') ? 2 : 1; },
-  spawnInterval() { return CFG.SPAWN_BASE / (1 + 0.15 * this.decorCount()); },
+  spawnInterval() { return Shop.spawnInterval(CFG.SPAWN_BASE, this.decorCount()); },
   carSpawnInterval() { return CFG.CAR_SPAWN_BASE / (1 + 0.08 * this.decorCount()); },
-  patienceBonus() { return 1 + 0.08 * this.decorCount(); },
+  patienceBonus() { return Shop.patience(1, this.decorCount()); },
   checkoutTime() {
     const staffed = this.staff.some((st) => st.role === 'cashier' && st.state === 'working');
     const lvl = staffed ? this.s.staff.cashier.level : 0;
-    return CFG.CHECKOUT_TIME / (1 + 0.3 * lvl);
+    return Shop.payTime(CFG.CHECKOUT_TIME, lvl);
   },
-  staffSpeed(role) { return 145 + 20 * this.s.staff[role].level; },
-  helperCap() { return 3 + 2 * this.s.staff.helper.level; },
+  staffSpeed(role) { return Shop.staffSpeed(this.s.staff[role].level); },
+  helperCap() { return Shop.staffCap(this.s.staff.helper.level); },
   cleanTime(who) { return who === 'cleaner' ? CFG.CLEAN_TIME / (1 + 0.35 * this.s.staff.cleaner.level) : CFG.CLEAN_TIME; },
 
-  upgradeCost(key) { const u = CFG.UPGRADES[key]; return Math.round(u.base * Math.pow(u.growth, this.s.upg[key]) * this.costMult()); },
+  upgradeCost(key) { const u = CFG.UPGRADES[key]; return Math.round(Shop.cost(u.base, this.s.upg[key], u.growth) * this.costMult()); },
   upgradeMaxed(key) { return this.s.upg[key] >= CFG.UPGRADES[key].max; },
   applyUpgrade(key) {
     this.s.upg[key]++;
@@ -201,7 +257,7 @@ const Game = {
   },
   staffAvailable(role) { const st = CFG.STAFF[role]; return !st.needs || this.isUnlocked(st.needs); },
   staffHireCost(role) { const st = CFG.STAFF[role]; const n = this.s.staff[role].count; return n >= st.hire.length ? null : Math.round(st.hire[n] * this.costMult()); },
-  staffUpgradeCost(role) { const st = CFG.STAFF[role]; const l = this.s.staff[role].level; return l >= st.upMax ? null : Math.round(st.upBase * Math.pow(st.upGrowth, l) * this.costMult()); },
+  staffUpgradeCost(role) { const st = CFG.STAFF[role]; const l = this.s.staff[role].level; return l >= st.upMax ? null : Math.round(Shop.cost(st.upBase, l, st.upGrowth) * this.costMult()); },
   // What a staff pad does next. Default: hire while there are openings, then train.
   // mode 'hire' / 'train' splits the two onto separate pads (used for helpers).
   staffPadAction(role, mode) {
@@ -279,37 +335,24 @@ const Game = {
 
   activeTables() { const n = this.isUnlocked('tables2') ? 4 : this.isUnlocked('dining') ? 2 : 0; return this.tables.slice(0, n); },
   findFreeTable() { return this.activeTables().find((t) => !t.dirty && !t.occupied) || null; },
-  cashierPresent() {
-    if (this.staff.some((st) => st.role === 'cashier' && st.state === 'working')) return true;
-    return U.dist(this.player.x, this.player.y, CFG.CASHIER_SPOT.x, CFG.CASHIER_SPOT.y) < 46;
-  },
+  cashierPresent() { return Shop.cashierPresent(this, PizzeriaShop); },
   dropTargets() {
-    const t = [{ key: 'display', pos: CFG.DISPLAY, stand: CFG.DISPLAY_STAND, cap: CFG.DISPLAY_CAP }];
+    const t = [{ key: 'display', pos: CFG.DISPLAY, stand: CFG.DISPLAY_STAND, cap: CFG.DISPLAY_CAP, main: true }];
     if (this.isUnlocked('driveThru')) t.push({ key: 'dt', pos: CFG.DT_STACK, stand: CFG.DT_STACK_STAND, cap: CFG.DT_STACK_CAP });
     return t;
   },
   // How many more pizzas a stack needs: what the people waiting on it still want, minus what is already there.
   stackNeed(key) {
     const wanted = key === 'display'
-      ? this.customers.filter((c) => c.inMainQueue || c.entering).reduce((n, c) => n + (c.want - c.have), 0)
+      ? Shop.lineWant(this.customers)
       : this.cars.filter((c) => c.inLine).reduce((n, c) => n + (c.want - c.have), 0);
     return wanted - this.s.piles[key];
   },
   // Where a helper should take pizzas: the stack with the biggest unmet demand, else the emptiest one.
-  bestDropTarget(exclude) {
-    let best = null, bestScore = -Infinity;
-    for (const t of this.dropTargets()) {
-      if (exclude && t.key === exclude) continue;
-      if (this.s.piles[t.key] >= t.cap) continue;
-      const need = this.stackNeed(t.key);
-      const score = need > 0 ? 100 + need : (1 - this.s.piles[t.key] / t.cap);
-      if (score > bestScore) { bestScore = score; best = t; }
-    }
-    return best;
-  },
-  queueIndex(c) { let i = 0; for (const o of this.customers) { if (o === c) return i; if (o.inMainQueue) i++; } return i; },
-  payIndex(c) { let i = 0; for (const o of this.customers) { if (o === c) return i; if (o.inPayQueue) i++; } return i; },
-  carIndex(c) { let i = 0; for (const o of this.cars) { if (o === c) return i; if (o.inLine) i++; } return i; },
+  bestDropTarget(exclude) { return Shop.bestTarget(PizzeriaShop, this, exclude); },
+  queueIndex(c) { return Shop.lineIndex(this.customers, c, (o) => o.inMainQueue); },
+  payIndex(c) { return Shop.lineIndex(this.customers, c, (o) => o.inPayQueue); },
+  carIndex(c) { return Shop.lineIndex(this.cars, c, (o) => o.inLine); },
   countMainQueue() { return this.customers.filter((c) => c.inMainQueue || c.entering).length; },
   insideBuilding(x, y) { const b = CFG.BUILDING; return x > b.x0 && x < b.x1 && y > b.y0 && y < b.y1; },
   // which map the player is on: the pizza town or Construction Town down the line
@@ -326,27 +369,17 @@ const Game = {
     this.floats.push({ x: pos.x + U.rand(-10, 10), y: pos.y - 20, text: '+' + U.money(amount), color: '#2f9e44', t: 0, dur: 1 });
   },
   collect(pileKey, pos) {
-    const amt = pileKey === 'cash' ? this.s.piles.cash : this.s.piles.dtCash;
-    if (amt <= 0) return;
-    this.s.cash += amt; this.s.stats.earned += amt;
+    const amt = this.s.piles[pileKey];
+    if (!(amt > 0)) return;
     this.s.piles[pileKey] = 0;
-    const n = Math.min(8, Math.ceil(amt / 15));
-    for (let i = 0; i < n; i++) {
-      this.fx.push({ kind: 'bill', x0: pos.x + U.rand(-14, 14), y0: pos.y + U.rand(-10, 4), x1: this.player.x, y1: this.player.y - 10, t: -i * 0.04, dur: 0.3, follow: true });
-    }
-    this.floats.push({ x: this.player.x, y: this.player.y - 46, text: '+' + U.money(amt), color: '#ffe08a', t: 0, dur: 1, big: true });
-    Sfx.cash(); Haptics.tap();
+    Shop.pocket(this, amt, pos);
   },
   // Tips left on tables: the player pockets them directly; the cleaner carries them to the register pile.
   collectTip(t, byPlayer) {
     const amt = t.tip; t.tip = 0;
     if (amt <= 0) return;
-    if (byPlayer) {
-      this.s.cash += amt; this.s.stats.earned += amt;
-      for (let i = 0; i < Math.min(5, Math.ceil(amt / 10)); i++) this.fx.push({ kind: 'bill', x0: t.x + U.rand(-10, 10), y0: t.y - 6, x1: this.player.x, y1: this.player.y - 10, t: -i * 0.04, dur: 0.3, follow: true });
-      this.floats.push({ x: this.player.x, y: this.player.y - 46, text: 'Tip +' + U.money(amt), color: '#ffe08a', t: 0, dur: 1, big: true });
-      Sfx.cash(); Haptics.tap();
-    } else {
+    if (byPlayer) Shop.pocket(this, amt, { x: t.x, y: t.y }, 'Tip +', 10, 5);
+    else {
       this.s.piles.cash += amt;
       this.fx.push({ kind: 'cash', x0: t.x, y0: t.y - 6, x1: CFG.CASH_PILE.x, y1: CFG.CASH_PILE.y, t: 0, dur: 0.5 });
     }
@@ -410,11 +443,7 @@ const Game = {
     for (const f of this.floats) { f.t += dt; f.y -= 28 * dt; }
     this.floats = this.floats.filter((f) => f.t < f.dur);
 
-    this.secT += dt;
-    if (this.secT >= 1) {
-      s.incomeRate = U.lerp(s.incomeRate, this.secEarned / this.secT, 0.04);
-      this.secEarned = 0; this.secT = 0;
-    }
+    s.incomeRate = Shop.meter(this, dt, s.incomeRate);
     this.saveT += dt;
     if (this.saveT > 5) { this.saveT = 0; this.save(); }
     this.computeHint();
@@ -739,12 +768,7 @@ const Game = {
         if (this.icCustomers.length < 4) this.icCustomers.push(new IceCreamCustomer(this.seq++));
       }
       const IC = CFG.ICE_CREAM;
-      if (s.iceCream.cash > 0 && U.dist(p.x, p.y, IC.cash.x, IC.cash.y) < 50) {
-        const amt = s.iceCream.cash; s.iceCream.cash = 0; s.cash += amt; s.stats.earned += amt;
-        for (let i = 0; i < Math.min(8, Math.ceil(amt / 15)); i++) this.fx.push({ kind: 'bill', x0: IC.cash.x + U.rand(-14, 14), y0: IC.cash.y, x1: p.x, y1: p.y - 10, t: -i * 0.04, dur: 0.3, follow: true });
-        this.floats.push({ x: p.x, y: p.y - 46, text: '+' + U.money(amt), color: '#ffe08a', t: 0, dur: 1, big: true });
-        Sfx.cash(); Haptics.tap();
-      }
+      if (s.iceCream.cash > 0 && U.dist(p.x, p.y, IC.cash.x, IC.cash.y) < 50) { const amt = s.iceCream.cash; s.iceCream.cash = 0; Shop.pocket(this, amt, IC.cash); }
     }
     this.nearVehicle = this.findNearVehicle(); this.carNear = !!this.nearVehicle;
     this.nearPrep = !this.driving && !this.onTrain && U.dist(p.x, p.y, CFG.PREP_TABLE.x, CFG.PREP_TABLE.y + 10) < 64;
@@ -754,16 +778,8 @@ const Game = {
   hitRect(px, py, r, o) { return px + r > o.x && px - r < o.x + o.w && py + r > o.y && py - r < o.y + o.h; },
 
   updateOvens(dt) {
-    const bt = this.bakeTime();
-    for (let i = 0; i < this.ovenCount(); i++) {
-      const ov = this.ovens[i];
-      if (this.s.piles.oven >= this.ovenPileCap()) { ov.t = Math.min(ov.t, bt * 0.98); continue; }
-      ov.t += dt;
-      if (ov.t >= bt) {
-        ov.t = 0; this.s.piles.oven++;
-        this.fx.push({ kind: 'pizza', x0: CFG.OVENS[i].x + 20, y0: CFG.OVENS[i].y, x1: CFG.OVEN_PILE.x, y1: CFG.OVEN_PILE.y - 10, t: 0, dur: 0.3 });
-      }
-    }
+    Shop.produce(this.ovens, this.ovenCount(), this.bakeTime(), this.s.piles, 'oven', this.ovenPileCap(), dt,
+      (i) => this.fx.push({ kind: 'pizza', x0: CFG.OVENS[i].x + 20, y0: CFG.OVENS[i].y, x1: CFG.OVEN_PILE.x, y1: CFG.OVEN_PILE.y - 10, t: 0, dur: 0.3 }));
   },
 
   updateInteractions(dt) {
@@ -771,23 +787,13 @@ const Game = {
     p.xferCd -= dt;
     const near = (pos, r) => U.dist(p.x, p.y, pos.x, pos.y) < r;
 
-    if (near(CFG.OVEN_PILE, 52) && s.piles.oven > 0 && p.carry < this.playerCap() && p.xferCd <= 0) {
-      s.piles.oven--; p.carry++; p.xferCd = CFG.XFER_DELAY;
-      this.fx.push({ kind: 'pizza', x0: CFG.OVEN_PILE.x, y0: CFG.OVEN_PILE.y - 10, x1: p.x, y1: p.y - 30, t: 0, dur: 0.15 });
-      Sfx.pickup();
-    }
+    // on foot in the shop: the oven pile, the counter and the drive-thru stack, the cash pile (shared with every shop)
+    if (!this.driving) Shop.chef(this, PizzeriaShop, p, this.playerCap());
     // driving past the drive-thru window loads pizzas from the window stack onto the vehicle
     if (this.driving && this.isUnlocked('driveThru') && near(CFG.DT_WINDOW, 84) && s.piles.dt > 0 && p.carry < this.playerCap() && p.xferCd <= 0) {
       s.piles.dt--; p.carry++; p.xferCd = CFG.XFER_DELAY;
       this.fx.push({ kind: 'pizza', x0: CFG.DT_STACK.x, y0: CFG.DT_STACK.y - 10, x1: p.x, y1: p.y - 30, t: 0, dur: 0.2 });
       Sfx.pickup();
-    }
-    for (const t of this.driving ? [] : this.dropTargets()) {
-      if (near(t.pos, 54) && p.carry > 0 && s.piles[t.key] < t.cap && p.xferCd <= 0) {
-        s.piles[t.key]++; p.carry--; p.xferCd = CFG.XFER_DELAY;
-        this.fx.push({ kind: 'pizza', x0: p.x, y0: p.y - 30, x1: t.pos.x, y1: t.pos.y - 10, t: 0, dur: 0.15 });
-        Sfx.drop();
-      }
     }
     // the bin by the station: walk up with pizzas to throw them away, one at a time
     const bin = CFG.STATION.trash;
@@ -796,7 +802,6 @@ const Game = {
       this.fx.push({ kind: 'pizza', x0: p.x, y0: p.y - 30, x1: bin.x, y1: bin.y - 24, t: 0, dur: 0.2 });
       if (p.carry === 0) this.floats.push({ x: bin.x, y: bin.y - 40, text: 'All gone!', color: '#8a7a6a', t: 0, dur: 1 });
     }
-    if (near(CFG.CASH_PILE, 46)) this.collect('cash', CFG.CASH_PILE);
     if (this.isUnlocked('driveThru') && near(CFG.DT_CASH, 46)) this.collect('dtCash', CFG.DT_CASH);
 
     p.cleanTarget = null;
@@ -851,7 +856,7 @@ const Game = {
 
   spawnTrainPassenger() {
     if (this.customers.length >= 22) return;
-    const want = U.randInt(1, 2 + Math.floor(this.decorCount() / 3));
+    const want = Shop.want(this.decorCount());
     const c = new Customer(this.seq++, want, true);
     this.customers.push(c);
   },
@@ -903,7 +908,7 @@ const Game = {
   spawnCustomer() {
     const s = this.s;
     if (this.countMainQueue() >= CFG.QUEUE.max || this.customers.length >= 16) return;
-    const want = U.randInt(1, 2 + Math.floor(this.decorCount() / 3));
+    const want = Shop.want(this.decorCount());
     const c = new Customer(this.seq++, want);
     c.y += U.rand(-12, 12);
     this.customers.push(c);
@@ -911,21 +916,8 @@ const Game = {
 
   updateSpawns(dt) {
     const s = this.s;
-    // Customers arrive at irregular intervals; sometimes a small group walks in together.
-    this.spawnT -= dt;
-    if (this.spawnT <= 0) {
-      const r = Math.random();
-      this.spawnT = this.spawnInterval() * (r < 0.2 ? U.rand(0.25, 0.6) : r < 0.85 ? U.rand(0.6, 1.4) : U.rand(1.4, 2.2));
-      const groupChance = 0.22 + 0.04 * this.decorCount();
-      const size = Math.random() < groupChance ? U.randInt(2, Math.random() < 0.3 ? 4 : 3) : 1;
-      this.spawnCustomer();
-      this.groupLeft = size - 1; this.groupT = U.rand(0.35, 0.7);
-      if (size > 1) this.spawnT += 0.6 * size;
-    }
-    if (this.groupLeft > 0) {
-      this.groupT -= dt;
-      if (this.groupT <= 0) { this.groupLeft--; this.groupT = U.rand(0.35, 0.7); this.spawnCustomer(); }
-    }
+    // Customers arrive at irregular intervals; sometimes a small group walks in together (the shared door, js/shop.js).
+    Shop.spawns(this, dt, this.spawnInterval(), Shop.groupChance(this.decorCount()), () => this.spawnCustomer());
     if (this.isUnlocked('driveThru')) {
       this.carT -= dt;
       if (this.carT <= 0) {

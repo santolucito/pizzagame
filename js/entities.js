@@ -9,127 +9,29 @@ const SPECIALS = {
 };
 // Runtime actors: customers, drive-thru cars, hired staff and the park dog. Game drives their updates.
 
-class Customer {
+// A walk-in pizza customer: the shared shop customer (js/shop.js) at the pizzeria. Train passengers come down the
+// platform path instead of along the sidewalk; one in a hundred is somebody special who announces themselves at the
+// door and pays (and tips) triple.
+class Customer extends ShopCustomer {
   constructor(id, want, fromTrain = false) {
-    this.id = id;
-    this.x = CFG.SPAWN_OUT.x; this.y = CFG.SPAWN_OUT.y;
-    this.route = [CFG.DOOR_OUT, CFG.ENTRANCE]; this.after = 'toQueue';
+    super(PizzeriaShop, id, want);
     if (fromTrain) {
       const S = CFG.STATION; this.x = S.stopX + S.boardDx + U.rand(-120, 80); this.y = S.platform.y1 - 10;
       this.route = S.route.map((p) => ({ x: p.x + U.rand(-8, 8), y: p.y + U.rand(-6, 6) })).concat([CFG.DOOR_OUT, CFG.ENTRANCE]);
       this.fromTrain = true;
     }
-    this.state = 'route';
-    this.want = want; this.have = 0;
-    this.patience = CFG.PATIENCE * Game.patienceBonus();
-    this.takeCd = 0;
-    this.payProg = 0;
-    this.table = null;
-    this.timer = 0;
-    this.angry = false;
-    this.facing = -1; this.moving = false;
-    this.speed = U.rand(115, 145);
-    this.shirt = U.pick(COLORS.shirts);
-    this.skin = U.pick(COLORS.skins);
-    this.hair = U.pick(['#2b1d14', '#5a3a1a', '#d9a066', '#1a1a1a', '#8c3b2f', '#c7c7c7']);
-    this.hairStyle = U.randInt(0, 3);
-    this.stripes = Math.random() < 0.3;
-    this.bob = Math.random() * Math.PI * 2;
     // 1 in 100 customers is somebody special
     this.special = Math.random() < 0.01 ? U.pick(Object.keys(SPECIALS)) : null;
-    if (this.special) { this.announced = false; }
-  }
-
-  get entering() { return this.state === 'route' && this.after === 'toQueue'; }
-  get inMainQueue() { return this.state === 'toQueue' || this.state === 'queue'; }
-  get inPayQueue() { return this.state === 'toPay' || this.state === 'paying'; }
-
-  leave() {
-    if (this.table) { this.table.occupied = null; this.table = null; }
-    this.route = [CFG.ENTRANCE, CFG.DOOR_OUT, { x: CFG.SPAWN_OUT.x + U.rand(0, 10), y: CFG.SPAWN_OUT.y + U.rand(-12, 12) }];
-    this.after = 'gone'; this.state = 'route';
+    if (this.special) { this.announced = false; this.mult = SPECIALS[this.special].tip; }
   }
 
   update(dt, g) {
-    this.takeCd -= dt;
-    switch (this.state) {
-      case 'route': {
-        if (this.special && !this.announced && this.x < CFG.DOOR_OUT.x + 40) {
-          this.announced = true;
-          g.toast(SPECIALS[this.special].arrive, true, 'town'); Sfx.chime();
-          g.floats.push({ x: this.x, y: this.y - 60, text: SPECIALS[this.special].arrive, color: '#ffe08a', t: 0, dur: 2, big: true });
-        }
-        const wp = this.route[0];
-        const sp = this.after === 'gone' ? this.speed * 1.1 : this.speed;
-        if (U.moveToward(this, wp.x, wp.y, sp, dt)) {
-          this.route.shift();
-          if (this.route.length === 0) this.state = this.after;
-        }
-        break;
-      }
-      case 'toQueue':
-      case 'queue': {
-        const idx = g.queueIndex(this);
-        let tx = CFG.QUEUE.x, ty = CFG.QUEUE.y + idx * CFG.QUEUE.dy;
-        if (idx >= CFG.QUEUE.max) { const o = CFG.STATION.overflow; tx = o.x; ty = o.y + (idx - CFG.QUEUE.max) * o.dy; } // wait outside the door
-        const arrived = U.moveToward(this, tx, ty, this.speed, dt);
-        this.state = arrived ? 'queue' : 'toQueue';
-        if (idx < CFG.QUEUE.max) this.patience -= dt; // nobody gets grumpy while waiting outside
-        if (this.patience <= 0) { this.leaveAngry(g); break; }
-        if (arrived && idx === 0 && this.takeCd <= 0 && g.s.piles.display > 0 && this.have < this.want) {
-          g.s.piles.display--; this.have++; this.takeCd = 0.25;
-          g.fx.push({ kind: 'pizza', x0: CFG.DISPLAY.x, y0: CFG.DISPLAY.y - 10, x1: this.x, y1: this.y - 30, t: 0, dur: 0.25 });
-        }
-        if (this.have >= this.want) { this.state = 'toPay'; this.patience = 70; }
-        break;
-      }
-      case 'toPay':
-      case 'paying': {
-        const idx = g.payIndex(this);
-        const tx = CFG.PAY_QUEUE.x + idx * CFG.PAY_QUEUE.dx, ty = CFG.PAY_QUEUE.y;
-        const arrived = U.moveToward(this, tx, ty, this.speed, dt);
-        this.state = arrived && idx === 0 ? 'paying' : 'toPay';
-        this.patience -= dt;
-        if (this.patience <= 0) { this.leaveAngry(g); break; }
-        if (this.state === 'paying' && g.cashierPresent()) {
-          this.payProg += dt / g.checkoutTime();
-          if (this.payProg >= 1) {
-            const amount = g.price() * this.want * (this.special ? SPECIALS[this.special].tip : 1);
-            g.earn(amount, CFG.CASH_PILE, 'register');
-            if (this.special) { g.floats.push({ x: this.x, y: this.y - 64, text: SPECIALS[this.special].thanks, color: '#ff6b8a', t: 0, dur: 1.6, big: true }); g.s.stats.specials = (g.s.stats.specials || 0) + 1; }
-            g.fx.push({ kind: 'cash', x0: this.x, y0: this.y - 20, x1: CFG.CASH_PILE.x, y1: CFG.CASH_PILE.y, t: 0, dur: 0.35 });
-            const table = g.findFreeTable();
-            if (table && Math.random() < 0.65) { table.occupied = this; this.table = table; this.state = 'toTable'; }
-            else this.leave();
-          }
-        }
-        break;
-      }
-      case 'toTable': {
-        const t = this.table;
-        if (U.moveToward(this, t.x, t.y - 34, this.speed, dt)) { this.state = 'eating'; this.timer = CFG.EAT_TIME * U.rand(0.8, 1.2); this.facing = 1; }
-        break;
-      }
-      case 'eating': {
-        this.timer -= dt;
-        if (this.timer <= 0) {
-          const tip = Math.round(g.price() * this.want * CFG.TIP_RATE * (this.special ? SPECIALS[this.special].tip : 1));
-          this.table.tip += tip;
-          g.floats.push({ x: this.table.x, y: this.table.y - 30, text: 'Tip ' + U.money(tip), color: '#2f9e44', t: 0, dur: 1.2 });
-          this.table.occupied = null; this.table.dirty = true; this.table.cleanProg = 0; this.table = null;
-          this.have = 0; this.leave();
-        }
-        break;
-      }
+    if (this.special && !this.announced && this.state === 'route' && this.x < CFG.DOOR_OUT.x + 40) {
+      this.announced = true;
+      g.toast(SPECIALS[this.special].arrive, true, 'town'); Sfx.chime();
+      g.floats.push({ x: this.x, y: this.y - 60, text: SPECIALS[this.special].arrive, color: '#ffe08a', t: 0, dur: 2, big: true });
     }
-  }
-
-  leaveAngry(g) {
-    this.angry = true;
-    g.floats.push({ x: this.x, y: this.y - 40, text: 'Too slow!', color: '#e4572e', t: 0, dur: 1.2 });
-    g.s.stats.lost++;
-    Sfx.angry();
-    this.leave();
+    super.update(dt, g);
   }
 }
 
@@ -161,7 +63,7 @@ class Car {
         return;
       }
       if (this.state === 'waiting' && this.takeCd <= 0 && g.s.piles.dt > 0 && this.have < this.want) {
-        g.s.piles.dt--; this.have++; this.takeCd = 0.22;
+        g.s.piles.dt--; this.have++; this.takeCd = SHOP.TAKE_GAP;
         g.fx.push({ kind: 'pizza', x0: CFG.DT_STACK.x, y0: CFG.DT_STACK.y - 10, x1: this.x, y1: this.y, t: 0, dur: 0.25 });
         if (this.have >= this.want) {
           const amount = g.price() * this.want * CFG.DT_PRICE_MULT * (this.kind === 'firetruck' ? 2 : 1);
@@ -294,112 +196,12 @@ class FireTruck {
   }
 }
 
-class Staff {
+// Pizzeria staff: the shared shop staff (js/shop.js) with the pizzeria's shirts. Roles: cashier, helper (carries
+// pizzas from the oven pile to the counter and the drive-thru window) and cleaner (wipes the dirty tables).
+class Staff extends ShopStaff {
   constructor(role, index) {
-    this.role = role; this.index = index;
-    const desk = CFG.OFFICE_DESK; this.x = desk.x; this.y = desk.y - 50;
-    this.carry = 0;
-    this.state = 'init';
-    this.timer = 0; this.cd = 0;
-    this.target = null;
-    this.facing = 1; this.moving = false;
-    this.skin = U.pick(COLORS.skins);
-    this.bob = Math.random() * Math.PI * 2;
+    super(PizzeriaShop, role, index);
     this.shirt = role === 'cashier' ? '#3f6fb5' : role === 'helper' ? '#e4572e' : '#2f9e44';
-  }
-
-  update(dt, g) {
-    this.cd -= dt; this.timer += dt;
-    if (this.role === 'cashier') return this.updateCashier(dt, g);
-    if (this.role === 'helper') return this.updateHelper(dt, g);
-    if (this.role === 'cleaner') return this.updateCleaner(dt, g);
-  }
-
-  updateCashier(dt, g) {
-    const sp = CFG.CASHIER_SPOT;
-    const arrived = U.moveToward(this, sp.x + 24, sp.y, g.staffSpeed('cashier'), dt);
-    this.state = arrived ? 'working' : 'walking';
-    if (arrived) this.facing = -1;
-  }
-
-  updateHelper(dt, g) {
-    const speed = g.staffSpeed('helper');
-    const cap = g.helperCap();
-    switch (this.state) {
-      case 'init':
-      case 'toOven': {
-        this.state = 'toOven';
-        const off = (this.index - 1) * 34;
-        if (U.moveToward(this, CFG.OVEN_PILE_STAND.x + off, CFG.OVEN_PILE_STAND.y + 10, speed, dt)) { this.state = 'loading'; this.timer = 0; }
-        break;
-      }
-      case 'loading': {
-        if (this.carry < cap && g.s.piles.oven > 0 && this.cd <= 0) {
-          g.s.piles.oven--; this.carry++; this.cd = 0.2; this.timer = 0;
-          g.fx.push({ kind: 'pizza', x0: CFG.OVEN_PILE.x, y0: CFG.OVEN_PILE.y - 10, x1: this.x, y1: this.y - 30, t: 0, dur: 0.18 });
-        }
-        // Leave with a full stack, or early if the shop is starving for pizzas or the oven has gone quiet.
-        const starving = g.s.piles.display === 0 || (g.isUnlocked('driveThru') && g.s.piles.dt === 0 && g.cars.some((c) => c.inLine));
-        if (this.carry >= cap || (this.carry > 0 && g.s.piles.oven === 0 && (this.timer > 2.5 || (starving && this.timer > 0.5)))) {
-          const t = g.bestDropTarget();
-          if (t) { this.target = t; this.state = 'toTarget'; }
-          else { this.timer = 0; }
-        }
-        break;
-      }
-      case 'toTarget': {
-        const t = this.target;
-        const off = (this.index - 1) * 30;
-        if (U.moveToward(this, t.stand.x + off, t.stand.y, speed, dt)) { this.state = 'unloading'; this.timer = 0; }
-        break;
-      }
-      case 'unloading': {
-        const t = this.target;
-        if (this.carry > 0 && g.s.piles[t.key] < t.cap && this.cd <= 0) {
-          g.s.piles[t.key]++; this.carry--; this.cd = 0.14; this.timer = 0;
-          g.fx.push({ kind: 'pizza', x0: this.x, y0: this.y - 30, x1: t.pos.x, y1: t.pos.y - 10, t: 0, dur: 0.18 });
-        }
-        if (this.carry === 0) { this.state = 'toOven'; this.target = null; }
-        else if (g.s.piles[t.key] >= t.cap && this.timer > 0.6) {
-          const other = g.bestDropTarget(t.key);
-          if (other) { this.target = other; this.state = 'toTarget'; }
-          else this.timer = 0;
-        } else if (g.stackNeed(t.key) <= -1) {
-          // this stack has what its people want; if the other one is short, take the rest there
-          const other = g.bestDropTarget(t.key);
-          if (other && g.stackNeed(other.key) > 0) { this.target = other; this.state = 'toTarget'; }
-        }
-        break;
-      }
-    }
-  }
-
-  updateCleaner(dt, g) {
-    const speed = g.staffSpeed('cleaner');
-    switch (this.state) {
-      case 'init':
-      case 'idle': {
-        this.state = 'idle';
-        U.moveToward(this, CFG.CLEANER_HOME.x, CFG.CLEANER_HOME.y, speed, dt);
-        if (this.cd <= 0) {
-          this.cd = 0.4;
-          const t = g.tables.find((tb) => tb.dirty && !tb.cleaner);
-          if (t) { t.cleaner = this; this.target = t; this.state = 'toTable'; }
-        }
-        break;
-      }
-      case 'toTable': {
-        const t = this.target;
-        if (U.moveToward(this, t.x + 30, t.y + 6, speed, dt)) { this.state = 'cleaning'; this.timer = 0; this.facing = -1; }
-        break;
-      }
-      case 'cleaning': {
-        const t = this.target;
-        t.cleanProg += dt / g.cleanTime('cleaner');
-        if (t.cleanProg >= 1) { g.cleanTable(t); t.cleaner = null; this.target = null; this.state = 'idle'; }
-        break;
-      }
-    }
   }
 }
 
@@ -413,7 +215,7 @@ class IceCreamCustomer {
     this.x = CFG.SPAWN_OUT.x + U.rand(0, 20); this.y = CFG.SPAWN_OUT.y + U.rand(-8, 8);
     this.route = IceCreamCustomer.wayIn().concat([{ x: IC.inside.x + U.rand(-30, 30), y: IC.inside.y + U.rand(-6, 6) }]);
     this.state = 'in'; this.timer = U.rand(1.5, 2.5); this.cone = false;
-    this.facing = 1; this.moving = false; this.bob = Math.random() * 6; this.speed = U.rand(110, 140);
+    this.facing = 1; this.moving = false; this.bob = Math.random() * 6; this.speed = U.rand(SHOP.WALK[0], SHOP.WALK[1]);
     this.shirt = U.pick(COLORS.shirts); this.skin = U.pick(COLORS.skins);
     this.hair = U.pick(['#2b1d14', '#5a3a1a', '#d9a066', '#1a1a1a']); this.hairStyle = U.randInt(0, 3); this.stripes = Math.random() < 0.3;
     this.flavor = U.pick(['#ffb6c1', '#fff3c4', '#8d5a2b', '#b8f2c8', '#cdb4ff']);

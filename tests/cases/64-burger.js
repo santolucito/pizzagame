@@ -115,14 +115,15 @@ module.exports = async (t) => {
     const s = Game.s.burger, st = BurgerExt.st;
     s.piles.counter = 6; s.piles.grill = 0; st.carry = 0; st.customers = []; st.spawnT = 0;
     T.tp(K.DISPLAY_STAND.x - 120, K.DISPLAY_STAND.y, 'burger');   // in the kitchen, away from the register
-    const n = T.until(() => st.customers.some((c) => c.state === 'pay' && U.dist(c.x, c.y, K.PAY.x, K.PAY.y) < 2), 60 * 20);
-    st.spawnT = 999;
-    const c = st.customers.find((q) => q.state === 'pay');
+    st.spawnT = 999; st.groupLeft = 0;   // just the one who came in (no friends behind them)
+    const n = T.until(() => st.customers.some((c) => c.state === 'paying' && U.dist(c.x, c.y, K.PAY.x, K.PAY.y) < 2), 60 * 20);
+    const c = st.customers.find((q) => q.state === 'paying');
     T.step(120);
-    return { n, have: c && c.have, want: c && c.want, counter: s.piles.counter, paid: c && c.pay, cash: s.piles.cash, hint: T.hint() };
+    return { n, have: c && c.have, want: c && c.want, counter: s.piles.counter, paid: c && c.payProg, cash: s.piles.cash, hint: T.hint(), shared: c instanceof ShopCustomer };
   }, K);
   t.expect(cust.n >= 0 && cust.have === cust.want, `a customer took burgers and went to pay (${JSON.stringify(cust)})`);
   t.expectEq(cust.counter, 6 - cust.want, 'burgers came off the display');
+  t.expect(cust.shared, 'a burger customer is the shared shop customer (js/shop.js), like the pizzeria\'s');
   t.expectEq(cust.paid, 0, 'nobody at the register: the customer waits');
   t.expectEq(cust.hint, 'Stand at the register to take the money! 💵', 'hint: stand at the register');
   await t.ev((K) => { T.tp(K.CASHIER_SPOT.x, K.CASHIER_SPOT.y, 'burger'); Render.setZoom(1.6); Game.cameraSnap = true; T.step(20); }, K);
@@ -135,20 +136,46 @@ module.exports = async (t) => {
   t.expectEq(col.got, paid.cash, 'walking over the pile collects it');
   t.expectEq(col.pile, 0, 'the pile is empty');
   // the customer leaves (or sits in a booth first, leaving a tip)
-  const gone = await t.ev(() => { const st = BurgerExt.st; for (const c of st.customers) if (c.state === 'eating') c.eat = 99; return T.until(() => st.customers.length === 0, 60 * 30); });
+  const gone = await t.ev(() => { const st = BurgerExt.st; for (const c of st.customers) if (c.state === 'eating') c.timer = 0; return T.until(() => st.customers.length === 0, 60 * 30); });
   t.expect(gone >= 0, 'the customer leaves');
   // a booth customer leaves a tip, which the chef picks up
   const tip = await t.ev((K) => {
     const st = BurgerExt.st, s = Game.s.burger, q = BurgerExt.seats()[1];
     s.tips = [0, 0];
-    st.customers.push({ id: 99, x: q.x + 26, y: q.y, state: 'eating', route: [], want: 1, have: 1, cd: 0, pay: 0, booth: 1, eat: CFG.BURGER.EAT_T - 0.05, facing: -1, moving: false, bob: 0, shirt: '#59a14f', skin: '#f1c27d', hair: '#2b1d14', hairStyle: 1 });
+    const c = new ShopCustomer(BurgerShop, 99, 1), tb = st.tables[1];
+    c.x = q.x + 26; c.y = q.y; c.have = 1; c.state = 'eating'; c.table = tb; tb.occupied = c; c.eatDur = CFG.BURGER.EAT_T; c.timer = 0.05;
+    st.customers.push(c);
     T.tp(K.EXIT.x, K.EXIT.y - 8, 'burger'); T.step(10);
     const left = s.tips[1], c0 = Game.s.cash;
     T.tp(q.spot.x, q.spot.y, 'burger'); T.step(2);
     return { left, got: Game.s.cash - c0, after: s.tips[1] };
   }, K);
-  t.expectEq(tip.left, K.TIP, 'the booth customer left a tip');
-  t.expectEq(tip.got, K.TIP, 'the chef pockets the tip');
+  const tipWant = Math.round(K.PRICE * K.TIP_RATE);
+  t.expectEq(tip.left, tipWant, 'the booth customer left a tip (the shared rule: a share of the bill)');
+  t.expectEq(tip.got, tipWant, 'the chef pockets the tip');
+
+  // ---- the pizzeria's patience rule: the bar runs down, the face turns grumpy, then "Too slow!" and out
+  const mad = await t.ev((K) => {
+    const st = BurgerExt.st, s = Game.s.burger;
+    st.customers = []; st.spawnT = 999; st.groupLeft = 0; s.piles.counter = 0; s.piles.grill = 0; st.grills.forEach((gr) => { gr.t = -1e9; });
+    T.tp(K.EXIT.x, K.EXIT.y - 8, 'burger');
+    const c = new ShopCustomer(BurgerShop, 98, 2); st.customers.push(c);
+    const lost0 = s.lost, out = { full: c.patience === c.patienceMax };
+    out.reach = T.until(() => c.state === 'queue', 60 * 10);
+    c.patience = c.patienceMax * 0.2; T.step(1);
+    out.grumpy = c.angry && c.state === 'queue';
+    c.patience = 0.01; T.step(2);
+    out.left = c.state === 'route' && c.after === 'gone' && c.angry;
+    out.lost = s.lost - lost0;
+    out.slow = Game.floats.some((f) => f.text === 'Too slow!');
+    out.gone = T.until(() => !st.customers.includes(c), 60 * 15) >= 0;
+    st.grills.forEach((gr) => { gr.t = 0; });
+    return out;
+  }, K);
+  t.expect(mad.full && mad.reach >= 0, `a fresh customer has full patience and lines up (${JSON.stringify(mad)})`);
+  t.expect(mad.grumpy, 'low on patience: a grumpy face');
+  t.expect(mad.left && mad.lost === 1 && mad.slow, `out of patience: "Too slow!" and away (${JSON.stringify(mad)})`);
+  t.expect(mad.gone, 'the angry customer walks out of the door');
 
   // ---- fun: eat a burger from the stack you carry; a milkshake; sit in a booth
   const eat = await t.ev(() => {
@@ -226,6 +253,7 @@ module.exports = async (t) => {
   t.expect(typeof pads.carry === 'number' && pads.bigger, 'carry more');
   t.expect(typeof pads.cook === 'number' && typeof pads.cashier === 'number', 'cook and cashier hired');
   t.expectEq(pads.staff, 'cashier,cook', 'both staff are there');
+  t.expect(await t.ev(() => BurgerExt.st.staff.every((w) => w instanceof ShopStaff)), 'the burger staff are the shared shop staff, like the pizzeria\'s');
   t.expectEq(pads.left, 'burgerGrill,burgerCarry', 'only the leveled pads stay');
 
   // ---- staff run the shop while the chef is out in town

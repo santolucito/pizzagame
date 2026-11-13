@@ -219,4 +219,34 @@ module.exports = async (t) => {
   t.expect(traffic.ic >= 4 && traffic.pz >= 6 && traffic.served >= 3 && traffic.pizzas >= 3, `both drive-thrus still get cars and serve them (${JSON.stringify(traffic)})`);
   await t.ev(() => { Render.setZoom(0.1); T.tp(1100, 700, 'town'); Render.draw(Game); IceCreamDriveThruExt.cars = []; IceCreamDriveThruExt.spawnT = 0.01; T.until(() => { Render.draw(Game); return IceCreamDriveThruExt.cars.some((c) => c.state === 'approach' && c.x > 1150); }, 3000); });
   await t.shot('icecream-drivethru-route');
+
+  // ---- one restaurant system (js/shop.js): the pizzeria and the burger shop use the same customer and staff code,
+  // with the same patience rule: the bar runs down in the line inside (not while waiting outside the door), the face
+  // turns grumpy when it is low, and when it runs out the customer says "Too slow!" and walks out
+  await t.boot();
+  const pat = await t.ev(() => {
+    const out = {};
+    out.shared = new Customer(1, 1) instanceof ShopCustomer && new Staff('helper', 0) instanceof ShopStaff;
+    Game.customers = []; Game.spawnT = 999; Game.groupLeft = 0; Game.s.piles.display = 0; Game.s.piles.oven = 0;
+    for (const o of Game.ovens) o.t = -1e9;
+    T.tp(540, 430, 'town');
+    for (let i = 0; i < CFG.QUEUE.max + 1; i++) { const c = new Customer(Game.seq++, 2); c.x = 1000 + i * 30; c.y = 560; c.speed = 130; c.route = [CFG.ENTRANCE]; Game.customers.push(c); }
+    T.step(60 * 8);
+    const [first] = Game.customers, last = Game.customers[Game.customers.length - 1];
+    out.first = first.state; out.outside = !Game.insideBuilding(last.x, last.y);
+    out.outsideFull = last.patience === last.patienceMax; out.insideLess = first.patience < first.patienceMax;
+    first.patience = first.patienceMax * 0.2; T.step(1);
+    out.grumpy = first.angry;
+    const lost0 = Game.s.stats.lost;
+    first.patience = 0.01; T.step(2);
+    out.left = first.state === 'route' && first.after === 'gone' && first.angry;
+    out.lost = Game.s.stats.lost - lost0;
+    out.gone = T.until(() => !Game.customers.includes(first), 60 * 30) >= 0;
+    return out;
+  });
+  t.expect(pat.shared, 'pizza customers and staff are the shared shop classes');
+  t.expect(pat.first === 'queue' && pat.outside, `the line fills and the last one waits outside (${JSON.stringify(pat)})`);
+  t.expect(pat.outsideFull && pat.insideLess, `patience only runs down inside (${JSON.stringify(pat)})`);
+  t.expect(pat.grumpy, 'low on patience: grumpy face');
+  t.expect(pat.left && pat.lost === 1 && pat.gone, `out of patience: leaves angry, counted as lost (${JSON.stringify(pat)})`);
 };

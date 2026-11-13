@@ -122,7 +122,7 @@ const JetInsideExt = {
   action(g) {
     if (!this.st) this.build(g);
     const st = this.st, J = CFG.JETCABIN, p = g.player;
-    if (g.area === 'town') return this.doorDist(g) < J.DOOR_R ? { label: '🚪 Board the plane', run: (gg) => this.board(gg) } : null;
+    if (g.area === 'town') return this.doorDist(g) < J.DOOR_R ? { label: this.atGate(this.jet()) ? '🚪 Board the plane' : Stairs.up('the plane'), run: (gg) => this.board(gg) } : null;
     if (g.area !== 'jetcabin' || !this.onFoot(g)) return null;
     if (st.captain) return { label: '🛫 Take off!', run: (gg) => this.takeOff(gg) };
     if (st.seat) return { label: '🚶 Stand up', run: (gg) => this.standUp(gg) };
@@ -328,13 +328,11 @@ const JetInsideExt = {
   drawStairs(r, g, v) {
     const ctx = r.ctx, D = CFG.AIRFIELD.JET_DOOR, L = CFG.JETCABIN.DOOR_OUT - 4;
     ctx.save(); ctx.translate(v.x, v.y); ctx.rotate(v.angle); ctx.translate(D.x, D.y);
-    // y runs from the door (0) out to -L; the stair truck stands on its wheels at the far end
-    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(-8, -L - 2, 22, L);
-    ctx.fillStyle = '#2b1d14'; for (const [wx, wy] of [[-11, -L + 3], [11, -L + 3], [-11, -L + 16], [11, -L + 16]]) { ctx.beginPath(); ctx.arc(wx, wy, 3, 0, Math.PI * 2); ctx.fill(); }
-    ctx.fillStyle = '#f2b134'; ctx.fillRect(-10, -L, 3.5, L); ctx.fillRect(6.5, -L, 3.5, L);   // the rails
-    ctx.fillStyle = '#e8e4d8'; ctx.fillRect(-6.5, -L, 13, L);
-    ctx.fillStyle = '#9aa0a8'; for (let y = -L + 3; y < -6; y += 4) ctx.fillRect(-6.5, y, 13, 1.6);   // the steps
-    ctx.fillStyle = '#fff'; ctx.fillRect(-8, -7, 16, 7);   // the little platform at the door
+    // y runs from the door (0) out to -L; the stair truck stands on its wheels at the far end. The flight is flat, in
+    // painted metal (js/stairs.js): its bottom step (pale, with the footprints) is where you stand to go up
+    ctx.fillStyle = '#2b1d14'; for (const [wx, wy] of [[-12, -L + 4], [12, -L + 4], [-12, -L + 18], [12, -L + 18]]) { ctx.beginPath(); ctx.arc(wx, wy, 3, 0, Math.PI * 2); ctx.fill(); }
+    Stairs.flat(ctx, { x0: -9, y0: -L, x1: 9, y1: -4, dir: 's', n: 6, first: 11, rails: ['w', 'e'], mat: 'metal' });
+    ctx.fillStyle = '#fff'; ctx.fillRect(-9, -5, 18, 5);   // the little platform at the door
     ctx.fillStyle = '#ffe08a'; ctx.fillRect(-4, -1.5, 8, 2);   // the open door glowing
     ctx.restore();
   },

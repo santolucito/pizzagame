@@ -26,8 +26,10 @@ CFG.UPSTAIRS = {
     sign: { x: 540, y: 446, pizza: { x: 150, y: 446 } },
     pigeons: [{ x: 380, y: 300 }, { x: 760, y: 420 }],
   },
-  // The office stairs: a flight along the bottom wall climbing east into the corner; stand at its foot to go up.
-  STAIRS: { block: { x: 296, y: 596, w: 76, h: 44 }, landing: { x: 266, y: 620 }, reach: 36, sign: { x: 318, y: 538 } },
+  // The office stairs: a small flat flight in the office's south-east corner, climbing east from the step by the HIRING
+  // desk (drawn by js/stairs.js). Stand on the bottom step (the pale one with the footprints) to go up;
+  // `landing` (where to stand) is read from it. `sign`: the ⬆️🛏️ picture sign.
+  STAIRS: { x0: 288, y0: 596, x1: 372, y1: 640, dir: 'e', n: 6, first: 22, rails: ['n'], sign: { x: 340, y: 580 } },
   WORLD: { x0: 6400, y0: 1500, x1: 7000, y1: 1900 },      // free space east of the cabin's map
   room: { x0: 6460, y0: 1560, x1: 6940, y1: 1840 }, wall: 26,
   bed: { x0: 6484, y0: 1572, x1: 6592, y1: 1710 },
@@ -42,8 +44,9 @@ CFG.UPSTAIRS = {
   rug: { x: 6700, y: 1716, rx: 86, ry: 46 },
   shelf: { x0: 6464, y0: 1744, x1: 6502, y1: 1836 },
   plant: { x: 6536, y: 1822 },
-  opening: { x0: 6866, y0: 1766, x1: 6936, y1: 1838 },    // the stair hole in the floor, railed on two sides
-  top: { x: 6836, y: 1806 }, topReach: 34,                // the top of the stairs: arrive here, go down from here
+  // the stairwell in the floor, in the same flat design: it goes down westward from the top step (footprints) by the east
+  // wall; `top` (where you arrive and go down) is read from it
+  WELL: { x0: 6846, y0: 1772, x1: 6936, y1: 1832, dir: 'w', n: 6, first: 20, down: true, rails: ['n', 'w'] },
   nap: { hop: 0.45, sleep: 3.0, wake: 0.5 },              // seconds
   chairReach: 36,                                         // stand by the desk chair to draw
   beanbag: { reach: 46, seat: { dx: 0, dy: 10 }, hop: 0.35 }, // stand beside the (owned) bean bag to flop into it; the chef's feet land on the seat
@@ -66,6 +69,9 @@ CFG.UPSTAIRS = {
   ],
 };
 CFG.AREAS.upstairs = { WORLD: CFG.UPSTAIRS.WORLD };
+// where to stand: the office's bottom step and the bedroom's top step, in the current design
+Object.defineProperty(CFG.UPSTAIRS.STAIRS, 'landing', { get: () => UpstairsExt.stairs().G.foot });
+Object.defineProperty(CFG.UPSTAIRS, 'top', { get: () => UpstairsExt.well().G.foot });
 
 const UpstairsExt = {
   name: 'upstairs',
@@ -88,6 +94,9 @@ const UpstairsExt = {
       notes: [], noteT: 0, rock: 0,
     };
   },
+  // the office flight and the bedroom's stairwell in the current design (js/stairs.js), as geometry
+  stairs() { return this._stairs || (this._stairs = { G: Stairs.flatGeom(CFG.UPSTAIRS.STAIRS) }); },
+  well() { return this._well || (this._well = { o: CFG.UPSTAIRS.WELL, G: Stairs.flatGeom(CFG.UPSTAIRS.WELL) }); },
   owned(g, key) { return !!(g.s.upstairs && g.s.upstairs.owned && g.s.upstairs.owned[key]); },
   // Inside the pizzeria, or in the door gap: the roof is off.
   insideShop(g) {
@@ -97,7 +106,7 @@ const UpstairsExt = {
   },
   obstacles(g) {
     if (g.area === 'upstairs') return this.roomBlocks();
-    if (g.area === 'town') return [CFG.UPSTAIRS.STAIRS.block];
+    if (g.area === 'town') return [this.stairs().G.body];
     return [];
   },
   roomBlocks() {
@@ -105,7 +114,7 @@ const UpstairsExt = {
     const rect = (q) => ({ x: q.x0, y: q.y0, w: q.x1 - q.x0, h: q.y1 - q.y0 });
     o.push({ x: R.x0 - w, y: R.y0 - w, w: R.x1 - R.x0 + 2 * w, h: w }, { x: R.x0 - w, y: R.y1, w: R.x1 - R.x0 + 2 * w, h: w });
     o.push({ x: R.x0 - w, y: R.y0, w, h: R.y1 - R.y0 }, { x: R.x1, y: R.y0, w, h: R.y1 - R.y0 });
-    o.push(rect(C.bed), rect(C.table), rect(C.wardrobe), rect(C.desk), rect(C.shelf), rect(C.opening));
+    o.push(rect(C.bed), rect(C.table), rect(C.wardrobe), rect(C.desk), rect(C.shelf), this.well().G.body);
     o.push({ x: C.chair.x - 10, y: C.chair.y - 10, w: 20, h: 20 });
     o.push({ x: C.plant.x - 13, y: C.plant.y - 12, w: 26, h: 20 });
     const g = Game;
@@ -149,7 +158,7 @@ const UpstairsExt = {
     const p = g.player, C = CFG.UPSTAIRS;
     if (g.driving || g.onTrain || g.ride || g.travel || g.fishing) return null;
     if (g.area === 'town') {
-      if (U.dist(p.x, p.y, C.STAIRS.landing.x, C.STAIRS.landing.y) < C.STAIRS.reach) return { label: '🪜 Go upstairs', run: (gg) => this.goUp(gg) };
+      if (Stairs.near(g, this.stairs().G.foot)) return { label: Stairs.up(), run: (gg) => this.goUp(gg) };
       return null;
     }
     if (g.area !== 'upstairs') return null;
@@ -157,7 +166,7 @@ const UpstairsExt = {
     if (st.nap && st.nap.phase === 'sleep' && st.nap.t > 0.4) return { label: '☀️ Wake up', run: (gg) => this.wakeUp(gg) };   // sleeps until you wake up
     if (st.nap || st.slide || st.draw.on) return null;                   // hopping in or out, whooshing, or busy drawing
     if (st.sit) return { label: '🚶 Get up', run: (gg) => this.getUp(gg) };
-    if (U.dist(p.x, p.y, C.top.x, C.top.y) < C.topReach) return { label: '🪜 Go downstairs', run: (gg) => this.goDown(gg) };
+    if (Stairs.near(g, this.well().G.foot)) return { label: Stairs.down(), run: (gg) => this.goDown(gg) };
     const nearBag = this.nearBeanbag(g), dChair = U.dist(p.x, p.y, C.chair.x, C.chair.y);
     if (nearBag && !(dChair < C.chairReach && dChair < nearBag)) return { label: '🛋️ Flop on the bean bag', run: (gg) => this.flop(gg) };
     if (dChair < C.chairReach) return { label: '✏️ Sit and draw', run: (gg) => this.openPad(gg, 'bedroom') };
@@ -177,19 +186,19 @@ const UpstairsExt = {
       return null;
     }
     if (g.area !== 'town' || g.driving || !g.insideBuilding(p.x, p.y)) return undefined;
-    const L = C.STAIRS.landing, d = U.dist(p.x, p.y, L.x, L.y);
-    if (d < 110) return { text: 'Go upstairs to your room! 🛏️', target: d < C.STAIRS.reach ? null : L };
-    return undefined;
+    return Stairs.hint(g, this.stairs().G.foot, 'Go upstairs to your room! 🛏️');
   },
   goUp(g) {
     const C = CFG.UPSTAIRS, p = g.player;
-    g.area = 'upstairs'; p.x = C.top.x; p.y = C.top.y; p.moving = false; p.facing = -1; p.hasMoved = true; g.cameraSnap = true;
+    const T = this.well().G.foot;
+    g.area = 'upstairs'; p.x = T.x; p.y = T.y; p.moving = false; p.facing = -1; p.hasMoved = true; g.cameraSnap = true;
     this.st.fade = C.ROOF.fade; this.st.nap = null; this.st.slide = null; this.st.slideArmed = false; Sfx.ding(); Haptics.tap();
     if (!g.s.upstairs.seen) { g.s.upstairs.seen = true; g.toast('🛏️ Your very own room!', true); }
   },
   goDown(g) {
     const C = CFG.UPSTAIRS, p = g.player;
-    g.area = 'town'; p.x = C.STAIRS.landing.x; p.y = C.STAIRS.landing.y; p.moving = false; p.facing = -1; p.hasMoved = true; g.cameraSnap = true;
+    const F = this.stairs().G.foot;
+    g.area = 'town'; p.x = F.x; p.y = F.y; p.moving = false; p.facing = -1; p.hasMoved = true; g.cameraSnap = true;
     this.st.fade = C.ROOF.fade; this.st.roofA = 0; Sfx.drop();
   },
   // Is this point somewhere the chef can stand: inside the room and not inside a wall or a piece of furniture?
@@ -207,7 +216,7 @@ const UpstairsExt = {
     if (p.x > B.x0 && p.x < B.x1 && p.y > B.y0 && p.y < B.y1) { p.x = C.sleepSpot.x; p.y = C.sleepSpot.y; p.moving = false; return true; }   // a save made mid-nap: just get up
     const bb = this.beanbagBlock(g);
     if (bb && p.x > bb.x && p.x < bb.x + bb.w && p.y > bb.y && p.y < bb.y + bb.h) { const q = this.standSpot(g, null); if (q) { p.x = q.x; p.y = q.y; p.moving = false; return true; } }   // a save made on the bean bag: just get up
-    p.x = C.top.x; p.y = C.top.y; p.moving = false;
+    const T = this.well().G.foot; p.x = T.x; p.y = T.y; p.moving = false;
     g.floats.push({ x: p.x, y: p.y - 50, text: 'Oops! Back inside', color: '#ffe08a', t: 0, dur: 1.4, big: true });
     return true;
   },
@@ -520,56 +529,9 @@ const UpstairsExt = {
 
   // ---------- the office stairs (static town art) ----------
   paintTown(r, g) {
-    const ctx = r.ctx, S = CFG.UPSTAIRS.STAIRS, b = S.block, L = S.landing;
-    // a mat at the foot of the stairs
-    ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.beginPath(); ctx.ellipse(L.x + 2, L.y + 4, 24, 13, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#b23a48'; ctx.beginPath(); ctx.ellipse(L.x, L.y, 24, 13, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(L.x, L.y, 18, 8, 0, 0, Math.PI * 2); ctx.stroke();
-    // the flight climbs EAST: each step stands taller than the last (3/4 view, so height lifts it up the screen),
-    // with a sawtooth stringer facing the room's front, lit treads, a rising handrail and, at the top, the stairwell
-    // opening into the floor above.
-    const n = 5, top = 14, run = (b.w - top) / n, rise = 7, y0 = b.y, y1 = b.y + b.h, ex = b.x + b.w - top, hTop = (n + 1) * rise;
-    // floor shadow cast to the south-east of the flight
-    ctx.fillStyle = 'rgba(0,0,0,0.16)'; ctx.beginPath();
-    ctx.moveTo(b.x + 4, y1); ctx.lineTo(b.x + b.w + 3, y1); ctx.lineTo(b.x + b.w + 3, y1 + 4); ctx.lineTo(b.x + 6, y1 + 4); ctx.fill();
-    // the stairwell: a dark opening in the corner that the top step leads into (the floor above is up there)
-    ctx.fillStyle = '#3a2516'; ctx.fillRect(ex, y0 - hTop - 10, top, b.h + hTop + 10);          // wall block in the corner
-    ctx.fillStyle = '#1b120b'; ctx.fillRect(ex + 2, y0 - hTop - 8, top - 3, b.h - 2);           // the hole up
-    const glow = ctx.createLinearGradient(0, y0 - hTop - 8, 0, y0 - hTop + b.h - 10);
-    glow.addColorStop(0, 'rgba(255,214,140,0.55)'); glow.addColorStop(1, 'rgba(255,214,140,0)');
-    ctx.fillStyle = glow; ctx.fillRect(ex + 2, y0 - hTop - 8, top - 3, b.h - 2);              // light from the bedroom
-    ctx.fillStyle = '#8d5a2b'; ctx.fillRect(ex, y0 - hTop - 10, top, 3);                        // the upstairs floor's edge
-    for (let i = 0; i < n; i++) {
-      const x = b.x + i * run, h = (i + 1) * rise, k = i / (n - 1);
-      // stringer (the flight's side, facing the viewer): a column as tall as this step
-      ctx.fillStyle = `rgb(${Math.round(120 + 14 * k)},${Math.round(76 + 10 * k)},${Math.round(38 + 6 * k)})`;
-      ctx.fillRect(x, y1 - h, run + 0.5, h);
-      ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(x, y1 - 3, run + 0.5, 3);
-      // the tread on top, lifted by its height, a touch lighter the higher it is
-      ctx.fillStyle = `rgb(${Math.round(196 + 40 * k)},${Math.round(146 + 40 * k)},${Math.round(88 + 34 * k)})`;
-      ctx.fillRect(x, y0 - h, run + 0.5, b.h);
-      // the riser: the step's face toward the landing, a dark band rising from the step below
-      ctx.fillStyle = 'rgba(70,40,18,0.55)'; ctx.fillRect(x, y0 - h, 3, b.h);
-      // bright nosing along the step's front edge (toward the viewer) and the stringer's top edge
-      ctx.fillStyle = 'rgba(255,240,205,0.7)'; ctx.fillRect(x + 3, y1 - h - 1.5, run - 2.5, 1.5);
-      ctx.fillStyle = '#3a2516'; ctx.fillRect(x, y1 - h, run + 0.5, 1.2); ctx.fillRect(x, y1 - h, 1.2, rise);   // sawtooth outline
-    }
-    // the handrail on the room side: posts on every step, the rail rising with them into the stairwell
-    const railY = (x) => y0 - rise * ((x - b.x) / run + 1) - 15;
-    ctx.fillStyle = '#5b3a1a';
-    for (let i = 0; i < n; i++) { const x = b.x + i * run + run / 2, h = (i + 1) * rise; ctx.fillRect(x - 1.2, railY(x), 2.4, y0 - h - railY(x) + 2); }
-    ctx.fillRect(b.x - 1, railY(b.x) - 3, 4, y0 - rise - railY(b.x) + 5);                       // newel post at the foot
-    ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 4; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(b.x + 1, railY(b.x) - 1); ctx.lineTo(ex + 2, railY(ex + 2)); ctx.stroke();
-    ctx.strokeStyle = '#d7b98a'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(b.x + 1, railY(b.x) - 1.5); ctx.lineTo(ex + 2, railY(ex + 2) - 0.5); ctx.stroke();
-    ctx.lineCap = 'butt';
-    ctx.fillStyle = '#d7b98a'; ctx.beginPath(); ctx.arc(b.x + 1, railY(b.x) - 3, 2.6, 0, Math.PI * 2); ctx.fill();
-    // "UPSTAIRS" sign hung on the wall above the flight
-    const sg = S.sign;
-    ctx.fillStyle = 'rgba(0,0,0,0.2)'; U.roundRect(ctx, sg.x - 30, sg.y - 7, 64, 16, 4); ctx.fill();
-    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, sg.x - 32, sg.y - 9, 64, 16, 4); ctx.fill();
-    ctx.fillStyle = '#ffe08a'; ctx.font = r.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🛏️ UPSTAIRS', sg.x, sg.y - 1);
+    const ctx = r.ctx, S = CFG.UPSTAIRS.STAIRS;
+    Stairs.flat(ctx, Object.assign({ mat: 'wood' }, S));
+    Stairs.sign(ctx, r, S.sign.x, S.sign.y, '⬆️🛏️', 9);
     // the owner's drawing hangs in the dining room too, on the back wall past the neon sign
     const A = CFG.UPSTAIRS.art.shop;
     if (this.img && this.img.ok) this.paintArt(ctx, A.x, A.y, A.w, A.h);
@@ -708,17 +670,10 @@ const UpstairsExt = {
     ctx.fillStyle = '#c45c2e'; U.roundRect(ctx, P.x - 10, P.y - 6, 20, 14, 3); ctx.fill(); ctx.fillStyle = '#e07a4a'; ctx.fillRect(P.x - 12, P.y - 8, 24, 4);
     ctx.fillStyle = '#3f9a4a'; for (const [dx, dy, rr] of [[-8, -14, 7], [8, -14, 7], [0, -20, 8], [-4, -9, 6], [5, -8, 6]]) { ctx.beginPath(); ctx.arc(P.x + dx, P.y + dy, rr, 0, Math.PI * 2); ctx.fill(); }
     ctx.fillStyle = '#56b862'; ctx.beginPath(); ctx.arc(P.x - 2, P.y - 20, 4, 0, Math.PI * 2); ctx.fill();
-    // the stair opening: a dark hole with the top steps showing, railed on the room sides
-    const O = C.opening;
-    ctx.fillStyle = '#2b1d14'; ctx.fillRect(O.x0, O.y0, O.x1 - O.x0, O.y1 - O.y0);
-    for (let k = 0; k < 4; k++) { const x = O.x0 + 6 + k * 12, kk = 1 - k / 4; ctx.fillStyle = `rgba(201,154,95,${(0.9 * kk).toFixed(2)})`; ctx.fillRect(x, O.y0 + 6, 10, O.y1 - O.y0 - 12); }
-    ctx.fillStyle = '#ffe08a'; ctx.font = r.font(10); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('▼', O.x1 - 12, (O.y0 + O.y1) / 2);
-    ctx.fillStyle = '#8d5a2b'; ctx.fillRect(O.x0 - 4, O.y0 - 4, O.x1 - O.x0 + 4, 4); ctx.fillRect(O.x0 - 4, O.y0 - 4, 4, O.y1 - O.y0 + 4);
-    ctx.fillStyle = '#5b3a1a'; for (let x = O.x0 - 2; x < O.x1; x += 12) ctx.fillRect(x, O.y0 - 14, 3, 12);
-    for (let y = O.y0 + 6; y < O.y1; y += 12) ctx.fillRect(O.x0 - 12, y, 12, 3);
-    ctx.fillStyle = '#d7b98a'; ctx.fillRect(O.x0 - 16, O.y0 - 16, O.x1 - O.x0 + 16, 4); ctx.fillRect(O.x0 - 16, O.y0 - 16, 4, O.y1 - O.y0 + 16);
-    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, O.x0 - 36, O.y0 - 36, 64, 16, 4); ctx.fill();
-    ctx.fillStyle = '#ffe08a'; ctx.font = r.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🍕 DOWNSTAIRS', O.x0 - 4, O.y0 - 28);
+    // the stairwell down to the shop, in the same design as the office's flight, with a little ⬇️🍕 sign
+    const Wl = CFG.UPSTAIRS.WELL;
+    Stairs.flat(ctx, Object.assign({ mat: 'wood' }, Wl));
+    Stairs.sign(ctx, r, Wl.x0 + 28, Wl.y0 - 18, '⬇️🍕', 9);
     // bought decorations (their still parts; the moving bits are drawn each frame in `dynamic`)
     for (const it of C.items) if (it.key !== 'racecar' && this.owned(g, it.key)) this.drawItem(r, g, it, 'static');   // the car bed was painted with the bed
     // the owner's drawing, framed on the wall beside the photo
@@ -941,7 +896,8 @@ const UpstairsExt = {
   },
   // Per-frame: the moving parts of the bought decorations and the notes from the drum kit.
   dynamic(r, g) {
-    if (!this.st || g.area !== 'upstairs') return;
+    if (!this.st) return;
+    if (g.area !== 'upstairs') return;
     const C = CFG.UPSTAIRS;
     for (const it of C.items) if (this.owned(g, it.key)) this.drawItem(r, g, it, 'dynamic');
     const ctx = r.ctx;

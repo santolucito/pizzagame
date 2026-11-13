@@ -602,10 +602,8 @@ const PizzaPierExt = {
       ctx.fillStyle = 'rgba(70,45,20,0.5)'; ctx.fillRect(x + 7, BW.y0 + 8, 2, 2); ctx.fillRect(x + 7, BW.y1 - 10, 2, 2);
     }
     ctx.fillStyle = '#8a5a2b'; ctx.fillRect(W.x0, BW.y0 - 4, W.x1 - W.x0, 6); ctx.fillRect(W.x0, BW.y1 - 4, W.x1 - W.x0, 8);
-    // the stairs down to the beach
-    for (const x of P.STAIRS) {
-      for (let k = 0; k < 4; k++) { ctx.fillStyle = k % 2 ? '#b98a55' : '#c99a63'; ctx.fillRect(x - P.STAIR_HALF + 4, BW.y1 + 4 + k * 9, P.STAIR_HALF * 2 - 8, 9); ctx.fillStyle = 'rgba(90,55,25,0.4)'; ctx.fillRect(x - P.STAIR_HALF + 4, BW.y1 + 12 + k * 9, P.STAIR_HALF * 2 - 8, 1); }
-    }
+    // the steps down to the beach: flat wooden slats you just walk over (js/stairs.js; no button, so no footprints)
+    for (const x of P.STAIRS) Stairs.flat(ctx, { x0: x - P.STAIR_HALF + 4, y0: BW.y1 + 2, x1: x + P.STAIR_HALF - 4, y1: BW.y1 + 42, dir: 's', n: 4, first: 10, stand: false, mat: 'wood' });
     // the spots
     this.paintSpot(r, P.BOARD, '🚇', PIER_D_ORANGE);
     this.paintSpot(r, P.WHEEL.BOARD, '🎡', '#e4572e');

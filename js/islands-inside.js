@@ -1,7 +1,7 @@
 'use strict';
 // Inside the island buildings. Every building on the Islands has a door you can walk through ('🚪 Go inside'):
 //  - the Lighthouse (from the tower's door or the keeper's cottage): a round stone room with the bearded keeper in his
-//    rocking chair (say hi), his cat (pet it) and a spiral staircase; climb it ('🪜 Climb the stairs') to the lamp room
+//    rocking chair (say hi), his cat (pet it) and a spiral staircase; climb it ('⬆️ Up to the lamp room') to the lamp room
 //    at the top, where the big lamp turns and throws its beams round the room and a telescope looks out to sea (ships,
 //    the islands, the rocket);
 //  - the Crab Shack: a seafood shack with a crab tank (wave at the crabs), nets and buoys, a cook at the counter, a
@@ -25,13 +25,13 @@ CFG.ISLE_IN = {
       name: 'Lighthouse', toast: '🗼 Welcome to the lighthouse!',
       WORLD: { x0: 6000, y0: 4000, x1: 6600, y1: 4400 }, ROOM: { x0: 6060, y0: 4110, x1: 6540, y1: 4340 }, BACK_TOP: 4020,
       EXIT: { x: 6250, y: 4322 },
-      STAIRS: { x: 6140, y: 4160, r: 50 }, FOOT: { x: 6140, y: 4238 },        // the same spot on both floors
+      STAIRS: { x: 6140, y: 4160, r: 50 }, FOOT: { x: 6140, y: 4224 },        // the spiral (js/stairs.js) and its front step: the same spot on both floors
       KEEPER: { x: 6466, y: 4172 }, STOVE: { x: 6518, y: 4132 },
       TABLE: { x: 6300, y: 4150, w: 76, h: 40 }, RUG: { x: 6400, y: 4290 },
       CAT_SPOTS: [{ x: 6400, y: 4292 }, { x: 6350, y: 4250 }, { x: 6460, y: 4270 }, { x: 6300, y: 4300 }],
       ROPE: { x: 6086, y: 4314 },
       LAMP: { x: 6330, y: 4214 }, SCOPE: { x: 6494, y: 4152 },
-      CLIMB: 1.3, KEEPER_LINES: ['Ahoy, chef! ⚓', 'The light keeps ships safe! 💡', 'Climb up and see the lamp!', 'My cat loves fish 🐟', 'Look! A rocket on that island! 🚀'],
+      CLIMB: 2.6, KEEPER_LINES: ['Ahoy, chef! ⚓', 'The light keeps ships safe! 💡', 'Climb up and see the lamp!', 'My cat loves fish 🐟', 'Look! A rocket on that island! 🚀'],
     },
     crabshack: {
       name: 'Crab Shack', toast: '🦀 Welcome to the Crab Shack!',
@@ -209,7 +209,7 @@ const IslandsInsideExt = {
     if (st.lie) return { label: '🚶 Get up', run: (gg) => this.getUp(gg) };
     if (!(k === 'lighthouse' && st.up) && this.near(g, R.EXIT, CFG.ISLE_IN.DOOR_R)) return { label: '🚪 Go outside', run: (gg) => this.leave(gg) };
     if (k === 'lighthouse') {
-      if (this.near(g, R.FOOT, 36)) return st.up ? { label: '🪜 Go down the stairs', run: (gg) => this.startClimb(gg, false) } : { label: '🪜 Climb the stairs', run: (gg) => this.startClimb(gg, true) };
+      if (Stairs.near(g, R.FOOT)) return st.up ? { label: Stairs.down(), run: (gg) => this.startClimb(gg, false) } : { label: Stairs.up('the lamp room'), run: (gg) => this.startClimb(gg, true) };
       if (st.up) { if (this.near(g, R.SCOPE, 48) && typeof CityExt !== 'undefined' && CityExt.scopeStart) return { label: '🔭 Look through the telescope', run: (gg) => this.look(gg) }; return null; }
       if (this.near(g, R.KEEPER, 58)) return { label: '👋 Say hi to the keeper', run: (gg) => this.sayHi(gg) };
       if (this.near(g, st.cat, 44)) return { label: '🐱 Pet the cat', run: (gg) => this.petCat(gg) };
@@ -255,7 +255,9 @@ const IslandsInsideExt = {
   },
 
   // ---------- the lighthouse ----------
-  startClimb(g, up) { const st = this.st, p = g.player; st.climb = { t: 0, up, swapped: false, x: p.x, y: p.y }; p.moving = false; Sfx.pickup(); Haptics.tap(); },
+  startClimb(g, up) { const st = this.st, p = g.player; st.climb = { t: 0, up, swapped: false, x: p.x, y: p.y }; p.moving = false; Stairs.sound(up); },
+  // the lighthouse's spiral stair as geometry (js/stairs.js): the same shape on both floors
+  spiral() { const S = CFG.ISLE_IN.ROOMS.lighthouse.STAIRS; return this._spiral || (this._spiral = Stairs.roundGeom({ x: S.x, y: S.y, r: S.r, n: 10 })); },
   look(g) { const p = g.player; p.moving = false; p.facing = 1; this.st.viewing = CityExt.scopeStart(p.x, p.y, 0.44); g.s.isleIn.looks++; Sfx.ding(); Haptics.tap(); },
   sayHi(g) {
     const st = this.st, L = CFG.ISLE_IN.ROOMS.lighthouse.KEEPER_LINES;
@@ -377,14 +379,14 @@ const IslandsInsideExt = {
   updateLighthouse(g, dt, R) {
     const st = this.st, p = g.player, c = st.cat;
     if (st.climb) {
-      const cl = st.climb; cl.t += dt; p.moving = false;
-      if (!cl.swapped) { p.x = cl.x; p.y = cl.y; }
-      if (!cl.swapped && cl.t >= R.CLIMB / 2) {
-        cl.swapped = true; st.up = cl.up; p.x = R.FOOT.x; p.y = R.FOOT.y; p.facing = 1; g.cameraSnap = true;
+      // the chef walks round the spiral step by step, blinks over to the other floor half-way, and walks out there
+      const cl = st.climb; cl.t += dt;
+      Stairs.spiralClimb(p, cl, this.spiral(), R.CLIMB, dt, () => {
+        st.up = cl.up; g.cameraSnap = true;
         if (cl.up) g.s.isleIn.climbs++;
-        g.floats.push({ x: p.x, y: p.y - 60, text: cl.up ? 'The lamp room! 💡' : 'Back downstairs!', color: '#ffe08a', t: 0, dur: 1.4, big: true });
-      }
-      if (cl.t >= R.CLIMB) { st.climb = null; Haptics.tap(); }
+        g.floats.push({ x: R.FOOT.x, y: R.FOOT.y - 60, text: cl.up ? 'The lamp room! 💡' : 'Back downstairs!', color: '#ffe08a', t: 0, dur: 1.4, big: true });
+      });
+      if (cl.t >= R.CLIMB) { st.climb = null; p.x = R.FOOT.x; p.y = R.FOOT.y; p.moving = false; Haptics.tap(); }
       return;
     }
     if (st.viewing) { if (!st.up) st.viewing = null; else { CityExt.scopeUpdate(g, st.viewing, dt); return; } }
@@ -439,18 +441,18 @@ const IslandsInsideExt = {
     const k = this.room(g); if (!k) return undefined;
     const R = CFG.ISLE_IN.ROOMS[k], s = g.s.isleIn;
     if (k === 'lighthouse') {
-      if (st.climb) return { text: st.climb.up ? 'Up, up, up the stairs! 🪜' : 'Down, down, down! 🪜', target: null };
+      if (st.climb) return { text: st.climb.up ? 'Up, up, up the stairs! ⬆️' : 'Down, down, down! ⬇️', target: null };
       if (st.viewing) return null;
       if (st.up) {
         if (this.near(g, R.SCOPE, 48)) return { text: 'Look through the telescope! 🔭', target: null };
         if (!s.looks) return { text: 'Look out to sea with the telescope! 🔭', target: { x: R.SCOPE.x - 30, y: R.SCOPE.y + 30 } };
-        if (this.near(g, R.FOOT, 36)) return { text: 'Press the button to go back down 🪜', target: null };
+        if (Stairs.near(g, R.FOOT)) return { text: 'Press the button to go back down ⬇️', target: null };
         return { text: 'Watch the big lamp turn! 💡', target: null };
       }
-      if (this.near(g, R.FOOT, 36)) return { text: 'Climb the stairs to the lamp! 🪜', target: null };
+      if (Stairs.near(g, R.FOOT)) return { text: 'Go up the stairs to the lamp! ⬆️', target: null };
       if (st.keeper) return { text: 'The keeper says hi! ⚓', target: null };
       if (!s.hellos) return { text: 'Say hi to the lighthouse keeper! 👋', target: { x: R.KEEPER.x - 40, y: R.KEEPER.y + 30 } };
-      if (!s.climbs) return { text: 'Climb the stairs to the lamp room! 🪜', target: R.FOOT };
+      if (!s.climbs) return { text: 'Go up the stairs to the lamp room! ⬆️', target: R.FOOT };
       if (!s.pets) return { text: 'Pet the keeper’s cat! 🐱', target: st.cat };
       return { text: 'A cosy lighthouse 🗼', target: null };
     }
@@ -576,23 +578,8 @@ const IslandsInsideExt = {
     // a coil of rope and a little anchor by the door
     const Rp = R.ROPE;
     ctx.strokeStyle = '#d9b27c'; ctx.lineWidth = 4; for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.ellipse(Rp.x, Rp.y, 16 - k * 5, 10 - k * 3, 0, 0, Math.PI * 2); ctx.stroke(); }
-    // the spiral staircase: wedge steps winding round a post, up through a hole in the ceiling
-    this.drawSpiral(ctx, S.x, S.y, S.r, false);
-    ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.font = r.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('⬆ UP', S.x, S.y + S.r + 14);
-  },
-  drawSpiral(ctx, x, y, rr, hole) {
-    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.arc(x + 3, y + 4, rr + 4, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = hole ? '#1a1410' : '#5c6670'; ctx.beginPath(); ctx.arc(x, y, rr + 2, 0, Math.PI * 2); ctx.fill();
-    const n = 14;
-    for (let k = 0; k < n; k++) {
-      const a0 = Math.PI / 2 + (k / n) * Math.PI * 2 * 0.92, a1 = a0 + (Math.PI * 2 * 0.92) / n, lit = hole ? 0.25 + (1 - k / n) * 0.6 : 0.45 + (k / n) * 0.55;
-      ctx.fillStyle = `rgba(${Math.round(150 * lit + 60)},${Math.round(110 * lit + 50)},${Math.round(70 * lit + 30)},1)`;
-      ctx.beginPath(); ctx.moveTo(x, y); ctx.arc(x, y, rr, a0, a1); ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = 'rgba(43,29,20,0.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a0) * rr, y + Math.sin(a0) * rr); ctx.stroke();
-    }
-    ctx.strokeStyle = '#2d3a4a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y, rr, 0, Math.PI * 2); ctx.stroke();
-    ctx.fillStyle = '#2d3a4a'; ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.fill();
-    for (let k = 0; k < 12; k++) { const a = (k / 12) * Math.PI * 2; ctx.fillStyle = '#2d3a4a'; ctx.beginPath(); ctx.arc(x + Math.cos(a) * rr, y + Math.sin(a) * rr, 2.5, 0, Math.PI * 2); ctx.fill(); }   // railing posts
+    // the spiral staircase up to the lamp room (js/stairs.js), its front step with the footprints
+    Stairs.round(ctx, { x: S.x, y: S.y, r: S.r, n: 10, mat: 'wood' });
   },
   // ---------- the lighthouse lamp room, up top: glass all round, the sea outside ----------
   paintLampRoom(r, g) {
@@ -612,8 +599,7 @@ const IslandsInsideExt = {
       },
     });
     const ctx = r.ctx, S = R.STAIRS;
-    this.drawSpiral(ctx, S.x, S.y, S.r, true);
-    ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.font = r.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('⬇ DOWN', S.x, S.y + S.r + 14);
+    Stairs.round(ctx, { x: S.x, y: S.y, r: S.r, n: 10, mat: 'wood', down: true });   // the stairwell back down
     // the lamp's round pedestal
     const L = R.LAMP;
     ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(L.x + 4, L.y + 8, 50, 16, 0, 0, Math.PI * 2); ctx.fill();
@@ -1233,32 +1219,10 @@ const IslandsInsideExt = {
   screen(r, g) {
     if (!this.st) return;
     const ctx = r.ctx, W = r.canvas.width / r.dpr, H = r.canvas.height / r.dpr, st = this.st;
-    if (g.area === 'lighthouse' && st.climb) this.drawClimb(r, g, W, H);
+    if (g.area === 'lighthouse' && st.climb) { ctx.fillStyle = `rgba(20,14,10,${Stairs.blink(st.climb, CFG.ISLE_IN.ROOMS.lighthouse.CLIMB).toFixed(3)})`; ctx.fillRect(0, 0, W, H); }
     else if (g.area === 'lighthouse' && st.viewing) this.drawView(r, g, W, H);
     else if (g.area === 'beachhut' && st.nap) { const n = this.nightAlpha(), d = this.dawnAlpha(); if (n > 0) this.drawSleepNight(r, g, W, H, n); if (d > 0) this.drawDawn(r, g, W, H, d); }
     if (st.fade > 0) { ctx.fillStyle = `rgba(20,12,6,${(st.fade / CFG.ISLE_IN.FADE).toFixed(3)})`; ctx.fillRect(0, 0, W, H); }
-  },
-  // climbing the spiral: a cut-away of the tower with the chef going round and round, up or down
-  drawClimb(r, g, W, H) {
-    const ctx = r.ctx, cl = this.st.climb, k = U.clamp(cl.t / CFG.ISLE_IN.ROOMS.lighthouse.CLIMB, 0, 1), cx = W / 2, cy = H / 2;
-    const alpha = Math.min(1, Math.min(k, 1 - k) * 6);
-    ctx.save(); ctx.globalAlpha = alpha;
-    ctx.fillStyle = '#2d3a4a'; ctx.fillRect(0, 0, W, H);
-    const th = Math.min(H * 0.7, 420), tw = th * 0.36, top = cy - th / 2;
-    ctx.fillStyle = '#f5f5f5'; ctx.beginPath(); ctx.moveTo(cx - tw / 2, top + th); ctx.lineTo(cx + tw / 2, top + th); ctx.lineTo(cx + tw * 0.36, top); ctx.lineTo(cx - tw * 0.36, top); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#e4572e'; ctx.fillRect(cx - tw * 0.4, top + th * 0.3, tw * 0.8, th * 0.1); ctx.fillRect(cx - tw * 0.45, top + th * 0.65, tw * 0.9, th * 0.1);
-    ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.arc(cx, top - 14, 16, 0, Math.PI * 2); ctx.fill();
-    // the steps zig-zag up the middle
-    ctx.strokeStyle = '#8d5a2b'; ctx.lineWidth = 3; ctx.beginPath();
-    for (let i = 0; i <= 24; i++) { const yy = top + th - 10 - (i / 24) * (th - 20), xx = cx + Math.sin(i * 0.8) * tw * 0.28; if (i) ctx.lineTo(xx, yy); else ctx.moveTo(xx, yy); }
-    ctx.stroke();
-    const q = cl.up ? k : 1 - k, i = q * 24, yy = top + th - 10 - q * (th - 20), xx = cx + Math.sin(i * 0.8) * tw * 0.28;
-    ctx.save(); ctx.translate(xx, yy); ctx.scale(0.8, 0.8);
-    r.drawPerson(0, 0, { shirt: '#fff', apron: '#e4572e', skin: '#f1c27d', hat: 'chef', facing: Math.cos(i * 0.8) >= 0 ? 1 : -1, moving: true, bob: cl.t * 16, carry: 0, pants: '#2d3a4a' });
-    ctx.restore();
-    ctx.fillStyle = '#ffe08a'; ctx.font = r.font(18); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(cl.up ? 'Up, up, up! 🪜' : 'Down, down, down! 🪜', cx, top + th + 34);
-    ctx.restore();
   },
   // Through the lamp-room telescope: the sea from the lighthouse, west round to east: Pizza Island far away, a big
   // ship, the Crab Shack's island, Rocket Island with its crane, a sailboat, a whale. Near layers move more.

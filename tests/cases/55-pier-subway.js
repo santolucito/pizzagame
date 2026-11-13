@@ -37,7 +37,7 @@ module.exports = async (t) => {
 
   // ---- down the same stairs in the City; the concourse hint names both lines
   await t.ev(() => { const e = SubwayExt.cityEntrance(); T.tp(e.x, e.y + 16, 'city'); });
-  t.expectEq(await t.ev(() => T.label()), '🚇 Go down to the subway', 'the City entrance is unchanged');
+  t.expectEq(await t.ev(() => T.label()), '⬇️ Down to the subway', 'the City entrance is unchanged');
   await t.ev(() => { T.act(); T.step(30); });
   t.expect(await t.ev(() => Game.area === 'subway' && SubwayExt.st.end === 'city'), 'down in the City station');
   await t.ev(() => T.tp(6800, 2240));
@@ -134,7 +134,7 @@ module.exports = async (t) => {
     const label = T.label(); T.act(); T.step(30);
     return { label, area: Game.area };
   });
-  t.expectEq(out.label, '🚶 Go up the stairs', 'walked from Line 2 to the stairs');
+  t.expectEq(out.label, '⬆️ Up to the City', 'walked from Line 2 to the stairs');
   t.expectEq(out.area, 'city', 'up into the City');
 
   // ---- rescues: pushed into a Line 2 pillar or into the dividing wall, the chef lands at the foot of the stairs

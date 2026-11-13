@@ -243,7 +243,7 @@ module.exports = async (t) => {
   t.expectEq(leave.label, '🚪 Leave the plane', 'leave label on the mat');
   t.expect(leave.area === 'town' && leave.d < 2, 'back outside at the door spot');
   t.expect(leave.area2 === 'town' && leave.d2 < 2 && leave.stairs && !leave.solid, `the door spot followed the moved jet (${JSON.stringify(leave)})`);
-  t.expectEq(leave.label2, '🚪 Board the plane', 'board label at the stairs');
+  t.expectEq(leave.label2, '⬆️ Up to the plane', 'board label at the stairs');
   t.expectEq(leave.hint2, 'Go inside the big plane! 🛫', 'door hint at the stairs');
   await t.ev(() => { const d = JetInsideExt.doorSpot(AirfieldExt.rt.jet); T.tp(d.x + 30, d.y + 30, 'town'); Render.setZoom(1.6); Game.cameraSnap = true; T.step(2); });
   await t.shot('jet-stairs');

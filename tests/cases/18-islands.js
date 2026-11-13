@@ -278,12 +278,13 @@ module.exports = async (t) => {
     const R = CFG.ISLE_IN.ROOMS.lighthouse; T.tp(R.FOOT.x, R.FOOT.y, 'lighthouse'); T.step(2);
     const label = T.label(), hint = T.hint(); T.act(); T.step(10);
     const climbing = !!IslandsInsideExt.st.climb, during = T.label();
-    T.steer(1, 0); T.step(10); T.unsteer(); const held = Math.hypot(Game.player.x - R.FOOT.x, Game.player.y - R.FOOT.y) < 2;
+    // the chef walks round the spiral's steps (the stick does nothing): k of the way along its path
+    T.steer(1, 0); T.step(10); T.unsteer(); const cl = IslandsInsideExt.st.climb, q = Stairs.walk(IslandsInsideExt.spiral().path, cl.t / (R.CLIMB / 2)), held = Math.hypot(Game.player.x - q.x, Game.player.y - q.y) < 1 && Game.player.y < R.FOOT.y - 10;
     return { label, hint, climbing, during, held };
   });
-  t.expectEq(climb.label, '🪜 Climb the stairs', 'climb label at the foot of the stairs');
-  t.expectEq(climb.hint, 'Climb the stairs to the lamp! 🪜', 'climb hint at the stairs');
-  t.expect(climb.climbing && climb.during === null && climb.held, 'climbing: no button, the chef stays on the stairs');
+  t.expectEq(climb.label, '⬆️ Up to the lamp room', 'climb label at the foot of the stairs');
+  t.expectEq(climb.hint, 'Go up the stairs to the lamp! ⬆️', 'climb hint at the stairs');
+  t.expect(climb.climbing && climb.during === null && climb.held, 'climbing: no button, the chef walks up the steps');
   await t.shot('lighthouse-climb');
   const top = await t.ev(() => {
     T.until(() => !IslandsInsideExt.st.climb, 200); T.step(2);
@@ -299,7 +300,7 @@ module.exports = async (t) => {
   });
   t.expect(top.up && top.floats.includes('The lamp room! 💡'), 'up in the lamp room');
   t.expectEq(top.hint, 'Look out to sea with the telescope! 🔭', 'telescope hint in the lamp room');
-  t.expectEq(top.downLabel, '🪜 Go down the stairs', 'the stairs lead back down');
+  t.expectEq(top.downLabel, '⬇️ Go downstairs', 'the stairs lead back down');
   t.expect(top.lampSolid, 'the big lamp stands on a solid pedestal');
   t.expectEq(top.scopeLabel, '🔭 Look through the telescope', 'telescope label');
   t.expect(top.viewing && top.viewLabel === '🚶 Done looking' && top.looks === 1, 'looking through the telescope');

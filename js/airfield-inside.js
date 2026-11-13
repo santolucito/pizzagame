@@ -12,7 +12,7 @@
 //  - the PIZZA AIR HANGAR (the small door between its bays): a plane under repair with a mechanic under it (a wrench,
 //    sparks), tool walls, the tug ('🚜 Drive the tug': toot toot, and you drive out at the wheel of the airfield's bag
 //    train, see js/airfield.js), parts on shelves, a stack of oil drums, a propeller hanging from the roof and a banner;
-//  - the CONTROL TOWER: the ground floor (a spiral stair, a sofa with a dozing pilot) and, '🪜 Climb up', the glass cab at
+//  - the CONTROL TOWER: the ground floor (a spiral stair, a sofa with a dozing pilot) and, '⬆️ Up to the top', the glass cab at
 //    the top: radar screens whose blips are the real planes, the controller in a headset, binoculars ('🔭 Look out': the
 //    runway and the planes, live) and a microphone ('🎙️ Clear for take-off!');
 //  - the WORKSHOP: a workbench with a vice, a propeller on a stand to spin, a mechanic who says hi, and a $4 toolbox;
@@ -28,7 +28,7 @@
 
 CFG.AF_IN = {
   WALL: 24, FADE: 0.45, DOOR_R: 30, HINT_R: 60, NEAR: 34,
-  CARRY: 30, CLIMB: 1.0, VIEW: 7, CLEAR: 3, STAND: 0.35,   // seconds: carrying a bag / toy / toolbox, the climb, the look-out, the radio call; stick-push to get up
+  CARRY: 30, CLIMB: 2.4, VIEW: 7, CLEAR: 3, STAND: 0.35,   // seconds: carrying a bag / toy / toolbox, the climb, the look-out, the radio call; stick-push to get up
   ROOMS: {
     // the terminal is a big two-part hall: the check-in hall (south, by the door) and, through security, the departures
     // lounge (north). A glass wall runs across between them; the only way through is the scanner arch.
@@ -73,7 +73,7 @@ CFG.AF_IN = {
       door: 'tower', toast: '🗼 Welcome to the control tower!', hint: 'Go inside the control tower! 🗼', title: '🗼 CONTROL TOWER', titleUp: '🎧 THE TOWER CAB',
       WORLD: { x0: 15000, y0: 4000, x1: 15600, y1: 4400 }, ROOM: { x0: 15040, y0: 4100, x1: 15560, y1: 4340 }, BACK_TOP: 4016,
       EXIT: { x: 15300, y: 4322 },
-      STAIRS: { x: 15440, y: 4166, r: 44 }, FOOT: { x: 15440, y: 4244 },   // the same spot on both floors
+      STAIRS: { x: 15440, y: 4166, r: 44 }, FOOT: { x: 15440, y: 4224 },   // the spiral (js/stairs.js) and its front step: the same spot on both floors
       SOFA: { x0: 15058, y0: 4266, x1: 15178, y1: 4322 }, TABLE: { x0: 15206, y0: 4166, x1: 15282, y1: 4200 },
       COOLER: { x0: 15514, y0: 4100, x1: 15552, y1: 4146 },
       // the cab, up top
@@ -272,7 +272,7 @@ const AirfieldInsideExt = {
       if (this.near(g, R.TUG_SPOT, 40)) return { label: '🚜 Drive the tug', run: (gg) => this.sitTug(gg) };
       if (this.near(g, R.MECH_SPOT, 40)) return { label: '👋 Say hi', run: (gg) => this.hiMech(gg) };
     } else if (k === 'aftower') {
-      if (this.near(g, R.FOOT, 36)) return st.up ? { label: '🪜 Go down', run: (gg) => this.startClimb(gg, false) } : { label: '🪜 Climb up', run: (gg) => this.startClimb(gg, true) };
+      if (Stairs.near(g, R.FOOT)) return st.up ? { label: Stairs.down(), run: (gg) => this.startClimb(gg, false) } : { label: Stairs.up('the top'), run: (gg) => this.startClimb(gg, true) };
       if (st.up) {
         if (this.near(g, R.BINO_SPOT, 36)) return { label: '🔭 Look out', run: (gg) => this.lookOut(gg) };
         if (this.near(g, R.MIC_SPOT, 36)) return { label: '🎙️ Clear for take-off!', run: (gg) => this.clearTakeOff(gg) };
@@ -401,7 +401,9 @@ const AirfieldInsideExt = {
     Sfx.chime(); Haptics.tap();
   },
   // ---------- the tower ----------
-  startClimb(g, up) { const st = this.st, p = g.player; st.climb = { t: 0, up, swapped: false, x: p.x, y: p.y }; st.viewing = null; p.moving = false; Sfx.pickup(); Haptics.tap(); },
+  startClimb(g, up) { const st = this.st, p = g.player; st.climb = { t: 0, up, swapped: false, x: p.x, y: p.y }; st.viewing = null; p.moving = false; Stairs.sound(up); },
+  // the tower's spiral stair as geometry (js/stairs.js): the same shape on both floors
+  spiral() { const S = CFG.AF_IN.ROOMS.aftower.STAIRS; return this._spiral || (this._spiral = Stairs.roundGeom({ x: S.x, y: S.y, r: S.r, n: 10 })); },
   lookOut(g) { const st = this.st, p = g.player; st.viewing = { t: 0 }; st.still = 0; p.moving = false; p.facing = 1; g.s.afIn.looks++; Sfx.ding(); Haptics.tap(); },
   doneLooking(g) { this.st.viewing = null; this.st.still = 0; Haptics.tap(); },
   clearTakeOff(g) {
@@ -515,14 +517,14 @@ const AirfieldInsideExt = {
     if (k === 'afhangar') this.updateSparks(g, dt, R);
     if (!this.onFoot(g)) return;
     if (st.climb) {
-      const cl = st.climb; cl.t += dt; p.moving = false;
-      if (!cl.swapped) { p.x = cl.x; p.y = cl.y; }
-      if (!cl.swapped && cl.t >= C.CLIMB / 2) {
-        cl.swapped = true; st.up = cl.up; p.x = R.FOOT.x; p.y = R.FOOT.y; p.facing = 1; g.cameraSnap = true;
+      // the chef walks round the spiral step by step, blinks over to the other floor half-way, and walks out there
+      const cl = st.climb; cl.t += dt;
+      Stairs.spiralClimb(p, cl, this.spiral(), C.CLIMB, dt, () => {
+        st.up = cl.up; g.cameraSnap = true;
         if (cl.up) g.s.afIn.climbs++;
-        this.float(g, p.x, p.y - 64, cl.up ? 'Wow, up so high! 🗼' : 'Back downstairs!', 1.4);
-      }
-      if (cl.t >= C.CLIMB) { st.climb = null; Haptics.tap(); }
+        this.float(g, R.FOOT.x, R.FOOT.y - 64, cl.up ? 'Wow, up so high! 🗼' : 'Back downstairs!', 1.4);
+      });
+      if (cl.t >= C.CLIMB) { st.climb = null; p.x = R.FOOT.x; p.y = R.FOOT.y; p.moving = false; Haptics.tap(); }
       return;
     }
     if (st.seat) {
@@ -636,13 +638,13 @@ const AirfieldInsideExt = {
       return out;
     }
     if (k === 'aftower') {
-      if (st.climb) return { text: st.climb.up ? 'Up, up, up the stairs! 🪜' : 'Down, down, down! 🪜', target: null };
-      if (!st.up) return go(s.climbs ? 'Climb up to see the planes! 🪜' : 'Climb up to the top of the tower! 🪜', R.FOOT);
+      if (st.climb) return { text: st.climb.up ? 'Up, up, up the stairs! ⬆️' : 'Down, down, down! ⬇️', target: null };
+      if (!st.up) return go(s.climbs ? 'Go up and see the planes! ⬆️' : 'Go up to the top of the tower! ⬆️', R.FOOT);
       if (st.viewing) return { text: 'Look at the planes! 🔭', target: null };
       if (st.clear > 0) return { text: 'Pizza Air is cleared for take-off! ✈️', target: null };
       if (!s.looks) return go('Look out with the binoculars! 🔭', R.BINO_SPOT);
       if (!s.clears) return go('Clear a plane for take-off! 🎙️', R.MIC_SPOT);
-      return go('Go back down the stairs 🪜', R.FOOT);
+      return go('Go back down the stairs ⬇️', R.FOOT);
     }
     if (k === 'affuel') {
       if (st.truck) return { text: 'Honk honk! Off we go! 🚚', target: null };
@@ -1203,8 +1205,7 @@ const AirfieldInsideExt = {
       },
     });
     const ctx = r.ctx, S = R.STAIRS;
-    this.drawSpiral(ctx, S.x, S.y, S.r);
-    ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.font = r.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('⬆ UP', S.x, S.y + S.r + 14);
+    Stairs.round(ctx, { x: S.x, y: S.y, r: S.r, n: 10, mat: 'metal' });   // the spiral up to the cab, its front step with the footprints
     // the sofa, the coffee table with a radio and two mugs, the water cooler
     const So = R.SOFA;
     ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(So.x0 + 4, So.y1 - 4, So.x1 - So.x0, 8);
@@ -1232,8 +1233,7 @@ const AirfieldInsideExt = {
     });
     const ctx = r.ctx, S = R.STAIRS, D = R.DESK;
     // the stairwell with its railing, coming up through the floor
-    this.drawSpiral(ctx, S.x, S.y, S.r, true);
-    ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.font = r.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('⬇ DOWN', S.x, S.y + S.r + 14);
+    Stairs.round(ctx, { x: S.x, y: S.y, r: S.r, n: 10, mat: 'metal', down: true });
     // the console along the windows: knobs, switches, a phone
     ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(D.x0 + 4, D.y1 - 2, D.x1 - D.x0, 6);
     ctx.fillStyle = '#5c6670'; U.roundRect(ctx, D.x0, D.y0 - 4, D.x1 - D.x0, D.y1 - D.y0 + 4, 4); ctx.fill();
@@ -1242,20 +1242,6 @@ const AirfieldInsideExt = {
     for (let i = 0; i < 18; i++) { ctx.fillStyle = cols[i % 4]; ctx.fillRect(D.x0 + 140 + (i % 9) * 10, D.y0 + 16 + Math.floor(i / 9) * 8, 5, 4); }
     ctx.fillStyle = '#e4572e'; U.roundRect(ctx, D.x0 + 236, D.y0 + 14, 18, 12, 3); ctx.fill();   // the red phone
     E.plant(ctx, 15062, 4320);
-  },
-  drawSpiral(ctx, x, y, rr, hole) {
-    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.arc(x + 3, y + 4, rr + 4, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = hole ? '#1a1410' : '#5c6670'; ctx.beginPath(); ctx.arc(x, y, rr + 2, 0, Math.PI * 2); ctx.fill();
-    const n = 14;
-    for (let k = 0; k < n; k++) {
-      const a0 = Math.PI / 2 + (k / n) * Math.PI * 2 * 0.92, a1 = a0 + (Math.PI * 2 * 0.92) / n, lit = hole ? 0.25 + (1 - k / n) * 0.6 : 0.45 + (k / n) * 0.55;
-      ctx.fillStyle = `rgba(${Math.round(120 * lit + 60)},${Math.round(130 * lit + 60)},${Math.round(140 * lit + 70)},1)`;
-      ctx.beginPath(); ctx.moveTo(x, y); ctx.arc(x, y, rr, a0, a1); ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = 'rgba(43,29,20,0.45)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a0) * rr, y + Math.sin(a0) * rr); ctx.stroke();
-    }
-    ctx.strokeStyle = '#e4572e'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(x, y, rr, 0, Math.PI * 2); ctx.stroke();
-    ctx.fillStyle = '#2d3a4a'; ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.fill();
-    for (let k = 0; k < 12; k++) { const a = (k / 12) * Math.PI * 2; ctx.fillStyle = '#2d3a4a'; ctx.beginPath(); ctx.arc(x + Math.cos(a) * rr, y + Math.sin(a) * rr, 2.5, 0, Math.PI * 2); ctx.fill(); }
   },
   // the cab's big windows (the airfield live, a plane taking off when you clear it) and its radar screens
   drawCabLive(r, g) {
@@ -1758,7 +1744,7 @@ const AirfieldInsideExt = {
     if (g.area === 'aftower' && st.viewing) this.drawLookOut(r, g, W, H);
     if (g.area === 'afterminal' && this.xrayPhase() === 'scan') this.drawXrayPopup(r, g, W, H);
     let a = st.fade > 0 ? st.fade / CFG.AF_IN.FADE : 0;
-    if (st.climb) { const k = st.climb.t / CFG.AF_IN.CLIMB; a = Math.max(a, 1 - Math.abs(k * 2 - 1)); }
+    if (st.climb) a = Math.max(a, Stairs.blink(st.climb, CFG.AF_IN.CLIMB));
     if (a > 0) { ctx.fillStyle = `rgba(20,12,6,${Math.min(1, a).toFixed(3)})`; ctx.fillRect(0, 0, W, H); }
   },
 };

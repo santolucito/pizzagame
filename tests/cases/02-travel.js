@@ -66,10 +66,10 @@ module.exports = async (t) => {
 
   // ---- upstairs
   await t.ev(() => { const L = CFG.UPSTAIRS.STAIRS.landing; T.tp(L.x, L.y, 'town'); });
-  t.expectEq(await t.ev(() => T.label()), '🪜 Go upstairs', 'stairs label on the landing');
+  t.expectEq(await t.ev(() => T.label()), '⬆️ Go upstairs', 'stairs label on the landing');
   await t.ev(() => { T.act(); T.step(30); });
   t.expectEq(await t.ev(() => Game.area), 'upstairs', 'in the bedroom');
-  t.expectEq(await t.ev(() => T.label()), '🪜 Go downstairs', 'downstairs label at the top of the stairs');
+  t.expectEq(await t.ev(() => T.label()), '⬇️ Go downstairs', 'downstairs label at the top of the stairs');
   await t.ev(() => T.act());
   t.expectEq(await t.ev(() => Game.area), 'town', 'back in the office');
 

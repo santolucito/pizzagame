@@ -77,7 +77,7 @@ module.exports = async (t) => {
   await t.shot('cab');
   await t.ev(() => { T.act(); T.step(2); });
   t.expect(await t.ev(() => !FireStationExt.st.cab && FireStationExt.free(Game.player.x, Game.player.y)), 'climbed out onto free floor');
-  t.expectEq(await t.ev(() => T.hint()), 'Climb the stairs to the fire pole! 🪜', 'stairs hint after the ride');
+  t.expectEq(await t.ev(() => T.hint()), 'Go up the stairs to the fire pole! ⬆️', 'stairs hint after the ride');
 
   // ---- the truck goes out (the core's outing, started the way the entity does it): the bay empties, with a cone
   const out = await t.ev(() => {
@@ -109,10 +109,10 @@ module.exports = async (t) => {
 
   // ---- the stairs and the pole
   await t.ev(() => { const s = CFG.FIRESTATION.STAIRS.foot; T.tp(s.x, s.y + 2, 'firestation'); });
-  t.expectEq(await t.ev(() => T.label()), '🪜 Climb the stairs', 'stairs label at the foot');
+  t.expectEq(await t.ev(() => T.label()), '⬆️ Up to the fire pole', 'stairs label at the foot');
   await t.ev(() => { T.act(); T.step(5); });
   t.expect(await t.ev(() => !!FireStationExt.st.climb), 'climbing');
-  t.expectEq(await t.ev(() => T.hint()), 'Up we go! 🪜', 'climbing hint');
+  t.expectEq(await t.ev(() => T.hint()), 'Up the stairs we go! ⬆️', 'climbing hint');
   const up = await t.ev(() => { const n = T.until(() => FireStationExt.st.up, 400); const P = CFG.FIRESTATION.POLE, G = CFG.FIRESTATION.GALLERY; return { n, label: T.label(), hint: T.hint(), d: Math.hypot(Game.player.x - P.x, Game.player.y - G.floor) }; });
   t.expect(up.n >= 0 && up.d < 1, 'arrived up on the gallery by the pole');
   t.expectEq(up.label, '🧑‍🚒 Slide down!', 'slide label up top');

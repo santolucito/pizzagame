@@ -262,15 +262,15 @@ module.exports = async (t) => {
 
   // ======== the control tower ========
   await t.ev(() => { const R = CFG.AF_IN.ROOMS.aftower; T.tp(R.EXIT.x, R.EXIT.y - 8, 'aftower'); T.step(2); });
-  t.expectEq(await t.ev(() => T.hint()), 'Climb up to the top of the tower! 🪜', 'tower: climb hint first');
+  t.expectEq(await t.ev(() => T.hint()), 'Go up to the top of the tower! ⬆️', 'tower: climb hint first');
   await t.shot('tower');
   await t.ev(() => { const F = CFG.AF_IN.ROOMS.aftower.FOOT; T.tp(F.x, F.y, 'aftower'); });
-  t.expectEq(await t.ev(() => T.label()), '🪜 Climb up', 'tower: climb label at the stairs');
+  t.expectEq(await t.ev(() => T.label()), '⬆️ Up to the top', 'tower: climb label at the stairs');
   await t.ev(() => { T.act(); T.step(3); });
-  t.expectEq(await t.ev(() => T.hint()), 'Up, up, up the stairs! 🪜', 'tower: climbing hint');
+  t.expectEq(await t.ev(() => T.hint()), 'Up, up, up the stairs! ⬆️', 'tower: climbing hint');
   const up = await t.ev(() => { const n = T.until(() => !AirfieldInsideExt.st.climb, 200); const F = CFG.AF_IN.ROOMS.aftower.FOOT; T.step(2); return { n, up: AirfieldInsideExt.st.up, d: Math.hypot(Game.player.x - F.x, Game.player.y - F.y), climbs: Game.s.afIn.climbs, label: T.label(), hint: T.hint(), key: AirfieldInsideExt.bgKey(Game), exit: Game.obstacles().length }; });
   t.expect(up.n >= 0 && up.up && up.d < 1 && up.climbs === 1, `tower: up in the cab at the top of the stairs (${JSON.stringify(up)})`);
-  t.expectEq(up.label, '🪜 Go down', 'tower: go-down label at the top of the stairs');
+  t.expectEq(up.label, '⬇️ Go downstairs', 'tower: go-down label at the top of the stairs');
   t.expectEq(up.hint, 'Look out with the binoculars! 🔭', 'tower: binoculars hint up top');
   t.expectEq(up.key, 'afTwrUp', 'tower: the cab has its own picture');
   t.expect(await t.ev(() => { const R = CFG.AF_IN.ROOMS.aftower; T.tp(R.EXIT.x, R.EXIT.y - 8, 'aftower'); T.step(1); return T.label() !== '🚪 Go outside'; }), 'tower: no way outside from the cab');
@@ -307,7 +307,7 @@ module.exports = async (t) => {
   t.expect(clear.clear > 0 && clear.clears === 1, 'tower: cleared for take-off');
   t.expectEq(clear.hint, 'Pizza Air is cleared for take-off! ✈️', 'tower: radio-call hint');
   await t.shot('tower-clear');
-  t.expectEq(await t.ev(() => { T.step(60 * 4); return T.hint(); }), 'Go back down the stairs 🪜', 'tower: then back down');
+  t.expectEq(await t.ev(() => { T.step(60 * 4); return T.hint(); }), 'Go back down the stairs ⬇️', 'tower: then back down');
   await t.page.setViewportSize({ width: 390, height: 844 });
   await t.ev(() => { Render.resize(); const R = CFG.AF_IN.ROOMS.aftower; T.tp(R.CTRL.x + 40, R.CTRL.y + 60, 'aftower'); T.step(2); });
   await t.shot('tower-cab-phone');
@@ -315,7 +315,7 @@ module.exports = async (t) => {
   await t.ev(() => { Render.resize(); T.step(1); });
   const down = await t.ev(() => { const F = CFG.AF_IN.ROOMS.aftower.FOOT; T.tp(F.x, F.y, 'aftower'); T.act(); const n = T.until(() => !AirfieldInsideExt.st.climb, 200); T.step(2); return { n, up: AirfieldInsideExt.st.up, label: T.label(), free: AirfieldInsideExt.free(Game, Game.player.x, Game.player.y) }; });
   t.expect(down.n >= 0 && !down.up && down.free, 'tower: back down on the ground floor');
-  t.expectEq(down.label, '🪜 Climb up', 'tower: climb label again downstairs');
+  t.expectEq(down.label, '⬆️ Up to the top', 'tower: climb label again downstairs');
   // a push into the console up top lands at the top of the stairs
   const cabRescue = await t.ev(() => { const F = CFG.AF_IN.ROOMS.aftower.FOOT; T.tp(F.x, F.y, 'aftower'); T.act(); T.until(() => !AirfieldInsideExt.st.climb, 200); const D = CFG.AF_IN.ROOMS.aftower.DESK; T.tp((D.x0 + D.x1) / 2, D.y0 + 10, 'aftower'); T.step(2); return Math.hypot(Game.player.x - F.x, Game.player.y - F.y); });
   t.expect(cabRescue < 1, 'tower: pushed into the console up top: back at the top of the stairs');

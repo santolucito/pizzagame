@@ -21,7 +21,8 @@ CFG.SUBWAY = {
     L1: { x0: 6400, x1: 7300 },   // Line 1's hall: its train runs in from 400 px west of it and out 400 px east of it
     wallTop: 2144, wallSide: 30,
     floor: { x0: 6430, y0: 2144, x1: 7270, y1: 2404 },
-    stairs: { x0: 6456, y0: 2144, x1: 6534, y1: 2218, foot: { x: 6495, y: 2234 } },
+    // the flat flight up to the street (js/stairs.js), climbing north from the bottom step (footprints) at `foot`
+    stairs: { x0: 6460, y0: 2144, x1: 6530, y1: 2246, dir: 'n', n: 6, first: 22, rails: ['w', 'e'], foot: { x: 6495, y: 2235 } },
     booth: { x0: 6590, y0: 2152, x1: 6700, y1: 2214, clerk: { x: 6645, y: 2210 } },
     board: { x0: 6750, y0: 2150, x1: 6920, y1: 2204 },   // the route board: both lines, with their pictures
     snack: { x0: 7110, y0: 2152, x1: 7230, y1: 2214, vendor: { x: 7170, y: 2210 } },
@@ -88,8 +89,9 @@ CFG.SUBWAY = {
     },
   },
   STOPS: ['CITY', 'PIZZA ST', 'MUSEUM', 'CATHEDRAL PKWY', 'COLUMBIA'],
-  // the street entrances: a flight of steps going DOWN into the ground, away from the chef, who stands on the landing at the top
-  ENTRANCE: { halfNear: 26, halfFar: 16, near: 20, far: -18, stand: 26, steps: 7 },
+  // the street entrances: a flat stairwell going DOWN into the ground, away from the chef, who stands on its top step
+  // (the pale one with the footprints) at `stand` below the entrance's spot; half: its half width; far / near: its ends
+  ENTRANCE: { half: 24, near: 34, far: -22, stand: 26, steps: 5, first: 20 },
   // school colours and the round crests (shield, crown and lion for Columbia; a bear for Barnard)
   CU_BLUE: '#3b7dd8', CU_LIGHT: '#9ecbff', BC_BLUE: '#1f4e9a',
   // inside Low Library: a marble rotunda reading room (its own map in the reserved Columbia rectangle)
@@ -150,8 +152,8 @@ const SubwayExt = {
   // the geometry of a street entrance centred at (x, y): the flight's rectangle (far end = the opening in the ground, at
   // the smaller y), the top step by the chef and the spot the chef stands on
   entranceArt(x, y) {
-    const E = CFG.SUBWAY.ENTRANCE;
-    return { stairs: { x0: x - E.halfNear, y0: y + E.far, x1: x + E.halfNear, y1: y + E.near }, opening: { x: x, y: y + E.far - 6 }, top: y + E.near, stand: { x, y: y + E.stand } };
+    const E = CFG.SUBWAY.ENTRANCE, flat = { x0: x - E.half, y0: y + E.far, x1: x + E.half, y1: y + E.near, dir: 'n', n: E.steps, first: E.first, down: true, rails: ['w', 'e'] };
+    return { flat, stairs: { x0: flat.x0, y0: flat.y0, x1: flat.x1, y1: flat.y1 - E.first }, opening: { x: x, y: y + E.far - 6 }, top: flat.y1 - E.first, stand: { x, y: y + E.stand } };
   },
   // the interiors: door spots on the campus and the exit mats inside
   interior(area) { return area === 'lowlibrary' ? CFG.SUBWAY.LOW : area === 'barnardhall' ? CFG.SUBWAY.BARNARD : null; },
@@ -260,7 +262,7 @@ const SubwayExt = {
       o.push({ x: W.x0, y: W.y0, w: W.x1 - W.x0, h: S.wallTop - W.y0 }, { x: W.x0, y: W.y0, w: S.wallSide, h: W.y1 - W.y0 }, { x: W.x1 - S.wallSide, y: W.y0, w: S.wallSide, h: W.y1 - W.y0 });
       o.push({ x: W.x0, y: S.track.y0 - 4, w: W.x1 - W.x0, h: W.y1 - S.track.y0 + 4 });   // nobody walks on the track
       const rect = (q) => ({ x: q.x0, y: q.y0, w: q.x1 - q.x0, h: q.y1 - q.y0 });
-      o.push(rect(S.stairs), rect(S.booth), rect(S.board), rect(S.snack));
+      o.push(Stairs.flatGeom(S.stairs).body, rect(S.booth), rect(S.board), rect(S.snack));
       for (const [x, y] of S.pillars) o.push({ x: x - 13, y: y - 13, w: 26, h: 26 });
       for (const [x, y] of S.benches) o.push({ x: x - 26, y: y - 10, w: 52, h: 20 });
       o.push({ x: S.bin.x - 9, y: S.bin.y - 12, w: 18, h: 20 });
@@ -313,8 +315,8 @@ const SubwayExt = {
   action(g) {
     const st = this.st;
     if (!st || st.boarding || st.alight || !this.onFoot(g)) return null;
-    if (this.nearCityEntrance(g)) return { label: '🚇 Go down to the subway', run: (gg) => this.goDown(gg, 'city') };
-    if (this.nearCampusEntrance(g)) return { label: '🚇 Go down to the subway', run: (gg) => this.goDown(gg, 'campus') };
+    if (this.nearCityEntrance(g)) return { label: Stairs.down('the subway'), run: (gg) => this.goDown(gg, 'city') };
+    if (this.nearCampusEntrance(g)) return { label: Stairs.down('the subway'), run: (gg) => this.goDown(gg, 'campus') };
     if (g.area === 'campus') {
       if (this.nearDoor(g, CFG.SUBWAY.LOW)) return { label: '🚪 Go inside', run: (gg) => this.enter(gg, 'lowlibrary') };
       if (this.nearDoor(g, CFG.SUBWAY.BARNARD)) return { label: '🚪 Go inside', run: (gg) => this.enter(gg, 'barnardhall') };
@@ -323,7 +325,7 @@ const SubwayExt = {
     if (g.area === 'lowlibrary') return this.lowAction(g);
     if (g.area === 'barnardhall') return this.barnardAction(g);
     if (g.area !== 'subway') return null;
-    if (this.nearStairs(g)) return { label: '🚶 Go up the stairs', run: (gg) => this.goUp(gg) };
+    if (this.nearStairs(g)) return { label: Stairs.up(st.end === 'city' ? 'the City' : 'the campus'), run: (gg) => this.goUp(gg) };
     if (this.canBoard(g)) return this.hallLine(g) === 2 ? { label: '🎡 Ride to Coney Island', run: (gg) => this.board(gg) } : { label: '🚇 Ride the subway', run: (gg) => this.board(gg) };
     return null;
   },
@@ -743,36 +745,17 @@ const SubwayExt = {
     const cols = ['#ff8fab', '#ffd166', '#fff', '#ff6b6b', '#9ad0ff'];
     for (let i = 0; i < 9; i++) { ctx.fillStyle = cols[i % 5]; ctx.beginPath(); ctx.arc(x - 26 + i * 6.5, y + Math.sin(i * 1.7) * 7, 3, 0, Math.PI * 2); ctx.fill(); }
   },
-  // a street entrance to the subway, seen from the sidewalk: the chef stands on the landing at the bottom of the picture (the
-  // TOP of the flight) and the steps run away from them, down into the ground: each step narrower and darker than the one
-  // before, the green railings closing in, and at the far end the dark opening with the station's warm light shining up it.
+  // a street entrance to the subway, seen from above: a flat stairwell going down into the ground, away from the chef, who
+  // stands on its top step (the pale one with the footprints); green railings with knobs along both sides, a green globe
+  // lamp, the line's round sign and the name board over the far end
   entrance(r, x, y, name) {
-    const ctx = r.ctx, E = CFG.SUBWAY.ENTRANCE, A = this.entranceArt(x, y), S = A.stairs, n = E.steps, K = CFG.SUBWAY;
-    const half = (yy) => U.lerp(E.halfNear, E.halfFar, (S.y1 - yy) / (S.y1 - S.y0));   // the flight's half width at a given y (narrower the deeper it goes)
-    // the landing the chef stands on: a stone slab with a yellow safety strip along the top step
-    ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(S.x0 - 10, S.y1 - 2, S.x1 - S.x0 + 22, 14);
-    ctx.fillStyle = '#c9c3b6'; ctx.fillRect(S.x0 - 12, S.y1, S.x1 - S.x0 + 24, 10); ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(S.x0 - 12, S.y1, S.x1 - S.x0 + 24, 2);
-    // the opening in the ground at the far end, lit from below
-    ctx.fillStyle = '#0d0b10'; ctx.fillRect(S.x0 + E.halfNear - E.halfFar - 3, S.y0 - 12, E.halfFar * 2 + 6, 16);
-    const glow = ctx.createLinearGradient(0, S.y0 - 2, 0, S.y0 - 12); glow.addColorStop(0, 'rgba(255,214,120,0.55)'); glow.addColorStop(1, 'rgba(255,214,120,0)'); ctx.fillStyle = glow; ctx.fillRect(S.x0 + E.halfNear - E.halfFar - 3, S.y0 - 12, E.halfFar * 2 + 6, 12);
-    // the steps: trapezoids from the bright top step by the chef down to the dark bottom one
-    for (let k = 0; k < n; k++) {
-      const ya = S.y1 - k * (S.y1 - S.y0) / n, yb = S.y1 - (k + 1) * (S.y1 - S.y0) / n, f = k / (n - 1), ha = half(ya), hb = half(yb);
-      ctx.fillStyle = `rgb(${Math.round(196 - 140 * f)},${Math.round(196 - 138 * f)},${Math.round(204 - 136 * f)})`;
-      ctx.beginPath(); ctx.moveTo(x - ha, ya); ctx.lineTo(x + ha, ya); ctx.lineTo(x + hb, yb); ctx.lineTo(x - hb, yb); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.moveTo(x - hb - 0.5, yb); ctx.lineTo(x + hb + 0.5, yb); ctx.lineTo(x + hb + 0.5, yb + 2); ctx.lineTo(x - hb - 0.5, yb + 2); ctx.closePath(); ctx.fill();   // the riser's shadow at the far edge of each step
-    }
-    ctx.fillStyle = '#f2c94c'; ctx.fillRect(S.x0, S.y1 - 3, S.x1 - S.x0, 3);
-    // the railings close in with the flight; little posts along them
-    ctx.strokeStyle = '#2f6b3a'; ctx.lineWidth = 4; ctx.lineCap = 'round';
-    for (const d of [-1, 1]) { ctx.beginPath(); ctx.moveTo(x + d * (E.halfNear + 5), S.y1 + 4); ctx.lineTo(x + d * (E.halfFar + 4), S.y0 - 8); ctx.stroke(); }
-    ctx.lineCap = 'butt'; ctx.fillStyle = '#2f6b3a';
-    for (const d of [-1, 1]) for (let k = 0; k <= 3; k++) { const yy = S.y1 + 4 - k * (S.y1 - S.y0 + 12) / 3, hx = U.lerp(E.halfNear + 5, E.halfFar + 4, k / 3); ctx.fillRect(x + d * hx - 1.5, yy - 10, 3, 12); }
-    // a green globe lamp on the right post, the line's round sign on the left one, and the name board above the far end
-    ctx.fillStyle = '#2f6b3a'; ctx.fillRect(x + E.halfNear + 3, S.y1 - 28, 4, 34); ctx.fillStyle = '#56b862'; ctx.beginPath(); ctx.arc(x + E.halfNear + 5, S.y1 - 32, 7, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.beginPath(); ctx.arc(x + E.halfNear + 3, S.y1 - 34, 2.5, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#5c6670'; ctx.fillRect(x - E.halfNear - 7, S.y1 - 30, 4, 36); ctx.fillStyle = K.COLOR; ctx.beginPath(); ctx.arc(x - E.halfNear - 5, S.y1 - 34, 10, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.font = r.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(K.LINE, x - E.halfNear - 5, S.y1 - 33);
-    this.sign(r, x, S.y0 - 24, '⬇ ' + name, 8, 12);
+    const ctx = r.ctx, E = CFG.SUBWAY.ENTRANCE, A = this.entranceArt(x, y), F = A.flat, K = CFG.SUBWAY;
+    Stairs.flat(ctx, Object.assign({ mat: 'stone' }, F));
+    ctx.fillStyle = '#f2c94c'; ctx.fillRect(F.x0 + 2, F.y1 - E.first - 1, F.x1 - F.x0 - 4, 2.5);   // the yellow safety strip on the top step's edge
+    ctx.fillStyle = '#2f6b3a'; ctx.fillRect(x + E.half + 4, F.y1 - 34, 4, 34); ctx.fillStyle = '#56b862'; ctx.beginPath(); ctx.arc(x + E.half + 6, F.y1 - 38, 7, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.beginPath(); ctx.arc(x + E.half + 4, F.y1 - 40, 2.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#5c6670'; ctx.fillRect(x - E.half - 8, F.y1 - 36, 4, 36); ctx.fillStyle = K.COLOR; ctx.beginPath(); ctx.arc(x - E.half - 6, F.y1 - 40, 10, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = r.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(K.LINE, x - E.half - 6, F.y1 - 39);
+    this.sign(r, x, F.y0 - 14, '⬇ ' + name, 8, 12);
   },
   // the City paints its own little entrance where CFG.CITY.SUBWAY says; this paints the proper flight over it
   paintAfter(r, g, area) {
@@ -863,24 +846,14 @@ const SubwayExt = {
     poster(7386, 2104, 62, 34, K.COLOR2, 'FERRIS WHEEL', '🎡 WHEE!'); poster(7700, 2104, 62, 34, '#e4572e', 'COASTER', '🎢 ZOOM!');
     const CK = S.clock; ctx.fillStyle = '#2d3a4a'; ctx.beginPath(); ctx.arc(CK.x, CK.y, 14, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(CK.x, CK.y, 11, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = '#2b1d14'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(CK.x, CK.y); ctx.lineTo(CK.x, CK.y - 7); ctx.moveTo(CK.x, CK.y); ctx.lineTo(CK.x + 5, CK.y + 2); ctx.stroke();
-    // the stairs up to the street: the chef stands at the foot (the bottom of the picture) and the flight climbs away from
-    // them, narrowing towards the daylight in the opening at the top; the steps get brighter the closer they are to the sky
-    const ST = S.stairs, scx = (ST.x0 + ST.x1) / 2, hNear = (ST.x1 - ST.x0) / 2, hFar = hNear - 12, n = 8;
-    const sHalf = (yy) => U.lerp(hNear, hFar, (ST.y1 - yy) / (ST.y1 - ST.y0));
-    ctx.fillStyle = '#3b2f26'; ctx.fillRect(scx - hFar - 6, W.y0 + 6, hFar * 2 + 12, ST.y0 - W.y0 - 6);
-    ctx.fillStyle = '#9fd8ff'; ctx.fillRect(scx - hFar + 2, W.y0 + 8, hFar * 2 - 4, ST.y0 - W.y0 - 8);
-    ctx.fillStyle = '#fff6c8'; ctx.fillRect(scx - hFar + 2, ST.y0 - 10, hFar * 2 - 4, 10);
-    for (let k = 0; k < n; k++) {
-      const ya = ST.y1 - k * (ST.y1 - ST.y0) / n, yb = ST.y1 - (k + 1) * (ST.y1 - ST.y0) / n, f = k / (n - 1), ha = sHalf(ya), hb = sHalf(yb);
-      ctx.fillStyle = `rgb(${Math.round(150 + 80 * f)},${Math.round(148 + 80 * f)},${Math.round(150 + 70 * f)})`;
-      ctx.beginPath(); ctx.moveTo(scx - ha, ya); ctx.lineTo(scx + ha, ya); ctx.lineTo(scx + hb, yb); ctx.lineTo(scx - hb, yb); ctx.closePath(); ctx.fill();
-      ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(scx - hb - 0.5, yb, hb * 2 + 1, 2);
-    }
-    const day = ctx.createLinearGradient(0, ST.y0, 0, ST.y0 + 36); day.addColorStop(0, 'rgba(255,246,200,0.55)'); day.addColorStop(1, 'rgba(255,246,200,0)'); ctx.fillStyle = day; ctx.fillRect(scx - hNear, ST.y0, hNear * 2, 36);
-    ctx.strokeStyle = '#9aa0a8'; ctx.lineWidth = 5; ctx.lineCap = 'round';
-    for (const d of [-1, 1]) { ctx.beginPath(); ctx.moveTo(scx + d * (hNear + 3), ST.y1 + 2); ctx.lineTo(scx + d * (hFar + 3), ST.y0 - 4); ctx.stroke(); }
-    ctx.lineCap = 'butt';
-    ctx.fillStyle = '#f2c94c'; ctx.fillRect(ST.x0, ST.y1 - 3, ST.x1 - ST.x0, 3);
+    // the stairs up to the street: a flat flight climbing north from the bottom step (the pale one with the footprints)
+    // to the daylight in the opening at the top (js/stairs.js)
+    const ST = S.stairs, scx = (ST.x0 + ST.x1) / 2, hw = (ST.x1 - ST.x0) / 2 - 6;
+    ctx.fillStyle = '#3b2f26'; ctx.fillRect(scx - hw - 6, W.y0 + 6, hw * 2 + 12, ST.y0 - W.y0 - 6);
+    ctx.fillStyle = '#9fd8ff'; ctx.fillRect(scx - hw + 2, W.y0 + 8, hw * 2 - 4, ST.y0 - W.y0 - 8);
+    ctx.fillStyle = '#fff6c8'; ctx.fillRect(scx - hw + 2, ST.y0 - 10, hw * 2 - 4, 10);
+    Stairs.flat(ctx, Object.assign({ mat: 'concrete' }, ST));
+    const day = ctx.createLinearGradient(0, ST.y0, 0, ST.y0 + 30); day.addColorStop(0, 'rgba(255,246,200,0.5)'); day.addColorStop(1, 'rgba(255,246,200,0)'); ctx.fillStyle = day; ctx.fillRect(ST.x0, ST.y0, ST.x1 - ST.x0, 30);
     E.sign(r, scx, W.y0 + 34, toCampus ? '⬆ CITY STREET' : '⬆ 116 ST · CAMPUS', 8, 12);
     // ticket booth: steel body, glass window, a counter and a sign
     const B = S.booth;

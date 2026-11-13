@@ -7,16 +7,16 @@ module.exports = async (t) => {
 
   // ---- the entrance in the City (its spot comes from CFG.CITY.SUBWAY, which the subway owns)
   await t.ev(() => { const e = SubwayExt.cityEntrance(); T.tp(e.x, e.y + 16, 'city'); });
-  t.expectEq(await t.ev(() => T.label()), '🚇 Go down to the subway', 'subway entrance label in the City');
+  t.expectEq(await t.ev(() => T.label()), '⬇️ Down to the subway', 'subway entrance label in the City');
   t.expectEq(await t.ev(() => T.hint()), 'Go down to the subway! 🚇', 'hint by the City entrance');
   await t.ev(() => T.tp(5300, 700, 'city'));
-  t.expect(await t.ev(() => T.label()) !== '🚇 Go down to the subway', 'no subway label away from the entrance');
+  t.expect(await t.ev(() => T.label()) !== '⬇️ Down to the subway', 'no subway label away from the entrance');
   await t.ev(() => { const e = SubwayExt.cityEntrance(); T.tp(e.x, e.y + 16, 'city'); });
   await t.ev(() => { T.act(); T.step(30); });
   t.expectEq(await t.ev(() => Game.area), 'subway', 'down in the station');
   t.expectEq(await t.ev(() => SubwayExt.st.end), 'city', 'the station is the City end');
   t.expect(await t.ev(() => Game.player.y > 2220 && Game.player.y < 2250), 'the chef stands at the foot of the stairs');
-  t.expectEq(await t.ev(() => T.label()), '🚶 Go up the stairs', 'stairs label at the foot of the stairs');
+  t.expectEq(await t.ev(() => T.label()), '⬆️ Up to the City', 'stairs label at the foot of the stairs');
   await t.shot('station-concourse');
 
   // ---- the train arrives soon after you reach the platform
@@ -43,7 +43,7 @@ module.exports = async (t) => {
 
   // ---- up the stairs onto the campus
   await t.ev(() => { const f = CFG.SUBWAY.STATION.stairs.foot; T.tp(f.x, f.y); });
-  t.expectEq(await t.ev(() => T.label()), '🚶 Go up the stairs', 'stairs label at the campus end');
+  t.expectEq(await t.ev(() => T.label()), '⬆️ Up to the campus', 'stairs label at the campus end');
   await t.ev(() => { T.toasts.length = 0; T.act(); T.step(30); });
   t.expectEq(await t.ev(() => Game.area), 'campus', 'on the campus');
   t.expect(await t.ev(() => T.toasts.length === 1), 'one important toast the first time on campus');
@@ -61,8 +61,8 @@ module.exports = async (t) => {
   t.expect(await t.ev(() => Game.floats.some((f) => /Giant slice/.test(f.text))), 'standing by the stand gets you a giant slice');
 
   // ---- walk to the campus entrance (from the south, up the median) and go back down
-  await t.ev(() => { T.tp(9775, 700); T.steer(0, -1); T.until(() => T.label() === '🚇 Go down to the subway', 400); T.unsteer(); });
-  t.expectEq(await t.ev(() => T.label()), '🚇 Go down to the subway', 'walked up to the campus entrance');
+  await t.ev(() => { T.tp(9775, 700); T.steer(0, -1); T.until(() => T.label() === '⬇️ Down to the subway', 400); T.unsteer(); });
+  t.expectEq(await t.ev(() => T.label()), '⬇️ Down to the subway', 'walked up to the campus entrance');
   await t.ev(() => { T.act(); T.step(30); });
   t.expect(await t.ev(() => Game.area === 'subway' && SubwayExt.st.end === 'campus'), 'back down in the campus station');
   await t.ev(() => T.tp(CFG.SUBWAY.STATION.stand.x, CFG.SUBWAY.STATION.stand.y));
@@ -85,7 +85,7 @@ module.exports = async (t) => {
     t.expect(A.opening.y < A.stairs.y0 && A.stairs.y0 < A.top, `${name}: the opening in the ground is at the far end of the flight, away from the chef`);
     t.expect(Math.abs(stand.x - A.stand.x) < 1 && Math.abs(stand.y - A.stand.y) < 1, `${name}: the standing spot is the one the art is built around`);
   }
-  t.expect(art.station.foot.y > art.station.y1, 'station: the chef stands at the foot and the stairs climb away to the street');
+  t.expect(art.station.foot.y > art.station.y1 - art.station.first && art.station.foot.y < art.station.y1, 'station: the chef stands on the bottom step and the stairs climb away to the street');
   await t.ev(() => { Render.setZoom(2); const e = SubwayExt.cityEntrance(); T.tp(e.x, e.y, 'city'); T.step(2); });
   await t.shot('city-entrance');
   await t.ev(() => { const a = CFG.SUBWAY.CAMPUS.ARRIVE; T.tp(a.x, a.y, 'campus'); T.step(2); });

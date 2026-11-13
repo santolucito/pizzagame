@@ -14,8 +14,8 @@ CFG.BIKEFLEET = {
   RACK: { x0: 422, y0: 826, x1: 582, y1: 892 },        // concrete slab under the fountain, above the South Road sidewalk (y 894)
   SLOTS: [{ x: 442, y: 862 }, { x: 472, y: 862 }, { x: 502, y: 862 }, { x: 532, y: 862 }, { x: 562, y: 862 }],
   EXIT_Y: 812,                                          // bikes leave the rack north to here, then head for the dock
-  CASH: { x: 636, y: 868 },                             // the pile the chef walks over to collect
-  PAD: { x: 724, y: 868 },                              // buy another bike
+  CASH: { x: 392, y: 864 },                             // the pile the chef walks over to collect (at the rack's west end)
+  PAD: { x: 632, y: 862 },                              // buy another bike: right at the rack's east end, beside the empty slots
   PRICES: [150, 250, 400, 600, 850],
   CAP: 3,                                               // boxes per trip
   SPEED: 190,

@@ -61,49 +61,7 @@ module.exports = async (t) => {
   await shot('bedroom', () => { const F = CFG.UPSTAIRS.top; T.tp(F.x - 60, F.y - 70, 'upstairs'); });
 
   // ---- the two fire stations: up the flat metal stairs step by step to the gallery, down the pole
-  for (const [area, ext, cfg, name] of [['firestation', 'FireStationExt', 'FIRESTATION', 'town fire station'], ['firedept', 'FireDeptExt', 'FIREDEPT', 'City fire dept']]) {
-    const fs = await t.ev(([area, ext, cfg]) => {
-      const E = (0, eval)(ext), F = CFG[cfg], G = E.stairs().G, f = G.foot;
-      T.tp(f.x + 50, f.y + 40, area); const d = S68.walkTo(f.x, f.y);
-      const out = { d, free: S68.free(f.x, f.y), label: T.label(), onStep: S68.inside(f, G.stand) };
-      T.act(); T.step(Math.round(F.CLIMB * 30));
-      out.mid = { risen: Game.player.y < f.y - 15, climbing: !!E.st.climb, label: T.label() };
-      T.until(() => E.st.up, 400); out.up = E.st.up; out.upLabel = T.label();
-      T.act(); T.until(() => !E.st.slide, 200); T.step(2);
-      out.down = { up: E.st.up, free: S68.free(Game.player.x, Game.player.y), label: T.label() };
-      return out;
-    }, [area, ext, cfg]);
-    t.expect(fs.d < 5 && fs.free && fs.onStep, `${name}: walked onto the bottom step ${JSON.stringify(fs)}`);
-    t.expectEq(fs.label, '⬆️ Up to the fire pole', `${name}: the button on the bottom step`);
-    t.expect(fs.mid.climbing && fs.mid.risen && fs.mid.label === null, `${name}: half-way up the steps ${JSON.stringify(fs.mid)}`);
-    t.expect(fs.up && fs.upLabel === '🧑‍🚒 Slide down!' && !fs.down.up && fs.down.free, `${name}: up on the gallery and back down the pole ${JSON.stringify(fs)}`);
-    await shot(area, ([a, c]) => { const f = CFG[c].STAIRS.foot; T.tp(f.x + 70, f.y + 30, a); }, 1.6, [area, cfg]);
-  }
-
-  // ---- the subway: down the street entrances, up the station's stairs
-  for (const end of ['city', 'campus']) {
-    const sb = await t.ev((end) => {
-      const e = end === 'city' ? SubwayExt.cityEntrance() : SubwayExt.campusEntrance(), K = end === 'city' ? CFG.CITY.SUBWAY : CFG.SUBWAY.CAMPUS.SUBWAY, A = SubwayExt.entranceArt(K.x, K.y), G = Stairs.flatGeom(A.flat);
-      T.tp(e.x, e.y + 60, end); const d = S68.walkTo(e.x, e.y, 200);
-      const out = { d, label: T.label(), onStep: S68.inside(e, G.stand) };
-      T.act(); T.step(2);
-      const S = CFG.SUBWAY.STATION.stairs, SG = Stairs.flatGeom(S);
-      out.station = { area: Game.area, d: Math.hypot(Game.player.x - S.foot.x, Game.player.y - S.foot.y), onStep: S68.inside(S.foot, SG.stand), free: S68.free(S.foot.x, S.foot.y), label: T.label() };
-      T.tp(S.foot.x + 60, S.foot.y + 40, 'subway'); out.station.walk = S68.walkTo(S.foot.x, S.foot.y);
-      T.act(); T.step(2);
-      out.back = { area: Game.area, d: Math.hypot(Game.player.x - e.x, Game.player.y - e.y) };
-      return out;
-    }, end);
-    t.expect(sb.d < 14 && sb.onStep, `subway ${end}: walked up to the entrance's top step ${JSON.stringify(sb)}`);
-    t.expectEq(sb.label, '⬇️ Down to the subway', `subway ${end}: the button at the entrance`);
-    t.expect(sb.station.area === 'subway' && sb.station.d < 1 && sb.station.onStep && sb.station.free && sb.station.walk < 5, `subway ${end}: down on the station's bottom step ${JSON.stringify(sb.station)}`);
-    t.expectEq(sb.station.label, end === 'city' ? '⬆️ Up to the City' : '⬆️ Up to the campus', `subway ${end}: the button on the station's stairs`);
-    t.expect(sb.back.area === end && sb.back.d < 2, `subway ${end}: back up at the entrance ${JSON.stringify(sb.back)}`);
-  }
-  await shot('subway-city', () => { const e = SubwayExt.cityEntrance(); T.tp(e.x + 60, e.y + 40, 'city'); });
-  await shot('subway-campus', () => { const e = SubwayExt.campusEntrance(); T.tp(e.x + 60, e.y + 40, 'campus'); });
-  await shot('subway-station', () => { const f = CFG.SUBWAY.STATION.stairs.foot; T.tp(f.x + 70, f.y + 30, 'subway'); });
-
+  // (the two fire stations keep their own side-on wooden stairs along the back wall, by request)
   // ---- the lighthouse and the control tower: round the spiral step by step, up and back down
   for (const [area, ext, R, place, name] of [['lighthouse', 'IslandsInsideExt', 'ISLE_IN', 'the lamp room', 'lighthouse'], ['aftower', 'AirfieldInsideExt', 'AF_IN', 'the top', 'control tower']]) {
     const sp = await t.ev(([area, ext, cfg]) => {

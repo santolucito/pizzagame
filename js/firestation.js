@@ -22,8 +22,7 @@ CFG.FIRESTATION = {
   HELMETS: { x0: 3118, y0: 4030, x1: 3232, y1: 4094 }, HELMET_SPOT: { x: 3175, y: 4128 },
   BELL: { x: 3258, y: 4072 }, BELL_SPOT: { x: 3258, y: 4128 },
   GALLERY: { x0: 3330, y0: 4040, x1: 3552, y1: 4084, floor: 4066 },   // the upstairs balcony along the back wall
-  // the stairs up to the gallery: a small flat flight climbing north from the bottom step (footprints; js/stairs.js)
-  STAIRS: { x0: 3298, y0: 4084, x1: 3338, y1: 4150, dir: 'n', n: 5, first: 20, rails: ['w', 'e'] },
+  STAIRS: { foot: { x: 3296, y: 4130 }, top: { x: 3338, y: 4066 } },
   POLE: { x: 3410, top: 4066, bottom: 4150, land: { x: 3410, y: 4166 } },
   CREW_HOMES: [{ x: 3450, y: 4066 }, { x: 3492, y: 4066 }, { x: 3534, y: 4066 }],
   LINE: [{ x: 3330, y: 4268 }, { x: 3372, y: 4268 }, { x: 3414, y: 4268 }],
@@ -36,8 +35,6 @@ CFG.FIRESTATION = {
   CLIMB: 0.9, WALK: 1.0, SLIDE: 0.8, SPRAY_T: 1.7, LINE_T: 5, HELMET: 30, CHILI: 20, ROLL_T: 2.4, DOG_WAKE: 90,   // seconds / px
 };
 CFG.AREAS.firestation = { WORLD: CFG.FIRESTATION.WORLD };
-Object.defineProperty(CFG.FIRESTATION.STAIRS, 'foot', { get: () => FireStationExt.stairs().G.foot });
-Object.defineProperty(CFG.FIRESTATION.STAIRS, 'top', { get: () => FireStationExt.stairs().G.top });
 
 const FireStationExt = {
   name: 'firestation',
@@ -61,7 +58,6 @@ const FireStationExt = {
     o.push({ x: R.x0 - w, y: R.y0 - w, w: R.x1 - R.x0 + 2 * w, h: w }, { x: R.x0 - w, y: R.y1, w: R.x1 - R.x0 + 2 * w, h: w });
     o.push({ x: R.x0 - w, y: R.y0, w, h: R.y1 - R.y0 }, { x: R.x1, y: R.y0, w, h: R.y1 - R.y0 });
     o.push({ x: F.TARGET.x - 14, y: F.TARGET.y - 6, w: 28, h: 14 });
-    o.push(this.stairs().G.body);   // the stairs (all but the bottom step)
     o.push({ x: F.KITCHEN.x0, y: F.KITCHEN.y0, w: F.KITCHEN.x1 - F.KITCHEN.x0, h: F.KITCHEN.y1 - F.KITCHEN.y0 });
     this.st.base = o;
   },
@@ -82,8 +78,6 @@ const FireStationExt = {
   inTown(g) { return g.area === 'town' && this.onFoot(g) && !(typeof CityExt !== 'undefined' && (CityExt.floor || (CityExt.st && (CityExt.st.cab || CityExt.st.boarding)))); },
   atDoor(g) { const D = CFG.FIRESTATION.DOOR_OUT, p = g.player; return this.inTown(g) && U.dist(p.x, p.y, D.x, D.y) < 30; },
   busy() { const st = this.st; return !!(st.cab || st.climb || st.up || st.slide || st.spray || st.roll); },
-  // the stairs to the gallery in the current design, as geometry (js/stairs.js)
-  stairs() { return this._stairs || (this._stairs = { G: Stairs.flatGeom(CFG.FIRESTATION.STAIRS) }); },
   near(g, s, r = 30) { const p = g.player; return U.dist(p.x, p.y, s.x, s.y) < r; },
 
   // ---------- game hooks ----------
@@ -97,7 +91,7 @@ const FireStationExt = {
     if (st.climb || st.slide || st.spray || st.roll) return null;
     if (this.near(g, F.EXIT)) return { label: '🚪 Go outside', run: (gg) => this.leave(gg) };
     if (this.truckHome(g) && this.near(g, F.CAB_IN)) return { label: '🚒 Climb in', run: (gg) => this.climbIn(gg) };
-    if (Stairs.near(g, F.STAIRS.foot, 30)) return { label: Stairs.up('the fire pole'), run: (gg) => this.climbStairs(gg) };
+    if (this.near(g, F.STAIRS.foot)) return { label: '🪜 Climb the stairs', run: (gg) => this.climbStairs(gg) };
     if (this.near(g, F.HELMET_SPOT)) return { label: '⛑️ Try a helmet', run: (gg) => this.tryHelmet(gg) };
     if (this.near(g, F.BELL_SPOT)) return { label: '🔔 Ring the bell', run: (gg) => this.ringBell(gg) };
     if (this.near(g, F.POSTER_SPOT)) return { label: '🔥 Stop, drop and roll!', run: (gg) => this.stopDropRoll(gg) };
@@ -217,7 +211,7 @@ const FireStationExt = {
       st.cab.t += dt; p.x = F.CAB_SEAT.x; p.y = F.CAB_SEAT.y; p.moving = false; p.facing = -1;
     } else if (st.climb) {
       const c = st.climb; c.t += dt;
-      if (c.t < F.CLIMB) Stairs.place(p, this.stairs().G.path, c.t / F.CLIMB, dt);   // step by step up the treads
+      if (c.t < F.CLIMB) { const k = U.ease(c.t / F.CLIMB); p.x = U.lerp(F.STAIRS.foot.x, F.STAIRS.top.x, k); p.y = U.lerp(F.STAIRS.foot.y, F.STAIRS.top.y, k); p.facing = 1; p.moving = true; p.bob += dt * 12; }
       else if (c.t < F.CLIMB + F.WALK) { const k = U.ease((c.t - F.CLIMB) / F.WALK); p.x = U.lerp(F.STAIRS.top.x, F.POLE.x, k); p.y = F.GALLERY.floor; p.facing = 1; p.moving = true; p.bob += dt * 14; }
       else { st.climb = null; st.up = true; p.x = F.POLE.x; p.y = F.GALLERY.floor; p.moving = false; p.facing = 1; }
     } else if (st.up) {
@@ -280,7 +274,7 @@ const FireStationExt = {
       case 'toLine': { const L = F.LINE[c.i]; if (U.moveToward(c, L.x, L.y, 130, dt)) { c.state = 'line'; c.facing = -1; c.moving = false; } else { c.moving = true; c.facing = L.x < c.x ? -1 : 1; } break; }
       case 'line': c.moving = false; c.facing = -1; break;
       case 'toStairs': if (U.moveToward(c, F.STAIRS.foot.x, F.STAIRS.foot.y, 120, dt)) { c.state = 'climb'; c.t = 0; } else { c.moving = true; c.facing = F.STAIRS.foot.x < c.x ? -1 : 1; } break;
-      case 'climb': { c.t += dt; const k = Math.min(1, c.t / F.CLIMB); Stairs.place(c, this.stairs().G.path, k, dt); if (k >= 1) c.state = 'toHome'; break; }
+      case 'climb': { c.t += dt; const k = U.ease(Math.min(1, c.t / F.CLIMB)); c.x = U.lerp(F.STAIRS.foot.x, F.STAIRS.top.x, k); c.y = U.lerp(F.STAIRS.foot.y, F.STAIRS.top.y, k); c.moving = true; c.facing = 1; if (k >= 1) c.state = 'toHome'; break; }
       case 'toHome': { const H = F.CREW_HOMES[c.i]; if (U.moveToward(c, H.x, H.y, 110, dt)) { c.state = 'up'; c.facing = -1; c.moving = false; } else { c.moving = true; c.facing = 1; } break; }
       default: c.moving = false;
     }
@@ -335,13 +329,13 @@ const FireStationExt = {
     if (g.area !== 'firestation') return undefined;
     const home = this.truckHome(g);
     if (st.cab) return { text: 'Wee-woo! Press the button to climb out 🚒', target: null };
-    if (st.climb) return { text: 'Up the stairs we go! ⬆️', target: null };
+    if (st.climb) return { text: 'Up we go! 🪜', target: null };
     if (st.up) return { text: 'Press the button to slide down the pole!', target: null };
     if (st.slide) return { text: 'Wheee! 🧑‍🚒', target: null };
     if (st.spray) return { text: 'Splash! 💦', target: null };
     if (st.roll) return { text: 'Stop, drop and roll! 🔥', target: null };
     if (!s.rides && home) return { text: 'Climb into the fire truck! 🚒', target: F.CAB_IN };
-    if (!s.slides) return { text: 'Go up the stairs to the fire pole! ⬆️', target: F.STAIRS.foot };
+    if (!s.slides) return { text: 'Climb the stairs to the fire pole! 🪜', target: F.STAIRS.foot };
     if (!s.helmets) return { text: 'Try on a fire helmet! ⛑️', target: F.HELMET_SPOT };
     if (!s.sprays) return { text: 'Spray the target with the hose! 💦', target: F.SPRAY };
     if (!s.bells) return { text: 'Ring the bell to call the crew! 🔔', target: F.BELL_SPOT };
@@ -447,8 +441,14 @@ const FireStationExt = {
     ctx.fillStyle = '#5c6670'; for (let x = G.x0 + 16; x < G.x1; x += 48) { ctx.beginPath(); ctx.moveTo(x, G.y1 + 2); ctx.lineTo(x + 12, G.y1 + 2); ctx.lineTo(x, G.y1 + 12); ctx.closePath(); ctx.fill(); }
     // a bunk's blanket and a pillow at the far end of the gallery: the crew naps up there
     ctx.fillStyle = '#3b7dd8'; U.roundRect(ctx, G.x1 - 36, G.y0 + 10, 30, 14, 3); ctx.fill(); ctx.fillStyle = '#fff8ee'; U.roundRect(ctx, G.x1 - 34, G.y0 + 6, 10, 7, 2); ctx.fill();
-    // the staircase up to the gallery: painted metal, in the shared design (js/stairs.js)
-    Stairs.flat(ctx, Object.assign({ mat: 'metal' }, F.STAIRS));
+    // the staircase up to the gallery: diagonal wooden treads with a stringer
+    const S = F.STAIRS, n = 7;
+    ctx.fillStyle = '#5b3a1a'; ctx.beginPath(); ctx.moveTo(S.foot.x - 14, R.y0); ctx.lineTo(S.top.x - 4, S.top.y - 8); ctx.lineTo(S.top.x + 10, S.top.y - 8); ctx.lineTo(S.top.x + 10, R.y0); ctx.closePath(); ctx.fill();
+    for (let i = 0; i < n; i++) {
+      const k = i / (n - 1), x = U.lerp(S.foot.x - 10, S.top.x - 2, k), y = U.lerp(R.y0 - 2, S.top.y - 6, k);
+      ctx.fillStyle = '#b5773a'; ctx.fillRect(x, y, 16, 6); ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.fillRect(x, y, 16, 2);
+    }
+    ctx.fillStyle = '#e0b44c'; ctx.fillRect(S.top.x - 1, S.top.y - 30, 3, 24);   // handrail post at the top
     // the pole's foot: a round rubber landing mat
     const Po = F.POLE;
     ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(Po.land.x + 2, Po.land.y + 6, 26, 11, 0, 0, Math.PI * 2); ctx.fill();

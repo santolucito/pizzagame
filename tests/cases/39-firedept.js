@@ -51,14 +51,14 @@ module.exports = async (t) => {
   await t.shot('cab');
   await t.ev(() => { T.act(); T.step(2); });
   t.expect(await t.ev(() => !FireDeptExt.st.cab && FireDeptExt.free(Game.player.x, Game.player.y)), 'climbed out onto free floor');
-  t.expectEq(await t.ev(() => T.hint()), 'Go up the stairs to the fire pole! ⬆️', 'stairs hint after the ride');
+  t.expectEq(await t.ev(() => T.hint()), 'Climb the stairs to the fire pole! 🪜', 'stairs hint after the ride');
 
   // ---- the stairs and the pole
   await t.ev(() => { const s = CFG.FIREDEPT.STAIRS.foot; T.tp(s.x, s.y + 2, 'firedept'); });
-  t.expectEq(await t.ev(() => T.label()), '⬆️ Up to the fire pole', 'stairs label at the foot');
+  t.expectEq(await t.ev(() => T.label()), '🪜 Climb the stairs', 'stairs label at the foot');
   await t.ev(() => { T.act(); T.step(5); });
   t.expect(await t.ev(() => !!FireDeptExt.st.climb), 'climbing');
-  t.expectEq(await t.ev(() => T.hint()), 'Up the stairs we go! ⬆️', 'climbing hint');
+  t.expectEq(await t.ev(() => T.hint()), 'Up we go! 🪜', 'climbing hint');
   const up = await t.ev(() => { const n = T.until(() => FireDeptExt.st.up, 400); const F = CFG.FIREDEPT; return { n, x: Game.player.x, y: Game.player.y, px: F.POLE.x, fy: F.GALLERY.floor, label: T.label(), hint: T.hint() }; });
   t.expect(up.n >= 0, 'reached the top of the pole');
   t.expect(Math.abs(up.x - up.px) < 1 && Math.abs(up.y - up.fy) < 1, `standing on the gallery by the pole (${Math.round(up.x)},${Math.round(up.y)})`);

@@ -8,7 +8,7 @@ const CFG = {
   BUILDING: { x0: 0, y0: 98, x1: 966, y1: 646 },    // outer wall rectangle
   DOOR: { y0: 572, y1: 638 },                        // gap in the right wall
   SAVE_KEY: 'pizza-rush-save-v1',
-  VERSION: 145,                                      // shown in the help panel; bump with the service worker cache (sw.js)
+  VERSION: 146,                                      // shown in the help panel; bump with the service worker cache (sw.js)
 
   PLAYER_START: { x: 540, y: 430 }, // open floor in front of the counter, away from every circle
   ENTRANCE: { x: 925, y: 605 },          // just inside the door
@@ -88,6 +88,7 @@ const CFG = {
     cowHome: { x: -605, y: 235 },
     gate: { x: -500, y: 420, half: 44 },        // opening in the east fence
     secretGate: { y: 225, half: 40 },            // a gap in the west fence hidden behind the barn
+    northGate: { x: -840, half: 40 },            // a gap in the north fence: the egg trucks' track from the barn's north doors to Main Street
     penGate: { x: -605, half: 34 },               // opening in the pen's bottom fence
     tractor: { x: -600, y: 760 },
     plots: [

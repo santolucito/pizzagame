@@ -723,7 +723,7 @@ const Render = {
       if (horiz) { ctx.fillRect(x0, y0 - 2, x1 - x0, 4); ctx.fillRect(x0, y0 + 8, x1 - x0, 4); for (let x = x0; x <= x1; x += 28) ctx.fillRect(x - 2, y0 - 8, 5, 22); }
       else { ctx.fillRect(x0 - 2, y0, 4, y1 - y0); ctx.fillRect(x0 + 8, y0, 4, y1 - y0); for (let y = y0; y <= y1; y += 28) ctx.fillRect(x0 - 8, y - 2, 22, 5); }
     };
-    fence(F.x0, F.y0, F.x1, F.y0); fence(F.x0, F.y1, F.x1, F.y1);
+    fence(F.x0, F.y0, F.northGate.x - F.northGate.half, F.y0); fence(F.northGate.x + F.northGate.half, F.y0, F.x1, F.y0); fence(F.x0, F.y1, F.x1, F.y1);   // north fence, gap for the egg trucks' track
     fence(F.x0, F.y0, F.x0, F.secretGate.y - F.secretGate.half); fence(F.x0, F.secretGate.y + F.secretGate.half, F.x0, F.y1);   // west fence, gap behind the barn
     fence(F.x1 - 10, F.y0, F.x1 - 10, F.gate.y - 40); fence(F.x1 - 10, F.gate.y + 40, F.x1 - 10, F.y1);
     // cow pen fence
@@ -743,8 +743,8 @@ const Render = {
     // big door facing right with an X
     ctx.fillStyle = '#fff'; ctx.fillRect(B.x1 - 40, B.y0 + 50, 36, 60); ctx.fillStyle = '#b23a3a'; ctx.fillRect(B.x1 - 36, B.y0 + 54, 28, 52);
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(B.x1 - 36, B.y0 + 54); ctx.lineTo(B.x1 - 8, B.y0 + 106); ctx.moveTo(B.x1 - 8, B.y0 + 54); ctx.lineTo(B.x1 - 36, B.y0 + 106); ctx.stroke();
-    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, B.x0 + 20, B.y0 + 10, 100, 20, 4); ctx.fill();
-    ctx.fillStyle = '#ffe08a'; ctx.font = this.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🐄 FARM', B.x0 + 70, B.y0 + 20);
+    ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, B.x0 + 10, B.y0 + 10, 84, 20, 4); ctx.fill();   // left of the big north doors (js/eggfarm.js)
+    ctx.fillStyle = '#ffe08a'; ctx.font = this.font(12); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🐄 FARM', B.x0 + 52, B.y0 + 20);
     // hay bales, scarecrow, tractor
     for (const [hx, hy] of [[-560, 730], [-530, 760], [-560, 790]]) { ctx.fillStyle = '#e0b44c'; U.roundRect(ctx, hx - 16, hy - 10, 32, 20, 4); ctx.fill(); ctx.fillStyle = '#b8862c'; ctx.fillRect(hx - 16, hy - 2, 32, 3); }
     const sx = -880, sy = 500;

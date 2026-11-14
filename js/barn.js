@@ -4,7 +4,9 @@
 // poster, a sleeping cat, swallows under the roof and dust in the sunbeam. Extension module (see js/EXTENSIONS.md).
 // The barn's map is a big rectangle of its own (1400 x 940): the cosy old barn sits in its top-left corner (BX..BX+600 x
 // 4000..4400, the room it always had) and a wide archway in its bottom wall leads into the Egg Farm hall below and to
-// the right (js/eggfarm.js). `place: 'town'` puts it on the farm in the world map.
+// the right (js/eggfarm.js). `place: 'town'` puts it on the farm in the world map. On the farm the barn has two doors:
+// this one (the people's door in its right wall) and the egg trucks' big north doors onto the farm track up to Main
+// Street (drawn, and driven through, by js/eggfarm.js).
 const BX = 39500;   // the old barn's left edge: every x below is BX + its old x
 CFG.AREAS.barn = { WORLD: { x0: BX, y0: 4000, x1: BX + 1400, y1: 4940 }, place: 'town', noSky: true };
 CFG.BARN = {

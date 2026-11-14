@@ -524,7 +524,8 @@ const Game = {
     // farm fences: perimeter with the east gate open, cow pen with a gate in its bottom rail
     const FA = CFG.FARM, G = FA.gate, P = FA.pen, PG = FA.penGate, fw = 8;
     const SG = FA.secretGate;   // the west fence has a hidden gap behind the barn
-    o.push({ x: FA.x0, y: FA.y0 - 4, w: FA.x1 - FA.x0, h: fw }, { x: FA.x0, y: FA.y1 - 4, w: FA.x1 - FA.x0, h: fw });
+    const NG = FA.northGate;   // and a gap in the north fence for the egg trucks' track up to Main Street
+    o.push({ x: FA.x0, y: FA.y0 - 4, w: NG.x - NG.half - FA.x0, h: fw }, { x: NG.x + NG.half, y: FA.y0 - 4, w: FA.x1 - (NG.x + NG.half), h: fw }, { x: FA.x0, y: FA.y1 - 4, w: FA.x1 - FA.x0, h: fw });
     o.push({ x: FA.x0 - 4, y: FA.y0, w: fw, h: SG.y - SG.half - FA.y0 }, { x: FA.x0 - 4, y: SG.y + SG.half, w: fw, h: FA.y1 - (SG.y + SG.half) });
     o.push({ x: FA.x1 - 14, y: FA.y0, w: fw, h: G.y - G.half - FA.y0 }, { x: FA.x1 - 14, y: G.y + G.half, w: fw, h: FA.y1 - (G.y + G.half) });
     o.push({ x: P.x0, y: P.y0 - 4, w: P.x1 - P.x0, h: fw }, { x: P.x0 - 4, y: P.y0, w: fw, h: P.y1 - P.y0 }, { x: P.x1 - 4, y: P.y0, w: fw, h: P.y1 - P.y0 });

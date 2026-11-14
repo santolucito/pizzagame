@@ -167,5 +167,27 @@ module.exports = async (t) => {
   });
   t.expect(!gap.blocked, 'the slot behind the barn is clear');
   t.expect(gap.x < -1010, `walked west through the hidden fence gap into the woods (${Math.round(gap.x)},${Math.round(gap.y)})`);
-  await t.ev(() => { Render.setZoom(1); T.tp(540, 430, 'town'); });
+
+  // ---- the barn's big north doors (the egg trucks' way out, js/eggfarm.js): a gap in the farm's north fence, a track
+  // up to Main Street, and the trucks drive out of the doors, through the gap, onto the road without touching anything
+  const north = await t.ev(() => {
+    const F = CFG.FARM, B = F.barn, NG = F.northGate, T2 = CFG.EGGFARM.TOWN, obs = Game.townObstacles(true);
+    const doorOnNorthWall = T2.door.x === NG.x && T2.door.y === B.y0 && NG.x - NG.half >= B.x0 && NG.x + NG.half <= B.x1 + 10;
+    const gapOpen = !obs.some((o) => Game.hitRect(NG.x, F.y0, NG.half - 14, o));
+    const fenceElsewhere = obs.some((o) => Game.hitRect(NG.x - NG.half - 40, F.y0, 4, o)) && obs.some((o) => Game.hitRect(NG.x + NG.half + 40, F.y0, 4, o));
+    // walk from between the barn and the fence, north through the gap onto Main Street
+    T.tp(NG.x, 136, 'town'); T.steer(0, -1); T.step(40); T.unsteer(); const walkedTo = Game.player.y;
+    // the trucks' route out: north from the doors, through the gap, onto the road
+    const R = CFG.EGGFARM.ROUTE_OUT, bad = [];
+    for (let d = 0; d < EggFarmExt.routeLen(R); d += 6) { const q = EggFarmExt.along(R, d); if (q.y > B.y0 - 26) continue; if (obs.some((o) => Game.hitRect(q.x, q.y, 22, o))) bad.push([Math.round(q.x), Math.round(q.y)]); }
+    const spot = T2.spot, spotFree = !obs.some((o) => Game.hitRect(spot.x, spot.y, 24, o));
+    return { doorOnNorthWall, gapOpen, fenceElsewhere, walkedTo, road: CFG.ROAD.y2, bad, spotFree, first: R[0], second: R[1] };
+  });
+  t.expect(north.doorOnNorthWall, 'the egg trucks\' doors are on the barn\'s north wall, over the fence gap');
+  t.expect(north.gapOpen && north.fenceElsewhere, 'the north fence has a gap for the track and is solid on both sides of it');
+  t.expect(north.walkedTo < north.road, `walked north through the gap onto Main Street (${Math.round(north.walkedTo)})`);
+  t.expect(north.first.y > north.second.y && north.second.y < north.road && north.bad.length === 0 && north.spotFree, `the trucks drive out north onto the road, hitting nothing (${JSON.stringify(north.bad)})`);
+  await t.ev(() => { const st = EggFarmExt.st, tr = st.trucks[0]; tr.state = 'road'; tr.d = 40; tr.boxes = 6; tr.val = 6; tr.x = -840; tr.y = 166; tr.angle = -Math.PI / 2; T.tp(-760, 60, 'town'); Render.setZoom(1.3); T.step(1); window.__ut = EggFarmExt.updateTrucks; EggFarmExt.updateTrucks = () => {}; });
+  await t.shot('north-doors');
+  await t.ev(() => { EggFarmExt.updateTrucks = window.__ut; Render.setZoom(1); T.tp(540, 430, 'town'); });
 };

@@ -5,27 +5,35 @@
 //
 // The egg chain, every step something you can see (first by hand, then with helpers, like the pizzeria):
 // - 🐣 Hatch! at the shiny hatching machine: a chick pops out with a peep and waddles along the yellow path, up a little
-//   ramp, into a henhouse (coop), where it grows into a hen. Each coop shows one little hen face per hen, in neat rows
-//   that fill its wire front, and the number on its roof is exactly the faces you see. Pads buy a New Coop (up to six)
-//   and Bigger Coops.
-// - Hens lay eggs through the hatch into the nest box (egg tray) under their coop. The chef walks past the trays and the
-//   eggs hop up onto THE EGG TOWER over his head (a springy stack, egg on egg, 100+ high, that leans and lags like a
-//   wobbly noodle). Loose eggs, the old barn's hens' eggs and a lucky egg's bonus eggs join it too.
+//   ramp, into a henhouse (coop). After a little while it comes back out down the ramp as a grown chicken.
+// - The chickens wander about the hall floor, peck and flap, and lay their eggs wherever they are (an egg pops out with
+//   a little "bok!"). The chef walks about picking them up: every egg near him hops up onto THE EGG TOWER sitting on his
+//   head (a springy stack, egg on egg, 100+ high, that leans and lags like a wobbly noodle). The old barn's hens' eggs
+//   and a lucky egg's bonus eggs join it too.
+// - Coops: a coop's size is how many chickens can sleep in it, and the flock can only be as big as all the coops
+//   together (pads buy a New Coop, up to six, and Bigger Coops). The number on a coop's roof is how many chickens
+//   belong to it; its window shows the ones inside. At dusk every chicken walks home and goes to sleep (sleepy faces
+//   and Zzz in the windows, no eggs at night); at dawn the rooster crows and out they come again. Eggs stay where they
+//   were laid.
 // - 📦 Pack the eggs at the egg packer: the tower streams off, egg by egg, into the packer's hopper; the packer's arm
 //   swings and full egg boxes pop up its chute onto the box pile.
 // - 📦 Load the truck at the dock: boxes fly from the pile onto the egg truck parked in the north doorway (a fill bar
 //   shows how full it is). When it is full, or a little while after the last box, it toots and drives out of the big
-//   north doors, up the farm track onto Main Street to the 🥚 Egg Market, unloads, and comes back with the money.
-// - Helpers (pads): the 🛤️ Egg Belt (built with a little animation) carries the eggs from the trays to the packer, and the
-//   🧑‍🌾 Loader walks boxes from the pile onto the truck. With both, the farm runs by itself (and while you are away).
-// - The spare egg truck in the second bay can be driven: load it at the box pile, drive out of the north doors and up to
-//   the Egg Market on Main Street, and 🥚 Deliver the eggs there (the normal price, the same as the trucks).
+//   north doors, up the farm track, along Main Street to the 🥚 Egg Market next to the fire station, unloads, and comes
+//   back with the money.
+// - The 🧑‍🌾 Loader (a pad) walks boxes from the pile onto the truck (and, while the game is closed, gathers the eggs too:
+//   only a farm with a Loader earns while you are away; without one the hens leave eggs on the floor for you).
+// - The spare egg truck in the second bay can be driven: load it at the box pile, drive out of the north doors and along
+//   Main Street to the Egg Market, and 🥚 Deliver the eggs there (the normal price, the same as the trucks).
 // - Egg types climb a ladder as the flock grows: plain → golden → rainbow → sparkly space → pizza egg, each worth more,
 //   and the hens dress up for each one. The giant board on the back wall shows the ladder and the hen count.
-// - Extras: a lucky egg floats across the hall on a balloon now and then (walk into it), a rooster crows at dawn,
-//   🌽 Scatter corn throws a fan of corn, chicks run out to peck it and the hens lay twice as fast for a while, and
-//   offline catch-up with the shared Shop helpers (js/shop.js).
-// Saved in g.s.eggfarm (version 2; older saves are moved over in state()).
+// - Extras: a lucky egg floats across the hall on a balloon now and then (walk into it), the rooster crows at dawn,
+//   🌽 Scatter corn throws corn bits on the floor and the chickens nearby come running to gather round and peck (and
+//   lay a few eggs there), and offline catch-up with the shared Shop helpers (js/shop.js).
+// The chef never reaches: the tower sits on his head and his hands stay at his sides (the game's carry pose).
+// Lots of chickens stay cheap: at most WALK_MAX of them walk about as little sprites (only the ones on screen are
+// drawn), the rest wait in their coops (still counted, still laying), and at most FLOOR_MAX eggs lie on the floor.
+// Saved in g.s.eggfarm (version 3; older saves are moved over in state(): the old Egg Belt and egg trays are gone).
 
 CFG.EGGFARM = {
   HALL: { x0: 39548, y0: 4410, x1: 40852, y1: 4892 }, WALL: 22,
@@ -35,10 +43,9 @@ CFG.EGGFARM = {
   CORN: { x: 40005, y: 4604, spot: { x: 40005, y: 4650 } },         // the corn sack and where you stand to scatter
   COOP_X: [40100, 40198, 40296, 40394, 40492, 40590], COOP: { y0: 4416, y1: 4498, w: 88 },
   COOP_COLORS: ['#e4572e', '#3b7dd8', '#2f9e44', '#9b59b6', '#f2b134', '#e84393'],
-  TRAY: { dx: 22, y: 4509, cap: 24, reach: 62 },                    // each coop's nest box, under its egg hatch
-  CHICK_Y: 4570,                                                    // the chicks' path along the coops
-  BELT: { y: 4532, x0: 40046, x1: 40640, half: 11, speed: 90, gap: 22 },   // the Egg Belt (bought), under the trays
-  SLIDE: { x0: 40640, y0: 4538, x1: 40692, y1: 4704 },              // from the belt's end down into the packer's hopper
+  CHICK_Y: 4570,                                                    // the chicks' path along the coops (the ramps come down to it)
+  // where the chickens roam (they lay where they stand), and the spots they keep off so eggs never hide a button
+  ROAM: { x0: 39600, y0: 4584, x1: 40630, y1: 4796 },
   PACKER: { x0: 40668, y0: 4700, x1: 40846, y1: 4776, hopper: { x: 40692, y: 4708 }, out: { x: 40756, y: 4700 } },
   BOXPILE: { x: 40756, y: 4652 },                                   // the box pile, up the packer's chute
   PACK: { x: 40612, y: 4768, r: 46 },                               // 📦 Pack the eggs (into the packer's hopper)
@@ -47,15 +54,18 @@ CFG.EGGFARM = {
   DOOR: { x0: 40656, x1: 40852, top: 4262 },                        // the big sliding door in the north (back) wall
   CASH: { x: 40560, y: 4812 },
   BOARD: { x0: 40104, y0: 4222, x1: 40556, y1: 4352 },              // the giant milestone board on the back wall
-  PADS_Y: 4840, PADS_X: [39640, 39764, 39888, 40012, 40136, 40260, 40384], NEWCOOP_Y: 4630,
+  PADS_Y: 4840, PADS_X: [39640, 39764, 39888, 40012, 40136, 40260], NEWCOOP_Y: 4630,
   LOADER_PAD: { x: 40740, y: 4834 }, LOADER_HOME: { x: 40776, y: 4600 },
-  // the farm and the town (map 'town'): the barn's big north doors, the farm track up to Main Street, the Egg Market
+  // the farm and the town (map 'town'): the barn's big north doors, the farm track up to Main Street, and the Egg Market
+  // on the grass at the corner of Main Street and East Road, right next to the fire station (CFG.FIRE_STATION, 1340..1520
+  // × 300..540): clear of the roads, the sidewalks, the station's door and its truck's routes. Its counter faces Main
+  // Street; the trucks pull up on the near lane in front of it.
   TOWN: { door: { x: -840, y: 150 }, spot: { x: -840, y: 106 }, half: 36 },
-  MARKET: { x0: -452, y0: -98, x1: -328, y1: -50, drop: { x: -390, y: 44 }, r: 80 },
-  // the egg trucks' drive: out of the north doors, right onto Main Street, a U-turn to the market's kerb; and back
-  // along the north lane, reversing into the barn (`rev` legs are driven backwards)
-  ROUTE_OUT: [{ x: -840, y: 206 }, { x: -840, y: 74 }, { x: -360, y: 74 }, { x: -300, y: 60 }, { x: -330, y: 44 }, { x: -390, y: 44 }],
-  ROUTE_BACK: [{ x: -390, y: 44 }, { x: -770, y: 44 }, { x: -840, y: 112, rev: true }, { x: -840, y: 206, rev: true }],
+  MARKET: { x0: 1328, y0: 116, x1: 1408, y1: 158, drop: { x: 1368, y: 74 }, r: 80 },   // (clear of the tree beside it)
+  // the egg trucks' drive: out of the north doors, right along Main Street's near lane to the market; then on a little,
+  // a U-turn, back along the far lane, reversing into the barn (`rev` legs are driven backwards)
+  ROUTE_OUT: [{ x: -840, y: 206 }, { x: -840, y: 74 }, { x: 1368, y: 74 }],
+  ROUTE_BACK: [{ x: 1368, y: 74 }, { x: 1440, y: 74 }, { x: 1478, y: 59 }, { x: 1440, y: 44 }, { x: -790, y: 44 }, { x: -840, y: 88, rev: true }, { x: -840, y: 206, rev: true }],
   // egg types: `at` is the hen count that unlocks it; value is $ per egg
   TYPES: [
     { key: 'plain', name: 'Plain eggs', at: 0, value: 1, ico: '🥚', glow: '#fff8ee' },
@@ -72,14 +82,18 @@ CFG.EGGFARM = {
     box: { label: 'Bigger Egg Boxes', ico: '📦', base: 90, growth: 1.6, max: 8 },
     truck: { label: 'More Trucks', ico: '🚚', base: 200, growth: 2.3, max: 3 },
     fancy: { label: 'Fancier Eggs', ico: '✨', base: 120, growth: 1.7, max: 8 },
-    belt: { label: 'Egg Belt', ico: '🛤️', base: 100, growth: 1, max: 1 },
     loader: { label: 'Loader', ico: '🧑‍🌾', base: 140, growth: 2.2, max: 3 },
   },
+  BELT_REFUND: 100,                                                 // what the old Egg Belt cost: an old save gets it back
   NEWCOOP: { base: 150, growth: 2.0 },
   REFILL: 0.4, COOP_BASE: 20, COOP_PER_LV: 10, LAY: 7, HOPPER_CAP: 400, BOX_PILE_CAP: 60,
-  STRAY_MAX: 24, STACK_MAX: 300, CHICK_MAX: 40, SCOOP_GAP: 0.02, MAGNET: 90,
-  CORN_TIME: 15, LUCKY_EVERY: [40, 80], SP: 12,                     // SP: px between eggs in the tower
-  TRUCK_WAIT: 5, ROAD_SPEED: 220, BUILD_TIME: 2.6, LOADER_SPEED: 95,
+  GROW: 3.5,                                                        // seconds a new chick spends in its coop before it comes out grown
+  WALK_MAX: 60, FLOOR_MAX: 80,                                      // chickens walking about at once; eggs lying on the floor at once
+  HEN_SPEED: [34, 52], RELEASE_GAP: 0.12,                           // px/s; seconds between chickens coming down a ramp
+  STACK_MAX: 300, CHICK_MAX: 40, MAGNET: 110,                       // MAGNET: eggs this close hop onto the tower (generous for small players)
+  CORN_TIME: 10, CORN_R: 360, CORN_EGGS: 3,                         // seconds the chickens gather; how far they come from; eggs laid at the corn
+  LUCKY_EVERY: [40, 80], SP: 12,                                    // SP: px between eggs in the tower
+  TRUCK_WAIT: 5, ROAD_SPEED: 280, LOADER_SPEED: 95,
 };
 CFG.VEHICLES.eggtruck = { speed: 250, radius: 24, label: '🚚 Drive the egg truck', exit: '🚶 Hop out' };
 
@@ -87,36 +101,54 @@ const EggFarmExt = {
   name: 'eggfarm',
   st: null,
   sprites: null,
-  defaults: { eggfarm: { ver: 2, seen: false, coops: 1, hens: [0, 0, 0, 0, 0, 0], trays: [0, 0, 0, 0, 0, 0], lv: { hatch: 0, coop: 0, feed: 0, box: 0, truck: 0, fancy: 0, belt: 0, loader: 0 }, type: 0, hopper: 0, hopperVal: 0, box: 0, boxEggVal: 0, boxes: 0, boxVal: 0, bank: 0, transit: 0, rate: 0, stack: [], spare: { boxes: 0, val: 0 }, hatched: 0, laid: 0, shipped: 0, earned: 0 } },
+  defaults: { eggfarm: { ver: 3, seen: false, coops: 1, hens: [0, 0, 0, 0, 0, 0], lv: { hatch: 0, coop: 0, feed: 0, box: 0, truck: 0, fancy: 0, loader: 0 }, type: 0, hopper: 0, hopperVal: 0, box: 0, boxEggVal: 0, boxes: 0, boxVal: 0, bank: 0, transit: 0, rate: 0, stack: [], floor: [], spare: { boxes: 0, val: 0 }, hatched: 0, laid: 0, shipped: 0, earned: 0 } },
 
   // ======================= numbers =======================
   state(g) {
     let s = g.s.eggfarm;
     if (!s || typeof s !== 'object') s = g.s.eggfarm = JSON.parse(JSON.stringify(this.defaults.eggfarm));
-    // a save from before the egg chain (version 1) had a belt and trucks that loaded themselves: a farm that had got
-    // going keeps its belt, and one that had shipped eggs keeps a loader, so nothing it could do stops working
+    const K = CFG.EGGFARM;
+    // a save from before the egg chain (version 1) had trucks that loaded themselves: one that had shipped eggs keeps a
+    // loader, so nothing it could do stops working
     if (s.ver === undefined) {
       if (!s.lv || typeof s.lv !== 'object') s.lv = {};
-      const going = (s.hatched | 0) > 0 || (s.laid | 0) > 0 || (s.coops | 0) > 1;
-      if (typeof s.lv.belt !== 'number') s.lv.belt = going ? 1 : 0;
       if (typeof s.lv.loader !== 'number') s.lv.loader = (s.shipped | 0) > 0 || (s.lv.truck | 0) > 0 ? 1 : 0;
-      if (typeof s.hopperVal !== 'number') s.hopperVal = (s.hopper | 0) * CFG.EGGFARM.TYPES[U.clamp(s.type | 0, 0, 4)].value;
+      if (typeof s.hopperVal !== 'number') s.hopperVal = (s.hopper | 0) * K.TYPES[U.clamp(s.type | 0, 0, 4)].value;
       s.ver = 2;
     }
+    // version 2 had the Egg Belt and an egg tray under each coop: the belt is gone (what it cost waits as egg money by
+    // the dock) and the eggs in the trays are on the floor in front of their coops; the flock, the coops, the money and
+    // every other upgrade (the Loader too) stay
+    if (s.ver === 2) {
+      if (s.lv && typeof s.lv === 'object' && 'belt' in s.lv) { if ((s.lv.belt | 0) > 0) s.bank = (+s.bank || 0) + K.BELT_REFUND; delete s.lv.belt; }
+      if (!Array.isArray(s.floor)) s.floor = [];
+      if (Array.isArray(s.trays)) {
+        s.trays.forEach((n, i) => { for (let k = 0; k < (n | 0) && s.floor.length < K.FLOOR_MAX; k++) s.floor.push([Math.round(K.COOP_X[i % 6] - 30 + Math.random() * 60), Math.round(K.CHICK_Y + 24 + Math.random() * 40), U.clamp(s.type | 0, 0, 4)]); });
+        delete s.trays;
+      }
+      s.ver = 3;
+    }
     const d = this.defaults.eggfarm;
+    if (!s.lv || typeof s.lv !== 'object') s.lv = {};
     for (const k of Object.keys(d)) if (s[k] === undefined) s[k] = JSON.parse(JSON.stringify(d[k]));
     for (const k of Object.keys(d.lv)) if (typeof s.lv[k] !== 'number') s.lv[k] = 0;
-    for (const k of ['hens', 'trays']) { if (!Array.isArray(s[k])) s[k] = [0, 0, 0, 0, 0, 0]; while (s[k].length < 6) s[k].push(0); }
+    if (!Array.isArray(s.hens)) s.hens = [0, 0, 0, 0, 0, 0];
+    while (s.hens.length < 6) s.hens.push(0);
+    s.coops = U.clamp(s.coops | 0, 1, 6);
     if (!Array.isArray(s.stack)) s.stack = [];
+    if (!Array.isArray(s.floor)) s.floor = [];
     if (!s.spare || typeof s.spare !== 'object') s.spare = { boxes: 0, val: 0 };
     return s;
   },
   cap(s) { const K = CFG.EGGFARM; return K.COOP_BASE + K.COOP_PER_LV * s.lv.coop; },
   hens(s) { let n = 0; for (let i = 0; i < s.coops; i++) n += s.hens[i]; return n; },
-  // the hens you can see: a chick still waddling to its coop is not a hen yet (the coops, their roof numbers and the
-  // board all count this)
+  // the chickens that belong to a coop: a chick still waddling to it is not one yet (the coops' roof numbers and the
+  // board count this)
   shown(s, i) { return Math.max(0, s.hens[i] - (this.st ? this.st.incoming[i] : 0)); },
   shownHens(s) { let n = 0; for (let i = 0; i < s.coops; i++) n += this.shown(s, i); return n; },
+  // the chickens in a coop right now (sleeping at night; by day the new ones growing up and any waiting their turn)
+  inCoop(s, i) { return this.st ? Math.max(0, this.shown(s, i) - this.st.walkers[i]) : this.shown(s, i); },
+  growing(i) { let n = 0; if (this.st) for (const q of this.st.grow) if (q.c === i) n++; return n; },
   room(s) { return s.coops * this.cap(s) - this.hens(s); },
   refill(s) { return CFG.EGGFARM.REFILL / (1 + 0.15 * s.lv.hatch); },
   perPress(s) { return 1 + Math.floor(s.lv.hatch / 4); },
@@ -131,10 +163,8 @@ const EggFarmExt = {
   typeFor(n) { const T = CFG.EGGFARM.TYPES; let k = 0; for (let i = 0; i < T.length; i++) if (n >= T[i].at) k = i; return k; },
   upgCost(s, key) { const u = CFG.EGGFARM.UPG[key]; return s.lv[key] >= u.max ? null : Shop.cost(u.base, s.lv[key], u.growth); },
   coopCost(s) { return s.coops >= 6 ? null : Shop.cost(CFG.EGGFARM.NEWCOOP.base, s.coops - 1, CFG.EGGFARM.NEWCOOP.growth); },
-  beltOn(s) { return s.lv.belt > 0 && !(this.st && this.st.build); },
-  automatic(s) { return this.beltOn(s) && s.lv.loader > 0; },
-  trayEggs(s) { let n = 0; for (let i = 0; i < s.coops; i++) n += s.trays[i]; return n; },
-  trayAt(i) { const K = CFG.EGGFARM; return { x: K.COOP_X[i] + K.TRAY.dx, y: K.TRAY.y }; },
+  // night in the barn: from dusk until dawn the chickens sleep in their coops
+  night() { return typeof AtmosphereExt !== 'undefined' && AtmosphereExt.phase === 'dusk'; },
   inHall(g) { return g.area === 'barn' && g.player.y > CFG.BARN.room.y1 + 10 && !(BarnExt.st && BarnExt.st.loft); },
   busy(g) { return g.onTrain || g.ride || g.travel || (typeof CityExt !== 'undefined' && (CityExt.floor || (CityExt.st && (CityExt.st.cab || CityExt.st.boarding)))); },
 
@@ -143,42 +173,58 @@ const EggFarmExt = {
     const s = this.state(g), K = CFG.EGGFARM;
     this.st = {
       refill: 0, press: 0, autoT: 0, fullFlash: 0, peepT: 0,
-      chicks: [], incoming: [0, 0, 0, 0, 0, 0], coopPop: [0, 0, 0, 0, 0, 0], acc: [0, 0, 0, 0, 0, 0], layPop: [0, 0, 0, 0, 0, 0],
-      belt: [], slide: [], phase: 0, packT: 0, packAnim: 0, strays: [], build: null,
+      chicks: [], incoming: [0, 0, 0, 0, 0, 0], coopPop: [0, 0, 0, 0, 0, 0],
+      flock: [], walkers: [0, 0, 0, 0, 0, 0], grow: [], releaseT: 0, acc: 0, bokT: 0, lays: 0,
+      floor: [], floorN: -1, stackN: -1,
+      packT: 0, packAnim: 0,
       trucks: [], boxFly: [], loading: null, loader: null, deliver: null, mkt: 0, mktT: 0,
-      stack: [], fly: [], scoopT: 0, noScoop: 0, packing: null, boing: 0, boingT: 0,
+      stack: [], fly: [], noScoop: 0, packing: null, boing: 0, boingT: 0,
       px: g.player.x, py: g.player.y, parea: g.area, vs: 0, lean: 0, leanV: 0, rip: 0,
       lucky: null, luckyT: U.rand(K.LUCKY_EVERY[0] * 0.5, K.LUCKY_EVERY[1] * 0.5),
-      boost: 0, corn: [], peck: [], crow: 0, labels: [0, 0, 0, 0, 0, 0], boardN: 0, peekDrawn: 0, badge: 0, lastPhase: null, peek: null, banner: null, fade: 0, magT: 0, faces: [],
+      corn: [], cornT: 0, cornAt: null, cornEggs: 0, cornEggT: 0,
+      crow: 0, labels: [0, 0, 0, 0, 0, 0], boardN: 0, peekDrawn: 0, lastPhase: null, peek: null, banner: null, fade: 0, magT: 0, faces: [],
       spare: { kind: 'eggtruck', x: K.BAYS[1].x, y: K.BAYS[1].y, angle: -Math.PI / 2, vx: 0, vy: 0, where: 'barn', boxes: s.spare.boxes | 0, val: +s.spare.val || 0 },
-      m: { secT: 0, secEarned: 0 }, obs: null, obsCar: null, awayMsg: null, frameMs: 0, drawn: 0,
+      m: { secT: 0, secEarned: 0 }, obs: null, obsCar: null, awayMsg: null, frameMs: 0, drawn: 0, henDrawn: 0,
     };
-    // the eggs the chef was carrying when the game was saved
+    // the eggs the chef was carrying when the game was saved, and the eggs left lying on the floor
     for (const t of s.stack.slice(0, K.STACK_MAX)) this.st.stack.push({ t: U.clamp(t | 0, 0, 4), x: 0, land: 9 });
+    this.loadFloor(s);
     // money that was on the road when the game was saved comes home
     if (s.transit > 0) { s.bank += Math.round(s.transit); s.transit = 0; }
     s.type = Math.max(s.type, this.typeFor(this.hens(s)));
     this.syncTrucks(g);
     this.away(g, Shop.awaySeconds(g));
+    // by day the flock is already out and about when you come in
+    if (!this.night()) this.scatterFlock(s);
   },
   ready(g) { if (!this.st) this.build(g); return this.st; },
-  // The time the game was closed (the shared rule, js/shop.js). A farm with its Egg Belt and a Loader keeps a share
-  // of the money it was making a second; without them the hens fill their egg trays, waiting for the chef. An
-  // automatic hatcher keeps hatching a few chicks into any room left in the coops.
+  loadFloor(s) {
+    const K = CFG.EGGFARM, R = K.ROAM, st = this.st; st.floor.length = 0;
+    for (const e of s.floor) { if (!Array.isArray(e) || st.floor.length >= K.FLOOR_MAX) continue; st.floor.push({ x: U.clamp(+e[0] || 0, R.x0, R.x1), y: U.clamp(+e[1] || 0, R.y0, R.y1), t: U.clamp(e[2] | 0, 0, 4), z: 0, vz: 0, pop: 0 }); }
+    st.floorN = -1;
+  },
+  // The time the game was closed (the shared rule, js/shop.js). A farm with a Loader keeps a share of the money it was
+  // making a second (the farmhand gathers the eggs too); without one the hens leave eggs on the floor (up to
+  // FLOOR_MAX), waiting for the chef. An automatic hatcher keeps hatching a few chicks into any room left in the coops.
   away(g, sec) {
-    const s = this.state(g), K = CFG.EGGFARM;
+    const s = this.state(g), K = CFG.EGGFARM, st = this.st;
     if (sec < SHOP.AWAY_MIN) return 0;
-    const amt = Math.round(Shop.awayEarnings(sec, this.hens(s) > 0 && this.automatic(s), s.rate));
+    const loader = s.lv.loader > 0 && this.hens(s) > 0;
+    const amt = Math.round(Shop.awayEarnings(sec, loader, s.rate));
     if (amt > 0) { s.bank += amt; s.earned += amt; }
     let eggs = 0;
-    if (!this.automatic(s)) for (let i = 0; i < s.coops; i++) { const n = Math.min(K.TRAY.cap - s.trays[i], Math.floor(s.hens[i] * sec / this.layTime(s) * SHOP.AWAY_SHARE)); if (n > 0) { s.trays[i] += n; s.laid += n; eggs += n; } }
+    if (!loader && this.hens(s) > 0) {
+      eggs = Math.max(0, Math.min(K.FLOOR_MAX - st.floor.length, Math.floor(this.hens(s) * sec / this.layTime(s) * SHOP.AWAY_SHARE)));
+      for (let k = 0; k < eggs; k++) { const q = this.roamSpot(); st.floor.push({ x: q.x, y: q.y, t: s.type, z: 0, vz: 0, pop: 0 }); }
+      s.laid += eggs; st.floorN = -1;
+    }
     let chicks = 0;
     if (s.lv.hatch > 0) {
-      chicks = Math.min(this.room(s), Math.floor(sec / this.autoEvery(s) * SHOP.AWAY_SHARE));
+      chicks = Math.max(0, Math.min(this.room(s), Math.floor(sec / this.autoEvery(s) * SHOP.AWAY_SHARE)));
       for (let k = 0; k < chicks; k++) { const c = this.coopWithRoom(s); if (c < 0) break; s.hens[c]++; s.hatched++; }
       s.type = Math.max(s.type, this.typeFor(this.hens(s)));
     }
-    if (amt > 0 || chicks > 0 || eggs > 0) this.st.awayMsg = amt > 0 ? `🥚 The egg trucks made ${U.money(amt)} while you were away!` : eggs > 0 ? `🥚 The hens laid ${eggs} eggs while you were away!` : `🐣 ${chicks} chicks hatched while you were away!`;
+    if (amt > 0 || chicks > 0 || eggs > 0) st.awayMsg = amt > 0 ? `🥚 The Loader gathered the eggs: the trucks made ${U.money(amt)} while you were away!` : eggs > 0 ? `🥚 The hens laid ${eggs} eggs while you were away!` : `🐣 ${chicks} chicks hatched while you were away!`;
     return amt;
   },
 
@@ -186,8 +232,8 @@ const EggFarmExt = {
   obstacles(g, forCar) {
     if (g.area === 'town') { const M = CFG.EGGFARM.MARKET; return [{ x: M.x0, y: M.y0, w: M.x1 - M.x0, h: M.y1 - M.y0 }]; }
     if (g.area !== 'barn') return [];
-    const st = this.ready(g), s = this.state(g), slot = forCar ? 'obsCar' : 'obs', belt = this.beltOn(s);
-    if (st[slot] && st[slot].coops === s.coops && st[slot].belt === belt) return st[slot].list;
+    const st = this.ready(g), s = this.state(g), slot = forCar ? 'obsCar' : 'obs';
+    if (st[slot] && st[slot].coops === s.coops) return st[slot].list;
     const K = CFG.EGGFARM, H = K.HALL, w = K.WALL, B = CFG.BARN, A = B.arch, R = B.room, D = K.DOOR, W = CFG.AREAS.barn.WORLD, o = [];
     // walls: the strip under the old barn (with the archway), the tall back wall right of the barn (with the big north
     // doors: open for a truck, closed to a chef on foot), the sides and the bottom
@@ -200,13 +246,12 @@ const EggFarmExt = {
     // machines and furniture
     const Hc = K.HATCHER; o.push({ x: Hc.x0, y: Hc.y0, w: Hc.x1 - Hc.x0, h: Hc.y1 - Hc.y0 });
     o.push({ x: K.CORN.x - 24, y: K.CORN.y - 16, w: 48, h: 30 });
-    for (let i = 0; i < s.coops; i++) o.push({ x: K.COOP_X[i] - K.COOP.w / 2, y: K.COOP.y0, w: K.COOP.w, h: K.TRAY.y + 8 - K.COOP.y0 });   // the coop and its egg tray
-    if (belt) { const Bt = K.BELT; o.push({ x: Bt.x0 - 12, y: Bt.y - Bt.half, w: Bt.x1 - Bt.x0 + 24, h: Bt.half * 2 }); }
+    for (let i = 0; i < s.coops; i++) o.push({ x: K.COOP_X[i] - K.COOP.w / 2, y: K.COOP.y0, w: K.COOP.w, h: K.COOP.y1 + 4 - K.COOP.y0 });
     const P = K.PACKER; o.push({ x: P.x0, y: P.y0, w: H.x1 - P.x0, h: P.y1 - P.y0 });
     const BP = K.BOXPILE; o.push({ x: BP.x - 32, y: BP.y - 18, w: 64, h: P.y0 - (BP.y - 18) });   // the pile and the chute up to it
     const B0 = K.BAYS[0]; o.push({ x: B0.x - 25, y: H.y0, w: 50, h: B0.y + 54 - H.y0 });         // the egg trucks' dock
     if (forCar) o.push({ x: A.x0, y: R.y1 - 30, w: A.x1 - A.x0, h: H.y0 - R.y1 + 40 });   // trucks stay out of the old barn
-    st[slot] = { coops: s.coops, belt, list: o };
+    st[slot] = { coops: s.coops, list: o };
     return o;
   },
   vehicles(g) { return this.st ? [this.st.spare] : []; },
@@ -215,19 +260,38 @@ const EggFarmExt = {
     for (let i = 0; i < s.coops; i++) { const r = cap - s.hens[i]; if (r > bestRoom) { bestRoom = r; best = i; } }
     return best;
   },
+  // a coop's little door (up its ramp) and the foot of the ramp on the floor
+  coopDoor(i) { return { x: CFG.EGGFARM.COOP_X[i] - 28, y: CFG.EGGFARM.COOP.y1 - 2 }; },
+  rampFoot(i) { return { x: CFG.EGGFARM.COOP_X[i] - 28, y: CFG.EGGFARM.CHICK_Y + 8 }; },
   // the chick's walk: out of the hatcher, along the yellow path, up the ramp into its coop's door
   chickPath(c) {
     const K = CFG.EGGFARM, O = K.HATCHER.out, x = K.COOP_X[c] - 28;
-    return [{ x: O.x + 14, y: O.y + 8 }, { x: O.x + 20, y: K.CHICK_Y }, { x, y: K.CHICK_Y }, { x, y: K.BELT.y }, { x, y: K.COOP.y1 - 4 }];
+    return [{ x: O.x + 14, y: O.y + 8 }, { x: O.x + 20, y: K.CHICK_Y }, { x, y: K.CHICK_Y }, { x, y: K.COOP.y1 - 4 }];
+  },
+  // a free spot on the floor where the chickens may stand (and lay): in the roaming area, off the buttons and pads
+  keepOut(x, y) {
+    const K = CFG.EGGFARM, s = this.st ? this.state(Game) : null, C = K.CORN;
+    if (x > C.x - 34 && x < C.x + 34 && y > C.y - 26 && y < C.y + 24) return true;   // the corn sack
+    if (U.dist(x, y, C.spot.x, C.spot.y) < 30 || U.dist(x, y, K.PACK.x, K.PACK.y) < 52 || U.dist(x, y, K.CASH.x, K.CASH.y) < 46) return true;
+    if (s && s.coops < 6 && U.dist(x, y, K.COOP_X[s.coops], K.NEWCOOP_Y) < 62) return true;   // the New Coop pad
+    return false;
+  },
+  roamSpot(nx, ny, r) {
+    const R = CFG.EGGFARM.ROAM;
+    for (let k = 0; k < 12; k++) {
+      const x = nx === undefined ? U.rand(R.x0, R.x1) : U.clamp(nx + U.rand(-r, r), R.x0, R.x1), y = ny === undefined ? U.rand(R.y0, R.y1) : U.clamp(ny + U.rand(-r * 0.6, r * 0.6), R.y0, R.y1);
+      if (!this.keepOut(x, y)) return { x, y };
+    }
+    return { x: (R.x0 + R.x1) / 2, y: R.y1 - 10 };
   },
 
   // ======================= the pads =======================
   pads(g) {
     if (g.area !== 'barn') return [];   // the circles only exist in the barn's map
-    const s = this.state(g), K = CFG.EGGFARM, out = [], keys = ['hatch', 'coop', 'feed', 'box', 'truck', 'fancy', 'belt'];
+    const s = this.state(g), K = CFG.EGGFARM, out = [], keys = ['hatch', 'coop', 'feed', 'box', 'truck', 'fancy'];
     keys.forEach((k, i) => {
       const u = K.UPG[k], c = this.upgCost(s, k);
-      out.push({ key: 'egg_' + k, upg: k, label: u.label, ico: u.ico, pos: { x: K.PADS_X[i], y: K.PADS_Y }, price: c || 0, maxed: c === null, sub: k === 'belt' ? (c === null ? '✓' : '') : `${s.lv[k]}/${u.max}` });
+      out.push({ key: 'egg_' + k, upg: k, label: u.label, ico: u.ico, pos: { x: K.PADS_X[i], y: K.PADS_Y }, price: c || 0, maxed: c === null, sub: `${s.lv[k]}/${u.max}` });
     });
     const L = K.UPG.loader, lc = this.upgCost(s, 'loader');
     out.push({ key: 'egg_loader', upg: 'loader', label: s.lv.loader ? 'Faster Loader' : 'Hire a Loader', ico: L.ico, pos: K.LOADER_PAD, price: lc || 0, maxed: lc === null, sub: `${s.lv.loader}/${L.max}` });
@@ -240,33 +304,18 @@ const EggFarmExt = {
     if (pad.key === 'egg_newcoop') {
       s.coops = Math.min(6, s.coops + 1); st.obs = st.obsCar = null;
       st.coopPop[s.coops - 1] = 0.8;
+      // any egg lying where the next coop's pad now is rolls aside
+      for (const e of st.floor) if (this.keepOut(e.x, e.y)) { const q = this.roamSpot(e.x, e.y + 60, 30); e.x = q.x; e.y = q.y; st.floorN = -1; }
       g.floats.push({ x: K.COOP_X[s.coops - 1], y: K.COOP.y0 - 40, text: '🏠 A new coop!', color: '#ffe08a', t: 0, dur: 1.6, big: true });
       Sfx.unlock(); Haptics.success();
       return;
     }
     const k = pad.upg; if (!k) return;
     s.lv[k] = Math.min(K.UPG[k].max, s.lv[k] + 1);
-    if (k === 'belt') { this.startBuild(g); return; }
-    const say = { hatch: '🐣 Faster hatcher!', coop: `🏡 Bigger coops! ${this.cap(s)} hens each`, feed: '🌾 Yummy feed: more eggs!', box: `📦 Bigger boxes! ${this.boxEggs(s)} eggs`, truck: '🚚 Another egg truck!', fancy: '✨ Fancier eggs: worth more!', loader: s.lv.loader === 1 ? '🧑‍🌾 A loader! He loads the truck' : `🧑‍🌾 Faster loader! ${s.lv.loader} boxes a trip` }[k];
+    const say = { hatch: '🐣 Faster hatcher!', coop: `🏡 Bigger coops! ${this.cap(s)} chickens each`, feed: '🌾 Yummy feed: more eggs!', box: `📦 Bigger boxes! ${this.boxEggs(s)} eggs`, truck: '🚚 Another egg truck!', fancy: '✨ Fancier eggs: worth more!', loader: s.lv.loader === 1 ? '🧑‍🌾 A loader! He loads the truck' : `🧑‍🌾 Faster loader! ${s.lv.loader} boxes a trip` }[k];
     g.floats.push({ x: pad.pos.x, y: pad.pos.y - 60, text: say, color: '#ffe08a', t: 0, dur: 1.6, big: true });
     if (k === 'truck') this.syncTrucks(g);
     if (k === 'loader') this.ensureLoader();
-  },
-  // the Egg Belt goes in piece by piece, from the hatcher end to the packer, with a hammer and sparkles
-  startBuild(g) {
-    const st = this.ready(g), K = CFG.EGGFARM;
-    st.build = { t: 0 }; st.obs = st.obsCar = null;
-    g.floats.push({ x: (K.BELT.x0 + K.BELT.x1) / 2, y: K.BELT.y - 70, text: '🔨 Building the Egg Belt!', color: '#ffe08a', t: 0, dur: 2, big: true });
-    Sfx.unlock(); Haptics.success();
-  },
-  // a chef standing in the belt's path while it is built is stepped out of its way
-  finishBuild(g) {
-    const st = this.st, K = CFG.EGGFARM, p = g.player, Bt = K.BELT;
-    st.build = null; st.obs = st.obsCar = null;
-    if (g.area === 'barn' && !g.driving && p.x > Bt.x0 - 24 && p.x < Bt.x1 + 24 && Math.abs(p.y - Bt.y) < Bt.half + 13) p.y = Bt.y + Bt.half + 14;
-    g.floats.push({ x: (Bt.x0 + Bt.x1) / 2, y: Bt.y - 60, text: '🛤️ The Egg Belt is ready!', color: '#9ef01a', t: 0, dur: 1.8, big: true });
-    for (let i = 0; i < 8; i++) g.fx.push({ kind: 'sparkle', x0: Bt.x0 + (Bt.x1 - Bt.x0) * i / 7, y0: Bt.y, x1: Bt.x0 + (Bt.x1 - Bt.x0) * i / 7, y1: Bt.y - 10, t: -i * 0.05, dur: 0.6 });
-    Sfx.chime();
   },
 
   // ======================= the one button =======================
@@ -335,32 +384,34 @@ const EggFarmExt = {
     st.banner = { type: k, t: 0 };
     if (g.area === 'barn') { Sfx.unlock(); Haptics.success(); }
   },
-  // 🌽 a fan of corn flies from the chef's hands onto the floor in front of the coops; chicks come running out of each
-  // coop to peck it, and the hens lay twice as fast while the badge counts down
+  // 🌽 a handful of corn bits flies from the chef's hand (low, at his side: no reaching) onto the floor in front of him;
+  // the chickens nearby come running, gather round the corn and peck at it for a while, then wander off again (and a
+  // few eggs get laid right there)
   scatterCorn(g) {
-    const st = this.ready(g), s = this.state(g), K = CFG.EGGFARM, p = g.player, hx = p.x + 8, hy = p.y - 34;
-    st.boost = K.CORN_TIME;
-    st.corn = st.corn.filter((c) => c.t < c.dur);
-    const n = 10 + 6 * s.coops;
-    for (let i = 0; i < n; i++) {
-      const c = i % s.coops, x1 = K.COOP_X[c] + U.rand(-38, 38), y1 = K.CHICK_Y + U.rand(-4, 34), d = U.dist(hx, hy, x1, y1);
-      st.corn.push({ x0: hx + U.rand(-4, 4), y0: hy, x1, y1, t: -i * 0.018, dur: 0.45 + d / 1100, h: 50 + d * 0.12 + U.rand(0, 30), c, eaten: false });
+    const st = this.ready(g), K = CFG.EGGFARM, R = K.ROAM, p = g.player, f = p.facing || 1, hx = p.x + f * 14, hy = p.y - 16;
+    const cx = U.clamp(p.x + f * 30, R.x0 + 70, R.x1 - 70), cy = U.clamp(p.y + 78, R.y0 + 40, R.y1 - 30);
+    st.corn.length = 0; st.cornT = K.CORN_TIME; st.cornAt = { x: cx, y: cy }; st.cornEggs = K.CORN_EGGS; st.cornEggT = 1.5;
+    for (let i = 0; i < 16; i++) {
+      const a = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random()) * 46, x1 = cx + Math.cos(a) * rr, y1 = cy + Math.sin(a) * rr * 0.6, d = U.dist(hx, hy, x1, y1);
+      st.corn.push({ x0: hx + U.rand(-3, 3), y0: hy, x1, y1, t: -i * 0.02, dur: 0.35 + d / 900, h: 24 + d * 0.15 + U.rand(0, 14), gone: U.rand(0.45, 1) * K.CORN_TIME });
     }
-    // the chicks that come out to peck: a few per coop that has hens, more for a big flock
-    st.peck = st.peck.filter((q) => q.state !== 'home');
-    for (let i = 0; i < s.coops; i++) {
-      const have = st.peck.filter((q) => q.c === i).length, want = this.shown(s, i) > 0 ? Math.min(4, 1 + Math.floor(this.shown(s, i) / 12)) : 0;
-      for (let k = have; k < want; k++) st.peck.push({ c: i, x: K.COOP_X[i] - 28, y: K.COOP.y1 - 4, state: 'out', wait: 0.3 + k * 0.35 + i * 0.08, bit: null, t: Math.random() * 6, face: 1 });
-    }
+    // every chicken out on the floor nearby comes to peck (the ones on their way home at dusk stay on their way)
+    for (const h of st.flock) if ((h.s === 'wander' || h.s === 'idle' || h.s === 'peck') && U.dist(h.x, h.y, cx, cy) < K.CORN_R) this.toCorn(h);
     g.floats.push({ x: p.x, y: p.y - 76, text: '🌽 Here, chicky chicky!', color: '#ffe08a', t: 0, dur: 1.4, big: true });
     Sfx.chime(); Haptics.tap();
   },
+  // a chicken heads for a spot in a ring round the corn (so they cluster without piling up on one spot)
+  toCorn(h) {
+    const C = this.st.cornAt, a = Math.random() * Math.PI * 2, rr = U.rand(14, 64);
+    h.s = 'corn'; h.at = false; h.tx = C.x + Math.cos(a) * rr; h.ty = C.y + Math.sin(a) * rr * 0.6; h.wait = 0; h.sp = CFG.EGGFARM.HEN_SPEED[1] * 1.35;
+  },
 
   // ======================= the egg tower =======================
-  // where egg i of the tower is drawn (world coords): above the chef's head, leaning with the spring
+  // where egg i of the tower is drawn (world coords): resting on the chef's head (on top of any pizzas he carries, the
+  // way the pizzeria's stack is carried), leaning with the spring. It bobs with his head while he walks.
   stackBase(g) {
-    const p = g.player, pz = p.carry > 0 ? Math.min(p.carry, 30) * 4 + 14 : 0;
-    return { x: p.x, y: p.y - 56 - pz };
+    const p = g.player, pz = p.carry > 0 ? Math.min(p.carry, 30) * 4 + 8 : 0, bob = p.moving ? Math.sin(p.bob || 0) * 2 : 0;
+    return { x: p.x, y: p.y - 70 - pz + bob };
   },
   stackComp() { const st = this.st; return 1 - 0.05 * st.boing * Math.cos(st.boingT * 26); },
   eggPos(g, i, base) {
@@ -438,82 +489,133 @@ const EggFarmExt = {
       }
     }
     st.noScoop = Math.max(0, st.noScoop - dt);
-    s.stack = st.stack.map((e) => e.t);
+    if (st.stackN !== st.stack.length) { st.stackN = st.stack.length; s.stack = st.stack.map((e) => e.t); }
   },
-  // walking past the egg trays (and along the belt) the eggs hop onto the tower; loose eggs near the chef hop on too
+  // the eggs on the floor near the chef hop up onto the tower, boing boing (a generous reach, so a small player only has
+  // to walk somewhere near them)
   updateCollect(g, dt) {
-    const st = this.st, s = this.state(g), K = CFG.EGGFARM, p = g.player;
-    if (g.area !== 'barn' || g.driving || this.busy(g) || st.packing || st.noScoop > 0) return;
-    const room = () => st.stack.length + this.flyingIn() < K.STACK_MAX;
-    let src = null;
-    for (let i = 0; i < s.coops && !src; i++) { const T = this.trayAt(i); if (s.trays[i] > 0 && U.dist(p.x, p.y, T.x, T.y + 36) < K.TRAY.reach) src = { tray: i, x: T.x, y: T.y - 4 }; }
-    if (!src && this.beltOn(s) && Math.abs(p.y - (K.BELT.y + 30)) < 34) { const tk = st.belt.find((t) => Math.abs(t.x - p.x) < 44 && t.drop <= 0); if (tk) src = { tk }; }
-    if (src) {
-      st.scoopT -= dt;
-      while (st.scoopT <= 0 && room()) {
-        st.scoopT += K.SCOOP_GAP;
-        if (src.tray !== undefined) {
-          if (s.trays[src.tray] <= 0) break;
-          s.trays[src.tray]--; this.catchEgg(g, src.x + U.rand(-8, 8), src.y, s.type);
-        } else {
-          const tk = src.tk; if (tk.n <= 0) break;
-          tk.n--; this.catchEgg(g, tk.x, K.BELT.y - 6, tk.type);
-          if (tk.n <= 0) { st.belt.splice(st.belt.indexOf(tk), 1); break; }
-        }
-      }
-      if (st.scoopT < 0) st.scoopT = 0;
-    } else st.scoopT = 0;
-    // the magnet: loose eggs near the chef hop on, boing boing
-    let pulled = 0;
-    for (let i = st.strays.length - 1; i >= 0; i--) {
-      const e = st.strays[i];
-      if (e.z > 0.5 || U.dist(p.x, p.y, e.x, e.y) > K.MAGNET || !room()) continue;
-      st.strays.splice(i, 1); this.catchEgg(g, e.x, e.y - 6, e.type, pulled * 0.06); pulled++;
-    }
+    const st = this.st, K = CFG.EGGFARM, p = g.player;
     st.magT = Math.max(0, st.magT - dt);
+    if (g.area !== 'barn' || g.driving || this.busy(g) || st.packing || st.noScoop > 0 || !this.inHall(g)) return;
+    let pulled = 0;
+    for (let i = st.floor.length - 1; i >= 0; i--) {
+      const e = st.floor[i];
+      if (e.z > 0.5 || e.pop > 0 || Math.abs(e.x - p.x) > K.MAGNET || Math.abs(e.y - p.y) > K.MAGNET || U.dist(p.x, p.y, e.x, e.y) > K.MAGNET) continue;
+      if (st.stack.length + this.flyingIn() >= K.STACK_MAX) break;
+      st.floor.splice(i, 1); st.floorN = -1; this.catchEgg(g, e.x, e.y - 6, e.t, Math.min(pulled, 12) * 0.05); pulled++;
+    }
     if (pulled && st.magT <= 0) { st.magT = 1.4; g.floats.push({ x: p.x + 30, y: p.y - 40, text: 'Boing boing! 🥚', color: '#fff3a0', t: 0, dur: 1, big: true }); Sfx.clean(); }
   },
 
-  // ======================= laying, the belt, the packer =======================
-  updateLaying(g, dt) {
-    const st = this.st, s = this.state(g), K = CFG.EGGFARM, Bt = K.BELT, lay = this.layTime(s), mul = st.boost > 0 ? 2 : 1, belt = this.beltOn(s);
-    for (let i = 0; i < 6; i++) st.layPop[i] = Math.max(0, st.layPop[i] - dt);
-    for (let i = 0; i < s.coops; i++) {
-      // the hens inside lay through the hatch into the nest box; a full box makes them wait
-      st.acc[i] = Math.min(60, st.acc[i] + this.shown(s, i) * dt / lay * mul);
-      let n = 0;
-      while (st.acc[i] >= 1 && s.trays[i] < K.TRAY.cap && n < 30) { st.acc[i] -= 1; s.trays[i]++; s.laid++; n++; }
-      if (n) st.layPop[i] = 0.35;
-      if (s.trays[i] >= K.TRAY.cap) st.acc[i] = Math.min(st.acc[i], 1);
-      // with the Egg Belt the nest box tips its eggs onto the belt
-      if (belt && s.trays[i] > 0) {
-        const dx = this.trayAt(i).x;
-        if (st.belt.some((t) => Math.abs(t.x - dx) < Bt.gap)) continue;
-        const m = Math.min(s.trays[i], 50); s.trays[i] -= m;
-        st.belt.push({ x: dx, n: m, type: s.type, drop: 0.22, roll: m <= 2 && st.strays.length < K.STRAY_MAX && Math.random() < 0.06 ? dx + U.rand(50, 300) : null });
-      }
-    }
-    if (!belt) return;
-    // the belt: eggs ride east and tip down the slide into the packer's hopper; the odd one rolls off onto the floor
-    st.phase += Bt.speed * dt;
-    st.belt.sort((a, b) => b.x - a.x);
-    let limit = Bt.x1;
-    for (let i = 0; i < st.belt.length; i++) {
-      const tk = st.belt[i]; tk.drop = Math.max(0, tk.drop - dt);
-      tk.x = Math.min(tk.x + Bt.speed * dt, limit); limit = tk.x - Bt.gap;
-      if (tk.roll && tk.x >= Math.min(tk.roll, Bt.x1 - 60)) {
-        for (let k = 0; k < tk.n && st.strays.length < K.STRAY_MAX; k++) st.strays.push({ x: tk.x + k * 8, y: Bt.y + 4, type: tk.type, z: 14, vz: -60, vy: U.rand(70, 120), vx: U.rand(-30, 30), t: 0 });
-        st.belt.splice(i, 1); i--; limit = i >= 0 ? st.belt[i].x - Bt.gap : Bt.x1; continue;
-      }
-    }
-    const front = st.belt[0];
-    if (front && front.x >= Bt.x1 - 0.5 && s.hopper + front.n + this.sliding() <= K.HOPPER_CAP && !st.slide.some((q) => q.k < 0.25)) { st.slide.push({ n: front.n, type: front.type, k: 0 }); st.belt.shift(); }
-    for (let i = st.slide.length - 1; i >= 0; i--) {
-      const q = st.slide[i]; q.k += dt / 0.6;
-      if (q.k >= 1) { s.hopper += q.n; s.hopperVal += q.n * this.eggValue(s, q.type); st.slide.splice(i, 1); }
+  // ======================= the flock: in and out of the coops, wandering, laying =======================
+  // A chicken out on the floor is a little object { c: its coop, x, y, s: state, tx, ty, ... }; at most WALK_MAX are
+  // out at once, the rest of the flock waits in the coops (still counted, still laying, at a walker's feet). States:
+  // 'down' (down the ramp from the coop door), 'wander' (walking to a spot), 'idle' (pecking or looking about there),
+  // 'corn' (gathered round the corn), 'home' (to the foot of its ramp at dusk), 'up' (up the ramp and in).
+  spawnHen(c, at) {
+    const st = this.st, K = CFG.EGGFARM, d = this.coopDoor(c), h = { c, x: d.x, y: d.y, tx: d.x, ty: d.y, s: 'down', sp: U.rand(K.HEN_SPEED[0], K.HEN_SPEED[1]), wait: 0, face: 1, ph: Math.random() * 6.3, flap: 0, peck: false, t: 0, grown: 0 };
+    if (at) { h.x = at.x; h.y = at.y; h.s = 'idle'; h.wait = U.rand(0.2, 2.5); h.peck = Math.random() < 0.5; h.face = Math.random() < 0.5 ? -1 : 1; }
+    else { const f = this.rampFoot(c); h.tx = f.x + U.rand(-5, 5); h.ty = f.y; h.sp = 72; }   // down the ramp at a trot
+    st.flock.push(h); st.walkers[c]++;
+    return h;
+  },
+  // by day, when the game starts: the flock is already out and about (no procession)
+  scatterFlock(s) {
+    const st = this.st, K = CFG.EGGFARM;
+    for (let guard = 0; st.flock.length < K.WALK_MAX && guard < 400; guard++) {
+      const c = this.nextOut(s); if (c < 0) break;
+      this.spawnHen(c, this.roamSpot());
     }
   },
-  sliding() { let n = 0; for (const q of this.st.slide) n += q.n; return n; },
+  // the coop whose turn it is to send a chicken out: the one with the most waiting for each of its chickens already out
+  nextOut(s) {
+    const st = this.st; let best = -1, score = 0;
+    for (let i = 0; i < s.coops; i++) { const free = this.inCoop(s, i) - this.growing(i); if (free > 0 && free / (st.walkers[i] + 1) > score) { score = free / (st.walkers[i] + 1); best = i; } }
+    return best;
+  },
+  // an egg pops out where a chicken stands, with a little flap (and a "bok!", now and then)
+  lay(g, h, type) {
+    const st = this.st, s = this.state(g);
+    st.floor.push({ x: h.x - h.face * 7, y: h.y + 3, t: type, z: 10, vz: -110, pop: 0.3 }); st.floorN = -1;
+    s.laid++; st.lays++; h.flap = 0.5;
+    const r = Render, seen = h.x > r.camX && h.x < r.camX + r.viewW && h.y > r.camY + 40 && h.y < r.camY + r.viewH;   // (on screen)
+    if (g.area === 'barn' && st.bokT <= 0 && this.inHall(g) && seen) { st.bokT = 0.9; g.floats.push({ x: h.x, y: h.y - 36, text: 'bok!', color: '#fff3a0', t: 0, dur: 0.8, big: false }); }
+  },
+  updateFlock(g, dt) {
+    const st = this.st, s = this.state(g), K = CFG.EGGFARM, night = this.night();
+    // recount who is out (the save may have changed under us: a coop's chickens can never be more than belong to it)
+    st.walkers.fill(0);
+    for (let i = st.flock.length - 1; i >= 0; i--) {
+      const h = st.flock[i];
+      if (h.c >= s.coops || st.walkers[h.c] >= this.shown(s, h.c)) { st.flock.splice(i, 1); continue; }
+      st.walkers[h.c]++;
+    }
+    // the new chickens growing up in their coops: grown, they come straight out (by day, when there is room)
+    for (let i = st.grow.length - 1; i >= 0; i--) {
+      const q = st.grow[i]; q.t -= dt;
+      if (q.c >= s.coops) { st.grow.splice(i, 1); continue; }
+      if (q.t <= 0) {
+        st.grow.splice(i, 1);
+        if (!night && st.flock.length < K.WALK_MAX && this.inCoop(s, q.c) > this.growing(q.c)) {
+          const h = this.spawnHen(q.c); h.grown = 1.2; h.flap = 0.6; st.coopPop[q.c] = 0.3;
+          if (g.area === 'barn') g.fx.push({ kind: 'sparkle', x0: h.x, y0: h.y - 20, x1: h.x, y1: h.y - 34, t: 0, dur: 0.6 });
+        }
+      }
+    }
+    // by day the coops let their chickens out one by one, down the ramps
+    st.releaseT -= dt;
+    if (!night && st.releaseT <= 0 && st.flock.length < K.WALK_MAX) { st.releaseT = K.RELEASE_GAP; const c = this.nextOut(s); if (c >= 0) this.spawnHen(c); }
+    // every chicken out: walk, peck, flap; home to bed at dusk
+    const corn = st.cornT > 0;
+    for (let i = st.flock.length - 1; i >= 0; i--) {
+      const h = st.flock[i]; h.t += dt; h.flap = Math.max(0, h.flap - dt); h.grown = Math.max(0, h.grown - dt);
+      if (night && h.s !== 'home' && h.s !== 'up') { const f = this.rampFoot(h.c); h.s = 'home'; h.tx = f.x + U.rand(-4, 4); h.ty = f.y; h.sp = K.HEN_SPEED[1] * 1.25; h.peck = false; }
+      if (h.s === 'idle' || (h.s === 'corn' && h.at)) {
+        h.wait -= dt;
+        if (h.s === 'corn') { if (!corn) { h.s = 'idle'; h.at = false; h.wait = U.rand(0.3, 1.5); } }
+        else if (h.wait <= 0) { const q = Math.random() < 0.6 ? this.roamSpot(h.x, h.y, 200) : this.roamSpot(); h.s = 'wander'; h.tx = q.x; h.ty = q.y; h.peck = false; h.sp = U.rand(K.HEN_SPEED[0], K.HEN_SPEED[1]); }
+        else if (Math.random() < dt * 0.08) h.flap = 0.45;   // a happy flap now and then
+        continue;
+      }
+      const was = h.x, done = U.moveToward(h, h.tx, h.ty, h.sp, dt);
+      if (Math.abs(h.x - was) > 0.01) h.face = h.x < was ? -1 : 1;
+      if (!done) continue;
+      if (h.s === 'down') { const q = this.roamSpot(h.x, h.y + 70, 120); h.s = 'wander'; h.tx = q.x; h.ty = q.y; h.sp = U.rand(K.HEN_SPEED[0], K.HEN_SPEED[1]); }
+      else if (h.s === 'wander') { h.s = 'idle'; h.wait = U.rand(0.8, 3.6); h.peck = Math.random() < 0.65; }
+      else if (h.s === 'corn') { h.at = true; h.peck = true; h.face = st.cornAt && st.cornAt.x < h.x ? -1 : 1; }
+      else if (h.s === 'home') { const d = this.coopDoor(h.c); h.s = 'up'; h.tx = d.x; h.ty = d.y; h.sp = K.HEN_SPEED[1]; }
+      else if (h.s === 'up') { st.flock.splice(i, 1); st.walkers[h.c]--; st.coopPop[h.c] = 0.2; }
+    }
+    // laying: every chicken awake lays one egg every layTime seconds, where one of the walkers stands; nothing at night
+    // (the chickens are asleep); with the floor full (FLOOR_MAX eggs) the hens wait
+    const awake = night ? 0 : Math.max(0, this.shownHens(s) - st.grow.length);
+    st.bokT = Math.max(0, st.bokT - dt);
+    const full = st.floor.length >= K.FLOOR_MAX;
+    st.acc = Math.min(full ? 1 : 6, st.acc + awake * dt / this.layTime(s));
+    for (let n = 0; st.acc >= 1 && st.floor.length < K.FLOOR_MAX && n < 8; n++) {
+      let h = null;
+      for (let k = 0; k < 6 && !h; k++) { const q = st.flock[(Math.random() * st.flock.length) | 0]; if (q && (q.s === 'idle' || q.s === 'wander' || q.s === 'corn')) h = q; }
+      if (!h) break;
+      st.acc -= 1; this.lay(g, h, s.type);
+    }
+    // corn: the gathered chickens lay a few eggs right there; the bits get eaten up
+    if (corn) {
+      st.cornT = Math.max(0, st.cornT - dt); st.cornEggT -= dt;
+      if (st.cornEggT <= 0 && st.cornEggs > 0 && st.floor.length < K.FLOOR_MAX) {
+        st.cornEggT = 2.2; const at = st.flock.filter((h) => h.s === 'corn' && h.at);
+        if (at.length) { st.cornEggs--; this.lay(g, at[(Math.random() * at.length) | 0], s.type); }
+      }
+      for (const c of st.corn) c.t += dt;
+      if (st.cornT <= 0) { st.corn.length = 0; st.cornAt = null; }
+    }
+    // eggs that just popped out bounce and settle
+    for (const e of st.floor) {
+      if (e.pop > 0) e.pop = Math.max(0, e.pop - dt);
+      if (e.z > 0 || e.vz !== 0) { e.vz += 420 * dt; e.z = Math.max(0, e.z - e.vz * dt); if (e.z <= 0) { e.vz = e.vz > 120 ? -e.vz * 0.35 : 0; e.z = 0; } }
+    }
+    // the floor as saved: only when it changed
+    if (st.floorN !== st.floor.length) { st.floorN = st.floor.length; s.floor = st.floor.map((e) => [Math.round(e.x), Math.round(e.y), e.t]); }
+  },
   // the packer boxes whatever is in its hopper: eggs go in, a full box pops up the chute onto the pile
   updatePacker(g, dt) {
     const st = this.st, s = this.state(g), K = CFG.EGGFARM;
@@ -656,8 +758,8 @@ const EggFarmExt = {
         }
       } else if (tr.state === 'unload') {
         // at the Egg Market: the boxes hop onto the market's counter
-        tr.t += dt; tr.k -= dt; this.turnTo(tr, Math.PI, dt * 7);
-        if (tr.k <= 0 && tr.boxes > 0) { tr.k = 0.14; tr.boxes--; const f = this.bedAt(tr, tr.boxes); st.boxFly.push({ x0: f.x, y0: f.y, x1: (M.x0 + M.x1) / 2 + U.rand(-30, 30), y1: M.y1 - 8, k: 0, dur: 0.34, to: 'market', h: 30 }); }
+        tr.t += dt; tr.k -= dt; this.turnTo(tr, 0, dt * 7);
+        if (tr.k <= 0 && tr.boxes > 0) { tr.k = 0.14; tr.boxes--; const f = this.bedAt(tr, tr.boxes); st.boxFly.push({ x0: f.x, y0: f.y, x1: (M.x0 + M.x1) / 2 + U.rand(-28, 28), y1: M.y0 + 2, k: 0, dur: 0.34, to: 'market', h: 30 }); }
         if (!tr.boxes && tr.t > 1.2 && !this.inFlightTo('market')) {
           tr.state = 'back'; tr.d = 0;
           if (g.area === 'town' && U.dist(g.player.x, g.player.y, M.drop.x, M.drop.y) < 700) g.floats.push({ x: M.drop.x, y: M.y0 - 30, text: '🥚 Thank you!', color: '#ffe08a', t: 0, dur: 1.2, big: true });
@@ -705,12 +807,12 @@ const EggFarmExt = {
   updateDeliver(g, dt) {
     const st = this.st, s = this.state(g), K = CFG.EGGFARM, M = K.MARKET, D = st.deliver, v = st.spare; if (!D) return;
     D.t += dt; D.k -= dt;
-    if (D.k <= 0 && v.boxes > 0) { D.k = 0.16; v.boxes--; v.val = v.boxes > 0 ? v.val * v.boxes / (v.boxes + 1) : 0; const f = this.bedAt(v, v.boxes); st.boxFly.push({ x0: f.x, y0: f.y, x1: (M.x0 + M.x1) / 2 + U.rand(-30, 30), y1: M.y1 - 8, k: 0, dur: 0.34, to: 'market', h: 40 }); if (g.area === 'town') Sfx.drop(); }
+    if (D.k <= 0 && v.boxes > 0) { D.k = 0.16; v.boxes--; v.val = v.boxes > 0 ? v.val * v.boxes / (v.boxes + 1) : 0; const f = this.bedAt(v, v.boxes); st.boxFly.push({ x0: f.x, y0: f.y, x1: (M.x0 + M.x1) / 2 + U.rand(-28, 28), y1: M.y0 + 2, k: 0, dur: 0.34, to: 'market', h: 40 }); if (g.area === 'town') Sfx.drop(); }
     if (v.boxes <= 0 && !this.inFlightTo('market')) {
       const amt = Math.round(D.val);
       st.deliver = null; v.val = 0;
       s.earned += amt; s.shipped += D.n; st.m.secEarned += amt;
-      Shop.pocket(g, amt, { x: (M.x0 + M.x1) / 2, y: M.y1 - 10 });
+      Shop.pocket(g, amt, { x: (M.x0 + M.x1) / 2, y: M.y0 });
       g.floats.push({ x: (M.x0 + M.x1) / 2, y: M.y0 - 34, text: '🥚 Thank you! Yummy eggs!', color: '#ffe08a', t: 0, dur: 1.6, big: true });
       Haptics.success();
     }
@@ -745,26 +847,17 @@ const EggFarmExt = {
     st.boxPopT = Math.max(0, (st.boxPopT || 0) - dt);
     for (let i = 0; i < 6; i++) st.coopPop[i] = Math.max(0, st.coopPop[i] - dt);
     if (this.inHall(g) && !s.seen) { s.seen = true; g.floats.push({ x: p.x, y: p.y - 70, text: '🐣 The Egg Farm!', color: '#ffe08a', t: 0, dur: 2, big: true }); }
-    // the Egg Belt being built
-    if (st.build) { st.build.t += dt; if (st.build.t >= K.BUILD_TIME) this.finishBuild(g); }
     // the automatic hatcher
     const every = this.autoEvery(s);
     if (every > 0) { st.autoT += dt; if (st.autoT >= every) { st.autoT = 0; this.hatch(g, true); } }
-    // chicks waddle to their coops (and become hens when they get there)
+    // chicks waddle to their coops; in they go, and after a little while they come out grown (updateFlock)
     for (let i = st.chicks.length - 1; i >= 0; i--) {
       const c = st.chicks[i]; c.t += dt; c.pop = Math.max(0, c.pop - dt);
       if (c.pop > 0) continue;
       const wp = c.path[c.i];
-      if (U.moveToward(c, wp.x, wp.y, 105, dt)) { c.i++; if (c.i >= c.path.length) { st.chicks.splice(i, 1); st.incoming[c.c] = Math.max(0, st.incoming[c.c] - 1); st.coopPop[c.c] = 0.35; this.checkMilestone(g); } }
+      if (U.moveToward(c, wp.x, wp.y, 105, dt)) { c.i++; if (c.i >= c.path.length) { st.chicks.splice(i, 1); st.incoming[c.c] = Math.max(0, st.incoming[c.c] - 1); st.grow.push({ c: c.c, t: K.GROW }); st.coopPop[c.c] = 0.35; this.checkMilestone(g); } }
     }
-    st.boost = Math.max(0, st.boost - dt);
-    this.updateLaying(g, dt);
-    // loose eggs bounce and roll to a stop
-    for (const e of st.strays) {
-      if (e.z > 0 || e.vz !== 0) { e.vz += 420 * dt; e.z = Math.max(0, e.z - e.vz * dt); if (e.z <= 0) { e.vz = e.vz > 120 ? -e.vz * 0.35 : 0; e.z = 0; } }
-      e.x += e.vx * dt; e.y += e.vy * dt; e.vx *= Math.pow(0.04, dt); e.vy *= Math.pow(0.04, dt);
-      e.x = U.clamp(e.x, K.HALL.x0 + 16, K.PACKER.x0 - 16); e.y = U.clamp(e.y, K.BELT.y + 24, K.HALL.y1 - 16); e.t += dt;
-    }
+    this.updateFlock(g, dt);
     this.updatePacker(g, dt);
     this.updateTrucks(g, dt);
     this.updateLoader(g, dt);
@@ -776,7 +869,6 @@ const EggFarmExt = {
     // the egg money waiting by the dock
     if (s.bank > 0 && g.area === 'barn' && !g.driving && U.dist(p.x, p.y, K.CASH.x, K.CASH.y) < 46) { const amt = Math.round(s.bank); s.bank = 0; Shop.pocket(g, amt, K.CASH); }
     s.rate = Shop.meter(st.m, dt, s.rate);
-    this.updateCorn(g, dt);
     // the lucky egg drifts across the hall on its balloon
     if (st.lucky) {
       const L = st.lucky, H = K.HALL; L.t += dt;
@@ -801,30 +893,6 @@ const EggFarmExt = {
     s.spare.boxes = v.boxes; s.spare.val = v.val;
     if (v.where === 'town' && U.dist(v.x, v.y, K.TOWN.spot.x, K.TOWN.spot.y) > 140) st.spareOff = true;
     st.frameMs = performance.now() - t0;
-  },
-  // corn: bits fly and land; the chicks come out, peck, and go home when the corn time is up
-  updateCorn(g, dt) {
-    const st = this.st, s = this.state(g), K = CFG.EGGFARM;
-    for (const c of st.corn) c.t += dt;
-    if (st.boost <= 0 && st.corn.length) st.corn.length = 0;
-    for (let i = st.peck.length - 1; i >= 0; i--) {
-      const q = st.peck[i], door = { x: K.COOP_X[q.c] - 28, y: K.COOP.y1 - 4 }, foot = { x: door.x, y: K.CHICK_Y };
-      q.t += dt;
-      if (st.boost <= 0 && q.state !== 'home' && q.state !== 'up') { if (q.bit) q.bit.claim = false; q.state = 'home'; }
-      const go = (pt, sp) => { const was = q.x, done = U.moveToward(q, pt.x, pt.y, sp, dt); if (Math.abs(q.x - was) > 0.01) q.face = q.x < was ? -1 : 1; return done; };
-      if (q.state === 'out') { q.wait -= dt; if (q.wait <= 0) q.state = 'down'; }
-      else if (q.state === 'down') { if (go(foot, 90)) q.state = 'find'; }
-      else if (q.state === 'find') {
-        let best = null, bd = 1e9;
-        for (const c of st.corn) { if (c.eaten || c.claim || c.t < c.dur) continue; const d = U.dist(q.x, q.y, c.x1, c.y1) + (c.c === q.c ? 0 : 120); if (d < bd) { bd = d; best = c; } }
-        if (best && bd < 400) { best.claim = true; q.bit = best; q.state = 'walk'; }
-        else { q.state = 'peck'; q.pk = 1.2; }
-      } else if (q.state === 'walk') { if (go({ x: q.bit.x1 - 9 * q.face, y: q.bit.y1 + 2 }, 85)) { q.state = 'peck'; q.pk = 1.4; } }
-      else if (q.state === 'peck') { q.pk -= dt; if (q.pk <= 0) { if (q.bit) { q.bit.eaten = true; q.bit = null; } q.state = 'find'; } }
-      else if (q.state === 'home') { if (go(foot, 100)) q.state = 'up'; }
-      else if (q.state === 'up') { if (go(door, 80)) st.peck.splice(i, 1); }
-      if (q.c >= s.coops) st.peck.splice(i, 1);
-    }
   },
   crow(g) {
     const st = this.st, R = CFG.EGGFARM.ROOSTER;
@@ -865,23 +933,25 @@ const EggFarmExt = {
       return { text: 'Drive out of the big doors! 🚚', target: door };
     }
     const at = (q, r) => U.dist(p.x, p.y, q.x, q.y) < r;
-    if (st.peek) return { text: 'Look at all the hens! 🐔', target: null };
+    if (st.peek) return { text: 'Look at the chickens! 🐔', target: null };
     if (st.lucky && !st.lucky.leave && U.dist(p.x, p.y, st.lucky.x, st.lucky.y) < 320) return { text: 'Catch the lucky egg! 🎈', target: { x: st.lucky.x, y: st.lucky.y } };
     if (st.packing) return { text: 'Packing the eggs! 📦', target: null };
     if (st.loading) return { text: 'Loading the truck! 📦', target: null };
     const btn = K.HATCHER.btn, atBtn = at(btn, 44);
     if (this.hens(s) === 0) return { text: 'Press the big red button! 🐣', target: atBtn ? null : btn };
     if (s.bank > 0) return { text: 'Grab the egg money! 💰', target: K.CASH };
-    const trays = this.trayEggs(s);
-    if (st.stack.length && (trays === 0 || st.stack.length >= 12 || at(K.PACK, 220))) return { text: 'Put the eggs in the packer! 📦', target: at(K.PACK, K.PACK.r) ? null : K.PACK };
+    const eggs = st.floor.length;
+    if (st.stack.length && (eggs === 0 || st.stack.length >= 30 || at(K.PACK, 220))) return { text: 'Put the eggs in the packer! 📦', target: at(K.PACK, K.PACK.r) ? null : K.PACK };
     const tr = this.dockTruck();
     if (s.boxes > 0 && !s.lv.loader && tr && tr.boxes < this.truckCap(s)) return { text: 'Load the boxes onto the truck! 🚚', target: at(K.LOAD[0], K.LOAD_R) ? null : K.LOAD[0] };
     if (st.trucks.some((t) => t.state === 'toot' || (t.state === 'out' && t.y > 4330))) return { text: 'Toot toot! Off to the Egg Market! 🚚', target: null };
-    if (trays > 0) {
+    if (eggs > 0) {
+      // the nearest egg (no arrow once it is in reach: walking about picks them up)
       let best = null, bd = 1e9;
-      for (let i = 0; i < s.coops; i++) { if (!s.trays[i]) continue; const T = this.trayAt(i), d = U.dist(p.x, p.y, T.x, T.y + 40); if (d < bd) { bd = d; best = { x: T.x, y: T.y + 40 }; } }
-      return { text: 'Collect the eggs! 🥚', target: bd < K.TRAY.reach ? null : best };
+      for (const e of st.floor) { const d = U.dist(p.x, p.y, e.x, e.y); if (d < bd) { bd = d; best = e; } }
+      return { text: 'Pick up the eggs! 🥚', target: bd < K.MAGNET ? null : { x: best.x, y: best.y } };
     }
+    if (this.night() && !st.flock.length) return { text: 'Shh! The chickens are asleep 😴', target: null };
     if (this.room(s) <= 0) {
       const pad = this.pads(g).filter((q) => q.key === 'egg_newcoop' || q.key === 'egg_coop').find((q) => !q.maxed);
       if (pad) return { text: 'The coops are full! Buy more room 🏠', target: pad.pos };
@@ -929,6 +999,33 @@ const EggFarmExt = {
     else if (type === 3) { c.fillStyle = 'rgba(190,230,255,0.28)'; c.beginPath(); c.arc(x + 1, y - 3, 10.5, 0, Math.PI * 2); c.fill(); c.strokeStyle = 'rgba(220,245,255,0.95)'; c.lineWidth = 1.3; c.beginPath(); c.arc(x + 1, y - 3, 10.5, 0, Math.PI * 2); c.stroke(); c.fillStyle = 'rgba(255,255,255,0.8)'; c.beginPath(); c.ellipse(x - 4, y - 8, 2.4, 1.3, -0.6, 0, Math.PI * 2); c.fill(); c.strokeStyle = '#9aa0a8'; c.lineWidth = 1; c.beginPath(); c.moveTo(x + 1, y - 13.5); c.lineTo(x + 1, y - 18); c.stroke(); c.fillStyle = '#ffe14d'; this.star(c, x + 1, y - 19.5, 2.6, 1.2); }
     else if (type === 4) { c.fillStyle = '#ffd23f'; c.beginPath(); c.moveTo(x - 6, y - 7); c.lineTo(x - 7, y - 15); c.lineTo(x - 3.5, y - 11); c.lineTo(x, y - 16); c.lineTo(x + 3.5, y - 11); c.lineTo(x + 7, y - 15); c.lineTo(x + 6, y - 7); c.closePath(); c.fill(); c.fillStyle = '#e4572e'; c.beginPath(); c.arc(x, y - 9.5, 1.3, 0, Math.PI * 2); c.fill(); c.fillStyle = '#3fa7ff'; c.beginPath(); c.arc(x - 4, y - 9, 0.9, 0, Math.PI * 2); c.arc(x + 4, y - 9, 0.9, 0, Math.PI * 2); c.fill(); }
   },
+  // a whole chicken from the side, facing right (feet drawn live), dressed for each egg type; `up`: wing flapping
+  paintWalkHen(c, type, x, y, up, leg) {
+    // the little orange legs (baked in: a frame for standing and one for each stride)
+    c.strokeStyle = '#ff9f1c'; c.lineWidth = 1.8; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(x - 2, y + 6); c.lineTo(x - 2 + leg * 2.5, y + 12); c.lineTo(x - 2 + leg * 2.5 + 2.5, y + 12.5); c.moveTo(x + 2, y + 6); c.lineTo(x + 2 - leg * 2.5, y + 12); c.lineTo(x + 2 - leg * 2.5 + 2.5, y + 12.5); c.stroke();
+    const body = ['#fffaf0', '#ffcf3a', '#fffaf0', '#cbb8ff', '#ff9a3d'][type], wing = ['#efe4d0', '#f2b134', '#ffd6ec', '#a996f0', '#e8742a'][type];
+    c.lineWidth = 0.8; c.strokeStyle = 'rgba(90,60,30,0.45)';
+    // the tail: three perky feathers at the back
+    c.fillStyle = wing; for (const [dx, dy, a] of [[-11, -7, -0.9], [-12, -3, -0.5], [-11, 1, -0.1]]) { c.save(); c.translate(x + dx, y + dy); c.rotate(a); c.beginPath(); c.ellipse(0, -3, 2.6, 5, 0, 0, Math.PI * 2); c.fill(); c.restore(); }
+    // the round body
+    c.fillStyle = body; c.beginPath(); c.ellipse(x - 1, y, 10.5, 8, 0, 0, Math.PI * 2); c.fill(); c.stroke();
+    if (type === 2) { ['#ff5a5f', '#ffe14d', '#5ad15a', '#3fa7ff'].forEach((col, i) => { c.fillStyle = col; c.beginPath(); c.ellipse(x - 2, y - 3 + i * 2.6, 8.5 - Math.abs(i - 1.5) * 1.4, 1.2, 0, 0, Math.PI * 2); c.fill(); }); }
+    // the head on a little neck
+    c.fillStyle = body; c.beginPath(); c.ellipse(x + 6, y - 6, 4.5, 6, 0.3, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.arc(x + 8, y - 10, 5, 0, Math.PI * 2); c.fill(); c.stroke();
+    if (type !== 4) { c.fillStyle = '#e53935'; for (const [dx, dy, r] of [[5.5, -15, 2], [8, -16, 2.4], [10.5, -15, 2]]) { c.beginPath(); c.arc(x + dx, y + dy, r, 0, Math.PI * 2); c.fill(); } }
+    c.fillStyle = '#ffa726'; c.beginPath(); c.moveTo(x + 12.5, y - 11.5); c.lineTo(x + 17, y - 9.5); c.lineTo(x + 12.5, y - 8); c.closePath(); c.fill();   // beak
+    c.fillStyle = '#e53935'; c.beginPath(); c.ellipse(x + 11.5, y - 6, 1.3, 2, 0, 0, Math.PI * 2); c.fill();                                            // wattle
+    c.fillStyle = '#2b1d14'; c.beginPath(); c.arc(x + 9.6, y - 11, 1.15, 0, Math.PI * 2); c.fill(); c.fillStyle = '#fff'; c.beginPath(); c.arc(x + 10, y - 11.4, 0.4, 0, Math.PI * 2); c.fill();
+    c.fillStyle = 'rgba(255,120,140,0.5)'; c.beginPath(); c.arc(x + 7.5, y - 8, 1.3, 0, Math.PI * 2); c.fill();
+    // the wing: folded at the side, or up in a flap
+    c.fillStyle = wing; c.save(); c.translate(x - 2, y - 1); c.rotate(up ? -1.0 : -0.15); c.beginPath(); c.ellipse(up ? -1 : 0, up ? -4 : 0, 6.5, 4.2, 0, 0, Math.PI * 2); c.fill(); c.stroke(); c.restore();
+    // dressed up for the egg type
+    if (type === 1) { c.fillStyle = '#ff5fa2'; c.beginPath(); c.moveTo(x + 5, y - 13); c.lineTo(x + 1, y - 16); c.lineTo(x + 1, y - 10); c.closePath(); c.fill(); c.beginPath(); c.moveTo(x + 5, y - 13); c.lineTo(x + 8, y - 17.5); c.lineTo(x + 8.5, y - 12); c.closePath(); c.fill(); }
+    else if (type === 3) { c.fillStyle = 'rgba(190,230,255,0.3)'; c.beginPath(); c.arc(x + 9, y - 11, 8, 0, Math.PI * 2); c.fill(); c.strokeStyle = 'rgba(220,245,255,0.95)'; c.lineWidth = 1.1; c.beginPath(); c.arc(x + 9, y - 11, 8, 0, Math.PI * 2); c.stroke(); c.fillStyle = '#ffe14d'; this.star(c, x + 9, y - 21, 2.2, 1); }
+    else if (type === 4) { c.fillStyle = '#ffd23f'; c.beginPath(); c.moveTo(x + 4, y - 13); c.lineTo(x + 3.5, y - 19); c.lineTo(x + 6, y - 16); c.lineTo(x + 8, y - 20); c.lineTo(x + 10, y - 16); c.lineTo(x + 12.5, y - 19); c.lineTo(x + 12, y - 13); c.closePath(); c.fill(); c.fillStyle = '#e4572e'; c.beginPath(); c.arc(x + 8, y - 15.5, 1, 0, Math.PI * 2); c.fill(); }
+  },
   paintChick(c, x, y) {
     c.fillStyle = '#ffd93b'; c.beginPath(); c.arc(x, y, 6.5, 0, Math.PI * 2); c.fill();
     c.fillStyle = '#ffe98a'; c.beginPath(); c.arc(x - 1.5, y - 2, 3, 0, Math.PI * 2); c.fill();
@@ -951,20 +1048,25 @@ const EggFarmExt = {
       hen: T.map((_, i) => mk(28, 34, (c) => this.paintHen(c, i, 13, 20))),
       chick: mk(20, 18, (c) => this.paintChick(c, 9, 10)),
       face: T.map((_, i) => mk(18, 22, (c) => this.paintFace(c, i, 9, 13))),
+      sleep: T.map((_, i) => mk(18, 22, (c) => this.paintFace(c, i, 9, 13, true))),
+      walk: T.map((_, i) => [0, 1, -1, 0].map((leg, k) => mk(34, 34, (c) => this.paintWalkHen(c, i, 15, 19, k === 3, leg)))),   // legs still, two strides, a flap
       box: mk(20, 13, (c) => this.paintBox(c, 20, 13)),
     };
   },
   spr() { if (!this.sprites) this.makeSprites(); return this.sprites; },
   drawEgg(ctx, type, x, y, s = 1) { const E = this.EW * s, H = this.EH * s; ctx.drawImage(this.spr().egg[type], x - E / 2, y - H / 2, E, H); },
   // a hen's little face, front on, dressed for each egg type: one of these per hen in the coops (and the peek view)
-  paintFace(c, type, x, y) {
+  paintFace(c, type, x, y, asleep) {
     const body = ['#fffaf0', '#ffcf3a', '#fffaf0', '#cbb8ff', '#ff9a3d'][type];
     if (type !== 4) { c.fillStyle = '#e53935'; for (const [dx, dy, r] of [[-3, -6.5, 2.3], [0, -7.5, 2.6], [3, -6.5, 2.3]]) { c.beginPath(); c.arc(x + dx, y + dy, r, 0, Math.PI * 2); c.fill(); } }
     c.fillStyle = body; c.beginPath(); c.arc(x, y, 6.2, 0, Math.PI * 2); c.fill();
     if (type === 2) { c.fillStyle = '#ff5a5f'; c.fillRect(x - 5.5, y + 2.6, 11, 1.3); c.fillStyle = '#3fa7ff'; c.fillRect(x - 4.5, y + 4.2, 9, 1.2); }
     c.strokeStyle = 'rgba(90,60,30,0.45)'; c.lineWidth = 0.7; c.beginPath(); c.arc(x, y, 6.2, 0, Math.PI * 2); c.stroke();
-    c.fillStyle = '#2b1d14'; for (const dx of [-2.3, 2.3]) { c.beginPath(); c.arc(x + dx, y - 1.2, 1.05, 0, Math.PI * 2); c.fill(); }
-    c.fillStyle = '#fff'; for (const dx of [-2, 2.6]) { c.beginPath(); c.arc(x + dx, y - 1.6, 0.4, 0, Math.PI * 2); c.fill(); }
+    if (asleep) { c.strokeStyle = '#2b1d14'; c.lineWidth = 0.8; for (const dx of [-2.3, 2.3]) { c.beginPath(); c.arc(x + dx, y - 1.6, 1.2, Math.PI * 0.15, Math.PI * 0.85); c.stroke(); } }   // eyes shut, fast asleep
+    else {
+      c.fillStyle = '#2b1d14'; for (const dx of [-2.3, 2.3]) { c.beginPath(); c.arc(x + dx, y - 1.2, 1.05, 0, Math.PI * 2); c.fill(); }
+      c.fillStyle = '#fff'; for (const dx of [-2, 2.6]) { c.beginPath(); c.arc(x + dx, y - 1.6, 0.4, 0, Math.PI * 2); c.fill(); }
+    }
     c.fillStyle = '#ffa726'; c.beginPath(); c.moveTo(x - 1.6, y + 0.6); c.lineTo(x + 1.6, y + 0.6); c.lineTo(x, y + 3); c.closePath(); c.fill();
     c.fillStyle = '#e53935'; c.beginPath(); c.ellipse(x, y + 3.9, 1, 1.3, 0, 0, Math.PI * 2); c.fill();
     c.fillStyle = 'rgba(255,120,140,0.5)'; for (const dx of [-3.8, 3.8]) { c.beginPath(); c.arc(x + dx, y + 1.2, 1.1, 0, Math.PI * 2); c.fill(); }
@@ -981,9 +1083,10 @@ const EggFarmExt = {
     return { cols, rows, cell, ox: (w - cols * cell) / 2, oy: (h - rows * cell) / 2 };
   },
   coopFront(i) { const K = CFG.EGGFARM, x0 = K.COOP_X[i] - K.COOP.w / 2; return { x: x0 + 6, y: K.COOP.y0 + 6, w: K.COOP.w - 12, h: K.COOP.y1 - 24 - (K.COOP.y0 + 6) }; },
-  // the coop's front, cached until its number of hens, their egg type or the coop's size changes: one face per hen
-  coopFace(i, n, type, cap) {
-    const st = this.st, key = n + '|' + type + '|' + cap;
+  // the coop's front, cached until its number of chickens inside, their egg type, the coop's size or day/night changes:
+  // one face per chicken inside (eyes shut at night)
+  coopFace(i, n, type, cap, asleep) {
+    const st = this.st, key = n + '|' + type + '|' + cap + (asleep ? 'z' : '');
     let c = st.faces[i];
     if (c && c.key === key) return c.cv;
     const F = this.coopFront(i), S = 3;
@@ -991,7 +1094,7 @@ const EggFarmExt = {
     c.key = key;
     const ctx = c.cv.getContext('2d'); ctx.setTransform(S, 0, 0, S, 0, 0); ctx.clearRect(0, 0, F.w, F.h);
     ctx.fillStyle = '#6b4424'; ctx.fillRect(0, 0, F.w, F.h);
-    const G = this.grid(cap, F.w, F.h), face = this.spr().face[type], fw = Math.min(G.cell * 1.1, 20), fh = fw * 22 / 18;
+    const G = this.grid(cap, F.w, F.h), face = this.spr()[asleep ? 'sleep' : 'face'][type], fw = Math.min(G.cell * 1.1, 20), fh = fw * 22 / 18;
     for (let r = 0; r < G.rows; r++) {
       const y = G.oy + (G.rows - r) * G.cell;
       ctx.fillStyle = '#8d5a2b'; ctx.fillRect(0, y - Math.max(1, G.cell * 0.12), F.w, Math.max(1, G.cell * 0.12));   // a perch under each row
@@ -1001,7 +1104,7 @@ const EggFarmExt = {
       const r = Math.floor(k / G.cols), col = k % G.cols, cx = G.ox + (col + 0.5) * G.cell, cy = G.oy + (G.rows - r - 0.5) * G.cell;
       ctx.drawImage(face, cx - fw / 2, cy - fh * 0.62, fw, fh);
     }
-    c.drawn = Math.min(n, cap);   // (the tests check this equals the number on the roof)
+    c.drawn = Math.min(n, cap);   // (the tests check this equals the chickens in the coop: at night, the number on the roof)
     // the wire mesh over the front
     ctx.strokeStyle = 'rgba(230,230,220,0.22)'; ctx.lineWidth = 0.5;
     for (let d = -F.h; d < F.w; d += 5) { ctx.beginPath(); ctx.moveTo(d, F.h); ctx.lineTo(d + F.h, 0); ctx.moveTo(d, 0); ctx.lineTo(d + F.h, F.h); ctx.stroke(); }
@@ -1009,7 +1112,7 @@ const EggFarmExt = {
   },
 
   // ======================= static art (cached background) =======================
-  bgKey(g) { return g.area === 'barn' && this.st ? 'egg' + this.state(g).coops + (this.beltOn(this.state(g)) ? 'b' : '') : ''; },
+  bgKey(g) { return g.area === 'barn' && this.st ? 'egg' + this.state(g).coops : ''; },
   paintAfter(r, g, area) { if (area === 'barn') this.paintHall(r, g); },
   paintHall(r, g) {
     const ctx = r.ctx, K = CFG.EGGFARM, H = K.HALL, w = K.WALL, B = CFG.BARN, R = B.room, A = B.arch, W = CFG.AREAS.barn.WORLD, s = this.state(g), D = K.DOOR;
@@ -1068,10 +1171,8 @@ const EggFarmExt = {
     ctx.fillStyle = '#ffd23f'; for (let i = 0; i < 9; i++) { ctx.beginPath(); ctx.arc(C.x - 14 + (i % 5) * 7, C.y - 24 + Math.floor(i / 5) * 4, 2.6, 0, Math.PI * 2); ctx.fill(); }
     ctx.font = r.font(16); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🌽', C.x, C.y + 1);
     this.spot(r, C.spot.x, C.spot.y + 6, '🌽', 'rgba(242,177,52,0.9)', 26, 14);
-    // ---- the coops (bought ones) with their egg trays, and dashed ghosts where new ones will go
+    // ---- the coops (bought ones), and dashed ghosts where new ones will go
     for (let i = 0; i < 6; i++) this.paintCoop(r, g, i, i < s.coops);
-    // ---- the Egg Belt's frame and the slide down to the packer (the moving rubber is drawn every frame)
-    if (this.beltOn(s)) { this.paintBeltFrame(ctx, K.BELT.x1); this.paintSlide(ctx); }
     // ---- the egg packer: a big blue machine with a hopper on top, its arm in a window, and a chute up to the box pile
     const P = K.PACKER, Hp = P.hopper, BP = K.BOXPILE;
     ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(P.x0 + 6, P.y0 + 8, P.x1 - P.x0, P.y1 - P.y0);
@@ -1141,21 +1242,6 @@ const EggFarmExt = {
     ctx.fillStyle = '#2b1d14'; U.roundRect(ctx, (x0 + x1) / 2 - 40, top - 40, 80, 22, 8); ctx.fill();
     ctx.fillStyle = '#ffe08a'; ctx.font = r.font(13); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🚚 ➜ 🥚', (x0 + x1) / 2, top - 29);
   },
-  paintBeltFrame(ctx, xEnd) {
-    const Bt = CFG.EGGFARM.BELT;
-    ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(Bt.x0 + 3, Bt.y - Bt.half + 6, xEnd - Bt.x0, Bt.half * 2 + 4);
-    ctx.fillStyle = '#5d636b'; ctx.fillRect(Bt.x0, Bt.y - Bt.half + 2, xEnd - Bt.x0, Bt.half * 2 + 6);
-    ctx.fillStyle = '#4a4f56'; for (let x = Bt.x0 + 10; x < xEnd - 4; x += 40) ctx.fillRect(x, Bt.y + Bt.half + 6, 5, 4);
-  },
-  paintSlide(ctx) {
-    const S = CFG.EGGFARM.SLIDE, a = Math.atan2(S.y1 - S.y0, S.x1 - S.x0), len = U.dist(S.x0, S.y0, S.x1, S.y1);
-    ctx.save(); ctx.translate(S.x0, S.y0); ctx.rotate(a);
-    ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(4, -8, len, 20);
-    ctx.fillStyle = '#9aa3ad'; U.roundRect(ctx, -6, -11, len + 6, 22, 8); ctx.fill();
-    ctx.fillStyle = '#c7ced6'; U.roundRect(ctx, -2, -7, len - 2, 14, 6); ctx.fill();
-    ctx.fillStyle = '#6e7a86'; ctx.fillRect(-6, -11, len + 6, 3); ctx.fillRect(-6, 8, len + 6, 3);
-    ctx.restore();
-  },
   paintCoop(r, g, i, owned) {
     const ctx = r.ctx, K = CFG.EGGFARM, cx = K.COOP_X[i], C = K.COOP, x0 = cx - C.w / 2, x1 = cx + C.w / 2, y0 = C.y0, y1 = C.y1, col = K.COOP_COLORS[i];
     if (!owned) {
@@ -1174,16 +1260,9 @@ const EggFarmExt = {
     // the wire front's frame (the hens behind it are drawn every frame)
     const F = this.coopFront(i);
     ctx.fillStyle = '#5b3a1a'; U.roundRect(ctx, F.x - 3, F.y - 3, F.w + 6, F.h + 6, 4); ctx.fill();
-    // the little door the chicks go in by (the ramp goes up to it), and the egg hatch over the nest box
+    // the little door the chickens go in and out by (the ramp goes up to it), and a round window with a nest inside
     ctx.fillStyle = '#8d5a2b'; U.roundRect(ctx, cx - 37, y1 - 20, 18, 20, 6); ctx.fill(); ctx.fillStyle = '#2e1c10'; U.roundRect(ctx, cx - 34, y1 - 17, 12, 17, 5); ctx.fill();
-    const T = this.trayAt(i);
-    ctx.fillStyle = '#8d5a2b'; ctx.beginPath(); ctx.arc(T.x, y1 - 11, 6.5, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#2e1c10'; ctx.beginPath(); ctx.arc(T.x, y1 - 11, 4.2, 0, Math.PI * 2); ctx.fill();
-    // the nest box: a little wooden tray of straw under the hatch
-    ctx.fillStyle = 'rgba(0,0,0,0.2)'; U.roundRect(ctx, T.x - 18, T.y - 3, 38, 14, 4); ctx.fill();
-    ctx.fillStyle = '#a8743c'; U.roundRect(ctx, T.x - 19, T.y - 6, 38, 14, 4); ctx.fill();
-    ctx.fillStyle = '#e0b44c'; U.roundRect(ctx, T.x - 16, T.y - 5, 32, 7, 3); ctx.fill();
-    ctx.strokeStyle = '#b8862c'; ctx.lineWidth = 1; for (let k = 0; k < 6; k++) { ctx.beginPath(); ctx.moveTo(T.x - 14 + k * 5.5, T.y - 4); ctx.lineTo(T.x - 11 + k * 5.5, T.y + 1); ctx.stroke(); }
-    ctx.fillStyle = '#8d5a2b'; ctx.fillRect(T.x - 19, T.y + 3, 38, 5);
+    ctx.fillStyle = '#8d5a2b'; ctx.beginPath(); ctx.arc(cx + 22, y1 - 11, 6.5, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#e0b44c'; ctx.beginPath(); ctx.arc(cx + 22, y1 - 11, 4.2, 0, Math.PI * 2); ctx.fill();
   },
 
   // ======================= the town: the barn's north doors, the farm track, the Egg Market =======================
@@ -1208,23 +1287,31 @@ const EggFarmExt = {
     ctx.fillStyle = '#e0b44c'; ctx.fillRect(dx0 - 14, 112, 8, 16); ctx.fillRect(dx1 + 6, 112, 8, 16);
     ctx.fillStyle = '#5b3a1a'; ctx.fillRect(dx1 + 9, 96, 3, 18); ctx.fillStyle = '#fff8e8'; U.roundRect(ctx, dx1 + 1, 84, 20, 15, 4); ctx.fill();
     ctx.font = r.font(10); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🥚', dx1 + 11, 92);
-    // ---- the Egg Market stall on the far side of Main Street
-    const cx = (M.x0 + M.x1) / 2;
-    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(M.x0 + 6, M.y0 + 8, M.x1 - M.x0, M.y1 - M.y0);
-    ctx.fillStyle = '#c98b4a'; ctx.fillRect(M.x0, M.y0 + 10, M.x1 - M.x0, M.y1 - M.y0 - 10);
-    ctx.fillStyle = 'rgba(0,0,0,0.1)'; for (let x = M.x0 + 12; x < M.x1; x += 12) ctx.fillRect(x, M.y0 + 10, 1.5, M.y1 - M.y0 - 10);
-    // crates of eggs on shelves at the back
-    for (let k = 0; k < 4; k++) { const bx = M.x0 + 10 + k * 28; ctx.fillStyle = '#8d5a2b'; ctx.fillRect(bx, M.y0 + 22, 24, 10); for (let e = 0; e < 3; e++) this.paintEgg(ctx, k === 1 ? 1 : 0, bx + 5 + e * 7, M.y0 + 21, 3, 4); }
-    // the counter
-    ctx.fillStyle = '#e0b46a'; ctx.fillRect(M.x0 - 4, M.y1 - 16, M.x1 - M.x0 + 8, 16);
-    ctx.fillStyle = '#b8862c'; ctx.fillRect(M.x0 - 4, M.y1 - 4, M.x1 - M.x0 + 8, 4);
-    ctx.fillStyle = '#fff8e8'; for (let k = 0; k < 5; k++) this.paintEgg(ctx, k % 2 ? 1 : 0, M.x0 + 14 + k * 24, M.y1 - 8, 4, 5);
-    // the striped awning with a scalloped edge
-    for (let k = 0; k < 8; k++) { const sx = M.x0 - 6 + k * (M.x1 - M.x0 + 12) / 8; ctx.fillStyle = k % 2 ? '#fff8e8' : '#ffc61a'; ctx.fillRect(sx, M.y0, (M.x1 - M.x0 + 12) / 8 + 0.5, 16); ctx.beginPath(); ctx.arc(sx + (M.x1 - M.x0 + 12) / 16, M.y0 + 16, (M.x1 - M.x0 + 12) / 16, 0, Math.PI); ctx.fill(); }
-    // the sign on top, an egg at each end
-    ctx.fillStyle = '#5b3a1a'; U.roundRect(ctx, cx - 54, M.y0 - 22, 108, 22, 8); ctx.fill();
-    ctx.fillStyle = '#ffe08a'; ctx.font = r.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🥚 EGG MARKET', cx, M.y0 - 11);
-    this.paintEgg(ctx, 0, cx - 62, M.y0 - 12, 7, 9.5); this.paintEgg(ctx, 1, cx + 62, M.y0 - 12, 7, 9.5);
+    // ---- the Egg Market stall on the corner of Main Street and East Road, next to the fire station: its counter faces the
+    // road (the trucks pull up in front of it), a striped awning over it, and its sign on the back for people walking by
+    const cx = (M.x0 + M.x1) / 2, mw = M.x1 - M.x0;
+    ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(M.x0 + 5, M.y0 + 6, mw, M.y1 - M.y0);
+    ctx.fillStyle = '#c98b4a'; ctx.fillRect(M.x0, M.y0, mw, M.y1 - M.y0);
+    ctx.fillStyle = 'rgba(0,0,0,0.1)'; for (let x = M.x0 + 10; x < M.x1; x += 10) ctx.fillRect(x, M.y0, 1.5, M.y1 - M.y0);
+    // the counter along the front, eggs in a row on it (the boxes the trucks bring are drawn live)
+    ctx.fillStyle = '#e0b46a'; ctx.fillRect(M.x0 - 4, M.y0 - 2, mw + 8, 16);
+    ctx.fillStyle = '#b8862c'; ctx.fillRect(M.x0 - 4, M.y0 - 2, mw + 8, 3); ctx.fillRect(M.x0 - 4, M.y0 + 12, mw + 8, 3);
+    // the striped awning over the stall (seen from above), its scalloped edge hanging over the back of the counter
+    const aw0 = M.y0 + 14, n = 8, sw = (mw + 12) / n;
+    for (let k = 0; k < n; k++) {
+      const sx = M.x0 - 6 + k * sw; ctx.fillStyle = k % 2 ? '#fff8e8' : '#ffc61a';
+      ctx.fillRect(sx, aw0, sw + 0.5, M.y1 - 2 - aw0);
+      ctx.beginPath(); ctx.arc(sx + sw / 2, aw0, sw / 2, Math.PI, 0); ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(M.x0 - 6, M.y1 - 6, mw + 12, 4);
+    ctx.fillStyle = '#8d5a2b'; for (const x of [M.x0 - 4, M.x1 + 1]) ctx.fillRect(x, aw0 - 2, 3, M.y1 - aw0);   // the posts
+    // the sign on the awning, an egg at each end
+    ctx.fillStyle = '#5b3a1a'; U.roundRect(ctx, cx - 38, M.y1 - 19, 76, 16, 7); ctx.fill();
+    ctx.fillStyle = '#ffe08a'; ctx.font = r.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('EGG MARKET', cx, M.y1 - 10.5);
+    this.paintEgg(ctx, 0, cx - 44, M.y1 - 11, 5, 7); this.paintEgg(ctx, 1, cx + 44, M.y1 - 11, 5, 7);
+    // a little "EGGS ➜" arrow sign on the kerb for the trucks
+    ctx.fillStyle = '#5b3a1a'; ctx.fillRect(M.x1 + 12, M.y0 - 14, 3, 22); ctx.fillStyle = '#fff8e8'; U.roundRect(ctx, M.x1 + 2, M.y0 - 24, 24, 14, 4); ctx.fill();
+    ctx.font = r.font(9); ctx.fillText('🥚', M.x1 + 14, M.y0 - 17);
   },
 
   // ======================= moving things =======================
@@ -1236,54 +1323,20 @@ const EggFarmExt = {
     const vx0 = r.camX - 60, vx1 = r.camX + r.viewW + 60, vy0 = r.camY - 80, vy1 = r.camY + r.viewH + 80;
     const vis = (x0, y0, x1, y1) => x1 > vx0 && x0 < vx1 && y1 > vy0 && y0 < vy1;
     if (vis(K.BOARD.x0, K.BOARD.y0, K.BOARD.x1, K.BOARD.y1)) this.drawBoard(r, g);
-    // ---- the Egg Belt: moving rubber, rails, rollers, eggs riding it (or being built, piece by piece)
-    const Bt = K.BELT, y0 = Bt.y - Bt.half, y1 = Bt.y + Bt.half, belt = this.beltOn(s);
-    if ((belt || st.build) && vis(Bt.x0, y0, Bt.x1 + 60, K.SLIDE.y1)) {
-      const k = st.build ? U.clamp(st.build.t / (K.BUILD_TIME * 0.85), 0, 1) : 1, xe = Bt.x0 + (Bt.x1 - Bt.x0) * k;
-      if (st.build) { this.paintBeltFrame(ctx, xe); if (k >= 1) this.paintSlide(ctx); }
-      ctx.fillStyle = '#3a3f46'; ctx.fillRect(Bt.x0 + 2, y0 + 2, xe - Bt.x0 - 4, y1 - y0 - 4);
-      ctx.fillStyle = 'rgba(255,255,255,0.13)'; const off = st.phase % 12, xa = Math.max(Bt.x0 + 2, vx0), xb = Math.min(xe - 4, vx1);
-      for (let x = xa - ((xa - Bt.x0 - off) % 12); x < xb; x += 12) if (x > Bt.x0 + 2) ctx.fillRect(x, y0 + 3, 3, y1 - y0 - 6);
-      ctx.fillStyle = '#b9c0c8'; ctx.fillRect(Bt.x0, y0, xe - Bt.x0, 3); ctx.fillRect(Bt.x0, y1 - 3, xe - Bt.x0, 3);
-      for (const q of k >= 1 ? [Bt.x0, Bt.x1] : [Bt.x0]) { ctx.fillStyle = '#7d848d'; U.roundRect(ctx, q - 12, Bt.y - 12, 24, 24, 5); ctx.fill(); ctx.fillStyle = '#a9b0b8'; ctx.beginPath(); ctx.arc(q, Bt.y, 8, 0, Math.PI * 2); ctx.fill(); const a = st.phase / 9; ctx.strokeStyle = '#5d636b'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(q + Math.cos(a) * 7, Bt.y + Math.sin(a) * 7); ctx.lineTo(q - Math.cos(a) * 7, Bt.y - Math.sin(a) * 7); ctx.stroke(); }
-      if (st.build) {
-        // the hammer bangs at the end of the new belt, sparkles fly
-        const bang = Math.abs(Math.sin(t * 14));
-        ctx.save(); ctx.translate(xe, Bt.y - 26); ctx.rotate(-0.8 + bang * 0.9); ctx.font = r.font(22); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🔨', 0, 0); ctx.restore();
-        ctx.fillStyle = '#fff3a0'; for (let q = 0; q < 4; q++) { const a = t * 9 + q * 1.6; this.star(ctx, xe + Math.cos(a) * 14, Bt.y - 6 + Math.sin(a) * 9, 3.4, 1.4); }
-      }
-      for (const tk of st.belt) {
-        if (tk.x < vx0 || tk.x > vx1) continue;
-        const dy = tk.drop > 0 ? -(tk.drop / 0.22) * 14 : 0, n = Math.min(3, tk.n);
-        for (let q = 0; q < n; q++) this.drawEgg(ctx, tk.type, tk.x - q * 5, Bt.y - 5 + dy - (q === 1 ? 4 : 0), 0.8);
-      }
-      // eggs rolling down the slide into the hopper
-      const SL = K.SLIDE;
-      for (const q of st.slide) { const e = q.k * q.k; for (let j = 0; j < Math.min(3, q.n); j++) { const kk = Math.max(0, e - j * 0.06); this.drawEgg(ctx, q.type, U.lerp(SL.x0, SL.x1, kk), U.lerp(SL.y0, SL.y1, kk) - 4, 0.8); } }
-    }
-    // ---- the coops: the ramps, the egg trays, one hen face per hen behind the wire, the number on the roof
-    const cap = this.cap(s);
+    // ---- the coops: the ramps, one face per chicken inside (sleepy faces and Zzz at night), the number on the roof (how
+    // many chickens belong to the coop)
+    const cap = this.cap(s), night = this.night();
     for (let i = 0; i < s.coops; i++) {
       const cx = K.COOP_X[i], C = K.COOP, x0 = cx - C.w / 2;
       if (!vis(x0 - 20, C.y0 - 70, x0 + C.w + 20, K.CHICK_Y)) continue;
-      // the ramp the chicks climb (over the belt) into the coop's door
+      // the ramp up to the coop's little door
       const rx = cx - 28;
-      ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(rx - 6, C.y1, 14, K.CHICK_Y - 10 - C.y1);
-      ctx.fillStyle = '#c9a36b'; ctx.fillRect(rx - 7, C.y1 - 2, 14, K.CHICK_Y - 8 - C.y1);
-      ctx.fillStyle = '#8d5a2b'; for (let y = C.y1 + 3; y < K.CHICK_Y - 10; y += 7) ctx.fillRect(rx - 7, y, 14, 2);
-      // the egg tray: every egg in it, heaped up (a badge with the number when there are some)
-      const T = this.trayAt(i), n = s.trays[i];
-      for (let k = 0; k < Math.min(n, 12); k++) { const row = Math.floor(k / 6), col = k % 6; this.drawEgg(ctx, s.type, T.x - 13 + col * 5.2 + row * 2.6, T.y - 4 - row * 5, 0.62); }
-      if (st.layPop[i] > 0) { const q = 1 - st.layPop[i] / 0.35; this.drawEgg(ctx, s.type, T.x + 4, U.lerp(C.y1 - 10, T.y - 6, q * q) - Math.sin(q * Math.PI) * 4, 0.65); }
-      if (n > 0) {
-        const lab = '🥚' + n; ctx.font = r.font(9); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        const bw = ctx.measureText(lab).width + 10; ctx.fillStyle = n >= K.TRAY.cap ? '#e4572e' : 'rgba(43,29,20,0.85)'; U.roundRect(ctx, T.x + 6, T.y + 4, bw, 13, 6); ctx.fill();
-        ctx.fillStyle = '#fff'; ctx.fillText(lab, T.x + 6 + bw / 2, T.y + 11);
-      }
-      // the hens: one face for every hen in this coop (chicks still on the path are not in yet)
-      const shown = this.shown(s, i), F = this.coopFront(i), cv = this.coopFace(i, shown, s.type, cap);
-      const jig = st.boost > 0 ? Math.sin(t * 16 + i) * 0.8 : 0, pop = st.coopPop[i] > 0 ? Math.sin(st.coopPop[i] * 18) * 1.5 : 0;
-      ctx.drawImage(cv, F.x + jig, F.y - pop, F.w, F.h);
+      ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(rx - 6, C.y1, 14, K.CHICK_Y - 2 - C.y1);
+      ctx.fillStyle = '#c9a36b'; ctx.fillRect(rx - 7, C.y1 - 2, 14, K.CHICK_Y - C.y1);
+      ctx.fillStyle = '#8d5a2b'; for (let y = C.y1 + 3; y < K.CHICK_Y - 2; y += 7) ctx.fillRect(rx - 7, y, 14, 2);
+      const inside = this.inCoop(s, i), shown = this.shown(s, i), F = this.coopFront(i), cv = this.coopFace(i, inside, s.type, cap, night);
+      const pop = st.coopPop[i] > 0 ? Math.sin(st.coopPop[i] * 18) * 1.5 : 0;
+      ctx.drawImage(cv, F.x, F.y - pop, F.w, F.h);
       // the number on the roof, and the FULL sign
       const full = s.hens[i] >= cap, label = `${shown}/${cap}`; st.labels[i] = shown;
       ctx.font = r.font(10); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -1292,11 +1345,17 @@ const EggFarmExt = {
       ctx.fillStyle = '#fff'; ctx.fillText('🐔' + label, cx, C.y0 - 39);
       if (full) {
         const wob = Math.sin(t * 5 + i) * 0.06 + (st.fullFlash > 0 ? Math.sin(st.fullFlash * 20) * 0.12 : 0);
-        ctx.save(); ctx.translate(cx, C.y0 - 11); ctx.rotate(wob);   // on the roof, never over a hen
+        ctx.save(); ctx.translate(cx, C.y0 - 11); ctx.rotate(wob);   // on the roof, never over a chicken
         ctx.fillStyle = '#fff'; U.roundRect(ctx, -22, -8, 44, 16, 5); ctx.fill();
         ctx.fillStyle = '#e4572e'; U.roundRect(ctx, -20, -6, 40, 12, 4); ctx.fill();
         ctx.fillStyle = '#fff'; ctx.font = r.font(10, 900); ctx.fillText('FULL', 0, 1);
         ctx.restore();
+      }
+      // fast asleep: Zzz floating up out of the coop
+      if (night && inside > 0) {
+        ctx.font = r.font(13, 900); ctx.fillStyle = '#e8f0ff';
+        for (let k = 0; k < 3; k++) { const q = (t * 0.5 + k / 3 + i * 0.17) % 1; ctx.font = r.font(10 + q * 6, 900); ctx.globalAlpha = Math.sin(q * Math.PI); ctx.fillText('z', cx + 30 + q * 10 + Math.sin(q * 6) * 2, C.y0 + 2 - q * 22); }
+        ctx.globalAlpha = 1;
       }
     }
     // ---- the hatcher: chrome body, glass dome with wobbling eggs, the big red button and its refill ring
@@ -1326,24 +1385,22 @@ const EggFarmExt = {
     }
     if (s.bank > 0) r.drawCashPile(K.CASH.x, K.CASH.y, Math.round(s.bank));
     for (const b of st.boxFly) if (b.to !== 'market') this.drawFlyingBox(ctx, b, S);
-    // ---- corn: bits flying in a fan from the chef's hands and lying on the floor; the chicks pecking at them
+    // ---- corn: bits flying from the chef's hand and lying on the floor until they are pecked up
     if (st.corn.length) {
-      const a = Math.min(1, st.boost / 1.5);
       ctx.fillStyle = '#ffd23f';
       for (const c of st.corn) {
-        if (c.t < 0 || c.eaten) continue;
+        if (c.t < 0 || c.t > c.gone) continue;
         const k = Math.min(1, c.t / c.dur), x = U.lerp(c.x0, c.x1, k), y = U.lerp(c.y0, c.y1, k) - Math.sin(k * Math.PI) * c.h;
-        ctx.globalAlpha = a; ctx.beginPath(); ctx.ellipse(x, y, 3, 2.3, (c.x1 * 7) % 3, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(x, y, 3, 2.3, (c.x1 * 7) % 3, 0, Math.PI * 2); ctx.fill();
       }
-      ctx.globalAlpha = 1;
     }
-    for (const q of st.peck) if (q.state !== 'out') this.drawPeckChick(r, g, q);
-    // ---- loose eggs on the floor
-    for (const e of st.strays) {
+    // ---- the eggs lying on the floor (only the ones on screen)
+    for (const e of st.floor) {
       if (e.x < vx0 || e.x > vx1 || e.y < vy0 || e.y > vy1) continue;
       ctx.fillStyle = 'rgba(0,0,0,0.16)'; ctx.beginPath(); ctx.ellipse(e.x, e.y + 4, 6, 2.5, 0, 0, Math.PI * 2); ctx.fill();
-      this.drawEgg(ctx, e.type, e.x, e.y - 4 - e.z);
-      if (Math.sin(t * 3 + e.x) > 0.6) { ctx.fillStyle = 'rgba(255,255,255,0.9)'; this.star(ctx, e.x + 8, e.y - 14, 3, 1.2); }
+      const sq = e.pop > 0 ? 0.6 + 0.4 * (1 - e.pop / 0.3) : 1;
+      this.drawEgg(ctx, e.t, e.x, e.y - 4 - e.z, sq);
+      if (Math.sin(t * 3 + e.x) > 0.75) { ctx.fillStyle = 'rgba(255,255,255,0.9)'; this.star(ctx, e.x + 8, e.y - 14, 3, 1.2); }
     }
   },
   drawFlyingBox(ctx, b, S) { const k = U.easeOut(Math.min(1, b.k)); ctx.drawImage(S.box, U.lerp(b.x0, b.x1, k) - 10, U.lerp(b.y0, b.y1, k) - 6 - Math.sin(Math.min(1, b.k) * Math.PI) * (b.h || 26), 20, 13); },
@@ -1357,19 +1414,12 @@ const EggFarmExt = {
     const bw = ctx.measureText(lab).width + 10; ctx.fillStyle = 'rgba(43,29,20,0.88)'; U.roundRect(ctx, x - bw / 2, y1 + 4, bw, 14, 7); ctx.fill();
     ctx.fillStyle = '#fff'; ctx.fillText(lab, x, y1 + 11);
   },
-  drawPeckChick(r, g, q) {
-    const ctx = r.ctx, S = this.spr(), t = q.t, pecking = q.state === 'peck', walk = !pecking;
-    const dip = pecking ? Math.max(0, Math.sin(t * 11)) : 0, w = walk ? Math.sin(t * 16) : 0;
-    ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(q.x, q.y + 3, 7, 2.6, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = '#ff9f1c'; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(q.x - 2.5, q.y - 3); ctx.lineTo(q.x - 2.5 + w * 2.5, q.y + 2); ctx.moveTo(q.x + 2.5, q.y - 3); ctx.lineTo(q.x + 2.5 - w * 2.5, q.y + 2); ctx.stroke();
-    ctx.save(); ctx.translate(q.x, q.y - 9 - Math.abs(w) * 1.5); ctx.scale(q.face, 1); ctx.rotate(dip * 0.7); ctx.drawImage(S.chick, -12, -11, 24, 21.6); ctx.restore();
-    if (pecking && Math.sin(t * 11) > 0.95) { ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(q.x + q.face * 10, q.y - 1, 1.6, 0, Math.PI * 2); ctx.fill(); }
-  },
-  // the Egg Market on Main Street: the boxes on its counter (and those flying onto it)
+  // the Egg Market by the fire station: the boxes on its counter (and those flying onto it)
   drawMarket(r, g) {
     const ctx = r.ctx, K = CFG.EGGFARM, M = K.MARKET, st = this.st, S = this.spr();
-    if (M.x1 < r.camX - 60 || M.x0 > r.camX + r.viewW + 60 || M.y1 < r.camY - 120 || M.y0 > r.camY + r.viewH + 80) return;
-    for (let k = 0; k < st.mkt; k++) { const col = k % 7, row = Math.floor(k / 7); ctx.drawImage(S.box, M.x0 + 4 + col * 17 + row * 6, M.y1 - 20 - row * 8, 18, 12); }
+    if (M.x1 < r.camX - 60 || M.x0 > r.camX + r.viewW + 60 || M.y1 < r.camY - 80 || M.y0 > r.camY + r.viewH + 80) return;
+    for (let k = 0; k < st.mkt; k++) { const col = k % 4, row = Math.floor(k / 4); ctx.drawImage(S.box, M.x0 + 4 + col * 18 + row * 4, M.y0 - 4 - row * 7, 18, 12); }
+    if (!st.mkt) for (let k = 0; k < 4; k++) this.drawEgg(ctx, k % 2, M.x0 + 13 + k * 18, M.y0 + 3, 0.5);   // a row of eggs on the counter
     for (const b of st.boxFly) if (b.to === 'market') this.drawFlyingBox(ctx, b, S);
   },
   drawHatcher(r, g) {
@@ -1447,6 +1497,10 @@ const EggFarmExt = {
     if (st.spare.where === g.area) items.push({ y: st.spare.y + 14, draw: () => this.drawTruck(r, g, st.spare, g.driving && g.vehicle === st.spare) });
     if (g.area === 'barn') {
       for (const c of st.chicks) items.push({ y: c.y, draw: () => this.drawChick(r, g, c) });
+      // the chickens out and about: only the ones on screen
+      const vx0 = r.camX - 40, vx1 = r.camX + r.viewW + 40, vy0 = r.camY - 30, vy1 = r.camY + r.viewH + 40; let n = 0;
+      for (const h of st.flock) { if (h.x < vx0 || h.x > vx1 || h.y < vy0 || h.y > vy1) continue; n++; items.push({ y: h.y, draw: () => this.drawHen(r, g, h) }); }
+      st.henDrawn = n;
       for (const tr of st.trucks) if (tr.state === 'in' || tr.state === 'dock' || tr.state === 'toot' || tr.state === 'out') items.push({ y: tr.y + 14, draw: () => this.drawTruck(r, g, tr, false) });
       items.push({ y: K.HATCHER.y1 + 1, draw: () => this.drawRooster(r, g) });
       const L = st.loader; if (L) items.push({ y: L.y, draw: () => this.drawLoader(r, g, L) });
@@ -1463,14 +1517,31 @@ const EggFarmExt = {
     const flip = c.i >= 1 && c.path[c.i] && c.path[c.i].x < c.x ? -1 : 1;
     ctx.save(); ctx.translate(c.x, c.y - 11 - hop); ctx.rotate(w * 0.15); ctx.scale(flip, 1); ctx.drawImage(S.chick, -14, -13, 28, 25); ctx.restore();
   },
-  // the Loader: a farmhand in a yellow cap, carrying egg boxes over his head
+  // a chicken from the side: little legs that step, a peck (the body tips forward), a flap of the wing, and a happy
+  // heart now and then while it pecks at the corn
+  drawHen(r, g, h) {
+    const ctx = r.ctx, S = this.spr(), t = h.t, walking = h.s !== 'idle' && !(h.s === 'corn' && h.at);
+    const w = walking ? Math.sin(t * 15 + h.ph) : 0, dip = !walking && h.peck ? Math.max(0, Math.sin(t * 9 + h.ph)) : 0;
+    const up = h.s === 'up', grow = h.grown > 0 ? 1 + Math.sin((1.2 - h.grown) * 9) * 0.12 * h.grown : 1;
+    const sc = (up ? Math.max(0.55, 1 - Math.max(0, CFG.EGGFARM.CHICK_Y + 8 - h.y) / 160) : 1) * grow;
+    ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.beginPath(); ctx.ellipse(h.x, h.y + 2, 9 * sc, 3 * sc, 0, 0, Math.PI * 2); ctx.fill();
+    // one sprite per chicken (legs baked in), placed with a single transform
+    const frame = h.flap > 0 && Math.sin(h.flap * 24) > 0 ? 3 : w > 0.35 ? 1 : w < -0.35 ? 2 : 0;
+    const m = r.dpr * r.scale, a = dip * 0.55, cs = Math.cos(a) * sc * m, sn = Math.sin(a) * sc * m, fx = h.face;   // scale(face) · rotate(peck)
+    const ox = (h.x - r.camX) * m, oy = (h.y - 5 - Math.abs(w) * 1.2 - (h.flap > 0 ? Math.sin(h.flap * 12) * 2 : 0) - r.camY) * m;
+    ctx.setTransform(cs * fx, sn, -sn * fx, cs, ox, oy);
+    ctx.drawImage(S.walk[this.state(g).type][frame], -15, -19, 34, 34);
+    ctx.setTransform(m, 0, 0, m, -r.camX * m, -r.camY * m);
+    if (dip > 0.95) { ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(h.x + h.face * 15, h.y, 1.5, 0, Math.PI * 2); ctx.fill(); }
+    if (h.s === 'corn' && h.at && Math.sin(t * 2.2 + h.ph * 3) > 0.93) { ctx.fillStyle = '#ff6b8a'; ctx.font = r.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('♥', h.x + h.face * 4, h.y - 34); }
+  },
+  // the Loader: a farmhand in a yellow cap, carrying egg boxes on his head (the game's carry pose: hands at his sides)
   drawLoader(r, g, L) {
     const ctx = r.ctx, S = this.spr(), carrying = L.carry > 0 && (L.state === 'lift' || L.state === 'toTruck');
     r.drawPerson(L.x, L.y, { shirt: '#2f9e44', pants: '#3b5998', skin: '#c68642', hat: 'cap', capColor: '#ffd23f', facing: L.facing, moving: L.moving, bob: L.bob, carry: 0 });
     if (carrying) {
-      const lift = L.state === 'lift' ? 1 - L.t / 0.3 : 1, bob = L.moving ? Math.sin(L.bob) * 1.5 : 0;
-      ctx.fillStyle = '#c68642'; for (const dx of [-11, 11]) { ctx.beginPath(); ctx.arc(L.x + dx, L.y - 34 - 24 * lift + bob, 3.6, 0, Math.PI * 2); ctx.fill(); }
-      for (let k = 0; k < L.carry; k++) ctx.drawImage(S.box, L.x - 13, L.y - 70 - 24 * (lift - 1) - k * 11 + bob, 26, 17);
+      const bob = L.moving ? Math.sin(L.bob) * 2 : 0, shown = L.state === 'lift' ? Math.max(1, Math.ceil(L.carry * (1 - L.t / 0.3))) : L.carry;
+      for (let k = 0; k < shown; k++) ctx.drawImage(S.box, L.x - 13, L.y - 68 - k * 11 + bob, 26, 17);
     }
   },
   drawRooster(r, g) {
@@ -1516,12 +1587,11 @@ const EggFarmExt = {
   },
   drawStack(r, g) {
     const ctx = r.ctx, st = this.st, K = CFG.EGGFARM, S = this.spr(), p = g.player, n = st.stack.length, base = this.stackBase(g), f = p.facing || 1;
-    // arms up and a little straw tray on the hands
+    // a little straw nest resting on top of his hat (no arms: his hands stay at his sides, like carrying pizzas)
     if (n) {
-      ctx.strokeStyle = '#f1c27d'; ctx.lineWidth = 5; ctx.lineCap = 'round';
-      ctx.beginPath(); ctx.moveTo(p.x - 12, p.y - 24); ctx.lineTo(base.x - 11 + st.stack[0].x * 0.5, base.y + 6); ctx.moveTo(p.x + 12, p.y - 24); ctx.lineTo(base.x + 11 + st.stack[0].x * 0.5, base.y + 6); ctx.stroke();
-      ctx.fillStyle = '#c9a36b'; ctx.beginPath(); ctx.ellipse(base.x + st.stack[0].x * 0.6, base.y + 8, 16, 5, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#e0b44c'; ctx.beginPath(); ctx.ellipse(base.x + st.stack[0].x * 0.6, base.y + 6, 13, 3.5, 0, 0, Math.PI * 2); ctx.fill();
+      const nx = base.x + st.stack[0].x * 0.6;
+      ctx.fillStyle = '#c9a36b'; ctx.beginPath(); ctx.ellipse(nx, base.y + 10, 14, 4.5, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#e0b44c'; ctx.beginPath(); ctx.ellipse(nx, base.y + 8, 11, 3, 0, 0, Math.PI * 2); ctx.fill();
     }
     const top = r.camY - 20, bottom = r.camY + r.viewH + 20, comp = this.stackComp(), SP = K.SP;
     let last = -1;
@@ -1590,36 +1660,15 @@ const EggFarmExt = {
     }
   },
 
-  // ======================= screen: the corn badge, peek inside a coop, the new-egg banner, fades =======================
+  // ======================= screen: peek inside a coop, the new-egg banner, fades =======================
   screen(r, g) {
     if (!this.st) return;
     const ctx = r.ctx, W = r.canvas.width / r.dpr, H = r.canvas.height / r.dpr, st = this.st;
-    if (g.area === 'barn' && st.boost > 0 && !st.peek) this.drawCornBadge(r, g, W, H);
     if (g.area === 'barn' && st.peek) this.drawPeek(r, g, W, H);
     if (g.area === 'barn' && st.banner) this.drawBanner(r, g, W, H);
     if (st.fade > 0) { ctx.fillStyle = `rgba(20,12,6,${(st.fade / 0.45).toFixed(3)})`; ctx.fillRect(0, 0, W, H); }
   },
-  // 🌽 Yummy! Eggs ×2 with a countdown, over the coops (kept below the money and buttons at the top of the screen)
-  drawCornBadge(r, g, W, H) {
-    const ctx = r.ctx, K = CFG.EGGFARM, s = this.state(g), st = this.st, t = g.time;
-    const wx = (K.COOP_X[0] + K.COOP_X[s.coops - 1]) / 2, wy = K.COOP.y0 - 62;
-    const label = '🌽 Yummy! Eggs ×2', secs = Math.ceil(st.boost); st.badge = secs;
-    ctx.font = r.font(15, 900);
-    const bw = ctx.measureText(label).width + 60, bh = 32;
-    const sx = U.clamp((wx - r.camX) * r.scale, bw / 2 + 8, W - bw / 2 - 8), sy = U.clamp((wy - r.camY) * r.scale, 106, H - 160);
-    const pop = st.boost > K.CORN_TIME - 0.4 ? 1 + (st.boost - (K.CORN_TIME - 0.4)) * 0.8 : 1 + Math.sin(t * 6) * 0.03;
-    ctx.save(); ctx.translate(sx, sy); ctx.scale(pop, pop);
-    ctx.fillStyle = 'rgba(43,29,20,0.9)'; U.roundRect(ctx, -bw / 2, -bh / 2, bw, bh, 19); ctx.fill();
-    ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 3; U.roundRect(ctx, -bw / 2, -bh / 2, bw, bh, 19); ctx.stroke();
-    ctx.fillStyle = '#ffe08a'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(label, -14, 1);
-    const cx = bw / 2 - 19, k = st.boost / K.CORN_TIME;
-    ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(cx, 0, 12, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#e4572e'; ctx.beginPath(); ctx.moveTo(cx, 0); ctx.arc(cx, 0, 12, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - k)); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.arc(cx, 0, 8.5, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.font = r.font(11, 900); ctx.fillText(String(secs), cx, 1);
-    ctx.restore();
-  },
-  // peeking into a coop: its front opened up like a doll's house, every hen in it on the perches
+  // peeking into a coop: its front opened up like a doll's house, every chicken inside on the perches (asleep at night)
   drawPeek(r, g, W, H) {
     const ctx = r.ctx, st = this.st, s = this.state(g), K = CFG.EGGFARM, S = this.spr(), t = g.time, c = st.peek.c;
     const k = Math.min(1, (6 - st.peek.t) / 0.25), pw = Math.min(W - 28, 500), ph = Math.min(H - 190, 330), px = W / 2 - pw / 2, py = Math.max(80, H / 2 - ph / 2 - 20);
@@ -1628,16 +1677,16 @@ const EggFarmExt = {
     ctx.fillStyle = K.COOP_COLORS[c]; U.roundRect(ctx, px - 12, py - 12, pw + 24, ph + 24, 18); ctx.fill();
     ctx.fillStyle = '#7a5130'; U.roundRect(ctx, px, py, pw, ph, 10); ctx.fill();
     ctx.fillStyle = 'rgba(0,0,0,0.12)'; for (let x = px + 20; x < px + pw; x += 22) ctx.fillRect(x, py, 2, ph);
-    const shown = this.shown(s, c), cap = this.cap(s), gx = px + 14, gy = py + 46, gw = pw - 28, gh = ph - 58, G = this.grid(cap, gw, gh), face = S.face[s.type], fw = Math.min(G.cell * 0.95, 64), fh = fw * 22 / 18;
+    const shown = this.shown(s, c), inside = this.inCoop(s, c), night = this.night(), cap = this.cap(s), gx = px + 14, gy = py + 46, gw = pw - 28, gh = ph - 58, G = this.grid(cap, gw, gh), face = S[night ? 'sleep' : 'face'][s.type], fw = Math.min(G.cell * 0.95, 64), fh = fw * 22 / 18;
     for (let row = 0; row < G.rows; row++) { const y = gy + G.oy + (G.rows - row) * G.cell; ctx.fillStyle = '#5b3a1a'; ctx.fillRect(gx, y - Math.max(2, G.cell * 0.1), gw, Math.max(2, G.cell * 0.1)); }
-    for (let i = 0; i < Math.min(shown, cap); i++) {
-      const row = Math.floor(i / G.cols), col = i % G.cols, cx = gx + G.ox + (col + 0.5) * G.cell, cy = gy + G.oy + (G.rows - row - 0.5) * G.cell, bob = Math.sin(t * 3 + i * 1.9) * Math.min(2, G.cell * 0.05);
+    for (let i = 0; i < Math.min(inside, cap); i++) {
+      const row = Math.floor(i / G.cols), col = i % G.cols, cx = gx + G.ox + (col + 0.5) * G.cell, cy = gy + G.oy + (G.rows - row - 0.5) * G.cell, bob = night ? 0 : Math.sin(t * 3 + i * 1.9) * Math.min(2, G.cell * 0.05);
       ctx.drawImage(face, cx - fw / 2, cy - fh * 0.62 + bob, fw, fh);
     }
-    st.peekDrawn = Math.min(shown, cap);
+    st.peekDrawn = Math.min(inside, cap);
     ctx.fillStyle = 'rgba(43,29,20,0.85)'; U.roundRect(ctx, W / 2 - 80, py - 4, 160, 34, 14); ctx.fill();
     ctx.fillStyle = '#ffe08a'; ctx.font = r.font(18); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(`🐔 ${shown} / ${cap}`, W / 2, py + 13);
-    if (Math.floor(t * 1.5) % 3 === 0 && shown) { ctx.font = r.font(14); ctx.fillStyle = '#fff'; ctx.fillText('Bok bok! 💛', px + pw - 60, py + 30); }
+    if (Math.floor(t * 1.5) % 3 === 0 && inside) { ctx.font = r.font(14); ctx.fillStyle = '#fff'; ctx.fillText(night ? 'Zzz… 💤' : 'Bok bok! 💛', px + pw - 60, py + 30); }
     ctx.restore();
   },
   drawBanner(r, g, W, H) {

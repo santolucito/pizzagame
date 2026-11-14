@@ -187,6 +187,15 @@ module.exports = async (t) => {
   t.expect(north.gapOpen && north.fenceElsewhere, 'the north fence has a gap for the track and is solid on both sides of it');
   t.expect(north.walkedTo < north.road, `walked north through the gap onto Main Street (${Math.round(north.walkedTo)})`);
   t.expect(north.first.y > north.second.y && north.second.y < north.road && north.bad.length === 0 && north.spotFree, `the trucks drive out north onto the road, hitting nothing (${JSON.stringify(north.bad)})`);
+  // the trucks' road ends at the Egg Market, which stands by the fire station on free grass (no egg trays or belt in the
+  // barn's hall any more: the chickens lay on the floor)
+  const mkt = await t.ev(() => {
+    const M = CFG.EGGFARM.MARKET, F = CFG.FIRE_STATION, R = CFG.EGGFARM.ROUTE_OUT, end = R[R.length - 1];
+    const near = Math.hypot(Math.max(0, F.x0 - M.x1, M.x0 - F.x1), Math.max(0, F.y0 - M.y1, M.y0 - F.y1));
+    const onRoad = CFG.ROADS.some((r) => M.x1 > r.x0 && M.x0 < r.x1 && M.y1 > r.y0 && M.y0 < r.y1);
+    return { near, onRoad, end, drop: M.drop, belt: 'BELT' in CFG.EGGFARM || 'TRAY' in CFG.EGGFARM };
+  });
+  t.expect(mkt.near < 160 && !mkt.onRoad && mkt.end.x === mkt.drop.x && mkt.end.y === mkt.drop.y && !mkt.belt, `the egg trucks drive to the Egg Market next to the fire station (${JSON.stringify(mkt)})`);
   await t.ev(() => { const st = EggFarmExt.st, tr = st.trucks[0]; tr.state = 'road'; tr.d = 40; tr.boxes = 6; tr.val = 6; tr.x = -840; tr.y = 166; tr.angle = -Math.PI / 2; T.tp(-760, 60, 'town'); Render.setZoom(1.3); T.step(1); window.__ut = EggFarmExt.updateTrucks; EggFarmExt.updateTrucks = () => {}; });
   await t.shot('north-doors');
   await t.ev(() => { EggFarmExt.updateTrucks = window.__ut; Render.setZoom(1); T.tp(540, 430, 'town'); });

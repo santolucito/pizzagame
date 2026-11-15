@@ -165,21 +165,24 @@ module.exports = async (t) => {
   await t.ev(() => { T.tp(40150, 4700, 'barn'); T.step(20); });
   await t.shot('chickens-laying');
 
-  // ---- picking up: just walk near the eggs and they hop onto the tower (from where they lie), in a generous reach
+  // ---- picking up: walk right over an egg and it hops onto the tower (from where it lies); eggs a little to the side stay
   const pick = await t.ev(() => {
     const s = Game.s.eggfarm, st = EggFarmExt.st, M = CFG.EGGFARM.MAGNET; const hens = s.hens.slice(); s.hens.fill(0); st.flock.length = 0; T.step(30); st.stack.length = 0; st.fly.length = 0; st.floor.length = 0; window.__eggFrom.length = 0;
-    const eggs = [[39700, 4700], [39760, 4730], [39820, 4690], [39880, 4720], [39940, 4700], [40000, 4740]];
+    const eggs = [[39700, 4700], [39760, 4712], [39820, 4690], [39880, 4714], [39940, 4700], [40000, 4688]];   // all on the walk (within the tight reach)
     for (const [x, y] of eggs) st.floor.push({ x, y, t: 0, z: 0, vz: 0, pop: 0 });
-    st.floor.push({ x: 39820, y: 4700 + M + 40, t: 0, z: 0, vz: 0, pop: 0 });   // one out of reach, below the walk
+    st.floor.push({ x: 39820, y: 4700 + M + 14, t: 0, z: 0, vz: 0, pop: 0 });   // one just beside the walk: not stepped on, so it stays
     T.tp(39572, 4700, 'barn'); T.step(1); const before = st.floor.length;
     T.steer(1, 0); T.until(() => Game.player.x > 40040, 400); T.unsteer(); T.step(40);
     const from = window.__eggFrom.map((f) => [Math.round(f.x), Math.round(f.y)]); s.hens = hens;
     return { before, left: st.floor.length, stack: st.stack.length, from, eggs, far: st.floor[0] && st.floor[0].y };
   });
-  t.expect(pick.stack === 6 && pick.left === 1, `walking past picked up the 6 eggs near the path and left the far one (${JSON.stringify(pick)})`);
+  t.expect(pick.stack === 6 && pick.left === 1, `walking over the 6 eggs picked them up and left the one just beside the path (${JSON.stringify(pick)})`);
+  t.expect(await t.ev(() => CFG.EGGFARM.MAGNET <= 26), 'the pick-up reach is tight: walk right over an egg');
   t.expect(pick.from.length === 6 && pick.from.every(([x, y]) => pick.eggs.some(([ex, ey]) => Math.abs(ex - x) < 2 && Math.abs(ey - 6 - y) < 2)), 'each egg hops up from where it lay');
   const reach = await t.ev(() => { const st = EggFarmExt.st, M = CFG.EGGFARM.MAGNET; st.floor.length = 0; st.floor.push({ x: 40100 + M - 12, y: 4720, t: 0, z: 0, vz: 0, pop: 0 }); T.tp(40100, 4720, 'barn'); T.step(3); return { left: st.floor.length, M }; });
-  t.expect(reach.left === 0 && reach.M >= 100, `the reach is generous: an egg ${reach.M - 12} px away hops on (magnet ${reach.M})`);
+  t.expect(reach.left === 0 && reach.M <= 26, `an egg right under the chef (${reach.M - 12} px) hops on (reach ${reach.M})`);
+  const miss = await t.ev(() => { const st = EggFarmExt.st, M = CFG.EGGFARM.MAGNET; st.floor.length = 0; st.floor.push({ x: 40100 + M + 20, y: 4720, t: 0, z: 0, vz: 0, pop: 0 }); T.tp(40100, 4720, 'barn'); T.step(3); const left = st.floor.length; st.floor.length = 0; return left; });
+  t.expect(miss === 1, 'an egg a step away stays on the floor until you walk right over it');
   await t.ev(() => { EggFarmExt.st.floor.length = 0; T.step(30); });
 
   // pack: the tower goes into the packer's hopper, the packer makes boxes onto the pile
@@ -424,9 +427,10 @@ module.exports = async (t) => {
   // ---- the egg tower: walking about the floor full of eggs until it is 100+ high
   const scoop = await t.ev(() => {
     const s = Game.s.eggfarm, st = EggFarmExt.st, hens = s.hens.slice(); s.hens.fill(0); st.flock.length = 0; st.stack.length = 0;
-    const fill = (y) => { st.floor.length = 0; for (let i = 0; i < 80; i++) st.floor.push({ x: 39640 + i * 12, y: y + (i % 3) * 14, t: i % 5, z: 0, vz: 0, pop: 0 }); };
-    fill(4700); T.tp(39600, 4714, 'barn'); T.steer(1, 0); const n1 = T.until(() => st.stack.length >= 80 || Game.player.x > 40620, 1200);
-    fill(4620); T.steer(-1, -0.3); const n2 = T.until(() => st.stack.length >= 120 || Game.player.x < 39620, 1200); T.unsteer(); T.step(30);
+    // a line of eggs along the walk (the reach is tight: you pick up what you walk over)
+    const fill = (y) => { st.floor.length = 0; for (let i = 0; i < 80; i++) st.floor.push({ x: 39640 + i * 12, y: y + (i % 3) * 4, t: i % 5, z: 0, vz: 0, pop: 0 }); };
+    fill(4706); T.tp(39600, 4714, 'barn'); T.steer(1, 0); const n1 = T.until(() => st.stack.length >= 80 || Game.player.x > 40620, 1200);
+    T.unsteer(); T.tp(40620, 4634, 'barn'); fill(4626); T.steer(-1, 0); const n2 = T.until(() => st.stack.length >= 120 || Game.player.x < 39620, 1200); T.unsteer(); T.step(30);
     return { n: n1 + n2, stack: st.stack.length };
   });
   t.expect(scoop.stack >= 120, `the egg tower grew to ${scoop.stack} by walking about (${scoop.n} steps)`);
@@ -726,4 +730,14 @@ module.exports = async (t) => {
   t.expectEq(origins2, 0, 'still no egg flying in from outside');
   await t.page.setViewportSize({ width: 1100, height: 720 });
   await t.ev(() => { Render.resize(); EggFarmExt.st.peek = null; T.tp(540, 430, 'town'); T.step(1); });
+
+  // ---- eggs never leave the barn: walking out of the door with a tower puts it in the packer's hopper (which may already be packing one)
+  const out = await t.ev(() => {
+    const s = Game.s.eggfarm, st = EggFarmExt.st, K = CFG.BARN;
+    st.stack.length = 0; for (let i = 0; i < 12; i++) st.stack.push({ t: 0, x: 0, land: 9 });
+    const hop0 = s.hopper;
+    T.tp(K.exit.x, K.exit.y, 'barn'); T.step(2); const label = T.label(); BarnExt.leave(Game); T.step(3);
+    return { area: Game.area, stack: st.stack.length, saved: s.stack.length, hopper: s.hopper - hop0, note: Game.floats.some((f) => /stay in the barn/.test(f.text)) };
+  });
+  t.expect(out.area === 'town' && out.stack === 0 && out.saved === 0 && out.hopper >= 10 && out.note, `eggs can't be carried out of the barn: they go into the packer (${JSON.stringify(out)})`);
 };

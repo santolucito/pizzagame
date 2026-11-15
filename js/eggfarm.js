@@ -90,7 +90,7 @@ CFG.EGGFARM = {
   GROW: 3.5,                                                        // seconds a new chick spends in its coop before it comes out grown
   WALK_MAX: 60, FLOOR_MAX: 80,                                      // chickens walking about at once; eggs lying on the floor at once
   HEN_SPEED: [34, 52], RELEASE_GAP: 0.12,                           // px/s; seconds between chickens coming down a ramp
-  STACK_MAX: 300, CHICK_MAX: 40, MAGNET: 110,                       // MAGNET: eggs this close hop onto the tower (generous for small players)
+  STACK_MAX: 300, CHICK_MAX: 40, MAGNET: 22,                        // MAGNET: walk right over an egg to pick it up
   CORN_TIME: 10, CORN_R: 360, CORN_EGGS: 3,                         // seconds the chickens gather; how far they come from; eggs laid at the corn
   LUCKY_EVERY: [40, 80], SP: 12,                                    // SP: px between eggs in the tower
   TRUCK_WAIT: 5, ROAD_SPEED: 280, LOADER_SPEED: 95,
@@ -437,6 +437,18 @@ const EggFarmExt = {
     Haptics.tap();
   },
   // eggs in the air finish where they were going (a trip to another map, Take-me-home): nothing flies across maps
+  // The eggs never leave the barn: whatever way the chef goes out (the door, the egg truck, Take-me-home), the tower he
+  // is carrying is put into the egg packer's hopper (nothing is lost) with a little note.
+  keepEggsInBarn(g) {
+    const st = this.st;
+    if (g.area === 'barn' && !g.travel) return;
+    this.settleFlights(g);
+    if (!st.stack.length) return;
+    const s = this.state(g), n = st.stack.length;
+    for (const e of st.stack) { s.hopper++; s.hopperVal += this.eggValue(s, e.t); }
+    st.stack.length = 0; s.stack = [];
+    g.floats.push({ x: g.player.x, y: g.player.y - 60, text: `🥚 ${n} eggs stay in the barn's packer`, color: '#fff3a0', t: 0, dur: 2, big: true });
+  },
   settleFlights(g) {
     const st = this.st, s = this.state(g);
     for (const f of st.fly) { if (f.out) { s.hopper++; s.hopperVal += this.eggValue(s, f.t); } else st.stack.push({ t: f.t, x: 0, land: 9 }); }
@@ -491,8 +503,7 @@ const EggFarmExt = {
     st.noScoop = Math.max(0, st.noScoop - dt);
     if (st.stackN !== st.stack.length) { st.stackN = st.stack.length; s.stack = st.stack.map((e) => e.t); }
   },
-  // the eggs on the floor near the chef hop up onto the tower, boing boing (a generous reach, so a small player only has
-  // to walk somewhere near them)
+  // the eggs on the floor right under the chef hop up onto the tower, boing boing (walk right over an egg to pick it up)
   updateCollect(g, dt) {
     const st = this.st, K = CFG.EGGFARM, p = g.player;
     st.magT = Math.max(0, st.magT - dt);
@@ -594,7 +605,7 @@ const EggFarmExt = {
     st.acc = Math.min(full ? 1 : 6, st.acc + awake * dt / this.layTime(s));
     for (let n = 0; st.acc >= 1 && st.floor.length < K.FLOOR_MAX && n < 8; n++) {
       let h = null;
-      for (let k = 0; k < 6 && !h; k++) { const q = st.flock[(Math.random() * st.flock.length) | 0]; if (q && (q.s === 'idle' || q.s === 'wander' || q.s === 'corn')) h = q; }
+      for (let k = 0; k < 6 && !h; k++) { const q = st.flock[(Math.random() * st.flock.length) | 0]; if (q && (q.s === 'idle' || q.s === 'wander' || q.s === 'corn') && !this.keepOut(q.x - q.face * 7, q.y + 3)) h = q; }   // a hen crossing a button spot waits to lay
       if (!h) break;
       st.acc -= 1; this.lay(g, h, s.type);
     }
@@ -602,7 +613,7 @@ const EggFarmExt = {
     if (corn) {
       st.cornT = Math.max(0, st.cornT - dt); st.cornEggT -= dt;
       if (st.cornEggT <= 0 && st.cornEggs > 0 && st.floor.length < K.FLOOR_MAX) {
-        st.cornEggT = 2.2; const at = st.flock.filter((h) => h.s === 'corn' && h.at);
+        st.cornEggT = 2.2; const at = st.flock.filter((h) => h.s === 'corn' && h.at && !this.keepOut(h.x - h.face * 7, h.y + 3));
         if (at.length) { st.cornEggs--; this.lay(g, at[(Math.random() * at.length) | 0], s.type); }
       }
       for (const c of st.corn) c.t += dt;
@@ -845,6 +856,7 @@ const EggFarmExt = {
     st.fade = Math.max(0, st.fade - dt);
     st.refill = Math.max(0, st.refill - dt); st.press = Math.max(0, st.press - dt); st.fullFlash = Math.max(0, st.fullFlash - dt); st.peepT = Math.max(0, st.peepT - dt);
     st.boxPopT = Math.max(0, (st.boxPopT || 0) - dt);
+    this.keepEggsInBarn(g);
     for (let i = 0; i < 6; i++) st.coopPop[i] = Math.max(0, st.coopPop[i] - dt);
     if (this.inHall(g) && !s.seen) { s.seen = true; g.floats.push({ x: p.x, y: p.y - 70, text: '🐣 The Egg Farm!', color: '#ffe08a', t: 0, dur: 2, big: true }); }
     // the automatic hatcher
@@ -902,7 +914,7 @@ const EggFarmExt = {
   home(g) {
     const st = this.st; if (!st) return;
     st.peek = null; st.packing = null; st.loading = null; st.fade = 0; st.banner = null;
-    this.settleFlights(g);
+    this.keepEggsInBarn(g);
     if (st.deliver) { const D = st.deliver, s = this.state(g), amt = Math.round(D.val); st.deliver = null; st.spare.boxes = 0; st.spare.val = 0; s.earned += amt; s.shipped += D.n; Shop.pocket(g, amt, g.player); }
     this.parkSpare();
   },

@@ -425,6 +425,16 @@ module.exports = async (t) => {
   await t.shot('board-kinds');
   await t.ev(() => { T.tp(40560, 4700, 'barn'); Render.setZoom(1.9); T.step(2); });
   await t.shot('dino-y-pizza-hens');
+  const dinoC = await t.ev(() => {
+    const E = EggFarmExt, st = E.st, c = CFG.EGGFARM.TYPES.findIndex((q) => q.key === 'dino'), O = CFG.EGGFARM.HATCHER.out;
+    for (let k = 0; k < 2; k++) { st.chicks.push({ x: O.x, y: O.y, path: E.chickPath(c), i: 0, c, t: 0, pop: 0, ph: k }); st.incoming[c]++; }
+    T.tp(CFG.EGGFARM.COOP_X[c] - 60, 4600, 'barn'); Render.setZoom(2.4); T.step(60 * 2.6);
+    return c;
+  });
+  await t.shot('dino-coop');
+  await t.ev((c) => { EggFarmExt.st.peek = { c, t: 6 }; T.step(20); }, dinoC);
+  await t.shot('dino-peek');
+  await t.ev(() => { EggFarmExt.st.peek = null; T.until(() => !EggFarmExt.st.chicks.length, 900); });
   await t.ev(() => { Render.setZoom(1); });
   for (const k of [0, 6]) {
     await t.ev((k) => {

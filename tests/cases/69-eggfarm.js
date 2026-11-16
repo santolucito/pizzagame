@@ -399,34 +399,36 @@ module.exports = async (t) => {
   t.expect(arms.strokes === 0 && arms.skinStroke === 0 && arms.highHands === 0, `no arms drawn reaching up for the tower or the boxes (${JSON.stringify(arms)})`);
   t.expect(arms.baseAbove > 0 && arms.baseAbove < 14 && Math.abs(arms.nest) <= 4, `the tower's nest rests right on the chef's hat (${JSON.stringify(arms)})`);
 
-  // ---- each coop lays its own kind of egg (coop 1 plain, 2 golden, 3 rainbow, 4 space, 5 pizza, 6 dino), each worth
-  // more; building a coop shows its new kind
+  // ---- each coop lays its own kind of egg (coop 1 plain, 2 golden, 3 rainbow, 4 space, 5 dino, 6 letter Y, 7 pizza:
+  // the best), each worth more; building a coop shows its new kind
   const kinds = await t.ev(() => {
     window.__day(); const s = Game.s.eggfarm, E = EggFarmExt, st = E.st, T2 = CFG.EGGFARM.TYPES;
-    s.coops = 6; s.lv.coop = 10; st.obs = st.obsCar = null; s.hens = [40, 40, 40, 40, 40, 40]; st.floor.length = 0; st.flock.length = 0; st.walkers.fill(0);
+    s.coops = 7; s.lv.coop = 10; st.obs = st.obsCar = null; s.hens = [34, 34, 34, 34, 34, 34, 34]; st.floor.length = 0; st.flock.length = 0; st.walkers.fill(0);
     T.tp(40260, 4620, 'barn'); T.step(60 * 8); st.floor.length = 0;
     const bad = []; let laid = 0;
     const lay = E.lay; E.lay = function (g, h, type) { laid++; if (type !== h.c) bad.push([h.c, type]); return lay.call(this, g, h, type); };
     T.step(60 * 3); E.lay = lay;
-    const onFloor = [0, 1, 2, 3, 4, 5].map((k) => st.floor.filter((e) => e.t === k).length);
+    const onFloor = [0, 1, 2, 3, 4, 5, 6].map((k) => st.floor.filter((e) => e.t === k).length);
     // a new coop: the banner shows its kind
-    s.coops = 3; s.hens = [10, 10, 0, 0, 0, 0]; st.obs = st.obsCar = null; st.banner = null; Game.s.money = 1e6;
+    s.coops = 3; s.hens = [10, 10, 0, 0, 0, 0, 0]; st.obs = st.obsCar = null; st.banner = null; Game.s.money = 1e6;
     const pad = E.pads(Game).find((q) => q.key === 'egg_newcoop'); E.onPad(Game, pad);
-    return { n: T2.length, values: T2.map((q) => E.eggValue(s, T2.indexOf(q))), bad, laid, onFloor, banner: st.banner && st.banner.type, sub: pad.sub, coops: s.coops };
+    return { n: T2.length, last: T2[T2.length - 1].key, y: T2.findIndex((q) => q.key === 'letterY'), values: T2.map((q) => E.eggValue(s, T2.indexOf(q))), bad, laid, onFloor, banner: st.banner && st.banner.type, sub: pad.sub, coops: s.coops };
   });
-  t.expectEq(kinds.n, 6, 'six kinds of egg, one for each coop');
+  t.expectEq(kinds.n, 7, 'seven kinds of egg, one for each coop');
+  t.expectEq(K.COOP_X.length, 7, 'seven coops');
+  t.expect(kinds.last === 'pizza' && kinds.y === 5, `pizza eggs are the last (the best), letter Y eggs just before (${kinds.last}, Y at ${kinds.y})`);
   t.expect(kinds.values.every((v, i) => i === 0 || v > kinds.values[i - 1]), `each coop's egg is worth more than the last (${kinds.values})`);
   t.expect(kinds.laid > 20 && kinds.bad.length === 0, `every hen lays her own coop's kind of egg (${kinds.laid} laid, wrong: ${JSON.stringify(kinds.bad.slice(0, 5))})`);
-  t.expect(kinds.onFloor.every((c) => c > 0), `all six kinds are on the floor at once (${kinds.onFloor})`);
+  t.expect(kinds.onFloor.every((c) => c > 0), `all seven kinds are on the floor at once (${kinds.onFloor})`);
   t.expect(kinds.coops === 4 && kinds.banner === 3 && /🚀/.test(kinds.sub), `building the 4th coop shows its space eggs (${JSON.stringify({ coops: kinds.coops, banner: kinds.banner, sub: kinds.sub })})`);
-  await t.ev(() => { const s = Game.s.eggfarm, st = EggFarmExt.st; s.coops = 6; s.hens = [12, 12, 12, 12, 12, 12]; st.obs = st.obsCar = null; st.banner = null; T.tp(40330, 4560, 'barn'); T.step(60 * 3); Render.setZoom(1.9); T.step(2); });
+  await t.ev(() => { const s = Game.s.eggfarm, st = EggFarmExt.st; s.coops = 7; s.hens = [12, 12, 12, 12, 12, 12, 12]; st.obs = st.obsCar = null; st.banner = null; T.tp(40350, 4530, 'barn'); T.step(60 * 3); Render.setZoom(1.15); T.step(2); });
   await t.shot('board-kinds');
-  await t.ev(() => { T.tp(40560, 4700, 'barn'); T.step(2); });
-  await t.shot('dino-hens');
+  await t.ev(() => { T.tp(40560, 4700, 'barn'); Render.setZoom(1.9); T.step(2); });
+  await t.shot('dino-y-pizza-hens');
   await t.ev(() => { Render.setZoom(1); });
-  for (const k of [0, 5]) {
+  for (const k of [0, 6]) {
     await t.ev((k) => {
-      window.__day(); const s = Game.s.eggfarm, E = EggFarmExt; s.coops = 6; E.st.obs = E.st.obsCar = null; E.st.banner = null; E.st.stack.length = 0; E.st.fly.length = 0;
+      window.__day(); const s = Game.s.eggfarm, E = EggFarmExt; s.coops = 7; E.st.obs = E.st.obsCar = null; E.st.banner = null; E.st.stack.length = 0; E.st.fly.length = 0;
       for (let i = 0; i < 16; i++) E.st.stack.push({ t: k, x: 0, land: 9 });
       s.hens = [30, 30, 30, 30, 30, 30]; T.tp(40260, 4620, 'barn'); T.step(60 * 3); T.tp(40150, 4560, 'barn'); T.step(2);
     }, k);
@@ -675,7 +677,7 @@ module.exports = async (t) => {
   await quiet();
   const mig2 = await t.ev(() => { const s = Game.s.eggfarm; return { ver: s.ver, belt: 'belt' in s.lv, trays: 'trays' in s, floor: EggFarmExt.st.floor.length, loader: s.lv.loader, lv: s.lv, coops: s.coops, hens: s.hens.join(','), bank: s.bank, boxes: s.boxes, stack: EggFarmExt.st.stack.length, cash: Game.s.cash, pads: EggFarmExt.pads(Game).map((p) => p.key).join(',') }; });
   t.expect(mig2.ver === 3 && !mig2.belt && !mig2.trays && mig2.floor >= 16, `an old save with the Egg Belt loads without it, its tray eggs on the floor (${JSON.stringify(mig2)})`);
-  t.expect(mig2.loader === 2 && mig2.coops === 4 && mig2.hens === '30,30,30,12,0,0' && mig2.lv.hatch === 3 && mig2.lv.fancy === 2 && mig2.boxes === 3 && mig2.stack === 3 && mig2.cash === v2.cash, `and keeps its flock, coops, Loader, money and upgrades (${JSON.stringify(mig2)})`);
+  t.expect(mig2.loader === 2 && mig2.coops === 4 && mig2.hens === '30,30,30,12,0,0,0' && mig2.lv.hatch === 3 && mig2.lv.fancy === 2 && mig2.boxes === 3 && mig2.stack === 3 && mig2.cash === v2.cash, `and keeps its flock, coops, Loader, money and upgrades (${JSON.stringify(mig2)})`);
   t.expect(mig2.bank === 40 + K.BELT_REFUND && !/belt/.test(mig2.pads), `the belt's price waits as egg money, and no belt pad (${mig2.bank})`);
   // an even older save (before the egg chain): it had trucks and a running farm; it keeps its trucks and gets a loader
   await t.ev(() => {

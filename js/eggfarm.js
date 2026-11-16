@@ -90,7 +90,7 @@ CFG.EGGFARM = {
   GROW: 3.5,                                                        // seconds a new chick spends in its coop before it comes out grown
   WALK_MAX: 60, FLOOR_MAX: 80,                                      // chickens walking about at once; eggs lying on the floor at once
   HEN_SPEED: [34, 52], RELEASE_GAP: 0.12,                           // px/s; seconds between chickens coming down a ramp
-  STACK_MAX: 300, CHICK_MAX: 40, MAGNET: 22,                        // MAGNET: walk right over an egg to pick it up
+  STACK_MAX: 300, CHICK_MAX: 40, MAGNET: 30,                        // MAGNET: walk over (or just next to) an egg to pick it up
   CORN_TIME: 10, CORN_R: 360, CORN_EGGS: 3,                         // seconds the chickens gather; how far they come from; eggs laid at the corn
   LUCKY_EVERY: [40, 80], SP: 12,                                    // SP: px between eggs in the tower
   TRUCK_WAIT: 5, ROAD_SPEED: 280, LOADER_SPEED: 95,

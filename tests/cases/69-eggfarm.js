@@ -177,10 +177,10 @@ module.exports = async (t) => {
     return { before, left: st.floor.length, stack: st.stack.length, from, eggs, far: st.floor[0] && st.floor[0].y };
   });
   t.expect(pick.stack === 6 && pick.left === 1, `walking over the 6 eggs picked them up and left the one just beside the path (${JSON.stringify(pick)})`);
-  t.expect(await t.ev(() => CFG.EGGFARM.MAGNET <= 26), 'the pick-up reach is tight: walk right over an egg');
+  t.expect(await t.ev(() => CFG.EGGFARM.MAGNET <= 34), 'the pick-up reach is tight: walk right over an egg');
   t.expect(pick.from.length === 6 && pick.from.every(([x, y]) => pick.eggs.some(([ex, ey]) => Math.abs(ex - x) < 2 && Math.abs(ey - 6 - y) < 2)), 'each egg hops up from where it lay');
   const reach = await t.ev(() => { const st = EggFarmExt.st, M = CFG.EGGFARM.MAGNET; st.floor.length = 0; st.floor.push({ x: 40100 + M - 12, y: 4720, t: 0, z: 0, vz: 0, pop: 0 }); T.tp(40100, 4720, 'barn'); T.step(3); return { left: st.floor.length, M }; });
-  t.expect(reach.left === 0 && reach.M <= 26, `an egg right under the chef (${reach.M - 12} px) hops on (reach ${reach.M})`);
+  t.expect(reach.left === 0 && reach.M <= 34, `an egg right under the chef (${reach.M - 12} px) hops on (reach ${reach.M})`);
   const miss = await t.ev(() => { const st = EggFarmExt.st, M = CFG.EGGFARM.MAGNET; st.floor.length = 0; st.floor.push({ x: 40100 + M + 20, y: 4720, t: 0, z: 0, vz: 0, pop: 0 }); T.tp(40100, 4720, 'barn'); T.step(3); const left = st.floor.length; st.floor.length = 0; return left; });
   t.expect(miss === 1, 'an egg a step away stays on the floor until you walk right over it');
   await t.ev(() => { EggFarmExt.st.floor.length = 0; T.step(30); });

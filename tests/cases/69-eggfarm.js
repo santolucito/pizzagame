@@ -150,15 +150,15 @@ module.exports = async (t) => {
 
   // ---- the chickens wander and lay their eggs on the floor, where they stand, with a "bok!"
   const lay = await t.ev(() => {
-    window.__day(); const s = Game.s.eggfarm, st = EggFarmExt.st, E = EggFarmExt; s.hens[0] = 12; s.hens[1] = 6; st.floor.length = 0; window.__lays.length = 0;
-    T.tp(39800, 4452, 'barn'); T.step(1); Game.floats.length = 0; const laid0 = s.laid, pos0 = st.flock.map((h) => [h.x, h.y]);
+    window.__day(); const s = Game.s.eggfarm, st = EggFarmExt.st, E = EggFarmExt; s.hens[0] = 12; s.hens[1] = 6;
+    T.tp(39800, 4452, 'barn'); T.step(1); st.floor.length = 0; window.__lays.length = 0; Game.floats.length = 0; const laid0 = s.laid, pos0 = st.flock.map((h) => [h.x, h.y]);
     let bok = false; const n = T.until(() => { bok = bok || Game.floats.some((f) => f.text === 'bok!'); return st.floor.length >= 6; }, 1500);
     const moved = st.flock.filter((h, i) => pos0[i] && Math.hypot(h.x - pos0[i][0], h.y - pos0[i][1]) > 20).length;
     const R = CFG.EGGFARM.ROAM, eggs = st.floor.map((e) => ({ x: e.x, y: e.y }));
     return { n, laid: s.laid - laid0, floor: st.floor.length, flock: st.flock.length, moved, bok, lays: window.__lays.slice(0, 8), inRoam: eggs.every((e) => e.x >= R.x0 - 10 && e.x <= R.x1 + 10 && e.y >= R.y0 - 10 && e.y <= R.y1 + 14), keep: eggs.filter((e) => U.dist(e.x, e.y, CFG.EGGFARM.PACK.x, CFG.EGGFARM.PACK.y) < 40 || U.dist(e.x, e.y, CFG.EGGFARM.CORN.spot.x, CFG.EGGFARM.CORN.spot.y) < 20).length, hint: T.hint(), target: Game.hint && Game.hint.target };
   });
   t.expect(lay.n > 0 && lay.flock >= 10 && lay.moved >= 3, `the chickens are out wandering about (${lay.flock} out, ${lay.moved} moved)`);
-  t.expect(lay.floor >= 6 && lay.laid === lay.floor && lay.lays.every((q) => Math.hypot(q.x - q.hx, q.y - q.hy) < 10), `they lay eggs on the floor right where they stand (${JSON.stringify(lay.lays.slice(0, 3))})`);
+  t.expect(lay.floor >= 6 && lay.laid === lay.floor && lay.lays.every((q) => Math.hypot(q.x - q.hx, q.y - q.hy) < 10), `they lay eggs on the floor right where they stand (n ${lay.n}, laid ${lay.laid}, floor ${lay.floor}: ${JSON.stringify(lay.lays.slice(0, 3))})`);
   t.expect(lay.bok, 'an egg pops out with a "bok!"');
   t.expect(lay.inRoam && lay.keep === 0, 'the eggs lie on the hall floor, never on a button spot');
   t.expect(lay.hint === 'Pick up the eggs! 🥚' && lay.target, `the hint says to pick up the eggs, with an arrow (${lay.hint})`);
@@ -687,7 +687,8 @@ module.exports = async (t) => {
   await quiet();
   const mig2 = await t.ev(() => { const s = Game.s.eggfarm; return { ver: s.ver, belt: 'belt' in s.lv, trays: 'trays' in s, floor: EggFarmExt.st.floor.length, loader: s.lv.loader, lv: s.lv, coops: s.coops, hens: s.hens.join(','), bank: s.bank, boxes: s.boxes, stack: EggFarmExt.st.stack.length, cash: Game.s.cash, pads: EggFarmExt.pads(Game).map((p) => p.key).join(',') }; });
   t.expect(mig2.ver === 3 && !mig2.belt && !mig2.trays && mig2.floor >= 16, `an old save with the Egg Belt loads without it, its tray eggs on the floor (${JSON.stringify(mig2)})`);
-  t.expect(mig2.loader === 2 && mig2.coops === 4 && mig2.hens === '30,30,30,12,0,0,0' && mig2.lv.hatch === 3 && mig2.lv.fancy === 2 && mig2.boxes === 3 && mig2.stack === 3 && mig2.cash === v2.cash, `and keeps its flock, coops, Loader, money and upgrades (${JSON.stringify(mig2)})`);
+  t.expect(mig2.loader === 2 && mig2.coops === 4 && mig2.hens === '30,30,30,12,0,0,0' && mig2.lv.hatch === 3 && mig2.lv.fancy === 2 && mig2.boxes >= 3 && mig2.stack === 3 && mig2.cash >= v2.cash,   // (the game runs on while it loads: the packer may box its hopper)
+    `and keeps its flock, coops, Loader, money and upgrades (${JSON.stringify(mig2)})`);
   t.expect(mig2.bank === 40 + K.BELT_REFUND && !/belt/.test(mig2.pads), `the belt's price waits as egg money, and no belt pad (${mig2.bank})`);
   // an even older save (before the egg chain): it had trucks and a running farm; it keeps its trucks and gets a loader
   await t.ev(() => {

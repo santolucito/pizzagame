@@ -167,7 +167,7 @@ const SnowPlowExt = {
     }
     return out;
   },
-  // Snowy Peak: fresh powder only on the flat snow away from the runs, the meadow, the stations and the cabin
+  // Snowy Peak: fresh powder only on the flat snow away from the runs, the meadow, the stations, the cabin and the ice rink
   peakCuts() {
     const out = [], R = (x0, y0, x1, y1) => out.push({ x0, y0, x1, y1 });
     const S = CFG.SNOW, W = S.WORLD, L = S.SLOPE, M = S.MEADOW, V = S.VALLEY;
@@ -179,6 +179,7 @@ const SnowPlowExt = {
     R(V.HUT.x0 - 14, V.HUT.y0 - 44, V.HUT.x1 + 10, V.HUT.y1 + 12);                   // the TO TOWN hut
     R(V.DECK.x0 - 8, V.DECK.y0 - 14, V.DECK.x1 + 8, W.y1);                            // the valley lift's deck
     R(W.x0, W.y1 - 40, W.x1, W.y1);                                                   // the fence along the bottom
+    if (CFG.ICERINK && CFG.ICERINK.CUT) { const K = CFG.ICERINK.CUT; R(K.x0, K.y0, K.x1, K.y1); }                // the ice rink, its stand and the Zamboni garage (js/icerink.js)
     return out;
   },
 

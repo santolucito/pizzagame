@@ -25,8 +25,9 @@
 //   only a farm with a Loader earns while you are away; without one the hens leave eggs on the floor for you).
 // - The spare egg truck in the second bay can be driven: load it at the box pile, drive out of the north doors and along
 //   Main Street to the Egg Market, and 🥚 Deliver the eggs there (the normal price, the same as the trucks).
-// - Egg types climb a ladder as the flock grows: plain → golden → rainbow → sparkly space → pizza egg, each worth more,
-//   and the hens dress up for each one. The giant board on the back wall shows the ladder and the hen count.
+// - Each coop lays its own kind of egg, each worth more than the last: coop 1 plain, 2 golden, 3 rainbow, 4 sparkly
+//   space, 5 pizza and 6 dino eggs; its hens dress up for it. Building a new coop brings a new kind. The giant board on
+//   the back wall shows each coop's egg and its hen count.
 // - Extras: a lucky egg floats across the hall on a balloon now and then (walk into it), the rooster crows at dawn,
 //   🌽 Scatter corn throws corn bits on the floor and the chickens nearby come running to gather round and peck (and
 //   lay a few eggs there), and offline catch-up with the shared Shop helpers (js/shop.js).
@@ -66,13 +67,14 @@ CFG.EGGFARM = {
   // a U-turn, back along the far lane, reversing into the barn (`rev` legs are driven backwards)
   ROUTE_OUT: [{ x: -840, y: 206 }, { x: -840, y: 74 }, { x: 1368, y: 74 }],
   ROUTE_BACK: [{ x: 1368, y: 74 }, { x: 1440, y: 74 }, { x: 1478, y: 59 }, { x: 1440, y: 44 }, { x: -790, y: 44 }, { x: -840, y: 88, rev: true }, { x: -840, y: 206, rev: true }],
-  // egg types: `at` is the hen count that unlocks it; value is $ per egg
+  // egg kinds: coop i lays kind i; value is $ per egg
   TYPES: [
-    { key: 'plain', name: 'Plain eggs', at: 0, value: 1, ico: '🥚', glow: '#fff8ee' },
-    { key: 'golden', name: 'Golden eggs', at: 30, value: 2, ico: '🌟', glow: '#ffd34d' },
-    { key: 'rainbow', name: 'Rainbow eggs', at: 100, value: 4, ico: '🌈', glow: '#ff8fd0' },
-    { key: 'space', name: 'Space eggs', at: 250, value: 7, ico: '🚀', glow: '#9a7bff' },
-    { key: 'pizza', name: 'Pizza eggs', at: 500, value: 12, ico: '🍕', glow: '#ff9a3d' },
+    { key: 'plain', name: 'Plain eggs', value: 1, ico: '🥚', glow: '#fff8ee' },
+    { key: 'golden', name: 'Golden eggs', value: 2, ico: '🌟', glow: '#ffd34d' },
+    { key: 'rainbow', name: 'Rainbow eggs', value: 4, ico: '🌈', glow: '#ff8fd0' },
+    { key: 'space', name: 'Space eggs', value: 7, ico: '🚀', glow: '#9a7bff' },
+    { key: 'pizza', name: 'Pizza eggs', value: 12, ico: '🍕', glow: '#ff9a3d' },
+    { key: 'dino', name: 'Dino eggs', value: 20, ico: '🦖', glow: '#7ee05a' },
   ],
   // pads: base price, growth, max level (Shop.cost)
   UPG: {
@@ -160,7 +162,8 @@ const EggFarmExt = {
   truckCap(s) { return 6 + 2 * s.lv.truck; },
   loaderCarry(s) { return s.lv.loader; },                           // boxes the loader carries each trip
   eggValue(s, type) { return CFG.EGGFARM.TYPES[type].value * (1 + 0.25 * s.lv.fancy); },
-  typeFor(n) { const T = CFG.EGGFARM.TYPES; let k = 0; for (let i = 0; i < T.length; i++) if (n >= T[i].at) k = i; return k; },
+  // a coop picked at random, by how many chickens it has (whose egg it is, for eggs laid while the game was closed)
+  someCoop(s) { let n = Math.random() * this.hens(s); for (let i = 0; i < s.coops; i++) { n -= s.hens[i]; if (n < 0) return i; } return 0; },
   upgCost(s, key) { const u = CFG.EGGFARM.UPG[key]; return s.lv[key] >= u.max ? null : Shop.cost(u.base, s.lv[key], u.growth); },
   coopCost(s) { return s.coops >= 6 ? null : Shop.cost(CFG.EGGFARM.NEWCOOP.base, s.coops - 1, CFG.EGGFARM.NEWCOOP.growth); },
   // night in the barn: from dusk until dawn the chickens sleep in their coops
@@ -187,11 +190,10 @@ const EggFarmExt = {
       m: { secT: 0, secEarned: 0 }, obs: null, obsCar: null, awayMsg: null, frameMs: 0, drawn: 0, henDrawn: 0,
     };
     // the eggs the chef was carrying when the game was saved, and the eggs left lying on the floor
-    for (const t of s.stack.slice(0, K.STACK_MAX)) this.st.stack.push({ t: U.clamp(t | 0, 0, 4), x: 0, land: 9 });
+    for (const t of s.stack.slice(0, K.STACK_MAX)) this.st.stack.push({ t: U.clamp(t | 0, 0, K.TYPES.length - 1), x: 0, land: 9 });
     this.loadFloor(s);
     // money that was on the road when the game was saved comes home
     if (s.transit > 0) { s.bank += Math.round(s.transit); s.transit = 0; }
-    s.type = Math.max(s.type, this.typeFor(this.hens(s)));
     this.syncTrucks(g);
     this.away(g, Shop.awaySeconds(g));
     // by day the flock is already out and about when you come in
@@ -200,7 +202,7 @@ const EggFarmExt = {
   ready(g) { if (!this.st) this.build(g); return this.st; },
   loadFloor(s) {
     const K = CFG.EGGFARM, R = K.ROAM, st = this.st; st.floor.length = 0;
-    for (const e of s.floor) { if (!Array.isArray(e) || st.floor.length >= K.FLOOR_MAX) continue; st.floor.push({ x: U.clamp(+e[0] || 0, R.x0, R.x1), y: U.clamp(+e[1] || 0, R.y0, R.y1), t: U.clamp(e[2] | 0, 0, 4), z: 0, vz: 0, pop: 0 }); }
+    for (const e of s.floor) { if (!Array.isArray(e) || st.floor.length >= K.FLOOR_MAX) continue; st.floor.push({ x: U.clamp(+e[0] || 0, R.x0, R.x1), y: U.clamp(+e[1] || 0, R.y0, R.y1), t: U.clamp(e[2] | 0, 0, K.TYPES.length - 1), z: 0, vz: 0, pop: 0 }); }
     st.floorN = -1;
   },
   // The time the game was closed (the shared rule, js/shop.js). A farm with a Loader keeps a share of the money it was
@@ -215,14 +217,13 @@ const EggFarmExt = {
     let eggs = 0;
     if (!loader && this.hens(s) > 0) {
       eggs = Math.max(0, Math.min(K.FLOOR_MAX - st.floor.length, Math.floor(this.hens(s) * sec / this.layTime(s) * SHOP.AWAY_SHARE)));
-      for (let k = 0; k < eggs; k++) { const q = this.roamSpot(); st.floor.push({ x: q.x, y: q.y, t: s.type, z: 0, vz: 0, pop: 0 }); }
+      for (let k = 0; k < eggs; k++) { const q = this.roamSpot(); st.floor.push({ x: q.x, y: q.y, t: this.someCoop(s), z: 0, vz: 0, pop: 0 }); }
       s.laid += eggs; st.floorN = -1;
     }
     let chicks = 0;
     if (s.lv.hatch > 0) {
       chicks = Math.max(0, Math.min(this.room(s), Math.floor(sec / this.autoEvery(s) * SHOP.AWAY_SHARE)));
       for (let k = 0; k < chicks; k++) { const c = this.coopWithRoom(s); if (c < 0) break; s.hens[c]++; s.hatched++; }
-      s.type = Math.max(s.type, this.typeFor(this.hens(s)));
     }
     if (amt > 0 || chicks > 0 || eggs > 0) st.awayMsg = amt > 0 ? `🥚 The Loader gathered the eggs: the trucks made ${U.money(amt)} while you were away!` : eggs > 0 ? `🥚 The hens laid ${eggs} eggs while you were away!` : `🐣 ${chicks} chicks hatched while you were away!`;
     return amt;
@@ -296,14 +297,14 @@ const EggFarmExt = {
     const L = K.UPG.loader, lc = this.upgCost(s, 'loader');
     out.push({ key: 'egg_loader', upg: 'loader', label: s.lv.loader ? 'Faster Loader' : 'Hire a Loader', ico: L.ico, pos: K.LOADER_PAD, price: lc || 0, maxed: lc === null, sub: `${s.lv.loader}/${L.max}` });
     const nc = this.coopCost(s);
-    if (nc !== null) out.push({ key: 'egg_newcoop', label: 'New Coop', ico: '🏠', pos: { x: K.COOP_X[s.coops], y: K.NEWCOOP_Y }, price: nc, sub: `${s.coops}/6` });
+    if (nc !== null) out.push({ key: 'egg_newcoop', label: 'New Coop', ico: '🏠', pos: { x: K.COOP_X[s.coops], y: K.NEWCOOP_Y }, price: nc, sub: `${K.TYPES[s.coops].ico} ${s.coops}/6` });
     return out;
   },
   onPad(g, pad) {
     const s = this.state(g), st = this.ready(g), K = CFG.EGGFARM;
     if (pad.key === 'egg_newcoop') {
       s.coops = Math.min(6, s.coops + 1); st.obs = st.obsCar = null;
-      st.coopPop[s.coops - 1] = 0.8;
+      st.coopPop[s.coops - 1] = 0.8; st.banner = { type: s.coops - 1, t: 0 };   // its own new kind of egg
       // any egg lying where the next coop's pad now is rolls aside
       for (const e of st.floor) if (this.keepOut(e.x, e.y)) { const q = this.roamSpot(e.x, e.y + 60, 30); e.x = q.x; e.y = q.y; st.floorN = -1; }
       g.floats.push({ x: K.COOP_X[s.coops - 1], y: K.COOP.y0 - 40, text: '🏠 A new coop!', color: '#ffe08a', t: 0, dur: 1.6, big: true });
@@ -373,16 +374,7 @@ const EggFarmExt = {
       Sfx.pickup(); Haptics.tap();
       if (st.peepT <= 0) { st.peepT = 0.8; g.floats.push({ x: O.x + 10, y: O.y - 46, text: 'Peep! 🐣', color: '#fff3a0', t: 0, dur: 0.9, big: true }); }
     }
-    this.checkMilestone(g);
     return true;
-  },
-  // a new egg type when the hens you can see reach its number (a chick still on its way counts once it is in)
-  checkMilestone(g) {
-    const s = this.state(g), st = this.st, k = this.typeFor(this.shownHens(s));
-    if (k <= s.type) return;
-    s.type = k;
-    st.banner = { type: k, t: 0 };
-    if (g.area === 'barn') { Sfx.unlock(); Haptics.success(); }
   },
   // 🌽 a handful of corn bits flies from the chef's hand (low, at his side: no reaching) onto the floor in front of him;
   // the chickens nearby come running, gather round the corn and peck at it for a while, then wander off again (and a
@@ -607,14 +599,14 @@ const EggFarmExt = {
       let h = null;
       for (let k = 0; k < 6 && !h; k++) { const q = st.flock[(Math.random() * st.flock.length) | 0]; if (q && (q.s === 'idle' || q.s === 'wander' || q.s === 'corn') && !this.keepOut(q.x - q.face * 7, q.y + 3)) h = q; }   // a hen crossing a button spot waits to lay
       if (!h) break;
-      st.acc -= 1; this.lay(g, h, s.type);
+      st.acc -= 1; this.lay(g, h, h.c);
     }
     // corn: the gathered chickens lay a few eggs right there; the bits get eaten up
     if (corn) {
       st.cornT = Math.max(0, st.cornT - dt); st.cornEggT -= dt;
       if (st.cornEggT <= 0 && st.cornEggs > 0 && st.floor.length < K.FLOOR_MAX) {
         st.cornEggT = 2.2; const at = st.flock.filter((h) => h.s === 'corn' && h.at && !this.keepOut(h.x - h.face * 7, h.y + 3));
-        if (at.length) { st.cornEggs--; this.lay(g, at[(Math.random() * at.length) | 0], s.type); }
+        if (at.length) { st.cornEggs--; const h = at[(Math.random() * at.length) | 0]; this.lay(g, h, h.c); }
       }
       for (const c of st.corn) c.t += dt;
       if (st.cornT <= 0) { st.corn.length = 0; st.cornAt = null; }
@@ -842,7 +834,7 @@ const EggFarmExt = {
     const amt = Math.max(50, Math.round(s.rate * 20)), ey = L.y - 70;
     s.earned += amt;
     Shop.pocket(g, amt, { x: L.x, y: ey });
-    for (let i = 0; i < 6; i++) this.catchEgg(g, L.x + U.rand(-12, 12), ey, Math.max(1, s.type), i * 0.07);
+    for (let i = 0; i < 6; i++) this.catchEgg(g, L.x + U.rand(-12, 12), ey, Math.max(1, s.coops - 1), i * 0.07);
     for (let i = 0; i < 3; i++) g.fx.push({ kind: 'sparkle', x0: L.x + U.rand(-20, 20), y0: ey + U.rand(-20, 20), x1: L.x, y1: ey, t: -i * 0.1, dur: 0.6 });
     g.floats.push({ x: L.x, y: L.y - 120, text: '🍀 Lucky egg!', color: '#9ef01a', t: 0, dur: 1.6, big: true });
     Haptics.success();
@@ -867,7 +859,7 @@ const EggFarmExt = {
       const c = st.chicks[i]; c.t += dt; c.pop = Math.max(0, c.pop - dt);
       if (c.pop > 0) continue;
       const wp = c.path[c.i];
-      if (U.moveToward(c, wp.x, wp.y, 105, dt)) { c.i++; if (c.i >= c.path.length) { st.chicks.splice(i, 1); st.incoming[c.c] = Math.max(0, st.incoming[c.c] - 1); st.grow.push({ c: c.c, t: K.GROW }); st.coopPop[c.c] = 0.35; this.checkMilestone(g); } }
+      if (U.moveToward(c, wp.x, wp.y, 105, dt)) { c.i++; if (c.i >= c.path.length) { st.chicks.splice(i, 1); st.incoming[c.c] = Math.max(0, st.incoming[c.c] - 1); st.grow.push({ c: c.c, t: K.GROW }); st.coopPop[c.c] = 0.35; } }
     }
     this.updateFlock(g, dt);
     this.updatePacker(g, dt);
@@ -988,7 +980,8 @@ const EggFarmExt = {
     else if (type === 1) { const gr = c.createLinearGradient(x - rx, y - ry, x + rx, y + ry); gr.addColorStop(0, '#fff6b8'); gr.addColorStop(0.45, '#ffcf3a'); gr.addColorStop(1, '#d98a0c'); c.fillStyle = gr; c.fillRect(x - rx - 1, y - ry - 1, rx * 2 + 2, ry * 2 + 2); c.strokeStyle = 'rgba(255,255,255,0.5)'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(x - rx, y + 2); c.quadraticCurveTo(x, y - 1, x + rx, y + 3); c.stroke(); }
     else if (type === 2) { const cols = ['#ff5a5f', '#ff9f1c', '#ffe14d', '#5ad15a', '#3fa7ff', '#a66bff']; const h = (ry * 2) / cols.length; cols.forEach((col, i) => { c.fillStyle = col; c.beginPath(); c.moveTo(x - rx - 1, y - ry + i * h); for (let k = 0; k <= 4; k++) c.lineTo(x - rx + k * rx / 2, y - ry + i * h + (k % 2 ? 1.4 : -0.6)); c.lineTo(x + rx + 1, y - ry + (i + 1) * h + 1.5); c.lineTo(x - rx - 1, y - ry + (i + 1) * h + 1.5); c.closePath(); c.fill(); }); }
     else if (type === 3) { const gr = c.createRadialGradient(x - rx * 0.3, y - ry * 0.3, 1, x, y, ry * 1.2); gr.addColorStop(0, '#8a6cf0'); gr.addColorStop(1, '#1e1450'); c.fillStyle = gr; c.fillRect(x - rx - 1, y - ry - 1, rx * 2 + 2, ry * 2 + 2); c.fillStyle = '#fff'; for (const [dx, dy, r] of [[-3, -4, 0.8], [3, -1, 0.6], [-1, 4, 0.7], [4, 5, 0.5], [-4, 2, 0.5], [1, -7, 0.5]]) { c.beginPath(); c.arc(x + dx, y + dy, r, 0, Math.PI * 2); c.fill(); } c.fillStyle = '#ffe14d'; this.star(c, x + 2, y + 1, 2.4, 1.1); c.strokeStyle = 'rgba(255,182,255,0.8)'; c.lineWidth = 1; c.beginPath(); c.ellipse(x, y + 2, rx * 1.2, 2, -0.3, 0, Math.PI * 2); c.stroke(); }
-    else { c.fillStyle = '#e2a64f'; c.fillRect(x - rx - 1, y - ry - 1, rx * 2 + 2, ry * 2 + 2); c.fillStyle = '#ffd65a'; this.eggPath(c, x, y + 0.5, rx - 2, ry - 2.2); c.fill(); c.fillStyle = '#c8382c'; for (const [dx, dy] of [[-2.5, -3], [2.5, 0], [-1.5, 4], [3, -5.5]]) { c.beginPath(); c.arc(x + dx, y + dy, 1.7, 0, Math.PI * 2); c.fill(); } c.fillStyle = '#3a9d3a'; c.beginPath(); c.ellipse(x + 1, y + 5.5, 1.6, 0.9, 0.6, 0, Math.PI * 2); c.fill(); }
+    else if (type === 4) { c.fillStyle = '#e2a64f'; c.fillRect(x - rx - 1, y - ry - 1, rx * 2 + 2, ry * 2 + 2); c.fillStyle = '#ffd65a'; this.eggPath(c, x, y + 0.5, rx - 2, ry - 2.2); c.fill(); c.fillStyle = '#c8382c'; for (const [dx, dy] of [[-2.5, -3], [2.5, 0], [-1.5, 4], [3, -5.5]]) { c.beginPath(); c.arc(x + dx, y + dy, 1.7, 0, Math.PI * 2); c.fill(); } c.fillStyle = '#3a9d3a'; c.beginPath(); c.ellipse(x + 1, y + 5.5, 1.6, 0.9, 0.6, 0, Math.PI * 2); c.fill(); }
+    else { const gr = c.createRadialGradient(x - rx * 0.4, y - ry * 0.4, 1, x, y, ry * 1.3); gr.addColorStop(0, '#d4f7a8'); gr.addColorStop(1, '#5fb83a'); c.fillStyle = gr; c.fillRect(x - rx - 1, y - ry - 1, rx * 2 + 2, ry * 2 + 2); c.fillStyle = '#2f7d32'; for (const [dx, dy, r] of [[-3, -4, 1.8], [3, -1, 1.4], [-2, 4, 1.6], [4, 5, 1.1], [1, -7.5, 1], [-5, 1, 1]]) { c.beginPath(); c.arc(x + dx, y + dy, r, 0, Math.PI * 2); c.fill(); } }
     c.restore();
     c.fillStyle = 'rgba(255,255,255,0.75)'; c.beginPath(); c.ellipse(x - rx * 0.38, y - ry * 0.42, rx * 0.26, ry * 0.3, -0.3, 0, Math.PI * 2); c.fill();
     c.strokeStyle = 'rgba(90,60,30,0.4)'; c.lineWidth = 0.8; path(); c.stroke();
@@ -996,12 +989,12 @@ const EggFarmExt = {
   star(c, x, y, R, r) { c.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r : R; c.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } c.closePath(); c.fill(); },
   // a hen's head and shoulders, dressed for each egg type (peeking out of a coop window)
   paintHen(c, type, x, y) {
-    const body = ['#fffaf0', '#ffcf3a', '#fffaf0', '#cbb8ff', '#ff9a3d'][type];
+    const body = ['#fffaf0', '#ffcf3a', '#fffaf0', '#cbb8ff', '#ff9a3d', '#9be36b'][type];
     c.fillStyle = body; c.beginPath(); c.ellipse(x, y + 7, 10, 7, 0, 0, Math.PI * 2); c.fill();
     if (type === 2) { const cols = ['#ff5a5f', '#ffe14d', '#3fa7ff']; cols.forEach((col, i) => { c.fillStyle = col; c.fillRect(x - 9, y + 5 + i * 2.6, 18, 1.6); }); }
     c.fillStyle = body; c.beginPath(); c.arc(x, y - 2, 7, 0, Math.PI * 2); c.fill();
     c.strokeStyle = 'rgba(90,60,30,0.35)'; c.lineWidth = 0.8; c.beginPath(); c.arc(x, y - 2, 7, 0, Math.PI * 2); c.stroke();
-    if (type !== 4) { c.fillStyle = '#e53935'; for (const [dx, dy, r] of [[-3, -9, 2.4], [0, -10, 2.8], [3, -9, 2.4]]) { c.beginPath(); c.arc(x + dx, y + dy, r, 0, Math.PI * 2); c.fill(); } }
+    if (type < 4) { c.fillStyle = '#e53935'; for (const [dx, dy, r] of [[-3, -9, 2.4], [0, -10, 2.8], [3, -9, 2.4]]) { c.beginPath(); c.arc(x + dx, y + dy, r, 0, Math.PI * 2); c.fill(); } }
     c.fillStyle = '#e53935'; c.beginPath(); c.ellipse(x + 2.5, y + 4, 1.5, 2.3, 0, 0, Math.PI * 2); c.fill();   // wattle
     c.fillStyle = '#ffb347'; c.beginPath(); c.moveTo(x + 5, y - 1.5); c.lineTo(x + 10, y); c.lineTo(x + 5, y + 1.8); c.closePath(); c.fill();
     c.fillStyle = '#2b1d14'; c.beginPath(); c.arc(x + 2.5, y - 3, 1.3, 0, Math.PI * 2); c.fill(); c.fillStyle = '#fff'; c.beginPath(); c.arc(x + 2.9, y - 3.4, 0.45, 0, Math.PI * 2); c.fill();
@@ -1010,13 +1003,16 @@ const EggFarmExt = {
     else if (type === 2) { c.fillStyle = '#3fa7ff'; c.beginPath(); c.moveTo(x - 6, y - 7); c.lineTo(x - 1, y - 20); c.lineTo(x + 3, y - 8); c.closePath(); c.fill(); c.fillStyle = '#ffe14d'; c.fillRect(x - 4.5, y - 12, 6, 1.8); c.fillStyle = '#ff5a5f'; c.fillRect(x - 3, y - 16, 4, 1.6); c.fillStyle = '#ff5fa2'; c.beginPath(); c.arc(x - 1, y - 20, 1.8, 0, Math.PI * 2); c.fill(); }
     else if (type === 3) { c.fillStyle = 'rgba(190,230,255,0.28)'; c.beginPath(); c.arc(x + 1, y - 3, 10.5, 0, Math.PI * 2); c.fill(); c.strokeStyle = 'rgba(220,245,255,0.95)'; c.lineWidth = 1.3; c.beginPath(); c.arc(x + 1, y - 3, 10.5, 0, Math.PI * 2); c.stroke(); c.fillStyle = 'rgba(255,255,255,0.8)'; c.beginPath(); c.ellipse(x - 4, y - 8, 2.4, 1.3, -0.6, 0, Math.PI * 2); c.fill(); c.strokeStyle = '#9aa0a8'; c.lineWidth = 1; c.beginPath(); c.moveTo(x + 1, y - 13.5); c.lineTo(x + 1, y - 18); c.stroke(); c.fillStyle = '#ffe14d'; this.star(c, x + 1, y - 19.5, 2.6, 1.2); }
     else if (type === 4) { c.fillStyle = '#ffd23f'; c.beginPath(); c.moveTo(x - 6, y - 7); c.lineTo(x - 7, y - 15); c.lineTo(x - 3.5, y - 11); c.lineTo(x, y - 16); c.lineTo(x + 3.5, y - 11); c.lineTo(x + 7, y - 15); c.lineTo(x + 6, y - 7); c.closePath(); c.fill(); c.fillStyle = '#e4572e'; c.beginPath(); c.arc(x, y - 9.5, 1.3, 0, Math.PI * 2); c.fill(); c.fillStyle = '#3fa7ff'; c.beginPath(); c.arc(x - 4, y - 9, 0.9, 0, Math.PI * 2); c.arc(x + 4, y - 9, 0.9, 0, Math.PI * 2); c.fill(); }
+    else if (type === 5) this.spikes(c, [[x - 5, y - 7], [x - 1, y - 9.5], [x + 3, y - 8.5]], 3.2, 6);
   },
+  // the dino hens' orange back spikes: little triangles standing on the head (a base point each, a half-width, a height)
+  spikes(c, pts, w, h) { c.fillStyle = '#ff8c42'; for (const [px, py] of pts) { c.beginPath(); c.moveTo(px - w, py + 1); c.lineTo(px, py - h); c.lineTo(px + w, py + 1); c.closePath(); c.fill(); } },
   // a whole chicken from the side, facing right (feet drawn live), dressed for each egg type; `up`: wing flapping
   paintWalkHen(c, type, x, y, up, leg) {
     // the little orange legs (baked in: a frame for standing and one for each stride)
     c.strokeStyle = '#ff9f1c'; c.lineWidth = 1.8; c.lineCap = 'round';
     c.beginPath(); c.moveTo(x - 2, y + 6); c.lineTo(x - 2 + leg * 2.5, y + 12); c.lineTo(x - 2 + leg * 2.5 + 2.5, y + 12.5); c.moveTo(x + 2, y + 6); c.lineTo(x + 2 - leg * 2.5, y + 12); c.lineTo(x + 2 - leg * 2.5 + 2.5, y + 12.5); c.stroke();
-    const body = ['#fffaf0', '#ffcf3a', '#fffaf0', '#cbb8ff', '#ff9a3d'][type], wing = ['#efe4d0', '#f2b134', '#ffd6ec', '#a996f0', '#e8742a'][type];
+    const body = ['#fffaf0', '#ffcf3a', '#fffaf0', '#cbb8ff', '#ff9a3d', '#9be36b'][type], wing = ['#efe4d0', '#f2b134', '#ffd6ec', '#a996f0', '#e8742a', '#5fb83a'][type];
     c.lineWidth = 0.8; c.strokeStyle = 'rgba(90,60,30,0.45)';
     // the tail: three perky feathers at the back
     c.fillStyle = wing; for (const [dx, dy, a] of [[-11, -7, -0.9], [-12, -3, -0.5], [-11, 1, -0.1]]) { c.save(); c.translate(x + dx, y + dy); c.rotate(a); c.beginPath(); c.ellipse(0, -3, 2.6, 5, 0, 0, Math.PI * 2); c.fill(); c.restore(); }
@@ -1026,7 +1022,7 @@ const EggFarmExt = {
     // the head on a little neck
     c.fillStyle = body; c.beginPath(); c.ellipse(x + 6, y - 6, 4.5, 6, 0.3, 0, Math.PI * 2); c.fill();
     c.beginPath(); c.arc(x + 8, y - 10, 5, 0, Math.PI * 2); c.fill(); c.stroke();
-    if (type !== 4) { c.fillStyle = '#e53935'; for (const [dx, dy, r] of [[5.5, -15, 2], [8, -16, 2.4], [10.5, -15, 2]]) { c.beginPath(); c.arc(x + dx, y + dy, r, 0, Math.PI * 2); c.fill(); } }
+    if (type < 4) { c.fillStyle = '#e53935'; for (const [dx, dy, r] of [[5.5, -15, 2], [8, -16, 2.4], [10.5, -15, 2]]) { c.beginPath(); c.arc(x + dx, y + dy, r, 0, Math.PI * 2); c.fill(); } }
     c.fillStyle = '#ffa726'; c.beginPath(); c.moveTo(x + 12.5, y - 11.5); c.lineTo(x + 17, y - 9.5); c.lineTo(x + 12.5, y - 8); c.closePath(); c.fill();   // beak
     c.fillStyle = '#e53935'; c.beginPath(); c.ellipse(x + 11.5, y - 6, 1.3, 2, 0, 0, Math.PI * 2); c.fill();                                            // wattle
     c.fillStyle = '#2b1d14'; c.beginPath(); c.arc(x + 9.6, y - 11, 1.15, 0, Math.PI * 2); c.fill(); c.fillStyle = '#fff'; c.beginPath(); c.arc(x + 10, y - 11.4, 0.4, 0, Math.PI * 2); c.fill();
@@ -1037,6 +1033,7 @@ const EggFarmExt = {
     if (type === 1) { c.fillStyle = '#ff5fa2'; c.beginPath(); c.moveTo(x + 5, y - 13); c.lineTo(x + 1, y - 16); c.lineTo(x + 1, y - 10); c.closePath(); c.fill(); c.beginPath(); c.moveTo(x + 5, y - 13); c.lineTo(x + 8, y - 17.5); c.lineTo(x + 8.5, y - 12); c.closePath(); c.fill(); }
     else if (type === 3) { c.fillStyle = 'rgba(190,230,255,0.3)'; c.beginPath(); c.arc(x + 9, y - 11, 8, 0, Math.PI * 2); c.fill(); c.strokeStyle = 'rgba(220,245,255,0.95)'; c.lineWidth = 1.1; c.beginPath(); c.arc(x + 9, y - 11, 8, 0, Math.PI * 2); c.stroke(); c.fillStyle = '#ffe14d'; this.star(c, x + 9, y - 21, 2.2, 1); }
     else if (type === 4) { c.fillStyle = '#ffd23f'; c.beginPath(); c.moveTo(x + 4, y - 13); c.lineTo(x + 3.5, y - 19); c.lineTo(x + 6, y - 16); c.lineTo(x + 8, y - 20); c.lineTo(x + 10, y - 16); c.lineTo(x + 12.5, y - 19); c.lineTo(x + 12, y - 13); c.closePath(); c.fill(); c.fillStyle = '#e4572e'; c.beginPath(); c.arc(x + 8, y - 15.5, 1, 0, Math.PI * 2); c.fill(); }
+    else if (type === 5) { this.spikes(c, [[x + 4.5, y - 14], [x + 8, y - 15], [x + 11.5, y - 14]], 2.2, 5); this.spikes(c, [[x - 5, y - 6.5], [x - 9, y - 4], [x - 12, y - 0.5]], 2, 4); }
   },
   paintChick(c, x, y) {
     c.fillStyle = '#ffd93b'; c.beginPath(); c.arc(x, y, 6.5, 0, Math.PI * 2); c.fill();
@@ -1069,8 +1066,8 @@ const EggFarmExt = {
   drawEgg(ctx, type, x, y, s = 1) { const E = this.EW * s, H = this.EH * s; ctx.drawImage(this.spr().egg[type], x - E / 2, y - H / 2, E, H); },
   // a hen's little face, front on, dressed for each egg type: one of these per hen in the coops (and the peek view)
   paintFace(c, type, x, y, asleep) {
-    const body = ['#fffaf0', '#ffcf3a', '#fffaf0', '#cbb8ff', '#ff9a3d'][type];
-    if (type !== 4) { c.fillStyle = '#e53935'; for (const [dx, dy, r] of [[-3, -6.5, 2.3], [0, -7.5, 2.6], [3, -6.5, 2.3]]) { c.beginPath(); c.arc(x + dx, y + dy, r, 0, Math.PI * 2); c.fill(); } }
+    const body = ['#fffaf0', '#ffcf3a', '#fffaf0', '#cbb8ff', '#ff9a3d', '#9be36b'][type];
+    if (type < 4) { c.fillStyle = '#e53935'; for (const [dx, dy, r] of [[-3, -6.5, 2.3], [0, -7.5, 2.6], [3, -6.5, 2.3]]) { c.beginPath(); c.arc(x + dx, y + dy, r, 0, Math.PI * 2); c.fill(); } }
     c.fillStyle = body; c.beginPath(); c.arc(x, y, 6.2, 0, Math.PI * 2); c.fill();
     if (type === 2) { c.fillStyle = '#ff5a5f'; c.fillRect(x - 5.5, y + 2.6, 11, 1.3); c.fillStyle = '#3fa7ff'; c.fillRect(x - 4.5, y + 4.2, 9, 1.2); }
     c.strokeStyle = 'rgba(90,60,30,0.45)'; c.lineWidth = 0.7; c.beginPath(); c.arc(x, y, 6.2, 0, Math.PI * 2); c.stroke();
@@ -1086,6 +1083,7 @@ const EggFarmExt = {
     else if (type === 2) { c.fillStyle = '#3fa7ff'; c.beginPath(); c.moveTo(x - 3.5, y - 5); c.lineTo(x + 1, y - 13); c.lineTo(x + 3.5, y - 5); c.closePath(); c.fill(); c.fillStyle = '#ffe14d'; c.beginPath(); c.arc(x + 1, y - 13, 1.4, 0, Math.PI * 2); c.fill(); }
     else if (type === 3) { c.strokeStyle = 'rgba(220,245,255,0.95)'; c.lineWidth = 1; c.beginPath(); c.arc(x, y - 0.5, 8, 0, Math.PI * 2); c.stroke(); c.fillStyle = 'rgba(190,230,255,0.22)'; c.beginPath(); c.arc(x, y - 0.5, 8, 0, Math.PI * 2); c.fill(); c.fillStyle = '#ffe14d'; this.star(c, x, y - 10.5, 2, 0.9); }
     else if (type === 4) { c.fillStyle = '#ffd23f'; c.beginPath(); c.moveTo(x - 5, y - 4.5); c.lineTo(x - 5.5, y - 10.5); c.lineTo(x - 2.5, y - 7.5); c.lineTo(x, y - 11.5); c.lineTo(x + 2.5, y - 7.5); c.lineTo(x + 5.5, y - 10.5); c.lineTo(x + 5, y - 4.5); c.closePath(); c.fill(); c.fillStyle = '#e4572e'; c.beginPath(); c.arc(x, y - 7, 1, 0, Math.PI * 2); c.fill(); }
+    else if (type === 5) this.spikes(c, [[x - 3.5, y - 5], [x, y - 6], [x + 3.5, y - 5]], 2, 5);
   },
   // how a coop's hens sit in its wire front: as many columns and rows as its size needs, the bottom row filling first
   grid(cap, w, h) {
@@ -1346,7 +1344,7 @@ const EggFarmExt = {
       ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(rx - 6, C.y1, 14, K.CHICK_Y - 2 - C.y1);
       ctx.fillStyle = '#c9a36b'; ctx.fillRect(rx - 7, C.y1 - 2, 14, K.CHICK_Y - C.y1);
       ctx.fillStyle = '#8d5a2b'; for (let y = C.y1 + 3; y < K.CHICK_Y - 2; y += 7) ctx.fillRect(rx - 7, y, 14, 2);
-      const inside = this.inCoop(s, i), shown = this.shown(s, i), F = this.coopFront(i), cv = this.coopFace(i, inside, s.type, cap, night);
+      const inside = this.inCoop(s, i), shown = this.shown(s, i), F = this.coopFront(i), cv = this.coopFace(i, inside, i, cap, night);
       const pop = st.coopPop[i] > 0 ? Math.sin(st.coopPop[i] * 18) * 1.5 : 0;
       ctx.drawImage(cv, F.x, F.y - pop, F.w, F.h);
       // the number on the roof, and the FULL sign
@@ -1377,12 +1375,12 @@ const EggFarmExt = {
     const P = K.PACKER, Hp = P.hopper;
     if (vis(P.x0 - 60, K.BAYS[0].y - 60, K.HALL.x1, P.y1 + 30)) {
       const hn = Math.min(14, Math.ceil(s.hopper / 6));
-      for (let k = 0; k < hn; k++) this.drawEgg(ctx, s.type, Hp.x - 15 + (k % 5) * 7 + (Math.floor(k / 5) % 2) * 3, Hp.y - 8 - Math.floor(k / 5) * 5, 0.66);
+      for (let k = 0; k < hn; k++) this.drawEgg(ctx, k % s.coops, Hp.x - 15 + (k % 5) * 7 + (Math.floor(k / 5) % 2) * 3, Hp.y - 8 - Math.floor(k / 5) * 5, 0.66);
       if (s.hopper > 0) { const lab = '🥚' + s.hopper; ctx.font = r.font(10); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const bw = ctx.measureText(lab).width + 12; ctx.fillStyle = 'rgba(43,29,20,0.85)'; U.roundRect(ctx, Hp.x - 34 - bw, Hp.y - 18, bw, 16, 8); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillText(lab, Hp.x - 34 - bw / 2, Hp.y - 10); }
       const ax = P.x0 + 88, ay = P.y0 + 32, sw = Math.sin(st.packAnim * Math.PI) * 0.8;
       ctx.save(); ctx.beginPath(); ctx.rect(P.x0 + 56, P.y0 + 26, 64, 42); ctx.clip();
       ctx.strokeStyle = '#e4572e'; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(ax, ay - 6); ctx.lineTo(ax + Math.sin(sw) * 18, ay + 12); ctx.stroke();
-      if (s.hopper > 0) this.drawEgg(ctx, s.type, ax + Math.sin(sw) * 18, ay + 20, 0.66);
+      if (s.hopper > 0) this.drawEgg(ctx, (st.packAnim | 0) % s.coops, ax + Math.sin(sw) * 18, ay + 20, 0.66);
       ctx.drawImage(S.box, P.x0 + 74, P.y0 + 52, 28, 18);
       ctx.restore();
       ctx.fillStyle = '#ffd23f'; for (const [gx, gy, gr] of [[P.x0 + 30, P.y0 + 52, 7], [P.x0 + 44, P.y0 + 62, 5]]) { ctx.save(); ctx.translate(gx, gy); ctx.rotate(st.packAnim * 0.6 * (gr === 7 ? 1 : -1.4)); for (let k = 0; k < 6; k++) { ctx.rotate(Math.PI / 3); ctx.fillRect(-1.5, -gr - 2.5, 3, 4); } ctx.beginPath(); ctx.arc(0, 0, gr, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#2f6fb5'; ctx.beginPath(); ctx.arc(0, 0, 2, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#ffd23f'; ctx.restore(); }
@@ -1448,7 +1446,7 @@ const EggFarmExt = {
     ctx.fillStyle = 'rgba(255,214,120,0.35)'; ctx.beginPath(); ctx.arc(cx, dy, 50, Math.PI, 0); ctx.closePath(); ctx.fill();
     for (let k = 0; k < 7; k++) {
       const ex = cx - 36 + k * 12, ey = dy - 8 - (k % 2) * 7, wob = Math.sin(t * (6 + k) + k * 2) * (st.press > 0 ? 0.4 : 0.15);
-      ctx.save(); ctx.translate(ex, ey); ctx.rotate(wob); ctx.drawImage(S.egg[k % 3 === 0 ? s.type : 0], -7, -9, 14, 17); ctx.restore();
+      ctx.save(); ctx.translate(ex, ey); ctx.rotate(wob); ctx.drawImage(S.egg[k % s.coops], -7, -9, 14, 17); ctx.restore();
     }
     ctx.fillStyle = 'rgba(200,235,255,0.35)'; ctx.beginPath(); ctx.arc(cx, dy, 50, Math.PI, 0); ctx.closePath(); ctx.fill();
     ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(cx, dy, 50, Math.PI * 1.15, Math.PI * 1.45); ctx.stroke();
@@ -1468,9 +1466,9 @@ const EggFarmExt = {
     else if (Math.sin(t * 5) > 0) { ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.ellipse(bx, by - 2, 24, 15, 0, 0, Math.PI * 2); ctx.stroke(); }
     ctx.font = r.font(16); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🐣', x0 + 36, y1 - 24);
   },
-  // the giant board on the back wall: each egg type with its hen and the hen count that unlocks it
-  // the giant board on the back wall: each egg type with its hen and the hen count that unlocks it, and the hen count
-  // now (the same number as all the coops' roof numbers added up)
+  // the giant board on the back wall: one panel per coop, in the coop's colour, with its hen, the egg it lays and its
+  // chickens (a coop not built yet shows a ? and a little house), and the whole flock's count at the bottom (the same
+  // number as all the coops' roof numbers added up)
   drawBoard(r, g) {
     const ctx = r.ctx, K = CFG.EGGFARM, Bd = K.BOARD, s = this.state(g), S = this.spr(), t = g.time, T = K.TYPES, n = this.shownHens(s);
     ctx.fillStyle = 'rgba(0,0,0,0.25)'; U.roundRect(ctx, Bd.x0 + 5, Bd.y0 + 6, Bd.x1 - Bd.x0, Bd.y1 - Bd.y0, 12); ctx.fill();
@@ -1478,28 +1476,24 @@ const EggFarmExt = {
     ctx.fillStyle = '#2f6b45'; U.roundRect(ctx, Bd.x0 + 8, Bd.y0 + 8, Bd.x1 - Bd.x0 - 16, Bd.y1 - Bd.y0 - 16, 8); ctx.fill();
     const pw = (Bd.x1 - Bd.x0 - 24) / T.length;
     for (let i = 0; i < T.length; i++) {
-      const px = Bd.x0 + 12 + i * pw + pw / 2, py = Bd.y0 + 50, open = s.type >= i, cur = s.type === i;
-      if (cur) { ctx.fillStyle = `rgba(255,236,150,${0.25 + 0.15 * Math.sin(t * 4)})`; U.roundRect(ctx, px - pw / 2 + 4, Bd.y0 + 12, pw - 8, Bd.y1 - Bd.y0 - 44, 10); ctx.fill(); }
-      ctx.fillStyle = open ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.arc(px - 10, py, 24, 0, Math.PI * 2); ctx.fill();
+      const px = Bd.x0 + 12 + i * pw + pw / 2, py = Bd.y0 + 50, open = i < s.coops;
+      ctx.fillStyle = open ? K.COOP_COLORS[i] : 'rgba(0,0,0,0.25)'; U.roundRect(ctx, px - pw / 2 + 3, Bd.y0 + 12, pw - 6, 7, 3); ctx.fill();   // the coop's colour
+      ctx.fillStyle = open ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.arc(px - 8, py, 22, 0, Math.PI * 2); ctx.fill();
       if (open) {
-        ctx.drawImage(S.hen[i], px - 28, py - 28, 36, 44);
-        const bob = cur ? Math.sin(t * 3) * 2 : 0; this.drawEgg(ctx, i, px + 20, py + 8 + bob, 1.2);
-        ctx.fillStyle = '#ffd23f'; this.star(ctx, px + 24, py - 20, 6, 2.6);
+        ctx.drawImage(S.hen[i], px - 25, py - 26, 34, 41);
+        this.drawEgg(ctx, i, px + 19, py + 10 + Math.sin(t * 3 + i) * 2, 1.1);
       } else {
-        ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = r.font(24, 900); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('?', px - 10, py + 2);
-        ctx.globalAlpha = 0.35; this.drawEgg(ctx, i, px + 20, py + 8, 1.2); ctx.globalAlpha = 1;
+        ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = r.font(22, 900); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('?', px - 8, py + 2);
+        ctx.globalAlpha = 0.35; this.drawEgg(ctx, i, px + 19, py + 10, 1.1); ctx.globalAlpha = 1;
       }
       ctx.fillStyle = open ? '#ffd23f' : 'rgba(255,255,255,0.85)'; U.roundRect(ctx, px - 27, Bd.y1 - 44, 54, 18, 9); ctx.fill();
-      ctx.fillStyle = '#2b1d14'; ctx.font = r.font(10); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(open ? T[i].ico + ' ✓' : '🐔 ' + T[i].at, px, Bd.y1 - 35);
+      ctx.fillStyle = '#2b1d14'; ctx.font = r.font(10); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(open ? T[i].ico + ' ' + this.shown(s, i) : '🏠', px, Bd.y1 - 35);
     }
-    // the progress bar to the next egg type, with a chick walking along it, and the hen count
-    const next = T[s.type + 1], x0 = Bd.x0 + 20, x1 = Bd.x1 - 78, by = Bd.y1 - 15;
-    const k = next ? U.clamp((n - T[s.type].at) / (next.at - T[s.type].at), 0, 1) : 1;
-    ctx.fillStyle = 'rgba(0,0,0,0.35)'; U.roundRect(ctx, x0, by - 5, x1 - x0, 10, 5); ctx.fill();
-    ctx.fillStyle = '#9ef01a'; U.roundRect(ctx, x0, by - 5, Math.max(10, (x1 - x0) * k), 10, 5); ctx.fill();
-    ctx.drawImage(S.chick, x0 + (x1 - x0) * k - 10, by - 15 + Math.abs(Math.sin(t * 6)) * -2, 20, 18);
-    ctx.fillStyle = 'rgba(0,0,0,0.35)'; U.roundRect(ctx, x1 + 8, by - 9, 56, 18, 9); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.font = r.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🐔 ' + n, x1 + 36, by);
+    // the whole flock, with a chick hopping beside the number
+    const cx = (Bd.x0 + Bd.x1) / 2, by = Bd.y1 - 15;
+    ctx.fillStyle = 'rgba(0,0,0,0.35)'; U.roundRect(ctx, cx - 34, by - 9, 68, 18, 9); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = r.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🐔 ' + n, cx, by);
+    ctx.drawImage(S.chick, cx + 40, by - 12 - Math.abs(Math.sin(t * 6)) * 3, 20, 18);
     this.st.boardN = n;
   },
 
@@ -1542,7 +1536,7 @@ const EggFarmExt = {
     const m = r.dpr * r.scale, a = dip * 0.55, cs = Math.cos(a) * sc * m, sn = Math.sin(a) * sc * m, fx = h.face;   // scale(face) · rotate(peck)
     const ox = (h.x - r.camX) * m, oy = (h.y - 5 - Math.abs(w) * 1.2 - (h.flap > 0 ? Math.sin(h.flap * 12) * 2 : 0) - r.camY) * m;
     ctx.setTransform(cs * fx, sn, -sn * fx, cs, ox, oy);
-    ctx.drawImage(S.walk[this.state(g).type][frame], -15, -19, 34, 34);
+    ctx.drawImage(S.walk[h.c][frame], -15, -19, 34, 34);
     ctx.setTransform(m, 0, 0, m, -r.camX * m, -r.camY * m);
     if (dip > 0.95) { ctx.fillStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(h.x + h.face * 15, h.y, 1.5, 0, Math.PI * 2); ctx.fill(); }
     if (h.s === 'corn' && h.at && Math.sin(t * 2.2 + h.ph * 3) > 0.93) { ctx.fillStyle = '#ff6b8a'; ctx.font = r.font(11); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('♥', h.x + h.face * 4, h.y - 34); }
@@ -1689,7 +1683,7 @@ const EggFarmExt = {
     ctx.fillStyle = K.COOP_COLORS[c]; U.roundRect(ctx, px - 12, py - 12, pw + 24, ph + 24, 18); ctx.fill();
     ctx.fillStyle = '#7a5130'; U.roundRect(ctx, px, py, pw, ph, 10); ctx.fill();
     ctx.fillStyle = 'rgba(0,0,0,0.12)'; for (let x = px + 20; x < px + pw; x += 22) ctx.fillRect(x, py, 2, ph);
-    const shown = this.shown(s, c), inside = this.inCoop(s, c), night = this.night(), cap = this.cap(s), gx = px + 14, gy = py + 46, gw = pw - 28, gh = ph - 58, G = this.grid(cap, gw, gh), face = S[night ? 'sleep' : 'face'][s.type], fw = Math.min(G.cell * 0.95, 64), fh = fw * 22 / 18;
+    const shown = this.shown(s, c), inside = this.inCoop(s, c), night = this.night(), cap = this.cap(s), gx = px + 14, gy = py + 46, gw = pw - 28, gh = ph - 58, G = this.grid(cap, gw, gh), face = S[night ? 'sleep' : 'face'][c], fw = Math.min(G.cell * 0.95, 64), fh = fw * 22 / 18;
     for (let row = 0; row < G.rows; row++) { const y = gy + G.oy + (G.rows - row) * G.cell; ctx.fillStyle = '#5b3a1a'; ctx.fillRect(gx, y - Math.max(2, G.cell * 0.1), gw, Math.max(2, G.cell * 0.1)); }
     for (let i = 0; i < Math.min(inside, cap); i++) {
       const row = Math.floor(i / G.cols), col = i % G.cols, cx = gx + G.ox + (col + 0.5) * G.cell, cy = gy + G.oy + (G.rows - row - 0.5) * G.cell, bob = night ? 0 : Math.sin(t * 3 + i * 1.9) * Math.min(2, G.cell * 0.05);

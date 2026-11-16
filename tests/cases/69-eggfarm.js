@@ -13,7 +13,7 @@
 // - 📦 Pack the eggs into the packer, the boxes, 📦 Load the truck, the Loader; the truck drives out of the north doors,
 //   along Main Street to the Egg Market next to the fire station (the stall and the route clear of the roads' edges, the
 //   sidewalks, the fire station's door and its truck's routes), unloads, comes back and pays;
-// - the spare truck driven to the market; the lucky egg; egg types; the tall wobbly tower; no long arms (the carry pose
+// - the spare truck driven to the market; the lucky egg; each coop's own kind of egg; the tall wobbly tower; no long arms (the carry pose
 //   draws no reaching arm); a big flock (300 chickens, 80 eggs) stays cheap; offline catch-up (only with the Loader);
 //   saves (an old save with the Egg Belt, trays and a loader loads cleanly); rescues, a stuck check, Take-me-home.
 module.exports = async (t) => {
@@ -399,30 +399,40 @@ module.exports = async (t) => {
   t.expect(arms.strokes === 0 && arms.skinStroke === 0 && arms.highHands === 0, `no arms drawn reaching up for the tower or the boxes (${JSON.stringify(arms)})`);
   t.expect(arms.baseAbove > 0 && arms.baseAbove < 14 && Math.abs(arms.nest) <= 4, `the tower's nest rests right on the chef's hat (${JSON.stringify(arms)})`);
 
-  // ---- the egg types climb with the flock: golden at 30, rainbow 100, space 250, pizza 500 (once the chick is in)
-  const types = [];
-  for (let k = 1; k <= 4; k++) {
-    const m = await t.ev((k) => {
-      const s = Game.s.eggfarm, E = EggFarmExt, T2 = CFG.EGGFARM.TYPES;
-      s.coops = 6; s.lv.coop = 10; E.st.obs = E.st.obsCar = null; s.type = k - 1; E.st.autoT = -1e9;
-      const per = Math.floor((T2[k].at - 1) / 6), extra = T2[k].at - 1 - per * 6; s.hens = [0, 1, 2, 3, 4, 5].map((i) => per + (i < extra ? 1 : 0));
-      const before = s.type; E.st.refill = 0; E.st.banner = null; const B = CFG.EGGFARM.HATCHER.btn; T.tp(B.x, B.y, 'barn'); T.act();
-      const early = s.type; T.until(() => !E.st.chicks.length, 900);
-      return { before, early, after: s.type, hens: E.shownHens(s), banner: E.st.banner && E.st.banner.type, value: E.eggValue(s, s.type) };
-    }, k);
-    types.push(m);
-    t.expect(m.before === k - 1 && m.early === k - 1 && m.after === k && m.banner === k, `egg type ${k} unlocks at ${m.hens} hens, when the chick gets into its coop (${JSON.stringify(m)})`);
-  }
-  t.expect(types.every((m, i) => i === 0 || m.value > types[i - 1].value), 'each egg type is worth more');
-  for (let k = 0; k <= 4; k++) {
+  // ---- each coop lays its own kind of egg (coop 1 plain, 2 golden, 3 rainbow, 4 space, 5 pizza, 6 dino), each worth
+  // more; building a coop shows its new kind
+  const kinds = await t.ev(() => {
+    window.__day(); const s = Game.s.eggfarm, E = EggFarmExt, st = E.st, T2 = CFG.EGGFARM.TYPES;
+    s.coops = 6; s.lv.coop = 10; st.obs = st.obsCar = null; s.hens = [40, 40, 40, 40, 40, 40]; st.floor.length = 0; st.flock.length = 0; st.walkers.fill(0);
+    T.tp(40260, 4620, 'barn'); T.step(60 * 8); st.floor.length = 0;
+    const bad = []; let laid = 0;
+    const lay = E.lay; E.lay = function (g, h, type) { laid++; if (type !== h.c) bad.push([h.c, type]); return lay.call(this, g, h, type); };
+    T.step(60 * 3); E.lay = lay;
+    const onFloor = [0, 1, 2, 3, 4, 5].map((k) => st.floor.filter((e) => e.t === k).length);
+    // a new coop: the banner shows its kind
+    s.coops = 3; s.hens = [10, 10, 0, 0, 0, 0]; st.obs = st.obsCar = null; st.banner = null; Game.s.money = 1e6;
+    const pad = E.pads(Game).find((q) => q.key === 'egg_newcoop'); E.onPad(Game, pad);
+    return { n: T2.length, values: T2.map((q) => E.eggValue(s, T2.indexOf(q))), bad, laid, onFloor, banner: st.banner && st.banner.type, sub: pad.sub, coops: s.coops };
+  });
+  t.expectEq(kinds.n, 6, 'six kinds of egg, one for each coop');
+  t.expect(kinds.values.every((v, i) => i === 0 || v > kinds.values[i - 1]), `each coop's egg is worth more than the last (${kinds.values})`);
+  t.expect(kinds.laid > 20 && kinds.bad.length === 0, `every hen lays her own coop's kind of egg (${kinds.laid} laid, wrong: ${JSON.stringify(kinds.bad.slice(0, 5))})`);
+  t.expect(kinds.onFloor.every((c) => c > 0), `all six kinds are on the floor at once (${kinds.onFloor})`);
+  t.expect(kinds.coops === 4 && kinds.banner === 3 && /🚀/.test(kinds.sub), `building the 4th coop shows its space eggs (${JSON.stringify({ coops: kinds.coops, banner: kinds.banner, sub: kinds.sub })})`);
+  await t.ev(() => { const s = Game.s.eggfarm, st = EggFarmExt.st; s.coops = 6; s.hens = [12, 12, 12, 12, 12, 12]; st.obs = st.obsCar = null; st.banner = null; T.tp(40330, 4560, 'barn'); T.step(60 * 3); Render.setZoom(1.9); T.step(2); });
+  await t.shot('board-kinds');
+  await t.ev(() => { T.tp(40560, 4700, 'barn'); T.step(2); });
+  await t.shot('dino-hens');
+  await t.ev(() => { Render.setZoom(1); });
+  for (const k of [0, 5]) {
     await t.ev((k) => {
-      window.__day(); const s = Game.s.eggfarm, E = EggFarmExt; s.type = k; E.st.banner = null; E.st.stack.length = 0; E.st.fly.length = 0;
+      window.__day(); const s = Game.s.eggfarm, E = EggFarmExt; s.coops = 6; E.st.obs = E.st.obsCar = null; E.st.banner = null; E.st.stack.length = 0; E.st.fly.length = 0;
       for (let i = 0; i < 16; i++) E.st.stack.push({ t: k, x: 0, land: 9 });
       s.hens = [30, 30, 30, 30, 30, 30]; T.tp(40260, 4620, 'barn'); T.step(60 * 3); T.tp(40150, 4560, 'barn'); T.step(2);
     }, k);
     await t.shot('type-' + k);
   }
-  await t.ev(() => { const s = Game.s.eggfarm, E = EggFarmExt; s.type = 0; E.st.stack.length = 0; s.hens = [20, 20, 0, 0, 0, 0]; s.coops = 2; s.lv.coop = 0; s.lv.loader = 0; E.st.loader = null; E.st.autoT = 0; E.st.obs = E.st.obsCar = null; E.st.floor.length = 0; T.step(2); });
+  await t.ev(() => { const s = Game.s.eggfarm, E = EggFarmExt; E.st.stack.length = 0; s.hens = [20, 20, 0, 0, 0, 0]; s.coops = 2; s.lv.coop = 0; s.lv.loader = 0; E.st.loader = null; E.st.autoT = 0; E.st.obs = E.st.obsCar = null; E.st.floor.length = 0; T.step(2); });
 
   // ---- the egg tower: walking about the floor full of eggs until it is 100+ high
   const scoop = await t.ev(() => {
@@ -617,7 +627,7 @@ module.exports = async (t) => {
 
   // ---- a busy farm: six coops, chickens everywhere, eggs on the floor, the loader and the trucks coming and going
   await t.ev(() => {
-    window.__day(); const s = Game.s.eggfarm, E = EggFarmExt; s.coops = 6; s.lv.coop = 4; s.lv.feed = 6; s.lv.truck = 3; s.lv.box = 4; s.lv.hatch = 6; s.lv.loader = 2; s.hens = [60, 60, 52, 40, 31, 18]; s.type = 2; E.st.obs = E.st.obsCar = null; E.syncTrucks(Game);
+    window.__day(); const s = Game.s.eggfarm, E = EggFarmExt; s.coops = 6; s.lv.coop = 4; s.lv.feed = 6; s.lv.truck = 3; s.lv.box = 4; s.lv.hatch = 6; s.lv.loader = 2; s.hens = [60, 60, 52, 40, 31, 18]; E.st.obs = E.st.obsCar = null; E.syncTrucks(Game);
     T.tp(39800, 4452, 'barn'); T.step(60 * 8); s.boxes = 8; s.boxVal = 80;
     for (let i = 0; i < 40; i++) E.st.stack.push({ t: 2, x: 0, land: 9 });
     T.tp(40400, 4660, 'barn'); T.step(30);

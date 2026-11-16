@@ -740,4 +740,12 @@ module.exports = async (t) => {
     return { area: Game.area, stack: st.stack.length, saved: s.stack.length, hopper: s.hopper - hop0, note: Game.floats.some((f) => /stay in the barn/.test(f.text)) };
   });
   t.expect(out.area === 'town' && out.stack === 0 && out.saved === 0 && out.hopper >= 10 && out.note, `eggs can't be carried out of the barn: they go into the packer (${JSON.stringify(out)})`);
+
+  // ---- no chicks hatch by themselves: Bigger Coops (and Faster Hatcher) only make room / speed the button up
+  const noAuto = await t.ev(() => {
+    const s = Game.s.eggfarm, E = EggFarmExt; s.lv.hatch = 5; s.lv.coop = 5; s.coops = 2; s.hens = [5, 5, 0, 0, 0, 0];
+    const h0 = s.hatched, n0 = E.hens(s); T.tp(40300, 4700, 'barn'); T.step(60 * 20);
+    return { hatched: s.hatched - h0, hens: E.hens(s) - n0, chicks: E.st.chicks ? E.st.chicks.length : 0 };
+  });
+  t.expect(noAuto.hatched === 0 && noAuto.hens === 0, `no chicks appear on their own after the upgrades (${JSON.stringify(noAuto)})`);
 };

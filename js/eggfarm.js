@@ -152,7 +152,7 @@ const EggFarmExt = {
   room(s) { return s.coops * this.cap(s) - this.hens(s); },
   refill(s) { return CFG.EGGFARM.REFILL / (1 + 0.15 * s.lv.hatch); },
   perPress(s) { return 1 + Math.floor(s.lv.hatch / 4); },
-  autoEvery(s) { return s.lv.hatch > 0 ? 3.2 / s.lv.hatch : 0; },
+  autoEvery(s) { return 0; },   // no automatic hatching: a chick only comes when you press 🐣 Hatch! (Faster Hatcher = a quicker refill, more per press)
   layTime(s) { return CFG.EGGFARM.LAY / (1 + 0.3 * s.lv.feed); },
   boxEggs(s) { return 6 + 3 * s.lv.box; },
   packRate(s) { return 8 * (1 + 0.4 * s.lv.box); },                // eggs a second through the packer
@@ -205,7 +205,7 @@ const EggFarmExt = {
   },
   // The time the game was closed (the shared rule, js/shop.js). A farm with a Loader keeps a share of the money it was
   // making a second (the farmhand gathers the eggs too); without one the hens leave eggs on the floor (up to
-  // FLOOR_MAX), waiting for the chef. An automatic hatcher keeps hatching a few chicks into any room left in the coops.
+  // FLOOR_MAX), waiting for the chef. No chicks hatch by themselves (only the 🐣 button hatches).
   away(g, sec) {
     const s = this.state(g), K = CFG.EGGFARM, st = this.st;
     if (sec < SHOP.AWAY_MIN) return 0;
